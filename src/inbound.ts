@@ -18,6 +18,7 @@ import {
 import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { ResolvedWahaAccount } from "./accounts.js";
 import { DmFilter } from "./dm-filter.js";
+import { getDirectoryDb } from "./directory.js";
 import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.js";
 import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
@@ -261,6 +262,47 @@ export async function handleWahaInbound(params: {
     });
     if (!filterResult.pass) {
       return; // Silent drop — no pairing message, no error
+    }
+  }
+
+  // Track contact in directory (fire-and-forget, errors non-fatal)
+  try {
+    const dirDb = getDirectoryDb(account.accountId);
+    dirDb.upsertContact(senderId, undefined, isGroup);
+  } catch (err) {
+    runtime.log?.(`waha: directory upsert failed for ${senderId}: ${String(err)}`);
+  }
+
+  // Per-DM settings enforcement (DMs only)
+  if (!isGroup) {
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      const dmSettings = dirDb.getContactDmSettings(senderId);
+
+      if (dmSettings.mode === "listen_only") {
+        runtime.log?.(`waha: listen-only mode for ${senderId}, skipping response`);
+        return;
+      }
+
+      if (dmSettings.mentionOnly) {
+        const mentionPatterns = config.channels?.waha?.dmFilter?.mentionPatterns ?? [];
+        const mentioned =
+          mentionPatterns.length === 0 ||
+          mentionPatterns.some((p) => {
+            try {
+              return new RegExp(p, "i").test(rawBody);
+            } catch {
+              return false;
+            }
+          });
+        if (!mentioned) {
+          runtime.log?.(`waha: mention-only mode for ${senderId}, no mention found`);
+          return;
+        }
+      }
+    } catch (err) {
+      // Non-fatal: if SQLite fails, continue with normal processing
+      runtime.log?.(`waha: per-DM settings check failed for ${senderId}: ${String(err)}`);
     }
   }
 

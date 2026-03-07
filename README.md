@@ -25,7 +25,7 @@ The plugin operates as a channel adapter within the OpenClaw plugin-sdk framewor
 | File | Lines | Description |
 |------|-------|-------------|
 | `channel.ts` | ~340 | Channel plugin registration and lifecycle. Exports the `ChannelPlugin` definition with metadata, capabilities (reactions, media, markdown), account resolution, and outbound delivery adapter. Wires up the webhook monitor, inbound handler, and send functions. |
-| `inbound.ts` | ~380 | Inbound message handler. Receives parsed `WahaInboundMessage` from the monitor, applies DM/group access control via `resolveDmGroupAccessWithCommandGate`, runs the DM keyword filter, starts the human presence simulation, dispatches the message to the AI agent, and delivers the reply. |
+| `inbound.ts` | ~420 | Inbound message handler. Receives parsed `WahaInboundMessage` from the monitor, applies DM/group access control, runs the DM keyword filter, tracks contacts in the SQLite directory, enforces per-DM settings (listen-only, mention-only), starts the human presence simulation, dispatches the message to the AI agent, and delivers the reply. |
 | `dm-filter.ts` | ~145 | DM keyword filter. `DmFilter` class with regex caching, god mode bypass for super-users, and stats tracking (dropped/allowed/tokensEstimatedSaved). Fail-open: any error allows messages through. |
 | `send.ts` | ~250 | WAHA REST API wrappers. Provides `sendWahaText()`, `sendWahaMediaBatch()`, `sendWahaReaction()`, `sendWahaPresence()`, `sendWahaSeen()`, and the internal `callWahaApi()` HTTP client. Includes `assertAllowedSession()` guardrail, `buildFilePayload()` for base64 encoding of local TTS files, and `resolveMime()` for MIME type detection with file-extension fallback. |
 | `presence.ts` | ~170 | Human mimicry presence system. Implements the 4-phase presence simulation: seen, read delay, typing with random pauses (flicker), and reply-length padding. Exports `startHumanPresence()` which returns a `PresenceController` with `finishTyping()` and `cancelTyping()` methods. |
@@ -33,7 +33,8 @@ The plugin operates as a channel adapter within the OpenClaw plugin-sdk framewor
 | `config-schema.ts` | ~86 | Zod validation schema for the `channels.waha` config section. Validates all account-level and channel-level settings including secret inputs, policies, presence parameters, DM filter config, and markdown options. |
 | `accounts.ts` | ~140 | Multi-account resolution. Resolves which WAHA account (baseUrl, apiKey, session) to use for a given operation. Supports a default account plus named sub-accounts under `channels.waha.accounts`. Handles API key resolution from env vars, files, or direct strings. |
 | `normalize.ts` | ~30 | JID normalization utilities. `normalizeWahaMessagingTarget()` strips `waha:`, `whatsapp:`, `chat:` prefixes. `normalizeWahaAllowEntry()` lowercases for allowlist comparison. `resolveWahaAllowlistMatch()` checks if a sender JID is in the allowlist (supports `*` wildcard). |
-| `monitor.ts` | ~506 | Webhook HTTP server, health monitoring, and admin panel. Starts an HTTP server on the configured port (default 8050). Handles `/healthz`, `/admin` (HTML dashboard), `/api/admin/stats` (JSON stats), and the main webhook path. Validates HMAC signatures and dispatches inbound events. |
+| `directory.ts` | ~120 | SQLite-backed contact directory. `DirectoryDb` class using `better-sqlite3` stores contacts (JID, display name, message count, first/last seen) and per-DM settings (mode, mention-only, custom keywords, can-initiate). Module-level singleton `Map<accountId, DirectoryDb>`. Database at `~/.openclaw/data/waha-directory-{accountId}.db`. |
+| `monitor.ts` | ~1500 | Webhook HTTP server, health monitoring, and multi-tab admin panel SPA. Starts an HTTP server on the configured port (default 8050). Handles `/healthz`, `/admin` (4-tab HTML SPA), `/api/admin/stats`, `/api/admin/config` (GET/POST), `/api/admin/directory` (REST API), and the main webhook path. Validates HMAC signatures and dispatches inbound events. |
 | `runtime.ts` | ~15 | Runtime singleton access. `setWahaRuntime()` / `getWahaRuntime()` store and retrieve the OpenClaw `PluginRuntime` instance for use across modules. |
 | `signature.ts` | ~30 | HMAC webhook verification. `verifyWahaWebhookHmac()` validates the `X-Webhook-Hmac` header using SHA-512, accepting hex or base64 signature formats. Uses `crypto.timingSafeEqual()` for constant-time comparison. |
 | `secret-input.ts` | ~15 | Secret field schema. Re-exports OpenClaw SDK secret input utilities and provides `buildSecretInputSchema()` which accepts either a plain string or a `{ source, provider, id }` object for env/file/exec-based secret resolution. |
@@ -92,7 +93,7 @@ Recent events (last 50) are stored in memory with timestamp, pass/fail, reason, 
 
 ## 4. Admin Panel
 
-A browser-based admin panel is served at `http://<host>:<webhookPort>/admin` (default port 8050).
+A browser-based multi-tab SPA admin panel is served at `http://<host>:<webhookPort>/admin` (default port 8050).
 
 ### Access
 
@@ -100,15 +101,45 @@ A browser-based admin panel is served at `http://<host>:<webhookPort>/admin` (de
 http://your-server-ip:8050/admin
 ```
 
-### Features
+### Tabs
 
-- **DM Filter card**: Shows enabled status, keyword patterns, stats (dropped/allowed/tokens saved), and a live event log (last 20 events with timestamp, reason, and message preview)
-- **Presence System card**: Displays current presence config (wpm, read delays, typing durations, jitter)
-- **Access Control card**: Shows dmPolicy, groupPolicy, allowFrom, groupAllowFrom, and allowedGroups
-- **Session Info card**: Shows session name, baseUrl, webhookPort, and server time
-- **Auto-refresh**: Reloads stats every 30 seconds. Manual refresh via button.
+**Dashboard** — Real-time overview of plugin status:
+- DM Filter stats (allowed/dropped/tokens saved, patterns, recent events)
+- Presence System configuration display
+- Access Control policies and allowlists
+- Session info (session name, baseUrl, port, uptime)
+- Auto-refresh every 30 seconds
 
-### Stats API
+**Settings** — Edit all plugin configuration fields via browser:
+- 6 collapsible sections: Connection, Access Control, DM Keyword Filter, Presence, Markdown, Features
+- Every field has a tooltip (?) explaining what it does and sensible defaults
+- "Save Settings" persists changes directly to `openclaw.json`
+- Visual success/error toast notifications
+
+**Directory** — SQLite-backed contact database:
+- Searchable list of all contacts who have messaged the bot
+- Avatar placeholders with initials, display name, last message time, message count
+- Per-DM settings panel per contact (mode, mention-only, custom keywords, can-initiate)
+- Pagination with "Load More" for large contact lists
+
+**Docs** — Built-in help documentation:
+- Getting Started, DM Keyword Filter, Per-DM Settings, Presence System, Access Control, Troubleshooting
+- Collapsible sections with clean typography
+
+**Footer** — "Created with love by omer nesher" with link to GitHub repository
+
+### Admin API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/admin/stats` | Dashboard stats (DM filter, presence, access, session) |
+| `GET` | `/api/admin/config` | Full editable config for Settings tab |
+| `POST` | `/api/admin/config` | Write config to `openclaw.json` (deep merge) |
+| `GET` | `/api/admin/directory` | List contacts with DM settings (`?search=&limit=&offset=`) |
+| `GET` | `/api/admin/directory/:jid` | Single contact detail |
+| `PUT` | `/api/admin/directory/:jid/settings` | Update per-DM settings for a contact |
+
+### Stats API Example
 
 ```bash
 curl http://your-server-ip:8050/api/admin/stats
@@ -131,17 +162,67 @@ Returns JSON:
   "webhookPort": 8050,
   "serverTime": "2026-03-07T18:50:00.000Z"
 }
-```
 
 ### Implementation notes
 
-- Zero build tooling: the entire admin dashboard is an embedded HTML/CSS/JS template string in `monitor.ts`
+- Zero build tooling: the entire admin panel is an embedded HTML/CSS/JS template string in `monitor.ts`
+- 4-tab SPA with URL hash persistence (#dashboard, #settings, #directory, #docs)
 - Admin routes are added BEFORE the POST-only webhook guard in the HTTP server handler
-- No authentication on admin routes (only accessible from localhost by default since `webhookHost: 0.0.0.0` binds to all interfaces — restrict via firewall if needed)
+- No authentication on admin routes (restrict via firewall if needed)
 
 ---
 
-## 5. Human Mimicry Presence System
+## 5. Directory Module & Per-DM Settings
+
+### Contact Directory
+
+The directory module (`directory.ts`) maintains a SQLite database of all contacts who have messaged the bot. Contacts are automatically tracked by the inbound handler — no manual setup required.
+
+**Database location:** `~/.openclaw/data/waha-directory-{accountId}.db`
+
+**SQLite schema:**
+
+```sql
+CREATE TABLE contacts (
+  jid TEXT PRIMARY KEY,
+  display_name TEXT,
+  first_seen_at INTEGER NOT NULL,
+  last_message_at INTEGER NOT NULL,
+  message_count INTEGER DEFAULT 1,
+  is_group INTEGER DEFAULT 0
+);
+
+CREATE TABLE dm_settings (
+  jid TEXT PRIMARY KEY,
+  mode TEXT DEFAULT 'active' CHECK(mode IN ('active','listen_only')),
+  mention_only INTEGER DEFAULT 0,
+  custom_keywords TEXT DEFAULT '',
+  can_initiate INTEGER DEFAULT 1,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (jid) REFERENCES contacts(jid)
+);
+```
+
+### Per-DM Settings
+
+Each contact can have individual settings that override global behavior:
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `mode` | `'active' \| 'listen_only'` | `active` | `active`: bot responds normally. `listen_only`: messages are tracked but bot does not respond. |
+| `mentionOnly` | `boolean` | `false` | When true, bot only responds if a mention pattern matches (uses DM filter patterns). |
+| `customKeywords` | `string` | `''` | Comma-separated additional keywords that trigger bot response for this contact. |
+| `canInitiate` | `boolean` | `true` | Whether the bot can proactively send messages to this contact. |
+
+Per-DM settings are enforced by `inbound.ts` after the global DM filter check. They are managed via the Admin Panel's Directory tab or the REST API.
+
+### Singleton Pattern
+
+`DirectoryDb` instances are managed as a module-level `Map<string, DirectoryDb>` keyed by `accountId`, following the same pattern as `DmFilter`. Access via `getDirectoryDb(accountId)`.
+
+---
+
+## 6. Human Mimicry Presence System
 
 ### Problem
 
@@ -195,7 +276,7 @@ Every computed duration is multiplied by `rand(jitter[0], jitter[1])` before use
 
 ---
 
-## 6. Configuration Reference
+## 7. Configuration Reference
 
 All configuration lives in `~/.openclaw/openclaw.json` AND `~/.openclaw/workspace/openclaw.json` under `channels.waha`. The gateway uses the **workspace config** (set by `OPENCLAW_CONFIG_PATH`), so changes must be applied there.
 
@@ -287,7 +368,7 @@ docker exec -i postgres-waha psql -U admin -d waha_noweb_your_session_name \
 
 ---
 
-## 7. Installation / Reinstallation
+## 8. Installation / Reinstallation
 
 ### File Locations
 
@@ -336,7 +417,7 @@ ssh user@your-server-ip "echo '$B64' | base64 -d > ~/.openclaw/workspace/skills/
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### CRITICAL: Gateway Uses Workspace Config, Not ~/.openclaw/openclaw.json
 
@@ -419,7 +500,7 @@ SSH heredocs with `!` characters (in `!==`, `!response.ok`, etc.) trigger bash h
 
 ---
 
-## 9. Key Guardrails
+## 10. Key Guardrails
 
 ### Session Blocking (`assertAllowedSession`)
 

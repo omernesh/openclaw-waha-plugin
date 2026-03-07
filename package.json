@@ -1,28 +1,34 @@
 {
-  "name": "openclaw-waha-plugin",
-  "version": "1.0.0",
-  "description": "OpenClaw channel plugin for WhatsApp via WAHA — includes DM keyword filter and web admin panel",
-  "license": "MIT",
-  "private": false,
-  "peerDependencies": {
-    "openclaw": ">=2026.3"
+  "name": "waha-openclaw-channel",
+  "version": "1.1.0",
+  "description": "OpenClaw WAHA (WhatsApp HTTP API) channel plugin",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "channel": {
+      "id": "waha",
+      "label": "WAHA",
+      "selectionLabel": "WAHA (WhatsApp HTTP API)",
+      "docsPath": "/channels/whatsapp",
+      "docsLabel": "whatsapp",
+      "blurb": "Self-hosted WhatsApp via WAHA webhooks + REST API bridge.",
+      "order": 70,
+      "aliases": [
+        "whatsapp-waha",
+        "waha-whatsapp"
+      ],
+      "quickstartAllowFrom": true
+    },
+    "install": {
+      "npmSpec": "waha-openclaw-channel",
+      "localPath": "skills/waha-openclaw-channel",
+      "defaultChoice": "local"
+    }
   },
-  "devDependencies": {
-    "typescript": "^5.0.0"
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
-  "keywords": [
-    "openclaw",
-    "whatsapp",
-    "waha",
-    "chatbot",
-    "plugin"
-  ],
-  "author": "omernesh",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/omernesh/openclaw-waha-plugin"
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "zod": "^4.3.6"
   }
 }
