@@ -12,15 +12,15 @@
       "dmPolicy": "allowlist",
       "groupPolicy": "allowlist",
       "allowFrom": [
-        "972544329000@c.us",
-        "271862907039996@lid"
+        "15551234567@c.us",
+        "123456789012345@lid"
       ],
       "groupAllowFrom": [
-        "972544329000@c.us",
-        "271862907039996@lid"
+        "15551234567@c.us",
+        "123456789012345@lid"
       ],
       "allowedGroups": [
-        "120363421825201386@g.us"
+        "120363000000000000@g.us"
       ],
       "presence": {
         "enabled": true,

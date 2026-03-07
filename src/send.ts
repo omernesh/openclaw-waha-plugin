@@ -7,13 +7,13 @@ import type { CoreConfig } from "./types.js";
 
 export function assertAllowedSession(session: string) {
   const normalized = session.trim();
-  // Block "omer" and any prefixed variant like "3cf11776_omer"
-  if (normalized === "omer" || normalized.endsWith("_omer")) {
+  // Block the owner session and any prefixed variant like "prefix_owner"
+  if (normalized === "owner" || normalized.endsWith("_owner")) {
     throw new Error(`WAHA session '${normalized}' is explicitly blocked by guardrail`);
   }
-  // Allow "logan" and any prefixed variant like "3cf11776_logan"
-  if (normalized !== "logan" && !normalized.endsWith("_logan")) {
-    throw new Error(`WAHA session '${normalized}' is not allowed (only 'logan' or '*_logan')`);
+  // Allow the bot session and any prefixed variant like "prefix_bot"
+  if (normalized !== "bot" && !normalized.endsWith("_bot")) {
+    throw new Error(`WAHA session '${normalized}' is not allowed (only 'bot' or '*_bot')`);
   }
 }
 

@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-This plugin bridges OpenClaw AI agents to WhatsApp through the WAHA (WhatsApp HTTP API) server. It enables the "Sammie" bot to receive WhatsApp messages via webhook, route them through OpenClaw's AI agent pipeline, and deliver replies back through WAHA — including text responses and TTS-generated voice notes.
+This plugin bridges OpenClaw AI agents to WhatsApp through the WAHA (WhatsApp HTTP API) server. It enables the "your OpenClaw assistant" bot to receive WhatsApp messages via webhook, route them through OpenClaw's AI agent pipeline, and deliver replies back through WAHA — including text responses and TTS-generated voice notes.
 
 The plugin operates as a channel adapter within the OpenClaw plugin-sdk framework. It:
 
@@ -16,7 +16,7 @@ The plugin operates as a channel adapter within the OpenClaw plugin-sdk framewor
 - Applies access control (DM policy, group allowlists with both `@c.us` and `@lid` JID formats)
 - Simulates human-like presence (read receipts, typing indicators with random pauses) before replying
 - Delivers AI-generated text and voice replies through WAHA's REST API
-- Enforces session guardrails (only the "logan" session can send outbound messages)
+- Enforces session guardrails (only the bot session can send outbound messages)
 
 ---
 
@@ -49,10 +49,10 @@ The DM keyword filter (`dm-filter.ts`) gates inbound DMs by keyword BEFORE they 
 ```json
 "dmFilter": {
   "enabled": true,
-  "mentionPatterns": ["sammie", "help", "hello", "bot", "ai"],
+  "mentionPatterns": ["yourbot", "help", "hello", "bot", "ai"],
   "godModeBypass": true,
   "godModeSuperUsers": [
-    { "identifier": "972544329000", "platform": "whatsapp", "passwordRequired": false }
+    { "identifier": "15551234567", "platform": "whatsapp", "passwordRequired": false }
   ],
   "tokenEstimate": 2500
 }
@@ -97,7 +97,7 @@ A browser-based admin panel is served at `http://<host>:<webhookPort>/admin` (de
 ### Access
 
 ```
-http://100.114.126.43:8050/admin
+http://your-server-ip:8050/admin
 ```
 
 ### Features
@@ -111,7 +111,7 @@ http://100.114.126.43:8050/admin
 ### Stats API
 
 ```bash
-curl http://100.114.126.43:8050/api/admin/stats
+curl http://your-server-ip:8050/api/admin/stats
 ```
 
 Returns JSON:
@@ -119,7 +119,7 @@ Returns JSON:
 {
   "dmFilter": {
     "enabled": true,
-    "patterns": ["sammie", "help"],
+    "patterns": ["yourbot", "help"],
     "stats": { "dropped": 5, "allowed": 12, "tokensEstimatedSaved": 12500 },
     "recentEvents": [
       { "ts": 1772902231754, "pass": false, "reason": "no_keyword_match", "preview": "hello world" }
@@ -127,7 +127,7 @@ Returns JSON:
   },
   "presence": { "enabled": true, "wpm": 42, ... },
   "access": { "dmPolicy": "pairing", "allowFrom": [...], ... },
-  "session": "3cf11776_logan",
+  "session": "your_session_name",
   "webhookPort": 8050,
   "serverTime": "2026-03-07T18:50:00.000Z"
 }
@@ -197,7 +197,7 @@ Every computed duration is multiplied by `rand(jitter[0], jitter[1])` before use
 
 ## 6. Configuration Reference
 
-All configuration lives in `~/.openclaw/openclaw.json` AND `/home/omer/.openclaw/workspace/openclaw.json` under `channels.waha`. The gateway uses the **workspace config** (set by `OPENCLAW_CONFIG_PATH`), so changes must be applied there.
+All configuration lives in `~/.openclaw/openclaw.json` AND `~/.openclaw/workspace/openclaw.json` under `channels.waha`. The gateway uses the **workspace config** (set by `OPENCLAW_CONFIG_PATH`), so changes must be applied there.
 
 ### Full Config Structure
 
@@ -208,25 +208,25 @@ All configuration lives in `~/.openclaw/openclaw.json` AND `/home/omer/.openclaw
       // --- Connection ---
       "enabled": true,
       "baseUrl": "http://127.0.0.1:3004",          // WAHA server URL
-      "apiKey": "XcTCX9cn84LE/...",                 // WHATSAPP_API_KEY (NOT WAHA_API_KEY)
-      "session": "3cf11776_logan",                  // WAHA session name
+      "apiKey": "your-api-key-here",                 // WHATSAPP_API_KEY (NOT WAHA_API_KEY)
+      "session": "your_session_name",                  // WAHA session name
 
       // --- Webhook Server ---
       "webhookHost": "0.0.0.0",                     // Bind address (default: 0.0.0.0)
       "webhookPort": 8050,                          // Webhook listener port (default: 8050)
       "webhookPath": "/webhook/waha",               // Webhook URL path
-      "webhookHmacKey": "95b5f1b4ae57...",          // HMAC-SHA512 key for signature verification
+      "webhookHmacKey": "your-hmac-key-here",          // HMAC-SHA512 key for signature verification
 
       // --- Access Control ---
       "dmPolicy": "allowlist",                      // "pairing" | "open" | "closed" | "allowlist"
       "groupPolicy": "allowlist",                   // "allowlist" | "open" | "closed"
       "allowFrom": [                                // DM senders allowed (when dmPolicy=allowlist)
-        "972544329000@c.us",
-        "271862907039996@lid"
+        "15551234567@c.us",
+        "123456789012345@lid"
       ],
       "groupAllowFrom": [                           // Group message senders allowed
-        "972544329000@c.us",                        // @c.us JID
-        "271862907039996@lid"                       // @lid JID (NOWEB engine sends these!)
+        "15551234567@c.us",                        // @c.us JID
+        "123456789012345@lid"                       // @lid JID (NOWEB engine sends these!)
       ],
 
       // --- Presence (Human Mimicry) ---
@@ -281,7 +281,7 @@ All configuration lives in `~/.openclaw/openclaw.json` AND `/home/omer/.openclaw
 ### Finding a User's LID
 
 ```bash
-docker exec -i postgres-waha psql -U admin -d waha_noweb_3cf11776_logan \
+docker exec -i postgres-waha psql -U admin -d waha_noweb_your_session_name \
   -c "SELECT id, pn FROM lid_map WHERE pn LIKE '%PHONE_NUMBER%'"
 ```
 
@@ -295,10 +295,10 @@ The plugin source exists in TWO locations that must always be kept in sync:
 
 | Location | Purpose |
 |----------|---------|
-| `/home/omer/.openclaw/extensions/waha/src/` | **Runtime** — what OpenClaw actually loads |
-| `/home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/` | **Development** — workspace copy |
+| `~/.openclaw/extensions/waha/src/` | **Runtime** — what OpenClaw actually loads |
+| `~/.openclaw/workspace/skills/waha-openclaw-channel/src/` | **Development** — workspace copy |
 
-The main config file is at `/home/omer/.openclaw/openclaw.json` under `channels.waha`.
+The main config file is at `~/.openclaw/openclaw.json` under `channels.waha`.
 
 ### Deploying Changes
 
@@ -306,12 +306,12 @@ After editing source files, deploy to BOTH locations and restart:
 
 ```bash
 # 1. Copy files (if editing in workspace)
-cp /home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts \
-   /home/omer/.openclaw/extensions/waha/src/
+cp ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts \
+   ~/.openclaw/extensions/waha/src/
 
 # 2. Verify both copies match
-md5sum /home/omer/.openclaw/extensions/waha/src/*.ts
-md5sum /home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts
+md5sum ~/.openclaw/extensions/waha/src/*.ts
+md5sum ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts
 
 # 3. Restart gateway (systemd auto-restarts on kill)
 kill -9 $(pgrep -f "openclaw-gatewa") 2>/dev/null
@@ -330,8 +330,8 @@ Use base64 transfer to avoid shell escaping issues with TypeScript `!==` operato
 B64=$(base64 -w 0 /path/to/file.ts)
 
 # Transfer to both locations
-ssh omer@100.114.126.43 "echo '$B64' | base64 -d > /home/omer/.openclaw/extensions/waha/src/file.ts"
-ssh omer@100.114.126.43 "echo '$B64' | base64 -d > /home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts"
+ssh user@your-server-ip "echo '$B64' | base64 -d > ~/.openclaw/extensions/waha/src/file.ts"
+ssh user@your-server-ip "echo '$B64' | base64 -d > ~/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts"
 ```
 
 ---
@@ -340,12 +340,12 @@ ssh omer@100.114.126.43 "echo '$B64' | base64 -d > /home/omer/.openclaw/workspac
 
 ### CRITICAL: Gateway Uses Workspace Config, Not ~/.openclaw/openclaw.json
 
-The openclaw gateway service sets `OPENCLAW_CONFIG_PATH=/home/omer/.openclaw/workspace/openclaw.json` (visible in `/proc/<pid>/environ`). The gateway reads FROM and writes TO this file, NOT `~/.openclaw/openclaw.json`.
+The openclaw gateway service sets `OPENCLAW_CONFIG_PATH=~/.openclaw/workspace/openclaw.json` (visible in `/proc/<pid>/environ`). The gateway reads FROM and writes TO this file, NOT `~/.openclaw/openclaw.json`.
 
 When WAHA is not starting (port 8050 not bound), verify the **workspace config** has the waha section:
 
 ```bash
-python3 -c "import json; cfg=json.load(open('/home/omer/.openclaw/workspace/openclaw.json')); print(list(cfg.get('channels',{}).keys()))"
+python3 -c "import json; cfg=json.load(open('~/.openclaw/workspace/openclaw.json')); print(list(cfg.get('channels',{}).keys()))"
 # Should show: ['telegram', 'waha']
 ```
 
@@ -353,11 +353,11 @@ To sync WAHA config from `~/.openclaw/openclaw.json` to workspace:
 ```bash
 python3 << 'PYEOF'
 import json, shutil
-full = json.load(open('/home/omer/.openclaw/openclaw.json'))
-ws = json.load(open('/home/omer/.openclaw/workspace/openclaw.json'))
+full = json.load(open('~/.openclaw/openclaw.json'))
+ws = json.load(open('~/.openclaw/workspace/openclaw.json'))
 ws.setdefault('channels', {})['waha'] = full['channels']['waha']
-shutil.copy('/home/omer/.openclaw/workspace/openclaw.json', '/home/omer/.openclaw/workspace/openclaw.json.bak')
-json.dump(ws, open('/home/omer/.openclaw/workspace/openclaw.json', 'w'), indent=2)
+shutil.copy('~/.openclaw/workspace/openclaw.json', '~/.openclaw/workspace/openclaw.json.bak')
+json.dump(ws, open('~/.openclaw/workspace/openclaw.json', 'w'), indent=2)
 print('Done')
 PYEOF
 ```
@@ -380,7 +380,7 @@ WAHA's NOWEB engine sends group message sender JIDs as `@lid` (linked device ID)
 
 **Fix:** Add both formats for each allowed user:
 ```json
-"groupAllowFrom": ["972544329000@c.us", "271862907039996@lid"]
+"groupAllowFrom": ["15551234567@c.us", "123456789012345@lid"]
 ```
 
 ### Voice Files: Use /api/sendVoice, Not Base64 File Conversion
@@ -423,15 +423,15 @@ SSH heredocs with `!` characters (in `!==`, `!response.ok`, etc.) trigger bash h
 
 ### Session Blocking (`assertAllowedSession`)
 
-The `send.ts` module enforces a hard guardrail that prevents the bot from sending messages as Omer:
+The `send.ts` module enforces a hard guardrail that prevents the bot from sending messages as the owner:
 
 ```typescript
-if (normalized === "omer" || normalized.endsWith("_omer")) {
+if (normalized === "owner" || normalized.endsWith("_owner")) {
     throw new Error(`WAHA session '${normalized}' is explicitly blocked by guardrail`);
 }
 ```
 
-Only sessions matching `"logan"` or `"*_logan"` are allowed to send outbound messages. This prevents accidental or malicious use of Omer's personal WhatsApp session by the AI bot.
+Only sessions matching  or  are allowed to send outbound messages. This prevents accidental or malicious use of the owner's personal WhatsApp session by the AI bot.
 
 ### HMAC Webhook Verification
 
@@ -449,9 +449,9 @@ Messages are dropped silently (with logging) if:
 ## Appendix: Architecture Diagram
 
 ```
-WAHA (hpg6:3004)
+WAHA (your-server:3004)
     |
-    |--- webhook (X-Webhook-Hmac signed) --->  OpenClaw Webhook Server (hpg6:8050)
+    |--- webhook (X-Webhook-Hmac signed) --->  OpenClaw Webhook Server (your-server:8050)
     |                                               |
     |                                          monitor.ts (verify HMAC, parse envelope)
     |                                               |
