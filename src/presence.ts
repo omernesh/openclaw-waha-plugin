@@ -87,6 +87,8 @@ async function typingFlickerLoop(params: {
       await sendWahaPresence({ cfg: coreCfg, chatId, typing: true, accountId }).catch(() => {});
     }
   }
+  // Guarantee typing is stopped on exit — loop may have resumed typing:true just before deadline
+  await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(() => {});
 }
 
 export async function startHumanPresence(params: {
@@ -157,6 +159,8 @@ export async function startHumanPresence(params: {
             durationMs: remaining,
             startedAt: Date.now(),
           });
+          // 100ms drain — let the loop's own typing:false settle before the final stop
+          await sleep(100);
         }
       }
 

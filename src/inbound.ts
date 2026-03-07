@@ -74,6 +74,8 @@ async function deliverWahaReply(params: {
       replyToId: payload.replyToId,
       accountId,
     });
+    // Safety net: ensure typing stopped after delivery
+    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
     statusSink?.({ lastOutboundAt: Date.now() });
     return;
   }
@@ -87,6 +89,8 @@ async function deliverWahaReply(params: {
     replyToId: payload.replyToId,
     accountId,
   });
+  // Safety net: ensure typing stopped after delivery
+  await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
   statusSink?.({ lastOutboundAt: Date.now() });
 }
 
