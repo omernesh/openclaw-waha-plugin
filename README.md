@@ -7,13 +7,11 @@
 ## Installation
 
 ```bash
-# Install from GitHub
-npm install github:omernesh/openclaw-waha-plugin
+# Install from npm
+npm install waha-openclaw-channel
 
-# Or clone and install locally
-git clone https://github.com/omernesh/openclaw-waha-plugin.git
-cd openclaw-waha-plugin
-npm install
+# Or install from GitHub
+npm install github:omernesh/openclaw-waha-plugin
 ```
 
 The plugin requires `better-sqlite3` (native addon) — ensure you have a C++ build toolchain available (`node-gyp`).
