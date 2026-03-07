@@ -152,17 +152,6 @@ export async function startHumanPresence(params: {
 
       flickerAborted = true;
       await flickerPromise; // Wait for in-flight flicker to drain
-
-      if (replyText) {
-        const humanTypingTime = calcTypingDuration(replyText, presenceCfg);
-        const elapsed = Date.now() - typingStartedAt;
-
-        if (elapsed < humanTypingTime) {
-          // Simple sleep — typing indicator is already on, no need to re-send typing:true
-          await sleep(humanTypingTime - elapsed);
-        }
-      }
-
       finishTypingDone = true;
       await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
     },
