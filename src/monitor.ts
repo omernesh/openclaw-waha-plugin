@@ -875,7 +875,7 @@ function debouncedDirSearch() {
 }
 async function loadDirectory() {
   var search = document.getElementById('dir-search').value.trim();
-  var url = '/api/admin/directory?limit=50&offset=' + dirOffset + (search ? '&search=' + encodeURIComponent(search) : '');
+  var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + (search ? '&search=' + encodeURIComponent(search) : '');
   try {
     var r = await fetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1112,8 +1112,8 @@ export function createWahaWebhookServer(opts: {
 
       // GET /api/admin/directory (list)
       const search = url.searchParams.get("search") ?? undefined;
-      const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
-      const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
+      const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10) || 50, 200);
+      const offset = parseInt(url.searchParams.get("offset") ?? "0", 10) || 0;
       try {
         const db = getDirectoryDb(opts.accountId);
         const contacts = db.getContacts({ search, limit, offset });
