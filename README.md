@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-This plugin bridges OpenClaw AI agents to WhatsApp through the WAHA (WhatsApp HTTP API) server. It enables the "your OpenClaw assistant" bot to receive WhatsApp messages via webhook, route them through OpenClaw's AI agent pipeline, and deliver replies back through WAHA — including text responses and TTS-generated voice notes.
+This plugin bridges OpenClaw AI agents to WhatsApp through the WAHA (WhatsApp HTTP API) server. It enables your "OpenClaw assistant" bot to receive WhatsApp messages via webhook, route them through OpenClaw's AI agent pipeline, and deliver replies back through WAHA — including text responses and TTS-generated voice notes.
 
 The plugin operates as a channel adapter within the OpenClaw plugin-sdk framework. It:
 
