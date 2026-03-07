@@ -1,0 +1,48 @@
+{
+  "channels": {
+    "waha": {
+      "enabled": true,
+      "baseUrl": "http://localhost:3004",
+      "apiKey": "your-waha-api-key",
+      "session": "your-session-name",
+      "webhookHost": "0.0.0.0",
+      "webhookPort": 8050,
+      "webhookPath": "/webhook/waha",
+      "webhookHmacKey": "your-hmac-key",
+      "dmPolicy": "allowlist",
+      "groupPolicy": "allowlist",
+      "allowFrom": [
+        "972544329000@c.us",
+        "271862907039996@lid"
+      ],
+      "groupAllowFrom": [
+        "972544329000@c.us",
+        "271862907039996@lid"
+      ],
+      "allowedGroups": [
+        "120363421825201386@g.us"
+      ],
+      "presence": {
+        "enabled": true,
+        "sendSeen": true,
+        "wpm": 42,
+        "readDelayMs": [500, 4000],
+        "msPerReadChar": 30,
+        "typingDurationMs": [1500, 15000],
+        "pauseChance": 0.3,
+        "pauseDurationMs": [500, 2000],
+        "pauseIntervalMs": [2000, 5000],
+        "jitter": [0.7, 1.3]
+      },
+      "dmFilter": {
+        "enabled": true,
+        "mentionPatterns": ["yourbot", "help", "hello"],
+        "godModeBypass": true,
+        "godModeSuperUsers": [
+          { "identifier": "your-phone-number", "platform": "whatsapp", "passwordRequired": false }
+        ],
+        "tokenEstimate": 2500
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "openclaw-waha-plugin",
+  "version": "1.0.0",
+  "description": "OpenClaw channel plugin for WhatsApp via WAHA — includes DM keyword filter and web admin panel",
+  "license": "MIT",
+  "private": false,
+  "peerDependencies": {
+    "openclaw": ">=2026.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "openclaw",
+    "whatsapp",
+    "waha",
+    "chatbot",
+    "plugin"
+  ],
+  "author": "omernesh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omernesh/openclaw-waha-plugin"
+  }
+}
