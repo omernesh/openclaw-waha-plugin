@@ -3,6 +3,26 @@
   "version": "1.1.0",
   "description": "OpenClaw WAHA (WhatsApp HTTP API) channel plugin",
   "type": "module",
+  "main": "./index.ts",
+  "files": [
+    "index.ts",
+    "src/",
+    "config-example.json",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omernesh/openclaw-waha-plugin.git"
+  },
+  "keywords": [
+    "openclaw",
+    "waha",
+    "whatsapp",
+    "channel",
+    "plugin"
+  ],
+  "author": "Omer Nesher",
+  "license": "MIT",
   "openclaw": {
     "extensions": [
       "./index.ts"
