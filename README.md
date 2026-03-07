@@ -2,7 +2,23 @@
 
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
-**Last updated:** 2026-03-07
+**Last updated:** 2026-03-08
+
+## Installation
+
+```bash
+# Install from GitHub
+npm install github:omernesh/openclaw-waha-plugin
+
+# Or clone and install locally
+git clone https://github.com/omernesh/openclaw-waha-plugin.git
+cd openclaw-waha-plugin
+npm install
+```
+
+The plugin requires `better-sqlite3` (native addon) — ensure you have a C++ build toolchain available (`node-gyp`).
+
+After installation, add the WAHA channel configuration to your `openclaw.json` under `channels.waha`. See the [Configuration Reference](#7-configuration-reference) and `config-example.json` for a full example.
 
 ---
 
