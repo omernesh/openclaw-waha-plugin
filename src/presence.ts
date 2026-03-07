@@ -140,8 +140,16 @@ export async function startHumanPresence(params: {
     }
   })();
 
+  let finishTypingDone = false;
+
   return {
     finishTyping: async (replyText?: string) => {
+      // Subsequent calls (e.g., voice after text) — just stop typing immediately
+      if (finishTypingDone) {
+        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+        return;
+      }
+
       flickerAborted = true;
       await flickerPromise; // Wait for in-flight flicker to drain
 
@@ -150,20 +158,12 @@ export async function startHumanPresence(params: {
         const elapsed = Date.now() - typingStartedAt;
 
         if (elapsed < humanTypingTime) {
-          const remaining = humanTypingTime - elapsed;
-          await typingFlickerLoop({
-            cfg: presenceCfg,
-            coreCfg: cfg,
-            chatId,
-            accountId,
-            durationMs: remaining,
-            startedAt: Date.now(),
-          });
-          // 100ms drain — let the loop's own typing:false settle before the final stop
-          await sleep(100);
+          // Simple sleep — typing indicator is already on, no need to re-send typing:true
+          await sleep(humanTypingTime - elapsed);
         }
       }
 
+      finishTypingDone = true;
       await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
     },
     cancelTyping: async () => {
