@@ -25,123 +25,21 @@ The plugin operates as a channel adapter within the OpenClaw plugin-sdk framewor
 | File | Lines | Description |
 |------|-------|-------------|
 | `channel.ts` | ~340 | Channel plugin registration and lifecycle. Exports the `ChannelPlugin` definition with metadata, capabilities (reactions, media, markdown), account resolution, and outbound delivery adapter. Wires up the webhook monitor, inbound handler, and send functions. |
-| `inbound.ts` | ~380 | Inbound message handler. Receives parsed `WahaInboundMessage` from the monitor, applies DM/group access control via `resolveDmGroupAccessWithCommandGate`, runs the DM keyword filter, starts the human presence simulation, dispatches the message to the AI agent, and delivers the reply. |
-| `dm-filter.ts` | ~145 | DM keyword filter. `DmFilter` class with regex caching, god mode bypass for super-users, and stats tracking (dropped/allowed/tokensEstimatedSaved). Fail-open: any error allows messages through. |
+| `inbound.ts` | ~300 | Inbound message handler. Receives parsed `WahaInboundMessage` from the monitor, applies DM/group access control via `resolveDmGroupAccessWithCommandGate`, starts the human presence simulation, dispatches the message to the AI agent, and delivers the reply (text first, then voice if TTS is available). |
 | `send.ts` | ~250 | WAHA REST API wrappers. Provides `sendWahaText()`, `sendWahaMediaBatch()`, `sendWahaReaction()`, `sendWahaPresence()`, `sendWahaSeen()`, and the internal `callWahaApi()` HTTP client. Includes `assertAllowedSession()` guardrail, `buildFilePayload()` for base64 encoding of local TTS files, and `resolveMime()` for MIME type detection with file-extension fallback. |
 | `presence.ts` | ~170 | Human mimicry presence system. Implements the 4-phase presence simulation: seen, read delay, typing with random pauses (flicker), and reply-length padding. Exports `startHumanPresence()` which returns a `PresenceController` with `finishTyping()` and `cancelTyping()` methods. |
-| `types.ts` | ~130 | TypeScript type definitions. Defines `CoreConfig`, `WahaChannelConfig`, `WahaAccountConfig`, `PresenceConfig`, `DmFilterConfig`, `WahaWebhookEnvelope`, `WahaInboundMessage`, `WahaReactionEvent`, and `WahaWebhookConfig`. |
-| `config-schema.ts` | ~86 | Zod validation schema for the `channels.waha` config section. Validates all account-level and channel-level settings including secret inputs, policies, presence parameters, DM filter config, and markdown options. |
+| `types.ts` | ~110 | TypeScript type definitions. Defines `CoreConfig`, `WahaChannelConfig`, `WahaAccountConfig`, `PresenceConfig`, `WahaWebhookEnvelope`, `WahaInboundMessage`, `WahaReactionEvent`, and `WahaWebhookConfig`. |
+| `config-schema.ts` | ~60 | Zod validation schema for the `channels.waha` config section. Validates all account-level and channel-level settings including secret inputs, policies, presence parameters, and markdown options. |
 | `accounts.ts` | ~140 | Multi-account resolution. Resolves which WAHA account (baseUrl, apiKey, session) to use for a given operation. Supports a default account plus named sub-accounts under `channels.waha.accounts`. Handles API key resolution from env vars, files, or direct strings. |
 | `normalize.ts` | ~30 | JID normalization utilities. `normalizeWahaMessagingTarget()` strips `waha:`, `whatsapp:`, `chat:` prefixes. `normalizeWahaAllowEntry()` lowercases for allowlist comparison. `resolveWahaAllowlistMatch()` checks if a sender JID is in the allowlist (supports `*` wildcard). |
-| `monitor.ts` | ~506 | Webhook HTTP server, health monitoring, and admin panel. Starts an HTTP server on the configured port (default 8050). Handles `/healthz`, `/admin` (HTML dashboard), `/api/admin/stats` (JSON stats), and the main webhook path. Validates HMAC signatures and dispatches inbound events. |
+| `monitor.ts` | ~290 | Webhook HTTP server and health monitoring. Starts an HTTP server on the configured port (default 8050), parses incoming WAHA webhook envelopes, validates HMAC signatures, extracts `WahaInboundMessage` or `WahaReactionEvent` payloads, and dispatches to the inbound handler. Exposes `/healthz` endpoint. |
 | `runtime.ts` | ~15 | Runtime singleton access. `setWahaRuntime()` / `getWahaRuntime()` store and retrieve the OpenClaw `PluginRuntime` instance for use across modules. |
 | `signature.ts` | ~30 | HMAC webhook verification. `verifyWahaWebhookHmac()` validates the `X-Webhook-Hmac` header using SHA-512, accepting hex or base64 signature formats. Uses `crypto.timingSafeEqual()` for constant-time comparison. |
 | `secret-input.ts` | ~15 | Secret field schema. Re-exports OpenClaw SDK secret input utilities and provides `buildSecretInputSchema()` which accepts either a plain string or a `{ source, provider, id }` object for env/file/exec-based secret resolution. |
 
 ---
 
-## 3. DM Keyword Filter
-
-The DM keyword filter (`dm-filter.ts`) gates inbound DMs by keyword BEFORE they reach the AI agent. Only messages matching at least one pattern are processed; others are silently dropped. This prevents the AI from consuming tokens on irrelevant or unsolicited messages.
-
-### Config (under `channels.waha`)
-
-```json
-"dmFilter": {
-  "enabled": true,
-  "mentionPatterns": ["sammie", "help", "hello", "bot", "ai"],
-  "godModeBypass": true,
-  "godModeSuperUsers": [
-    { "identifier": "972544329000", "platform": "whatsapp", "passwordRequired": false }
-  ],
-  "tokenEstimate": 2500
-}
-```
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | `boolean` | `false` | Enable/disable the filter |
-| `mentionPatterns` | `string[]` | `[]` | Regex patterns (case-insensitive). Message must match at least one. Empty list means no restriction. |
-| `godModeBypass` | `boolean` | `true` | Super-users bypass the filter entirely |
-| `godModeSuperUsers` | `array` | `[]` | List of users who bypass the filter (phone in E.164 or JID format) |
-| `tokenEstimate` | `number` | `2500` | Estimated tokens saved per dropped message (used for stats display) |
-
-### Behavior
-
-- **Filter disabled**: All messages pass through (stats count as allowed)
-- **No patterns**: All messages pass through (no restriction configured)
-- **God mode**: Super-users bypass pattern matching entirely. Israeli phone normalization handles 05X/972X/+972X and JID suffixes (`@c.us`, `@lid`, `@s.whatsapp.net`)
-- **Pattern match**: Message is allowed if ANY pattern matches (case-insensitive regex)
-- **No match**: Message is silently dropped — no reply, no error, no pairing message
-- **Fail-open**: Any error in the filter allows the message through (avoids outages from filter bugs)
-
-### Regex caching
-
-Patterns are compiled to `RegExp` objects once and cached. The cache key is the joined pattern array. If config updates (e.g. via `updateConfig()`), the cache is invalidated and rebuilt on next check.
-
-### Stats tracking
-
-The filter maintains runtime counters per account:
-- `dropped`: messages silently dropped
-- `allowed`: messages passed through
-- `tokensEstimatedSaved`: `dropped * tokenEstimate` — rough estimate of AI tokens saved
-
-Recent events (last 50) are stored in memory with timestamp, pass/fail, reason, and text preview.
-
----
-
-## 4. Admin Panel
-
-A browser-based admin panel is served at `http://<host>:<webhookPort>/admin` (default port 8050).
-
-### Access
-
-```
-http://100.114.126.43:8050/admin
-```
-
-### Features
-
-- **DM Filter card**: Shows enabled status, keyword patterns, stats (dropped/allowed/tokens saved), and a live event log (last 20 events with timestamp, reason, and message preview)
-- **Presence System card**: Displays current presence config (wpm, read delays, typing durations, jitter)
-- **Access Control card**: Shows dmPolicy, groupPolicy, allowFrom, groupAllowFrom, and allowedGroups
-- **Session Info card**: Shows session name, baseUrl, webhookPort, and server time
-- **Auto-refresh**: Reloads stats every 30 seconds. Manual refresh via button.
-
-### Stats API
-
-```bash
-curl http://100.114.126.43:8050/api/admin/stats
-```
-
-Returns JSON:
-```json
-{
-  "dmFilter": {
-    "enabled": true,
-    "patterns": ["sammie", "help"],
-    "stats": { "dropped": 5, "allowed": 12, "tokensEstimatedSaved": 12500 },
-    "recentEvents": [
-      { "ts": 1772902231754, "pass": false, "reason": "no_keyword_match", "preview": "hello world" }
-    ]
-  },
-  "presence": { "enabled": true, "wpm": 42, ... },
-  "access": { "dmPolicy": "pairing", "allowFrom": [...], ... },
-  "session": "3cf11776_logan",
-  "webhookPort": 8050,
-  "serverTime": "2026-03-07T18:50:00.000Z"
-}
-```
-
-### Implementation notes
-
-- Zero build tooling: the entire admin dashboard is an embedded HTML/CSS/JS template string in `monitor.ts`
-- Admin routes are added BEFORE the POST-only webhook guard in the HTTP server handler
-- No authentication on admin routes (only accessible from localhost by default since `webhookHost: 0.0.0.0` binds to all interfaces — restrict via firewall if needed)
-
----
-
-## 5. Human Mimicry Presence System
+## 3. Human Mimicry Presence System
 
 ### Problem
 
@@ -195,9 +93,9 @@ Every computed duration is multiplied by `rand(jitter[0], jitter[1])` before use
 
 ---
 
-## 6. Configuration Reference
+## 4. Configuration Reference
 
-All configuration lives in `~/.openclaw/openclaw.json` AND `/home/omer/.openclaw/workspace/openclaw.json` under `channels.waha`. The gateway uses the **workspace config** (set by `OPENCLAW_CONFIG_PATH`), so changes must be applied there.
+All configuration lives in `~/.openclaw/openclaw.json` under `channels.waha`.
 
 ### Full Config Structure
 
@@ -287,7 +185,7 @@ docker exec -i postgres-waha psql -U admin -d waha_noweb_3cf11776_logan \
 
 ---
 
-## 7. Installation / Reinstallation
+## 5. Installation / Reinstallation
 
 ### File Locations
 
@@ -336,31 +234,7 @@ ssh omer@100.114.126.43 "echo '$B64' | base64 -d > /home/omer/.openclaw/workspac
 
 ---
 
-## 8. Troubleshooting
-
-### CRITICAL: Gateway Uses Workspace Config, Not ~/.openclaw/openclaw.json
-
-The openclaw gateway service sets `OPENCLAW_CONFIG_PATH=/home/omer/.openclaw/workspace/openclaw.json` (visible in `/proc/<pid>/environ`). The gateway reads FROM and writes TO this file, NOT `~/.openclaw/openclaw.json`.
-
-When WAHA is not starting (port 8050 not bound), verify the **workspace config** has the waha section:
-
-```bash
-python3 -c "import json; cfg=json.load(open('/home/omer/.openclaw/workspace/openclaw.json')); print(list(cfg.get('channels',{}).keys()))"
-# Should show: ['telegram', 'waha']
-```
-
-To sync WAHA config from `~/.openclaw/openclaw.json` to workspace:
-```bash
-python3 << 'PYEOF'
-import json, shutil
-full = json.load(open('/home/omer/.openclaw/openclaw.json'))
-ws = json.load(open('/home/omer/.openclaw/workspace/openclaw.json'))
-ws.setdefault('channels', {})['waha'] = full['channels']['waha']
-shutil.copy('/home/omer/.openclaw/workspace/openclaw.json', '/home/omer/.openclaw/workspace/openclaw.json.bak')
-json.dump(ws, open('/home/omer/.openclaw/workspace/openclaw.json', 'w'), indent=2)
-print('Done')
-PYEOF
-```
+## 6. Troubleshooting
 
 ### WAHA API Key: Use WHATSAPP_API_KEY, Not WAHA_API_KEY
 
@@ -419,7 +293,7 @@ SSH heredocs with `!` characters (in `!==`, `!response.ok`, etc.) trigger bash h
 
 ---
 
-## 9. Key Guardrails
+## 7. Key Guardrails
 
 ### Session Blocking (`assertAllowedSession`)
 
