@@ -111,8 +111,21 @@ export async function handleWahaInbound(params: {
   const _preCheckDropped = _preCheckIsGroup && _preCheckAllowedGroups && _preCheckAllowedGroups.length > 0 && !_preCheckAllowedGroups.includes(rawMessage.chatId);
 
   // Preprocess media (download + transcribe/analyze) before building rawBody
+  // Location, vCard, and document messages have hasMedia=false but still need preprocessing
   let message = rawMessage;
-  if (rawPayload && rawMessage.hasMedia && !_preCheckDropped) {
+  const _rawData = (rawPayload as Record<string, unknown>)?._data as Record<string, unknown> | undefined;
+  const _rawMsg = _rawData?.message as Record<string, unknown> | undefined;
+  const needsPreprocessing = rawMessage.hasMedia
+    || Boolean(rawMessage.location)
+    || Boolean(_rawMsg?.locationMessage)
+    || Boolean(_rawMsg?.liveLocationMessage)
+    || Boolean(_rawMsg?.contactMessage)
+    || Boolean(_rawMsg?.contactsArrayMessage)
+    || Boolean(_rawMsg?.documentMessage)
+    || Boolean(_rawMsg?.pollCreationMessage)        // polls
+    || Boolean(_rawMsg?.eventMessage)               // events
+    || Boolean(_rawMsg?.eventCreationMessage);       // event creation
+  if (rawPayload && needsPreprocessing && !_preCheckDropped) {
     try {
       const mediaConfig = account.config.mediaPreprocessing ?? { enabled: true };
       message = await preprocessInboundMessage({
@@ -159,7 +172,36 @@ export async function handleWahaInbound(params: {
         .join(" ")
     : "";
 
-  const rawBody = [textBody, locationSummary, mediaSummary].filter(Boolean).join("\n").trim();
+  // Poll summary
+  let pollSummary = "";
+  const pollMsg = _rawMsg?.pollCreationMessage;
+  if (pollMsg && typeof pollMsg === "object") {
+    const pollName = (pollMsg as any).name ?? textBody ?? "Untitled poll";
+    const options = Array.isArray((pollMsg as any).options)
+      ? (pollMsg as any).options.map((o: any, i: number) => `${i + 1}) ${o.name ?? o}`).join("  ")
+      : "";
+    const multi = (pollMsg as any).multipleAnswers ? "yes" : "no";
+    pollSummary = `[poll] "${pollName}"\nOptions: ${options}\nMultiple answers: ${multi}`;
+    if (rawMessage.messageId) pollSummary += `\nPoll message ID: ${rawMessage.messageId}`;
+  }
+
+  // Event summary
+  let eventSummary = "";
+  const eventMsg = _rawMsg?.eventMessage ?? _rawMsg?.eventCreationMessage;
+  if (eventMsg && typeof eventMsg === "object") {
+    const evName = (eventMsg as any).name ?? "Untitled event";
+    const startTs = (eventMsg as any).startTime;
+    const endTs = (eventMsg as any).endTime;
+    const startStr = startTs ? new Date(startTs * 1000).toISOString() : "unknown";
+    const endStr = endTs ? new Date(endTs * 1000).toISOString() : "";
+    const loc = (eventMsg as any).location?.name ?? "";
+    const desc = (eventMsg as any).description ?? "";
+    eventSummary = `[event] "${evName}"\nWhen: ${startStr}${endStr ? " to " + endStr : ""}`;
+    if (loc) eventSummary += `\nWhere: ${loc}`;
+    if (desc) eventSummary += `\nDescription: ${desc}`;
+  }
+
+  const rawBody = [textBody, locationSummary, mediaSummary, pollSummary, eventSummary].filter(Boolean).join("\n").trim();
   if (!rawBody) {
     return;
   }
