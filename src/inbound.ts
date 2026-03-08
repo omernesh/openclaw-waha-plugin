@@ -465,24 +465,30 @@ export async function handleWahaInbound(params: {
     });
   });
 
-  await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
-    ctx: ctxPayload,
-    cfg: config as OpenClawConfig,
-    dispatcherOptions: {
-      ...prefixOptions,
-      deliver: deliverReply,
-      onError: (err, info) => {
-        // Cancel typing on error
-        presenceCtrl.cancelTyping().catch(() => {});
-        runtime.error?.(`waha ${info.kind} reply failed: ${String(err)}`);
+  try {
+    await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+      ctx: ctxPayload,
+      cfg: config as OpenClawConfig,
+      dispatcherOptions: {
+        ...prefixOptions,
+        deliver: deliverReply,
+        onError: (err, info) => {
+          // Cancel typing on error
+          presenceCtrl.cancelTyping().catch(() => {});
+          runtime.error?.(`waha ${info.kind} reply failed: ${String(err)}`);
+        },
       },
-    },
-    replyOptions: {
-      onModelSelected,
-      disableBlockStreaming:
-        typeof account.config.blockStreaming === "boolean"
-          ? !account.config.blockStreaming
-          : undefined,
-    },
-  });
+      replyOptions: {
+        onModelSelected,
+        disableBlockStreaming:
+          typeof account.config.blockStreaming === "boolean"
+            ? !account.config.blockStreaming
+            : undefined,
+      },
+    });
+  } finally {
+    // Guarantee typing is stopped after dispatch — handles empty responses,
+    // errors, and any path where deliverReply was never called
+    await presenceCtrl.cancelTyping().catch(() => {});
+  }
 }

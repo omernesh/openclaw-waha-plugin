@@ -124,17 +124,19 @@ export async function startHumanPresence(params: {
   const typingStartedAt = Date.now();
 
   let flickerAborted = false;
+  // Hard ceiling: never flicker longer than 90s (safety net for leaked loops)
+  const maxFlickerMs = 90_000;
   const flickerPromise = (async () => {
-    while (!flickerAborted) {
+    while (!flickerAborted && Date.now() - typingStartedAt < maxFlickerMs) {
       const interval = rand(presenceCfg.pauseIntervalMs[0], presenceCfg.pauseIntervalMs[1]);
       await sleep(interval);
-      if (flickerAborted) break;
+      if (flickerAborted || Date.now() - typingStartedAt >= maxFlickerMs) break;
 
       if (Math.random() < presenceCfg.pauseChance) {
         await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
         const pauseDuration = rand(presenceCfg.pauseDurationMs[0], presenceCfg.pauseDurationMs[1]);
         await sleep(pauseDuration);
-        if (flickerAborted) break;
+        if (flickerAborted || Date.now() - typingStartedAt >= maxFlickerMs) break;
         await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(() => {});
       }
     }
