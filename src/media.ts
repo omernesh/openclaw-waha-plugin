@@ -40,13 +40,10 @@ const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 20MB
 type DownloadResult = { path: string; cleanup: () => Promise<void> };
 
 export async function downloadWahaMedia(
-  baseUrl: string,
+  mediaUrl: string,
   apiKey: string,
-  session: string,
-  messageId: string,
 ): Promise<DownloadResult> {
-  const url = `${baseUrl}/api/${session}/messages/${messageId}/download`;
-  const response = await fetch(url, {
+  const response = await fetch(mediaUrl, {
     method: "GET",
     headers: { "x-api-key": apiKey },
   });
@@ -408,11 +405,17 @@ export async function preprocessInboundMessage(params: {
 
   let prefix: string | null = null;
 
+  // Resolve absolute media URL (WAHA may send relative paths)
+  let resolvedMediaUrl = message.mediaUrl;
+  if (resolvedMediaUrl && !resolvedMediaUrl.startsWith("http")) {
+    resolvedMediaUrl = `${account.baseUrl}${resolvedMediaUrl.startsWith("/") ? "" : "/"}${resolvedMediaUrl}`;
+  }
+
   try {
     // Detect message type from _data.message keys
     if (msgContent.audioMessage || msgContent.pttMessage) {
-      if (config?.audio?.enabled !== false) {
-        const dl = await downloadWahaMedia(account.baseUrl, account.apiKey, account.session, message.messageId);
+      if (config?.audio?.enabled !== false && resolvedMediaUrl) {
+        const dl = await downloadWahaMedia(resolvedMediaUrl, account.apiKey);
         try {
           prefix = await preprocessAudio(dl.path, config?.audio);
         } finally {
@@ -420,8 +423,8 @@ export async function preprocessInboundMessage(params: {
         }
       }
     } else if (msgContent.imageMessage) {
-      if (config?.image?.enabled !== false) {
-        const dl = await downloadWahaMedia(account.baseUrl, account.apiKey, account.session, message.messageId);
+      if (config?.image?.enabled !== false && resolvedMediaUrl) {
+        const dl = await downloadWahaMedia(resolvedMediaUrl, account.apiKey);
         try {
           prefix = await preprocessImage(dl.path, config?.image, message.body || undefined);
         } finally {
@@ -429,8 +432,8 @@ export async function preprocessInboundMessage(params: {
         }
       }
     } else if (msgContent.videoMessage) {
-      if (config?.video?.enabled !== false) {
-        const dl = await downloadWahaMedia(account.baseUrl, account.apiKey, account.session, message.messageId);
+      if (config?.video?.enabled !== false && resolvedMediaUrl) {
+        const dl = await downloadWahaMedia(resolvedMediaUrl, account.apiKey);
         try {
           prefix = await preprocessVideo(dl.path, config?.video);
         } finally {
