@@ -105,9 +105,14 @@ export async function handleWahaInbound(params: {
 }) {
   const { message: rawMessage, rawPayload, account, config, runtime, statusSink } = params;
 
+  // Quick pre-check: skip media preprocessing for groups not in allowedGroups
+  const _preCheckIsGroup = isWhatsAppGroupJid(rawMessage.chatId);
+  const _preCheckAllowedGroups = account.config.allowedGroups;
+  const _preCheckDropped = _preCheckIsGroup && _preCheckAllowedGroups && _preCheckAllowedGroups.length > 0 && !_preCheckAllowedGroups.includes(rawMessage.chatId);
+
   // Preprocess media (download + transcribe/analyze) before building rawBody
   let message = rawMessage;
-  if (rawPayload && rawMessage.hasMedia) {
+  if (rawPayload && rawMessage.hasMedia && !_preCheckDropped) {
     try {
       const mediaConfig = account.config.mediaPreprocessing ?? { enabled: true };
       message = await preprocessInboundMessage({
