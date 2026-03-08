@@ -119,7 +119,7 @@ export function resolveWahaAccount(params: { cfg: CoreConfig; accountId?: string
     const enabled = baseEnabled && accountEnabled;
     const apiKeyResolution = resolveWahaApiKey(params.cfg, { accountId });
     const baseUrl = merged.baseUrl?.trim().replace(/\/$/, "") ?? "";
-    const session = merged.session?.trim() || "default";
+    const session = merged.session?.trim() || "logan";
 
     return {
       accountId,

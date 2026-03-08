@@ -443,6 +443,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
             <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-presenceEnabled" name="presenceEnabled"><span class="slider"></span></label>
           </label>
         </div>
+<div class="field">          <label class="toggle-wrap">            <span>Send Seen <span class="tip" data-tip="Send read receipts (blue ticks) when reading incoming messages. Shows the sender that the bot has seen their message.">?</span></span>            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-sendSeen" name="sendSeen"><span class="slider"></span></label>          </label>        </div>
         <div class="field">
           <label>Words Per Minute <span class="tip" data-tip="Typing speed for calculating typing duration. Default: 42. Range: 20-120.">?</span></label>
           <input type="number" id="s-wpm" name="wpm" min="10" max="200">
@@ -791,6 +792,7 @@ async function loadConfig() {
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
     var pr = w.presence || {};
     setChk('s-presenceEnabled', pr.enabled !== false);
+    setChk("s-sendSeen", pr.sendSeen === true);
     setVal('s-wpm', pr.wpm || 42);
     setVal('s-readDelayMin', (pr.readDelayMs || [500])[0]);
     setVal('s-readDelayMax', (pr.readDelayMs || [500, 4000])[1]);
@@ -837,6 +839,7 @@ async function saveSettings(e) {
       },
       presence: {
         enabled: getChk('s-presenceEnabled'),
+        sendSeen: getChk("s-sendSeen"),
         wpm: parseNum(getVal('s-wpm'), 42),
         readDelayMs: [parseNum(getVal('s-readDelayMin'), 500), parseNum(getVal('s-readDelayMax'), 4000)],
         msPerReadChar: parseNum(getVal('s-msPerReadChar'), 30),
