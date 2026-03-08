@@ -111,8 +111,18 @@ export async function handleWahaInbound(params: {
   const _preCheckDropped = _preCheckIsGroup && _preCheckAllowedGroups && _preCheckAllowedGroups.length > 0 && !_preCheckAllowedGroups.includes(rawMessage.chatId);
 
   // Preprocess media (download + transcribe/analyze) before building rawBody
+  // Location, vCard, and document messages have hasMedia=false but still need preprocessing
   let message = rawMessage;
-  if (rawPayload && rawMessage.hasMedia && !_preCheckDropped) {
+  const _rawData = (rawPayload as Record<string, unknown>)?._data as Record<string, unknown> | undefined;
+  const _rawMsg = _rawData?.message as Record<string, unknown> | undefined;
+  const needsPreprocessing = rawMessage.hasMedia
+    || Boolean(rawMessage.location)
+    || Boolean(_rawMsg?.locationMessage)
+    || Boolean(_rawMsg?.liveLocationMessage)
+    || Boolean(_rawMsg?.contactMessage)
+    || Boolean(_rawMsg?.contactsArrayMessage)
+    || Boolean(_rawMsg?.documentMessage);
+  if (rawPayload && needsPreprocessing && !_preCheckDropped) {
     try {
       const mediaConfig = account.config.mediaPreprocessing ?? { enabled: true };
       message = await preprocessInboundMessage({
