@@ -68,6 +68,15 @@ export type WahaAccountConfig = {
   blockStreaming?: boolean;
   presence?: PresenceConfig;
   dmFilter?: DmFilterConfig;
+  mediaPreprocessing?: {
+    enabled?: boolean;
+    audio?: { enabled?: boolean; whisperScript?: string };
+    image?: { enabled?: boolean; visionEndpoint?: string; visionApiKey?: string; visionModel?: string };
+    video?: { enabled?: boolean; geminiApiKey?: string; geminiModel?: string };
+    location?: { enabled?: boolean };
+    vcard?: { enabled?: boolean };
+    document?: { enabled?: boolean };
+  };
 };
 
 export type WahaChannelConfig = WahaAccountConfig & {

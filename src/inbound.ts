@@ -24,6 +24,7 @@ import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
 import { sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
+import { preprocessInboundMessage } from "./media.js";
 
 const CHANNEL_ID = "waha" as const;
 
@@ -96,12 +97,29 @@ async function deliverWahaReply(params: {
 
 export async function handleWahaInbound(params: {
   message: WahaInboundMessage;
+  rawPayload?: Record<string, unknown>;
   account: ResolvedWahaAccount;
   config: CoreConfig;
   runtime: RuntimeEnv;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
 }) {
-  const { message, account, config, runtime, statusSink } = params;
+  const { message: rawMessage, rawPayload, account, config, runtime, statusSink } = params;
+
+  // Preprocess media (download + transcribe/analyze) before building rawBody
+  let message = rawMessage;
+  if (rawPayload && rawMessage.hasMedia) {
+    try {
+      const mediaConfig = account.config.mediaPreprocessing ?? { enabled: true };
+      message = await preprocessInboundMessage({
+        message: rawMessage,
+        rawPayload,
+        account,
+        config: mediaConfig,
+      });
+    } catch (err) {
+      runtime.log?.(`waha: media preprocessing failed: ${String(err)}`);
+    }
+  }
   const core = getWahaRuntime();
   const pairing = createScopedPairingAccess({
     core,
@@ -420,7 +438,4 @@ export async function handleWahaInbound(params: {
           : undefined,
     },
   });
-
-  // Final safety net: ensure typing indicator is stopped after all dispatch completes
-  await presenceCtrl.finishTyping().catch(() => {});
 }

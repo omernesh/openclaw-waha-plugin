@@ -1232,6 +1232,7 @@ export function createWahaWebhookServer(opts: {
       }
       await handleWahaInbound({
         message,
+        rawPayload: payload.payload,
         account,
         config: opts.config,
         runtime,
