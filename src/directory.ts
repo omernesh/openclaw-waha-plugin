@@ -196,6 +196,24 @@ export class DirectoryDb {
     return row.cnt;
   }
 
+  bulkUpsertContacts(contacts: Array<{ jid: string; name?: string; isGroup?: boolean }>): number {
+    if (contacts.length === 0) return 0;
+    const now = Date.now();
+    const insert = this.db.prepare(
+      `INSERT OR REPLACE INTO contacts (jid, display_name, first_seen_at, last_message_at, message_count, is_group)
+       VALUES (?, ?, COALESCE((SELECT first_seen_at FROM contacts WHERE jid = ?), ?), ?, COALESCE((SELECT message_count FROM contacts WHERE jid = ?), 1), ?)`,
+    );
+    const upsertMany = this.db.transaction((rows: Array<{ jid: string; name?: string; isGroup?: boolean }>) => {
+      let count = 0;
+      for (const row of rows) {
+        insert.run(row.jid, row.name ?? null, row.jid, now, now, row.jid, row.isGroup ? 1 : 0);
+        count++;
+      }
+      return count;
+    });
+    return upsertMany(contacts) as number;
+  }
+
   close(): void {
     this.db.close();
   }

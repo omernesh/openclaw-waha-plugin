@@ -138,6 +138,8 @@ export async function startHumanPresence(params: {
         await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(() => {});
       }
     }
+    // Guarantee typing is stopped when loop exits
+    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
   })();
 
   let finishTypingDone = false;
@@ -152,6 +154,7 @@ export async function startHumanPresence(params: {
 
       flickerAborted = true;
       await flickerPromise; // Wait for in-flight flicker to drain
+      await sleep(100); // drain delay for protocol to settle
       finishTypingDone = true;
       await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
     },
