@@ -86,7 +86,7 @@ export async function preprocessAudio(
 ): Promise<string> {
   const script = config?.whisperScript || DEFAULT_WHISPER_SCRIPT;
   try {
-    const transcription = await execFileAsync("python3", [script, filePath]);
+    const transcription = await execFileAsync("/home/omer/.openclaw/venv/bin/python3", [script, filePath]);
     if (transcription) {
       return `[Voice Message Transcription]: "${transcription}"`;
     }
