@@ -23,7 +23,48 @@ import {
 import { monitorWahaProvider } from "./monitor.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
 import { getWahaRuntime } from "./runtime.js";
-import { sendWahaMediaBatch, sendWahaReaction, sendWahaText } from "./send.js";
+import {
+  sendWahaMediaBatch, sendWahaReaction, sendWahaText,
+  // Rich messages
+  sendWahaPoll, sendWahaPollVote, sendWahaLocation, sendWahaContactVcard,
+  sendWahaList, forwardWahaMessage, sendWahaLinkPreview, sendWahaButtonsReply,
+  // Message management
+  editWahaMessage, deleteWahaMessage, pinWahaMessage, unpinWahaMessage, starWahaMessage,
+  // Chat management
+  getWahaChats, getWahaChatsOverview, getWahaChatMessages, getWahaChatMessage,
+  deleteWahaChat, clearWahaChatMessages, archiveWahaChat, unarchiveWahaChat,
+  unreadWahaChat, readWahaChatMessages, getWahaChatPicture,
+  // Group admin
+  createWahaGroup, getWahaGroups, getWahaGroup, deleteWahaGroup, leaveWahaGroup,
+  setWahaGroupSubject, setWahaGroupDescription, setWahaGroupPicture, deleteWahaGroupPicture,
+  getWahaGroupPicture, addWahaGroupParticipants, removeWahaGroupParticipants,
+  promoteWahaGroupAdmin, demoteWahaGroupAdmin, getWahaGroupParticipants,
+  setWahaGroupInfoAdminOnly, getWahaGroupInfoAdminOnly,
+  setWahaGroupMessagesAdminOnly, getWahaGroupMessagesAdminOnly,
+  getWahaGroupInviteCode, revokeWahaGroupInviteCode, joinWahaGroup, getWahaGroupsCount,
+  // Contacts
+  getWahaContacts, getWahaContact, checkWahaContactExists,
+  getWahaContactAbout, getWahaContactPicture, blockWahaContact, unblockWahaContact,
+  // Labels
+  getWahaLabels, createWahaLabel, updateWahaLabel, deleteWahaLabel,
+  getWahaChatLabels, setWahaChatLabels, getWahaChatsByLabel,
+  // Status
+  sendWahaTextStatus, sendWahaImageStatus, sendWahaVoiceStatus, sendWahaVideoStatus, deleteWahaStatus,
+  // Channels
+  getWahaChannels, createWahaChannel, getWahaChannel, deleteWahaChannel,
+  followWahaChannel, unfollowWahaChannel, muteWahaChannel, unmuteWahaChannel,
+  searchWahaChannelsByText, previewWahaChannelMessages,
+  // Events
+  sendWahaEvent,
+  // Presence
+  setWahaPresenceStatus, getWahaPresence, subscribeWahaPresence,
+  // Profile
+  getWahaProfile, setWahaProfileName, setWahaProfileStatus, setWahaProfilePicture, deleteWahaProfilePicture,
+  // LID
+  findWahaPhoneByLid, findWahaLidByPhone, getWahaAllLids,
+  // Calls
+  rejectWahaCall,
+} from "./send.js";
 import type { CoreConfig } from "./types.js";
 
 const meta = {
@@ -37,48 +78,149 @@ const meta = {
   quickstartAllowFrom: true,
 } as const;
 
+// Action name → handler function map
+const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: CoreConfig, accountId?: string) => Promise<unknown>> = {
+  // Rich messages
+  sendPoll: (p, cfg, aid) => sendWahaPoll({ cfg, chatId: String(p.chatId), name: String(p.name), options: p.options as string[], multipleAnswers: Boolean(p.multipleAnswers), replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  sendPollVote: (p, cfg, aid) => sendWahaPollVote({ cfg, chatId: String(p.chatId), pollMessageId: String(p.pollMessageId), votes: p.votes as string[], accountId: aid }),
+  sendLocation: (p, cfg, aid) => sendWahaLocation({ cfg, chatId: String(p.chatId), latitude: Number(p.latitude), longitude: Number(p.longitude), title: String(p.title ?? ""), replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  sendContactVcard: (p, cfg, aid) => sendWahaContactVcard({ cfg, chatId: String(p.chatId), contacts: p.contacts as any[], replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  sendList: (p, cfg, aid) => sendWahaList({ cfg, chatId: String(p.chatId), title: String(p.title), description: String(p.description ?? ""), buttonText: String(p.buttonText ?? "Select"), sections: p.sections as any[], replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  forwardMessage: (p, cfg, aid) => forwardWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
+  sendLinkPreview: (p, cfg, aid) => sendWahaLinkPreview({ cfg, chatId: String(p.chatId), url: String(p.url), title: String(p.title ?? ""), description: p.description ? String(p.description) : undefined, image: p.image ? String(p.image) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  sendButtonsReply: (p, cfg, aid) => sendWahaButtonsReply({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), buttonId: String(p.buttonId), accountId: aid }),
+  sendEvent: (p, cfg, aid) => sendWahaEvent({ cfg, chatId: String(p.chatId), name: String(p.name), startTime: Number(p.startTime), endTime: p.endTime != null ? Number(p.endTime) : undefined, description: p.description ? String(p.description) : undefined, location: p.location as any, extraGuestsAllowed: p.extraGuestsAllowed != null ? Boolean(p.extraGuestsAllowed) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  // Message management
+  editMessage: (p, cfg, aid) => editWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), text: String(p.text), accountId: aid }),
+  deleteMessage: (p, cfg, aid) => deleteWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
+  pinMessage: (p, cfg, aid) => pinWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
+  unpinMessage: (p, cfg, aid) => unpinWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
+  starMessage: (p, cfg, aid) => starWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), star: Boolean(p.star), accountId: aid }),
+  // Chat management
+  getChats: (p, cfg, aid) => getWahaChats({ cfg, accountId: aid }),
+  getChatsOverview: (p, cfg, aid) => getWahaChatsOverview({ cfg, page: p.page != null ? Number(p.page) : undefined, limit: p.limit != null ? Number(p.limit) : undefined, accountId: aid }),
+  getChatMessages: (p, cfg, aid) => getWahaChatMessages({ cfg, chatId: String(p.chatId), limit: p.limit != null ? Number(p.limit) : undefined, offset: p.offset != null ? Number(p.offset) : undefined, downloadMedia: p.downloadMedia != null ? Boolean(p.downloadMedia) : undefined, accountId: aid }),
+  getChatMessage: (p, cfg, aid) => getWahaChatMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
+  deleteChat: (p, cfg, aid) => deleteWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
+  clearChatMessages: (p, cfg, aid) => clearWahaChatMessages({ cfg, chatId: String(p.chatId), accountId: aid }),
+  archiveChat: (p, cfg, aid) => archiveWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
+  unarchiveChat: (p, cfg, aid) => unarchiveWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
+  unreadChat: (p, cfg, aid) => unreadWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
+  readChatMessages: (p, cfg, aid) => readWahaChatMessages({ cfg, chatId: String(p.chatId), accountId: aid }),
+  getChatPicture: (p, cfg, aid) => getWahaChatPicture({ cfg, chatId: String(p.chatId), accountId: aid }),
+  // Group admin
+  createGroup: (p, cfg, aid) => createWahaGroup({ cfg, name: String(p.name), participants: p.participants as string[], accountId: aid }),
+  getGroups: (p, cfg, aid) => getWahaGroups({ cfg, accountId: aid }),
+  getGroup: (p, cfg, aid) => getWahaGroup({ cfg, groupId: String(p.groupId), accountId: aid }),
+  deleteGroup: (p, cfg, aid) => deleteWahaGroup({ cfg, groupId: String(p.groupId), accountId: aid }),
+  leaveGroup: (p, cfg, aid) => leaveWahaGroup({ cfg, groupId: String(p.groupId), accountId: aid }),
+  setGroupSubject: (p, cfg, aid) => setWahaGroupSubject({ cfg, groupId: String(p.groupId), subject: String(p.subject), accountId: aid }),
+  setGroupDescription: (p, cfg, aid) => setWahaGroupDescription({ cfg, groupId: String(p.groupId), description: String(p.description), accountId: aid }),
+  setGroupPicture: (p, cfg, aid) => setWahaGroupPicture({ cfg, groupId: String(p.groupId), file: String(p.file), accountId: aid }),
+  deleteGroupPicture: (p, cfg, aid) => deleteWahaGroupPicture({ cfg, groupId: String(p.groupId), accountId: aid }),
+  getGroupPicture: (p, cfg, aid) => getWahaGroupPicture({ cfg, groupId: String(p.groupId), accountId: aid }),
+  addParticipants: (p, cfg, aid) => addWahaGroupParticipants({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
+  removeParticipants: (p, cfg, aid) => removeWahaGroupParticipants({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
+  promoteToAdmin: (p, cfg, aid) => promoteWahaGroupAdmin({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
+  demoteFromAdmin: (p, cfg, aid) => demoteWahaGroupAdmin({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
+  getParticipants: (p, cfg, aid) => getWahaGroupParticipants({ cfg, groupId: String(p.groupId), accountId: aid }),
+  setInfoAdminOnly: (p, cfg, aid) => setWahaGroupInfoAdminOnly({ cfg, groupId: String(p.groupId), adminOnly: Boolean(p.adminOnly), accountId: aid }),
+  getInfoAdminOnly: (p, cfg, aid) => getWahaGroupInfoAdminOnly({ cfg, groupId: String(p.groupId), accountId: aid }),
+  setMessagesAdminOnly: (p, cfg, aid) => setWahaGroupMessagesAdminOnly({ cfg, groupId: String(p.groupId), adminOnly: Boolean(p.adminOnly), accountId: aid }),
+  getMessagesAdminOnly: (p, cfg, aid) => getWahaGroupMessagesAdminOnly({ cfg, groupId: String(p.groupId), accountId: aid }),
+  getInviteCode: (p, cfg, aid) => getWahaGroupInviteCode({ cfg, groupId: String(p.groupId), accountId: aid }),
+  revokeInviteCode: (p, cfg, aid) => revokeWahaGroupInviteCode({ cfg, groupId: String(p.groupId), accountId: aid }),
+  joinGroup: (p, cfg, aid) => joinWahaGroup({ cfg, inviteCode: String(p.inviteCode), accountId: aid }),
+  getGroupsCount: (p, cfg, aid) => getWahaGroupsCount({ cfg, accountId: aid }),
+  // Contacts
+  getContacts: (p, cfg, aid) => getWahaContacts({ cfg, accountId: aid }),
+  getContact: (p, cfg, aid) => getWahaContact({ cfg, contactId: String(p.contactId), accountId: aid }),
+  checkContactExists: (p, cfg, aid) => checkWahaContactExists({ cfg, phone: String(p.phone), accountId: aid }),
+  getContactAbout: (p, cfg, aid) => getWahaContactAbout({ cfg, contactId: String(p.contactId), accountId: aid }),
+  getContactPicture: (p, cfg, aid) => getWahaContactPicture({ cfg, contactId: String(p.contactId), accountId: aid }),
+  blockContact: (p, cfg, aid) => blockWahaContact({ cfg, contactId: String(p.contactId), accountId: aid }),
+  unblockContact: (p, cfg, aid) => unblockWahaContact({ cfg, contactId: String(p.contactId), accountId: aid }),
+  // Labels
+  getLabels: (p, cfg, aid) => getWahaLabels({ cfg, accountId: aid }),
+  createLabel: (p, cfg, aid) => createWahaLabel({ cfg, name: String(p.name), color: p.color != null ? Number(p.color) : undefined, accountId: aid }),
+  updateLabel: (p, cfg, aid) => updateWahaLabel({ cfg, labelId: String(p.labelId), name: p.name ? String(p.name) : undefined, color: p.color != null ? Number(p.color) : undefined, accountId: aid }),
+  deleteLabel: (p, cfg, aid) => deleteWahaLabel({ cfg, labelId: String(p.labelId), accountId: aid }),
+  getChatLabels: (p, cfg, aid) => getWahaChatLabels({ cfg, chatId: String(p.chatId), accountId: aid }),
+  setChatLabels: (p, cfg, aid) => setWahaChatLabels({ cfg, chatId: String(p.chatId), labels: p.labels as Array<{ id: string }>, accountId: aid }),
+  getChatsByLabel: (p, cfg, aid) => getWahaChatsByLabel({ cfg, labelId: String(p.labelId), accountId: aid }),
+  // Status
+  sendTextStatus: (p, cfg, aid) => sendWahaTextStatus({ cfg, text: String(p.text), backgroundColor: p.backgroundColor ? String(p.backgroundColor) : undefined, font: p.font != null ? Number(p.font) : undefined, accountId: aid }),
+  sendImageStatus: (p, cfg, aid) => sendWahaImageStatus({ cfg, image: String(p.image), caption: p.caption ? String(p.caption) : undefined, accountId: aid }),
+  sendVoiceStatus: (p, cfg, aid) => sendWahaVoiceStatus({ cfg, voice: String(p.voice), accountId: aid }),
+  sendVideoStatus: (p, cfg, aid) => sendWahaVideoStatus({ cfg, video: String(p.video), caption: p.caption ? String(p.caption) : undefined, accountId: aid }),
+  deleteStatus: (p, cfg, aid) => deleteWahaStatus({ cfg, id: String(p.id), accountId: aid }),
+  // Channels
+  getChannels: (p, cfg, aid) => getWahaChannels({ cfg, accountId: aid }),
+  createChannel: (p, cfg, aid) => createWahaChannel({ cfg, name: String(p.name), description: p.description ? String(p.description) : undefined, picture: p.picture ? String(p.picture) : undefined, accountId: aid }),
+  getChannel: (p, cfg, aid) => getWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
+  deleteChannel: (p, cfg, aid) => deleteWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
+  followChannel: (p, cfg, aid) => followWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
+  unfollowChannel: (p, cfg, aid) => unfollowWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
+  muteChannel: (p, cfg, aid) => muteWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
+  unmuteChannel: (p, cfg, aid) => unmuteWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
+  searchChannelsByText: (p, cfg, aid) => searchWahaChannelsByText({ cfg, query: String(p.query), accountId: aid }),
+  previewChannelMessages: (p, cfg, aid) => previewWahaChannelMessages({ cfg, channelId: String(p.channelId), accountId: aid }),
+  // Presence
+  setPresenceStatus: (p, cfg, aid) => setWahaPresenceStatus({ cfg, status: p.status as "online" | "offline", accountId: aid }),
+  getPresence: (p, cfg, aid) => getWahaPresence({ cfg, contactId: String(p.contactId), accountId: aid }),
+  subscribePresence: (p, cfg, aid) => subscribeWahaPresence({ cfg, contactId: String(p.contactId), accountId: aid }),
+  // Profile
+  getProfile: (p, cfg, aid) => getWahaProfile({ cfg, accountId: aid }),
+  setProfileName: (p, cfg, aid) => setWahaProfileName({ cfg, name: String(p.name), accountId: aid }),
+  setProfileStatus: (p, cfg, aid) => setWahaProfileStatus({ cfg, status: String(p.status), accountId: aid }),
+  setProfilePicture: (p, cfg, aid) => setWahaProfilePicture({ cfg, file: String(p.file), accountId: aid }),
+  deleteProfilePicture: (p, cfg, aid) => deleteWahaProfilePicture({ cfg, accountId: aid }),
+  // LID
+  findPhoneByLid: (p, cfg, aid) => findWahaPhoneByLid({ cfg, lid: String(p.lid), accountId: aid }),
+  findLidByPhone: (p, cfg, aid) => findWahaLidByPhone({ cfg, phone: String(p.phone), accountId: aid }),
+  getAllLids: (p, cfg, aid) => getWahaAllLids({ cfg, accountId: aid }),
+  // Calls
+  rejectCall: (p, cfg, aid) => rejectWahaCall({ cfg, callId: String(p.callId), accountId: aid }),
+};
+
+const ALL_ACTIONS = ["react", ...Object.keys(ACTION_HANDLERS)];
+
 const wahaMessageActions: ChannelMessageActionAdapter = {
-  listActions: ({ cfg }) => {
-    const baseActions = (cfg.channels?.waha?.actions as { reactions?: boolean } | undefined)
-      ?.reactions;
-    const hasReactionEnabled = listWahaAccountIds(cfg as CoreConfig)
-      .map((accountId) => resolveWahaAccount({ cfg: cfg as CoreConfig, accountId }))
-      .filter((account) => account.enabled)
-      .some((account) => {
-        const accountActions = account.config.actions as { reactions?: boolean } | undefined;
-        return (accountActions?.reactions ?? baseActions ?? true) !== false;
+  listActions: () => ALL_ACTIONS,
+  supportsAction: ({ action }) => ALL_ACTIONS.includes(action),
+  handleAction: async ({ action, params, cfg, accountId }) => {
+    if (action === "react") {
+      const messageId = typeof (params as any)?.messageId === "string" ? (params as any).messageId : "";
+      const emojiRaw = typeof (params as any)?.emoji === "string" ? (params as any).emoji : "";
+      const remove = (params as any)?.remove === true;
+      if (!messageId) throw new Error("WAHA react requires messageId");
+      if (!emojiRaw && !remove) throw new Error("WAHA react requires emoji");
+
+      await sendWahaReaction({
+        cfg: cfg as CoreConfig,
+        messageId,
+        emoji: emojiRaw,
+        remove,
+        accountId: accountId ?? undefined,
       });
 
-    return hasReactionEnabled ? ["react"] : [];
-  },
-  supportsAction: ({ action }) => action === "react",
-  handleAction: async ({ action, params, cfg, accountId }) => {
-    if (action !== "react") {
-      throw new Error(`WAHA action ${action} not supported`);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: remove
+              ? `Removed reaction from ${messageId}`
+              : `Reacted with ${emojiRaw} on ${messageId}`,
+          },
+        ],
+        details: {},
+      };
     }
-    const messageId = typeof (params as any)?.messageId === "string" ? (params as any).messageId : "";
-    const emojiRaw = typeof (params as any)?.emoji === "string" ? (params as any).emoji : "";
-    const remove = (params as any)?.remove === true;
-    if (!messageId) throw new Error("WAHA react requires messageId");
-    if (!emojiRaw && !remove) throw new Error("WAHA react requires emoji");
-
-    await sendWahaReaction({
-      cfg: cfg as CoreConfig,
-      messageId,
-      emoji: emojiRaw,
-      remove,
-      accountId: accountId ?? undefined,
-    });
-
+    const handler = ACTION_HANDLERS[action];
+    if (!handler) throw new Error(`WAHA action "${action}" not supported`);
+    const result = await handler(params as Record<string, unknown>, cfg as CoreConfig, accountId ?? undefined);
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: remove
-            ? `Removed reaction from ${messageId}`
-            : `Reacted with ${emojiRaw} on ${messageId}`,
-        },
-      ],
+      content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       details: {},
     };
   },
