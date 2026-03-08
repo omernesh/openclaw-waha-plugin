@@ -1252,6 +1252,73 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
+    // ── Poll votes ──
+    if (payload.event === "poll.vote" || payload.event === "poll.vote.failed") {
+      const voteData = payload.payload as Record<string, any>;
+      const vote = voteData?.vote;
+      const poll = voteData?.poll;
+      if (vote && poll) {
+        const voter = vote.participant ?? vote.from ?? "unknown";
+        const selected = Array.isArray(vote.selectedOptions) ? vote.selectedOptions.join(", ") : "unknown";
+        const failed = payload.event === "poll.vote.failed" ? " (decryption failed)" : "";
+        const syntheticMessage: WahaInboundMessage = {
+          messageId: vote.id ?? `poll-vote-${Date.now()}`,
+          timestamp: vote.timestamp ?? Date.now(),
+          from: vote.from ?? "",
+          fromMe: vote.fromMe ?? false,
+          chatId: vote.to ?? poll.to ?? "",
+          body: `[poll_vote${failed}] ${voter} voted "${selected}" on poll ${poll.id ?? "unknown"}`,
+          hasMedia: false,
+          participant: vote.participant,
+        };
+        if (!syntheticMessage.fromMe && syntheticMessage.chatId) {
+          await handleWahaInbound({
+            message: syntheticMessage,
+            rawPayload: voteData,
+            account,
+            config: opts.config,
+            runtime,
+            statusSink: opts.statusSink,
+          });
+        }
+      }
+      writeJsonResponse(res, 200, { status: "ok" });
+      return;
+    }
+
+    // ── Event RSVPs ──
+    if (payload.event === "event.response" || payload.event === "event.response.failed") {
+      const rsvpData = payload.payload as Record<string, any>;
+      const eventResponse = rsvpData?.eventResponse;
+      if (eventResponse) {
+        const participant = rsvpData.participant ?? rsvpData.from ?? "unknown";
+        const response = eventResponse.response ?? "UNKNOWN";
+        const failed = payload.event === "event.response.failed" ? " (decryption failed)" : "";
+        const syntheticMessage: WahaInboundMessage = {
+          messageId: rsvpData.id ?? `event-rsvp-${Date.now()}`,
+          timestamp: rsvpData.timestamp ?? Date.now(),
+          from: rsvpData.from ?? "",
+          fromMe: rsvpData.fromMe ?? false,
+          chatId: rsvpData.to ?? "",
+          body: `[event_rsvp${failed}] ${participant} responded "${response}"`,
+          hasMedia: false,
+          participant: rsvpData.participant,
+        };
+        if (!syntheticMessage.fromMe && syntheticMessage.chatId) {
+          await handleWahaInbound({
+            message: syntheticMessage,
+            rawPayload: rsvpData,
+            account,
+            config: opts.config,
+            runtime,
+            statusSink: opts.statusSink,
+          });
+        }
+      }
+      writeJsonResponse(res, 200, { status: "ok" });
+      return;
+    }
+
     writeJsonResponse(res, 200, { status: "ignored" });
   });
 
