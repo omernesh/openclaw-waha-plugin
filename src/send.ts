@@ -27,9 +27,6 @@ async function callWahaApi(params: {
 }) {
   const method = params.method ?? "POST";
   const url = new URL(params.path, params.baseUrl);
-  if (params.apiKey) {
-    url.searchParams.set("api_key", params.apiKey);
-  }
   if (params.query) {
     for (const [k, v] of Object.entries(params.query)) {
       url.searchParams.set(k, v);
@@ -63,10 +60,12 @@ function resolveSessionPath(template: string, cfg: CoreConfig, accountId?: strin
 
 function resolveAccountParams(cfg: CoreConfig, accountId?: string) {
   const account = resolveWahaAccount({ cfg, accountId: accountId ?? DEFAULT_ACCOUNT_ID });
+  const session = account.session ?? "default";
+  assertAllowedSession(session);
   return {
     baseUrl: account.baseUrl ?? "",
-    apiKey: account.apiKey as string ?? "",
-    session: account.session ?? "default",
+    apiKey: typeof account.apiKey === "string" ? account.apiKey : "",
+    session,
   };
 }
 
@@ -1005,7 +1004,7 @@ export async function sendWahaImageStatus(params: { cfg: CoreConfig; image: stri
   const filePayload = buildFilePayload(params.image);
   return callWahaApi({ baseUrl, apiKey,
     path: resolveSessionPath("/api/{session}/status/image", params.cfg, params.accountId),
-    body: { ...filePayload, ...(params.caption ? { caption: params.caption } : {}) } });
+    body: { file: filePayload, ...(params.caption ? { caption: params.caption } : {}) } });
 }
 
 export async function sendWahaVoiceStatus(params: { cfg: CoreConfig; voice: string; accountId?: string }) {
@@ -1013,7 +1012,7 @@ export async function sendWahaVoiceStatus(params: { cfg: CoreConfig; voice: stri
   const filePayload = buildFilePayload(params.voice);
   return callWahaApi({ baseUrl, apiKey,
     path: resolveSessionPath("/api/{session}/status/voice", params.cfg, params.accountId),
-    body: filePayload });
+    body: { file: filePayload } });
 }
 
 export async function sendWahaVideoStatus(params: { cfg: CoreConfig; video: string; caption?: string; accountId?: string }) {
@@ -1021,7 +1020,7 @@ export async function sendWahaVideoStatus(params: { cfg: CoreConfig; video: stri
   const filePayload = buildFilePayload(params.video);
   return callWahaApi({ baseUrl, apiKey,
     path: resolveSessionPath("/api/{session}/status/video", params.cfg, params.accountId),
-    body: { ...filePayload, ...(params.caption ? { caption: params.caption } : {}) } });
+    body: { file: filePayload, ...(params.caption ? { caption: params.caption } : {}) } });
 }
 
 export async function deleteWahaStatus(params: { cfg: CoreConfig; id: string; accountId?: string }) {

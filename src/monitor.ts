@@ -1061,7 +1061,12 @@ export function createWahaWebhookServer(opts: {
         if (currentWaha.webhookHmacKey) merged.webhookHmacKey = currentWaha.webhookHmacKey;
         if (currentWaha.webhookHmacKeyFile) merged.webhookHmacKeyFile = currentWaha.webhookHmacKeyFile;
         if (currentWaha.godModeSuperUsers) {
-          // Preserve godModeSuperUsers from nested dmFilter if present
+          merged.godModeSuperUsers = currentWaha.godModeSuperUsers;
+        }
+        const currentDmFilter = currentWaha.dmFilter as Record<string, unknown> | undefined;
+        const mergedDmFilter = merged.dmFilter as Record<string, unknown> | undefined;
+        if (currentDmFilter?.godModeSuperUsers && mergedDmFilter) {
+          mergedDmFilter.godModeSuperUsers = currentDmFilter.godModeSuperUsers;
         }
 
         const updatedConfig = {
@@ -1233,15 +1238,20 @@ export function createWahaWebhookServer(opts: {
         writeJsonResponse(res, 200, { status: "ignored" });
         return;
       }
-      await handleWahaInbound({
-        message,
-        rawPayload: payload.payload,
-        account,
-        config: opts.config,
-        runtime,
-        statusSink: opts.statusSink,
-      });
-      writeJsonResponse(res, 200, { status: "ok" });
+      try {
+        await handleWahaInbound({
+          message,
+          rawPayload: payload.payload,
+          account,
+          config: opts.config,
+          runtime,
+          statusSink: opts.statusSink,
+        });
+        writeJsonResponse(res, 200, { status: "ok" });
+      } catch (err) {
+        console.error(`[waha] handleWahaInbound failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
       return;
     }
 
@@ -1257,32 +1267,36 @@ export function createWahaWebhookServer(opts: {
 
     // ── Poll votes ──
     if (payload.event === "poll.vote" || payload.event === "poll.vote.failed") {
-      const voteData = payload.payload as Record<string, any>;
-      const vote = voteData?.vote;
-      const poll = voteData?.poll;
+      const voteData = payload.payload as Record<string, unknown>;
+      const vote = voteData?.vote as Record<string, unknown> | undefined;
+      const poll = voteData?.poll as Record<string, unknown> | undefined;
       if (vote && poll) {
-        const voter = vote.participant ?? vote.from ?? "unknown";
+        const voter = (vote.participant ?? vote.from ?? "unknown") as string;
         const selected = Array.isArray(vote.selectedOptions) ? vote.selectedOptions.join(", ") : "unknown";
         const failed = payload.event === "poll.vote.failed" ? " (decryption failed)" : "";
         const syntheticMessage: WahaInboundMessage = {
-          messageId: vote.id ?? `poll-vote-${Date.now()}`,
-          timestamp: vote.timestamp ?? Date.now(),
-          from: vote.from ?? "",
-          fromMe: vote.fromMe ?? false,
-          chatId: vote.to ?? poll.to ?? "",
-          body: `[poll_vote${failed}] ${voter} voted "${selected}" on poll ${poll.id ?? "unknown"}`,
+          messageId: (vote.id as string) ?? `poll-vote-${Date.now()}`,
+          timestamp: normalizeTimestamp(typeof vote.timestamp === "number" ? vote.timestamp : Date.now()),
+          from: (vote.from as string) ?? "",
+          fromMe: vote.fromMe === true,
+          chatId: (vote.to as string) ?? (poll.to as string) ?? "",
+          body: `[poll_vote${failed}] ${voter} voted "${selected}" on poll ${(poll.id as string) ?? "unknown"}`,
           hasMedia: false,
-          participant: vote.participant,
+          participant: vote.participant as string | undefined,
         };
         if (!syntheticMessage.fromMe && syntheticMessage.chatId) {
-          await handleWahaInbound({
-            message: syntheticMessage,
-            rawPayload: voteData,
-            account,
-            config: opts.config,
-            runtime,
-            statusSink: opts.statusSink,
-          });
+          try {
+            await handleWahaInbound({
+              message: syntheticMessage,
+              rawPayload: voteData,
+              account,
+              config: opts.config,
+              runtime,
+              statusSink: opts.statusSink,
+            });
+          } catch (err) {
+            console.error(`[waha] poll.vote handleWahaInbound failed: ${String(err)}`);
+          }
         }
       }
       writeJsonResponse(res, 200, { status: "ok" });
@@ -1291,31 +1305,35 @@ export function createWahaWebhookServer(opts: {
 
     // ── Event RSVPs ──
     if (payload.event === "event.response" || payload.event === "event.response.failed") {
-      const rsvpData = payload.payload as Record<string, any>;
-      const eventResponse = rsvpData?.eventResponse;
+      const rsvpData = payload.payload as Record<string, unknown>;
+      const eventResponse = rsvpData?.eventResponse as Record<string, unknown> | undefined;
       if (eventResponse) {
-        const participant = rsvpData.participant ?? rsvpData.from ?? "unknown";
-        const response = eventResponse.response ?? "UNKNOWN";
+        const participant = ((rsvpData.participant ?? rsvpData.from) as string) ?? "unknown";
+        const response = (eventResponse.response as string) ?? "UNKNOWN";
         const failed = payload.event === "event.response.failed" ? " (decryption failed)" : "";
         const syntheticMessage: WahaInboundMessage = {
-          messageId: rsvpData.id ?? `event-rsvp-${Date.now()}`,
-          timestamp: rsvpData.timestamp ?? Date.now(),
-          from: rsvpData.from ?? "",
-          fromMe: rsvpData.fromMe ?? false,
-          chatId: rsvpData.to ?? "",
+          messageId: (rsvpData.id as string) ?? `event-rsvp-${Date.now()}`,
+          timestamp: normalizeTimestamp(typeof rsvpData.timestamp === "number" ? rsvpData.timestamp : Date.now()),
+          from: (rsvpData.from as string) ?? "",
+          fromMe: rsvpData.fromMe === true,
+          chatId: (rsvpData.to as string) ?? "",
           body: `[event_rsvp${failed}] ${participant} responded "${response}"`,
           hasMedia: false,
-          participant: rsvpData.participant,
+          participant: rsvpData.participant as string | undefined,
         };
         if (!syntheticMessage.fromMe && syntheticMessage.chatId) {
-          await handleWahaInbound({
-            message: syntheticMessage,
-            rawPayload: rsvpData,
-            account,
-            config: opts.config,
-            runtime,
-            statusSink: opts.statusSink,
-          });
+          try {
+            await handleWahaInbound({
+              message: syntheticMessage,
+              rawPayload: rsvpData,
+              account,
+              config: opts.config,
+              runtime,
+              statusSink: opts.statusSink,
+            });
+          } catch (err) {
+            console.error(`[waha] event.response handleWahaInbound failed: ${String(err)}`);
+          }
         }
       }
       writeJsonResponse(res, 200, { status: "ok" });
@@ -1350,8 +1368,8 @@ function resolveWebhookHmacSecret(account: ReturnType<typeof resolveWahaAccount>
   if (account.config.webhookHmacKeyFile) {
     try {
       return readFileSync(account.config.webhookHmacKeyFile, "utf-8").trim();
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error(`[waha] CRITICAL: webhookHmacKeyFile "${account.config.webhookHmacKeyFile}" unreadable: ${String(err)}`);
     }
   }
   const inline = normalizeResolvedSecretInputString({
