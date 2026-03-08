@@ -12,7 +12,7 @@ import {
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb } from "./directory.js";
-import { assertAllowedSession } from "./send.js";
+import { assertAllowedSession, getWahaContacts, getWahaGroups } from "./send.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
@@ -359,8 +359,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           <input type="text" id="s-baseUrl" name="baseUrl" placeholder="http://127.0.0.1:3004">
         </div>
         <div class="field">
-          <label>Session <span class="tip" data-tip="WAHA session name. Read-only — change in openclaw.json directly.">?</span></label>
-          <input type="text" id="s-session" name="session" readonly>
+          <label>Active WAHA Session <span class="tip" data-tip="WAHA session name. Select from sessions available on your WAHA server.">?</span></label>
+          <select id="s-session" name="session">
+            <option value="" disabled>Loading sessions...</option>
+          </select>
         </div>
         <div class="field">
           <label>Webhook Port <span class="tip" data-tip="Port the webhook HTTP server listens on. Default: 8050. Restart required after change.">?</span></label>
@@ -532,6 +534,62 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       </div>
     </details>
 
+    <details class="settings-section">
+      <summary>Media Preprocessing</summary>
+      <div class="field-group">
+        <div class="field">
+          <label class="toggle-wrap">
+            <span>Media Preprocessing <span class="tip" data-tip="Master toggle. When enabled, inbound media messages (audio, images, video, documents, locations, vCards) are preprocessed before being sent to the AI.">?</span></span>
+            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-mediaEnabled" name="mediaEnabled" onchange="toggleMediaSubToggles()"><span class="slider"></span></label>
+          </label>
+        </div>
+        <div id="media-sub-toggles" style="display:none;padding-left:16px;border-left:2px solid #334155;display:grid;gap:10px;">
+          <div class="field">
+            <label class="toggle-wrap">
+              <span>Audio Transcription <span class="tip" data-tip="Transcribe voice messages to text using Whisper before sending to AI.">?</span></span>
+              <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-audioTranscription" name="audioTranscription"><span class="slider"></span></label>
+            </label>
+          </div>
+          <div class="field">
+            <label class="toggle-wrap">
+              <span>Image Analysis <span class="tip" data-tip="Analyze image content and generate descriptions before sending to AI.">?</span></span>
+              <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-imageAnalysis" name="imageAnalysis"><span class="slider"></span></label>
+            </label>
+          </div>
+          <div class="field">
+            <label class="toggle-wrap">
+              <span>Video Analysis <span class="tip" data-tip="Analyze video content (extracts key frames) before sending to AI.">?</span></span>
+              <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-videoAnalysis" name="videoAnalysis"><span class="slider"></span></label>
+            </label>
+          </div>
+          <div class="field">
+            <label class="toggle-wrap">
+              <span>Location Resolution <span class="tip" data-tip="Resolve GPS coordinates to human-readable addresses via OpenStreetMap Nominatim.">?</span></span>
+              <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-locationResolution" name="locationResolution"><span class="slider"></span></label>
+            </label>
+          </div>
+          <div class="field">
+            <label class="toggle-wrap">
+              <span>vCard Parsing <span class="tip" data-tip="Parse vCard contact attachments and extract contact info as structured text.">?</span></span>
+              <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-vcardParsing" name="vcardParsing"><span class="slider"></span></label>
+            </label>
+          </div>
+          <div class="field">
+            <label class="toggle-wrap">
+              <span>Document Analysis <span class="tip" data-tip="Extract text content from PDF and document attachments before sending to AI.">?</span></span>
+              <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-documentAnalysis" name="documentAnalysis"><span class="slider"></span></label>
+            </label>
+          </div>
+        </div>
+        <div class="field" style="margin-top:4px;">
+          <label style="color:#64748b;font-size:0.82rem;">Poll Handling &nbsp;<span style="background:#10b981;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">Automatic (built-in)</span></label>
+        </div>
+        <div class="field">
+          <label style="color:#64748b;font-size:0.82rem;">Event Handling &nbsp;<span style="background:#10b981;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">Automatic (built-in)</span></label>
+        </div>
+      </div>
+    </details>
+
     <div style="padding-top:8px;">
       <button type="submit" class="save-btn">Save Settings</button>
       <div id="save-note" style="font-size:0.78rem;color:#64748b;margin-top:6px;display:none">Some settings require a gateway restart to take effect.</div>
@@ -548,6 +606,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <h2>Contact Directory</h2>
   <div class="dir-header">
     <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()">
+    <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Import contacts and groups from WAHA API">Refresh from WAHA</button>
     <div class="dir-stats" id="dir-stats"></div>
   </div>
   <div class="contact-list" id="contact-list"></div>
@@ -636,6 +695,33 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   </details>
 
   <details class="docs-section">
+    <summary>Media Preprocessing (v1.4.0)</summary>
+    <div class="docs-body">
+      <p>The media preprocessing system transforms inbound media into AI-readable text before forwarding to OpenClaw:</p>
+      <ul>
+        <li><strong>Audio Transcription</strong> — Voice messages transcribed via faster-whisper (requires ffmpeg on host)</li>
+        <li><strong>Image Analysis</strong> — Image descriptions generated by vision-capable LLM</li>
+        <li><strong>Video Analysis</strong> — Key frame extraction + analysis</li>
+        <li><strong>Location Resolution</strong> — GPS coordinates resolved to addresses via OpenStreetMap Nominatim (no API key needed)</li>
+        <li><strong>vCard Parsing</strong> — Contact attachments extracted to structured text</li>
+        <li><strong>Document Analysis</strong> — PDF/document text extraction</li>
+        <li><strong>Poll Handling</strong> — Automatic (built-in, always on)</li>
+        <li><strong>Event Handling</strong> — Automatic (built-in, always on)</li>
+      </ul>
+      <p>Enable the master toggle, then enable individual sub-features as needed. Each sub-feature can be toggled independently.</p>
+    </div>
+  </details>
+
+  <details class="docs-section">
+    <summary>Directory Refresh (v1.4.0)</summary>
+    <div class="docs-body">
+      <p>The <strong>Refresh from WAHA</strong> button in the Directory tab bulk-imports all contacts and groups from your WAHA session into the local SQLite directory.</p>
+      <p>This is useful for pre-populating the directory on first setup, or syncing after adding new contacts to WhatsApp. The import uses <code>INSERT OR REPLACE</code>, so existing contact settings and message counts are preserved.</p>
+      <p>Under the hood, it calls <code>GET /api/{session}/contacts</code> and <code>GET /api/{session}/groups</code> on your WAHA server.</p>
+    </div>
+  </details>
+
+  <details class="docs-section">
     <summary>Troubleshooting</summary>
     <div class="docs-body">
       <p><strong>Bot not responding to messages?</strong></p>
@@ -648,7 +734,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       </ul>
       <p><strong>HMAC signature errors?</strong> The <code>webhookHmacKey</code> in this config must match the HMAC key configured in WAHA's webhook settings.</p>
       <p><strong>Settings not taking effect?</strong> Connection settings (baseUrl, webhookPort) require a gateway restart: <code>kill -9 $(pgrep -f openclaw-gatewa)</code> — systemd auto-restarts it.</p>
-      <p><strong>Directory not updating?</strong> Contacts are tracked on first message receipt. The SQLite file is at <code>~/.openclaw/data/waha-directory-{accountId}.db</code>.</p>
+      <p><strong>Directory not updating?</strong> Contacts are tracked on first message receipt. Use the Refresh button to bulk-import from WAHA. The SQLite file is at <code>~/.openclaw/data/waha-directory-{accountId}.db</code>.</p>
     </div>
   </details>
 
@@ -777,7 +863,25 @@ async function loadConfig() {
     var setVal = function(id, v) { var el = document.getElementById(id); if (el) el.value = v != null ? v : ''; };
     var setChk = function(id, v) { var el = document.getElementById(id); if (el) el.checked = Boolean(v); };
     setVal('s-baseUrl', w.baseUrl || '');
-    setVal('s-session', w.session || '');
+    // Populate session picker from WAHA API
+    (async function() {
+      var sel = document.getElementById('s-session');
+      if (!sel) return;
+      try {
+        var sr = await fetch('/api/admin/sessions');
+        if (sr.ok) {
+          var sessions = await sr.json();
+          var currentSession = w.session || '';
+          sel.innerHTML = sessions.map(function(s) {
+            var name = typeof s === 'string' ? s : (s.name || s.id || JSON.stringify(s));
+            return '<option value="' + esc(name) + '"' + (name === currentSession ? ' selected' : '') + '>' + esc(name) + '</option>';
+          }).join('') || '<option value="' + esc(currentSession) + '" selected>' + esc(currentSession || 'unknown') + '</option>';
+        }
+      } catch(e) {
+        var cur = w.session || '';
+        sel.innerHTML = '<option value="' + esc(cur) + '" selected>' + esc(cur || 'unknown') + '</option>';
+      }
+    })();
     setVal('s-webhookPort', w.webhookPort || 8050);
     setVal('s-webhookPath', w.webhookPath || '/webhook/waha');
     setVal('s-dmPolicy', w.dmPolicy || 'pairing');
@@ -811,6 +915,15 @@ async function loadConfig() {
     setVal('s-markdownTables', md.tables || 'auto');
     setChk('s-reactions', (w.actions || {}).reactions !== false);
     setChk('s-blockStreaming', w.blockStreaming === true);
+    var mp = w.mediaPreprocessing || {};
+    setChk('s-mediaEnabled', mp.enabled === true);
+    setChk('s-audioTranscription', mp.audioTranscription !== false);
+    setChk('s-imageAnalysis', mp.imageAnalysis !== false);
+    setChk('s-videoAnalysis', mp.videoAnalysis !== false);
+    setChk('s-locationResolution', mp.locationResolution !== false);
+    setChk('s-vcardParsing', mp.vcardParsing !== false);
+    setChk('s-documentAnalysis', mp.documentAnalysis !== false);
+    toggleMediaSubToggles();
   } catch(e) {
     showToast('Failed to load config: ' + e.message, true);
   }
@@ -855,6 +968,15 @@ async function saveSettings(e) {
       },
       actions: { reactions: getChk('s-reactions') },
       blockStreaming: getChk('s-blockStreaming'),
+      mediaPreprocessing: {
+        enabled: getChk('s-mediaEnabled'),
+        audioTranscription: getChk('s-audioTranscription'),
+        imageAnalysis: getChk('s-imageAnalysis'),
+        videoAnalysis: getChk('s-videoAnalysis'),
+        locationResolution: getChk('s-locationResolution'),
+        vcardParsing: getChk('s-vcardParsing'),
+        documentAnalysis: getChk('s-documentAnalysis'),
+      },
     }
   };
   try {
@@ -866,6 +988,31 @@ async function saveSettings(e) {
     else document.getElementById('save-note').style.display = 'none';
   } catch(e) {
     showToast('Error: ' + e.message, true);
+  }
+}
+
+// ---- Media sub-toggles visibility ----
+function toggleMediaSubToggles() {
+  var masterEl = document.getElementById('s-mediaEnabled');
+  var subDiv = document.getElementById('media-sub-toggles');
+  if (masterEl && subDiv) subDiv.style.display = masterEl.checked ? 'grid' : 'none';
+}
+
+// ---- Directory refresh ----
+async function refreshDirectory() {
+  var btn = document.getElementById('dir-refresh-btn');
+  if (btn) { btn.textContent = 'Importing...'; btn.disabled = true; }
+  try {
+    var r = await fetch('/api/admin/directory/refresh', { method: 'POST' });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Refresh failed');
+    showToast('Imported ' + d.contacts + ' contacts, ' + d.groups + ' groups');
+    dirOffset = 0;
+    await loadDirectory();
+  } catch(e) {
+    showToast('Refresh error: ' + e.message, true);
+  } finally {
+    if (btn) { btn.textContent = 'Refresh from WAHA'; btn.disabled = false; }
   }
 }
 
@@ -1175,6 +1322,56 @@ export function createWahaWebhookServer(opts: {
       } else {
         res.writeHead(404);
         res.end();
+      }
+      return;
+    }
+
+    // GET /api/admin/sessions — proxy to WAHA sessions API
+    if (req.url === "/api/admin/sessions" && req.method === "GET") {
+      try {
+        const baseUrl = account.config.baseUrl ?? "";
+        const apiKey = account.config.apiKey ?? "";
+        const response = await fetch(`${baseUrl}/api/sessions/`, {
+          headers: { "x-api-key": apiKey },
+        });
+        if (!response.ok) throw new Error(`WAHA sessions API returned ${response.status}`);
+        const sessions = await response.json();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(sessions));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Failed to fetch sessions" }));
+      }
+      return;
+    }
+
+    // POST /api/admin/directory/refresh — bulk import contacts and groups from WAHA
+    if (req.url === "/api/admin/directory/refresh" && req.method === "POST") {
+      try {
+        const db = getDirectoryDb(opts.accountId);
+        const [rawContacts, rawGroups] = await Promise.all([
+          getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch(() => []),
+          getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch(() => []),
+        ]);
+        const contactsArr = Array.isArray(rawContacts) ? rawContacts : [];
+        const groupsArr = Array.isArray(rawGroups) ? rawGroups : [];
+        const mappedContacts = contactsArr.map((c: Record<string, unknown>) => ({
+          jid: String(c.id ?? ""),
+          name: (c.name as string) || (c.pushName as string) || undefined,
+          isGroup: false,
+        })).filter((c) => c.jid);
+        const mappedGroups = groupsArr.map((g: Record<string, unknown>) => ({
+          jid: String(g.id ?? ""),
+          name: (g.subject as string) || (g.name as string) || undefined,
+          isGroup: true,
+        })).filter((g) => g.jid);
+        const combined = [...mappedContacts, ...mappedGroups];
+        const imported = db.bulkUpsertContacts(combined);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ imported, contacts: mappedContacts.length, groups: mappedGroups.length }));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: String(err) }));
       }
       return;
     }

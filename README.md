@@ -2,7 +2,19 @@
 
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
-**Last updated:** 2026-03-07
+**Last updated:** 2026-03-08
+**Version:** 1.4.0
+
+## Changelog
+
+### v1.4.0 (2026-03-08)
+- **Typing indicator bug fix:** Inline flicker loop in `startHumanPresence` now guarantees `typing: false` on loop exit, eliminating lingering "typing..." state after message delivery. Added 100ms drain delay after `flickerPromise` to prevent race condition on final stop signal.
+- **Admin GUI — Media Preprocessing toggles:** New "Media Preprocessing" section in Settings tab with master toggle and independent sub-toggles for audio transcription, image analysis, video analysis, location resolution, vCard parsing, and document analysis.
+- **Admin GUI — Dynamic WAHA session picker:** Connection section now has a dropdown populated from `GET /api/admin/sessions` (proxies to WAHA `/api/sessions/`), replacing the read-only session text field.
+- **Admin GUI — Directory Refresh button:** Directory tab now has "Refresh from WAHA" button that calls `POST /api/admin/directory/refresh`, bulk-importing all contacts and groups from WAHA API into the local SQLite directory.
+- **Poll Handling & Event Handling:** Displayed as "Automatic (built-in)" in the Features section — no user configuration needed.
+- **New API endpoints:** `GET /api/admin/sessions`, `POST /api/admin/directory/refresh`.
+- **`bulkUpsertContacts()`:** New method on `DirectoryDb` for transactional batch upsert.
 
 ---
 
