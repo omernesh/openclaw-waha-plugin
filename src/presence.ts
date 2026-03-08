@@ -124,16 +124,27 @@ export async function startHumanPresence(params: {
   const typingStartedAt = Date.now();
 
   let flickerAborted = false;
+  let wakeFlicker: (() => void) | null = null;
+
+  /** Sleep that can be interrupted immediately when flickerAborted is set */
+  const flickerSleep = (ms: number): Promise<void> => {
+    if (flickerAborted) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => { wakeFlicker = null; resolve(); }, ms);
+      wakeFlicker = () => { clearTimeout(timer); wakeFlicker = null; resolve(); };
+    });
+  };
+
   const flickerPromise = (async () => {
     while (!flickerAborted) {
       const interval = rand(presenceCfg.pauseIntervalMs[0], presenceCfg.pauseIntervalMs[1]);
-      await sleep(interval);
+      await flickerSleep(interval);
       if (flickerAborted) break;
 
       if (Math.random() < presenceCfg.pauseChance) {
         await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
         const pauseDuration = rand(presenceCfg.pauseDurationMs[0], presenceCfg.pauseDurationMs[1]);
-        await sleep(pauseDuration);
+        await flickerSleep(pauseDuration);
         if (flickerAborted) break;
         await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(() => {});
       }
@@ -151,13 +162,15 @@ export async function startHumanPresence(params: {
       }
 
       flickerAborted = true;
-      await flickerPromise; // Wait for in-flight flicker to drain
+      wakeFlicker?.(); // Interrupt pending sleep immediately — no more 2-5s wait
+      await flickerPromise;
       finishTypingDone = true;
       await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
     },
     cancelTyping: async () => {
       flickerAborted = true;
-      await flickerPromise; // Wait for in-flight flicker to drain
+      wakeFlicker?.(); // Interrupt pending sleep immediately
+      await flickerPromise;
       await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
     },
   };

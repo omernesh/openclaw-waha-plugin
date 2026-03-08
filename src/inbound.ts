@@ -420,4 +420,7 @@ export async function handleWahaInbound(params: {
           : undefined,
     },
   });
+
+  // Final safety net: ensure typing indicator is stopped after all dispatch completes
+  await presenceCtrl.finishTyping().catch(() => {});
 }
