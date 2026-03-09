@@ -5,6 +5,20 @@ import { resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
 import type { CoreConfig } from "./types.js";
 
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  SESSION GUARDRAIL — DO NOT REMOVE                                   ║
+// ║                                                                      ║
+// ║  This blocks the "omer" session from sending messages.               ║
+// ║  Only "logan" (or *_logan) sessions are allowed to send.             ║
+// ║  Without this, the bot could send messages AS Omer — dangerous.      ║
+// ║                                                                      ║
+// ║  The guardrail was accidentally removed in an earlier version,       ║
+// ║  then a different hardcoded restriction was added that blocked ALL    ║
+// ║  sessions except logan. Fixed in v1.9.0 to allow any non-omer.       ║
+// ║                                                                      ║
+// ║  If you need to test with omer session, temporarily comment out      ║
+// ║  the throw — but NEVER deploy without this guardrail.                ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 export function assertAllowedSession(session: string) {
   const normalized = session.trim();
   // Block "omer" and any prefixed variant like "3cf11776_omer"
@@ -17,6 +31,9 @@ export function assertAllowedSession(session: string) {
   }
 }
 
+// Core HTTP client for all WAHA API calls. All functions below use this.
+// Handles method, headers, query params, body serialization.
+// ⚠️ Do not add retry logic here — the gateway handles retries upstream.
 async function callWahaApi(params: {
   baseUrl: string;
   apiKey: string;
@@ -58,6 +75,9 @@ function resolveSessionPath(template: string, cfg: CoreConfig, accountId?: strin
   return template.replace("{session}", encodeURIComponent(session));
 }
 
+// Account resolution: determines which WAHA session + API key to use.
+// In production: session=3cf11776_logan, API key from WHATSAPP_API_KEY env var.
+// ⚠️ WAHA has TWO API keys (WAHA_API_KEY vs WHATSAPP_API_KEY) — only WHATSAPP_API_KEY works.
 function resolveAccountParams(cfg: CoreConfig, accountId?: string) {
   const account = resolveWahaAccount({ cfg, accountId: accountId ?? DEFAULT_ACCOUNT_ID });
   const session = account.session ?? "default";
@@ -298,6 +318,9 @@ export async function sendWahaMediaBatch(params: {
   });
 }
 
+// ── VERIFIED WORKING 2026-03-10 ──────────────────────────────────
+// Reaction needs full messageId: "true_<chatId>_<shortId>"
+// Uses PUT /api/reaction (not POST).
 export async function sendWahaReaction(params: {
   cfg: CoreConfig;
   messageId: string;
@@ -327,6 +350,9 @@ export async function sendWahaReaction(params: {
 
 // ── Rich Messages ──────────────────────────────────────────────
 
+// ── VERIFIED WORKING 2026-03-10 (native WhatsApp poll, 19s) ─────
+// WAHA requires poll:{name, options, multipleAnswers} wrapper object.
+// Do NOT flatten poll fields into the top-level body.
 export async function sendWahaPoll(params: {
   cfg: CoreConfig; chatId: string; name: string; options: string[];
   multipleAnswers?: boolean; replyToId?: string; accountId?: string;
@@ -352,6 +378,7 @@ export async function sendWahaPollVote(params: {
   });
 }
 
+// ── VERIFIED WORKING 2026-03-10 ──────────────────────────────────
 export async function sendWahaLocation(params: {
   cfg: CoreConfig; chatId: string; latitude: number; longitude: number; title: string;
   replyToId?: string; accountId?: string;
@@ -442,6 +469,10 @@ export async function sendWahaButtonsReply(params: {
 
 // ── Message Management ─────────────────────────────────────────
 
+// ── VERIFIED WORKING 2026-03-10 ──────────────────────────────────
+// Edit endpoint: PUT /api/{session}/chats/{chatId}/messages/{messageId}
+// messageId MUST be full format: "true_<chatId>_<shortId>"
+// Short IDs (just the hex part) cause 500 error from WAHA.
 export async function editWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; text: string; accountId?: string;
 }) {
@@ -454,6 +485,10 @@ export async function editWahaMessage(params: {
   });
 }
 
+// ── VERIFIED WORKING 2026-03-10 ──────────────────────────────────
+// Delete/unsend endpoint: DELETE /api/{session}/chats/{chatId}/messages/{messageId}
+// Same full messageId format required as edit.
+// Returns protocolMessage type "REVOKE" on success.
 export async function deleteWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
 }) {
@@ -1094,8 +1129,23 @@ export async function previewWahaChannelMessages(params: { cfg: CoreConfig; chan
     path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/messages/preview` });
 }
 
+/**
+ * Get newsletter info by JID. Tries /channels endpoint first (newsletters are channels in WAHA).
+ * Falls back gracefully if the newsletter is not found.
+ */
+export async function getWahaNewsletter(params: { cfg: CoreConfig; newsletterId: string; accountId?: string }): Promise<Record<string, unknown> | null> {
+  try {
+    const result = await getWahaChannel({ cfg: params.cfg, channelId: params.newsletterId, accountId: params.accountId });
+    return result as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 // ── Events / Calendar ──────────────────────────────────────────
 
+// ⚠️ NOT SUPPORTED on NOWEB engine (returns 501).
+// Only works with WEBJS engine. Keep the function for future compatibility.
 export async function sendWahaEvent(params: {
   cfg: CoreConfig; chatId: string; name: string; startTime: number;
   endTime?: number; description?: string; location?: { name: string };

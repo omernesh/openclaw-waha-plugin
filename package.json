@@ -1,6 +1,6 @@
 {
   "name": "waha-openclaw-channel",
-  "version": "1.4.1",
+  "version": "1.8.5",
   "description": "OpenClaw WAHA (WhatsApp HTTP API) channel plugin",
   "type": "module",
   "main": "./index.ts",
@@ -8,6 +8,7 @@
     "index.ts",
     "src/",
     "docs/",
+    "SKILL.md",
     "config-example.json",
     "README.md"
   ],
@@ -51,5 +52,8 @@
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

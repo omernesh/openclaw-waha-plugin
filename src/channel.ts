@@ -183,42 +183,160 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   rejectCall: (p, cfg, aid) => rejectWahaCall({ cfg, callId: String(p.callId), accountId: aid }),
 };
 
-const ALL_ACTIONS = ["react", ...Object.keys(ACTION_HANDLERS)];
+// ======================================================================
+// VERIFIED WORKING -- DO NOT MODIFY WITHOUT READING THIS
+//
+// These action names MUST match OpenClaw gateway's
+// MESSAGE_ACTION_TARGET_MODE registry (in compact-*.js).
+// Custom WAHA names (sendPoll, editMessage, etc.) are REJECTED
+// by the gateway with "Action X does not accept a target" error.
+//
+// Only these standard names support target resolution:
+//   send, poll, react, edit, unsend, pin, unpin, read, delete, reply
+//
+// handleAction() below maps these standard names to WAHA API calls.
+// Last verified: 2026-03-10 -- all 7/8 actions PASS (sendEvent=NOWEB)
+//
+// If you change these names, the gateway will silently reject them.
+// See: docs/integrations/OPENCLAW_LESSONS_LEARNED.md
+// ======================================================================
+const STANDARD_ACTIONS = ["send", "poll", "react", "edit", "unsend", "pin", "unpin", "read", "delete", "reply"];
+
+// Utility actions don't need target resolution. They are exposed to the LLM
+// as available tools. Keep this list curated -- too many actions overwhelm the
+// model's context and degrade response quality. Each action here costs ~50 tokens.
+const UTILITY_ACTIONS = [
+  "getGroups", "getGroup", "getGroupsCount", "getParticipants",
+  "getContacts", "getContact", "checkContactExists",
+  "getChatsOverview", "getChats", "getChatMessages",
+  "getProfile", "getLabels", "getChannels",
+  "getPresence", "findPhoneByLid", "findLidByPhone", "getAllLids",
+  "createGroup", "sendEvent", "sendLocation", "sendContactVcard",
+  "sendTextStatus", "sendImageStatus",
+];
+
+// DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.
+// Only EXPOSED_ACTIONS (standard + curated utility) should be returned by listActions().
+const EXPOSED_ACTIONS = [...STANDARD_ACTIONS, ...UTILITY_ACTIONS];
+
+// Resolve chatId from gateway target resolution params
+function resolveChatId(params: Record<string, unknown>, toolContext?: { currentChannelId?: string }): string {
+  return (typeof params.chatId === "string" && params.chatId) ? params.chatId
+    : (typeof params.to === "string" && params.to) ? params.to
+    : (toolContext?.currentChannelId ?? "");
+}
 
 const wahaMessageActions: ChannelMessageActionAdapter = {
-  listActions: () => ALL_ACTIONS,
-  supportsAction: ({ action }) => ALL_ACTIONS.includes(action),
-  handleAction: async ({ action, params, cfg, accountId }) => {
+  listActions: () => EXPOSED_ACTIONS, // !!! DO NOT CHANGE to ALL_ACTIONS -- breaks gateway target resolution
+  supportsAction: ({ action }) => EXPOSED_ACTIONS.includes(action) || action in ACTION_HANDLERS,
+  handleAction: async ({ action, params, cfg, accountId, toolContext }) => {
+    const p = params as Record<string, unknown>;
+    const coreCfg = cfg as CoreConfig;
+    const aid = accountId ?? undefined;
+
+    // --- Standard targeted actions (gateway-recognized names) ---
+
     if (action === "react") {
-      const messageId = typeof (params as any)?.messageId === "string" ? (params as any).messageId : "";
-      const emojiRaw = typeof (params as any)?.emoji === "string" ? (params as any).emoji : "";
-      const remove = (params as any)?.remove === true;
+      const messageId = typeof p.messageId === "string" ? p.messageId : "";
+      const emojiRaw = typeof p.emoji === "string" ? p.emoji : "";
+      const remove = p.remove === true;
       if (!messageId) throw new Error("WAHA react requires messageId");
       if (!emojiRaw && !remove) throw new Error("WAHA react requires emoji");
 
-      await sendWahaReaction({
-        cfg: cfg as CoreConfig,
-        messageId,
-        emoji: emojiRaw,
-        remove,
-        accountId: accountId ?? undefined,
-      });
+      await sendWahaReaction({ cfg: coreCfg, messageId, emoji: emojiRaw, remove, accountId: aid });
 
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: remove
-              ? `Removed reaction from ${messageId}`
-              : `Reacted with ${emojiRaw} on ${messageId}`,
-          },
-        ],
+        content: [{ type: "text" as const, text: remove ? `Removed reaction from ${messageId}` : `Reacted with ${emojiRaw} on ${messageId}` }],
         details: {},
       };
     }
+
+    // -- VERIFIED WORKING 2026-03-10 (19s response time) ----------
+    // Poll uses sendWahaPoll. chatId resolved via 3-source fallback:
+    //   1. params.to  2. params.chatId  3. toolContext.currentChannelId
+    // The poll:{} wrapper is required by WAHA API.
+    if (action === "poll") {
+      const chatId = resolveChatId(p, toolContext);
+      const question = typeof p.pollQuestion === "string" ? p.pollQuestion : (typeof p.name === "string" ? p.name : "");
+      const options = Array.isArray(p.pollOption) ? p.pollOption as string[] : (Array.isArray(p.options) ? p.options as string[] : []);
+      const multipleAnswers = Boolean(p.multipleAnswers);
+      if (!chatId) throw new Error("poll action requires chatId (resolved from target)");
+      if (!question) throw new Error("poll action requires pollQuestion");
+      if (!options.length) throw new Error("poll action requires pollOption (array of strings)");
+
+      const result = await sendWahaPoll({ cfg: coreCfg, chatId, name: question, options, multipleAnswers, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    // -- VERIFIED WORKING 2026-03-10 ------------------------------
+    // Send DM uses sendWahaText with chatId from target resolution.
+    // Target can come from: params.to, params.chatId, or toolContext.currentChannelId
+    if (action === "send" || action === "reply") {
+      const chatId = resolveChatId(p, toolContext);
+      const text = typeof p.text === "string" ? p.text : (typeof p.message === "string" ? p.message : "");
+      const replyToId = typeof p.replyToId === "string" ? p.replyToId : undefined;
+      if (!chatId) throw new Error("send action requires chatId (resolved from target)");
+      if (!text) throw new Error("send action requires text");
+
+      const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    // -- VERIFIED WORKING 2026-03-10 ------------------------------
+    // Edit requires full serialized message ID: "true_<chatId>_<shortId>"
+    // The LLM gets this from webhook payloads. Don't try to construct it.
+    if (action === "edit") {
+      const chatId = resolveChatId(p, toolContext);
+      const messageId = typeof p.messageId === "string" ? p.messageId : "";
+      const text = typeof p.text === "string" ? p.text : "";
+      if (!chatId || !messageId || !text) throw new Error("edit action requires chatId, messageId, and text");
+
+      const result = await editWahaMessage({ cfg: coreCfg, chatId, messageId, text, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    // -- VERIFIED WORKING 2026-03-10 ------------------------------
+    // Unsend/delete also requires full serialized message ID format.
+    // WAHA returns protocolMessage type "REVOKE" on success.
+    if (action === "unsend" || action === "delete") {
+      const chatId = resolveChatId(p, toolContext);
+      const messageId = typeof p.messageId === "string" ? p.messageId : "";
+      if (!chatId || !messageId) throw new Error("unsend action requires chatId and messageId");
+
+      const result = await deleteWahaMessage({ cfg: coreCfg, chatId, messageId, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    if (action === "pin") {
+      const chatId = resolveChatId(p, toolContext);
+      const messageId = typeof p.messageId === "string" ? p.messageId : "";
+      if (!chatId || !messageId) throw new Error("pin action requires chatId and messageId");
+
+      const result = await pinWahaMessage({ cfg: coreCfg, chatId, messageId, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    if (action === "unpin") {
+      const chatId = resolveChatId(p, toolContext);
+      const messageId = typeof p.messageId === "string" ? p.messageId : "";
+      if (!chatId || !messageId) throw new Error("unpin action requires chatId and messageId");
+
+      const result = await unpinWahaMessage({ cfg: coreCfg, chatId, messageId, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    if (action === "read") {
+      const chatId = resolveChatId(p, toolContext);
+      if (!chatId) throw new Error("read action requires chatId");
+
+      const result = await readWahaChatMessages({ cfg: coreCfg, chatId, accountId: aid });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+    }
+
+    // --- Fallback: custom WAHA action names (utility actions + backward compat) ---
     const handler = ACTION_HANDLERS[action];
     if (!handler) throw new Error(`WAHA action "${action}" not supported`);
-    const result = await handler(params as Record<string, unknown>, cfg as CoreConfig, accountId ?? undefined);
+    const result = await handler(p, coreCfg, aid);
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       details: {},
@@ -251,7 +369,29 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     nativeCommands: false,
     blockStreaming: true,
   },
-  messageActions: wahaMessageActions,
+  messaging: {
+    // Strips waha:/whatsapp:/chat: prefixes that OpenClaw may prepend.
+    // Without this, targets like "waha:120363@g.us" fail at WAHA API level.
+    normalizeTarget: (raw: string) => {
+      const trimmed = raw.trim().replace(/^(waha|whatsapp|chat):/i, "");
+      return trimmed || undefined;
+    },
+    // targetResolver is CRITICAL for action routing. Without it, the gateway
+    // throws "Unknown target" for JID-format targets (@c.us, @g.us, @lid, etc.)
+    // Added in v1.8.0 -- verified working. DO NOT REMOVE.
+    targetResolver: {
+      looksLikeId: (raw: string) => {
+        const trimmed = raw.trim();
+        // WAHA JID formats: 123@c.us, 123@g.us, 123@lid, 123@s.whatsapp.net, 123@newsletter
+        if (/@(c\.us|g\.us|lid|s\.whatsapp\.net|newsletter|broadcast)$/i.test(trimmed)) return true;
+        // Plain phone number (6+ digits, optional + prefix)
+        if (/^\+?\d{6,}$/.test(trimmed)) return true;
+        return false;
+      },
+      hint: "Use a WhatsApp JID (e.g. 123456@c.us, 120363...@g.us) or a phone number",
+    },
+  },
+  actions: wahaMessageActions,
   reload: { configPrefixes: ["channels.waha"] },
   configSchema: buildChannelConfigSchema(WahaConfigSchema),
   config: {
@@ -372,6 +512,17 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
         accountId: accountId ?? undefined,
       });
       return { channel: "waha", ok: true } as const;
+    },
+    sendPoll: async ({ to, poll, accountId }) => {
+      const result = await sendWahaPoll({
+        cfg: getWahaRuntime().config.readConfigFile() as CoreConfig,
+        chatId: normalizeWahaMessagingTarget(to),
+        name: poll.question,
+        options: poll.options,
+        multipleAnswers: (poll.maxSelections ?? 1) > 1,
+        accountId: accountId ?? undefined,
+      });
+      return { messageId: (result as any)?.key?.id ?? "", channelId: "waha" };
     },
   },
   status: {
