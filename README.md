@@ -3,9 +3,15 @@
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
 **Last updated:** 2026-03-10
-**Version:** 1.9.1
+**Version:** 1.9.2
 
 ## Changelog
+
+### v1.9.2 (2026-03-10) -- Fix: Image Analysis via Native Pipeline
+- **Bug fix**: Images sent via WhatsApp were not being analyzed by Sammie. Root cause: `downloadWahaMedia()` saved temp files to `/tmp/waha-media-*` which is outside OpenClaw's allowed media path roots (`/tmp/openclaw/`). The native `applyMediaUnderstanding()` pipeline silently rejected these paths.
+- **Fix in media.ts**: Changed download path to `/tmp/openclaw/waha-media-*` with `mkdir` recursive to ensure the directory exists.
+- **Fix in inbound.ts**: For image messages, downloads the image from WAHA and passes it as `MediaPath`/`MediaPaths`/`MediaTypes` on the context payload, letting OpenClaw's native media-understanding pipeline analyze it (same pipeline Telegram uses). Previously, the plugin called LiteLLM vision API directly which failed with 401 (no API key in systemd env).
+- Audio transcription (local Whisper) unchanged and working correctly.
 
 ### v1.9.1 (2026-03-10) -- Fix: Voice Transcription Disabled by Config
 - **Bug fix**: `mediaPreprocessing.enabled` was `false` in openclaw.json, silently disabling ALL media preprocessing (voice transcription, image analysis, video analysis, location resolution, vCard parsing, document analysis)
@@ -110,7 +116,7 @@ Test results from manual verification on 2026-03-10:
 | `runtime.ts` | ~15 | Runtime singleton access. `setWahaRuntime()` / `getWahaRuntime()` store and retrieve the OpenClaw `PluginRuntime` instance for use across modules. |
 | `signature.ts` | ~30 | HMAC webhook verification. `verifyWahaWebhookHmac()` validates the `X-Webhook-Hmac` header using SHA-512, accepting hex or base64 signature formats. Uses `crypto.timingSafeEqual()` for constant-time comparison. |
 | `secret-input.ts` | ~15 | Secret field schema. Re-exports OpenClaw SDK secret input utilities and provides `buildSecretInputSchema()` which accepts either a plain string or a `{ source, provider, id }` object for env/file/exec-based secret resolution. |
-| `media.ts` | ~470 | Media preprocessing pipeline. Downloads media from WAHA, transcribes audio via local faster-whisper, analyzes images via Vision API, describes videos via Gemini, reverse-geocodes locations, parses vCards, extracts document metadata. **DO NOT disable `mediaPreprocessing.enabled`** -- it is the master kill switch for all processing. |
+| `media.ts` | ~470 | Media preprocessing pipeline. Downloads media from WAHA to `/tmp/openclaw/waha-media-*` (must be under `/tmp/openclaw/` for OpenClaw's allowed media path roots), transcribes audio via local faster-whisper, passes images through OpenClaw's native media-understanding pipeline, describes videos via Gemini, reverse-geocodes locations, parses vCards, extracts document metadata. **DO NOT disable `mediaPreprocessing.enabled`** -- it is the master kill switch for all processing. |
 
 ---
 

@@ -24,7 +24,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { readFile, writeFile, unlink, stat } from "node:fs/promises";
+import { readFile, writeFile, unlink, stat, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -71,7 +71,14 @@ export async function downloadWahaMedia(
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  const tmpPath = join(tmpdir(), `waha-media-${randomBytes(8).toString("hex")}`);
+  // !! DO NOT CHANGE — Must save to /tmp/openclaw/ (not /tmp/) !!
+  // OpenClaw's native media-understanding pipeline validates paths against allowed roots.
+  // Files under /tmp/waha-media-* are BLOCKED by isInboundPathAllowed().
+  // Only /tmp/openclaw/, ~/.openclaw/media/, and the agent's media dir are allowed.
+  // Bug fixed 2026-03-10: images saved to /tmp/ were silently rejected by the pipeline.
+  const mediaDir = join(tmpdir(), "openclaw");
+  await mkdir(mediaDir, { recursive: true });
+  const tmpPath = join(mediaDir, `waha-media-${randomBytes(8).toString("hex")}`);
   await writeFile(tmpPath, buffer);
 
   return {
@@ -445,14 +452,20 @@ export async function preprocessInboundMessage(params: {
         }
       }
     } else if (msgContent.imageMessage) {
-      if (config?.image?.enabled !== false && resolvedMediaUrl) {
-        const dl = await downloadWahaMedia(resolvedMediaUrl, account.apiKey);
-        try {
-          prefix = await preprocessImage(dl.path, config?.image, message.body || undefined);
-        } finally {
-          await dl.cleanup();
-        }
-      }
+      // !! DO NOT CHANGE — Images handled by OpenClaw's native media-understanding pipeline !!
+      // The inbound handler (inbound.ts) downloads the image and passes it as MediaPath/MediaPaths
+      // on the context payload. OpenClaw's applyMediaUnderstanding() then analyzes it using the
+      // gateway's configured vision providers and API keys (same pipeline as Telegram channel).
+      //
+      // Bug history:
+      // - 2026-03-10: Custom preprocessImage() called LiteLLM vision API directly via fetch(),
+      //   but LITELLM_API_KEY was not in the systemd service environment → 401 auth error.
+      //   Agent received "[Image]: (analysis failed)" instead of actual descriptions.
+      //   Telegram worked because it uses the native pipeline which inherits gateway secrets.
+      //   Fixed by switching images to native pipeline; audio transcription kept as-is (local Whisper).
+      //
+      // Verified working: 2026-03-10
+      // no-op: native pipeline handles image analysis
     } else if (msgContent.videoMessage) {
       if (config?.video?.enabled !== false && resolvedMediaUrl) {
         const dl = await downloadWahaMedia(resolvedMediaUrl, account.apiKey);

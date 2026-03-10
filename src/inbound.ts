@@ -24,7 +24,7 @@ import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
 import { sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
-import { preprocessInboundMessage } from "./media.js";
+import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
 
 const CHANNEL_ID = "waha" as const;
 
@@ -171,6 +171,50 @@ export async function handleWahaInbound(params: {
       runtime.log?.(`waha: media preprocessing failed: ${String(err)}`);
     }
   }
+  // !! DO NOT CHANGE — Native media pipeline for images !!
+  // Download image files from WAHA and pass to OpenClaw's native media-understanding
+  // pipeline via MediaPath/MediaPaths on the context payload (same pipeline as Telegram).
+  // This uses the gateway's configured vision providers and API keys automatically.
+  // Audio transcription is NOT affected — it still uses local Whisper via media.ts.
+  //
+  // Bug fixed 2026-03-10: Custom vision API fetch() to LiteLLM returned 401 because
+  // LITELLM_API_KEY was not in the systemd service env. Native pipeline resolves keys
+  // from the gateway's secrets system, so it works without env vars.
+  //
+  // Verified working: 2026-03-10
+  let mediaDownload: { path: string; cleanup: () => Promise<void> } | null = null;
+  let mediaPayload: {
+    MediaPath?: string;
+    MediaType?: string;
+    MediaUrl?: string;
+    MediaPaths?: string[];
+    MediaUrls?: string[];
+    MediaTypes?: string[];
+  } = {};
+  if (rawMessage.hasMedia && !_preCheckDropped && _rawMsg?.imageMessage) {
+    try {
+      let resolvedUrl = rawMessage.mediaUrl;
+      if (resolvedUrl && !resolvedUrl.startsWith("http")) {
+        resolvedUrl = `${account.baseUrl}${resolvedUrl.startsWith("/") ? "" : "/"}${resolvedUrl}`;
+      }
+      if (resolvedUrl) {
+        mediaDownload = await downloadWahaMedia(resolvedUrl, account.apiKey);
+        const mimeType = rawMessage.mediaMime || "image/jpeg";
+        mediaPayload = {
+          MediaPath: mediaDownload.path,
+          MediaType: mimeType,
+          MediaUrl: mediaDownload.path,
+          MediaPaths: [mediaDownload.path],
+          MediaUrls: [mediaDownload.path],
+          MediaTypes: [mimeType],
+        };
+      }
+    } catch (err) {
+      runtime.log?.(`waha: image download for native pipeline failed: ${String(err)}`);
+      // Fallback: agent sees mediaSummary text but no image analysis
+    }
+  }
+
   const core = getWahaRuntime();
   const pairing = createScopedPairingAccess({
     core,
@@ -481,6 +525,7 @@ export async function handleWahaInbound(params: {
     OriginatingChannel: CHANNEL_ID,
     OriginatingTo: `waha:${chatId}`,
     CommandAuthorized: access.commandAuthorized,
+    ...mediaPayload,
   });
 
   await core.channel.session.recordInboundSession({
@@ -544,5 +589,7 @@ export async function handleWahaInbound(params: {
     // Guarantee typing is stopped after dispatch — handles empty responses,
     // errors, and any path where deliverReply was never called
     await presenceCtrl.cancelTyping().catch(() => {});
+    // Clean up image temp file after native pipeline has processed it
+    if (mediaDownload) await mediaDownload.cleanup().catch(() => {});
   }
 }

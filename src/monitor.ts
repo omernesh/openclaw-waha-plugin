@@ -10,9 +10,9 @@ import {
   type RuntimeEnv,
 } from "openclaw/plugin-sdk";
 import { resolveWahaAccount } from "./accounts.js";
-import { getDmFilterForAdmin, handleWahaInbound } from "./inbound.js";
+import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb } from "./directory.js";
-import { assertAllowedSession, getWahaContacts, getWahaGroups } from "./send.js";
+import { assertAllowedSession, getWahaChats, getWahaContact, getWahaContacts, getWahaGroups, getWahaGroupParticipants, getWahaNewsletter, getWahaAllLids } from "./send.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
@@ -30,6 +30,68 @@ const WEBHOOK_ERRORS = {
   payloadTooLarge: "Payload too large",
   internalServerError: "Internal server error",
 } as const;
+
+/**
+ * Simple rate limiter for WAHA API calls.
+ * Limits concurrent requests and enforces minimum delay between requests.
+ */
+class RateLimiter {
+  private queue: Array<() => void> = [];
+  private activeCount = 0;
+  private lastRequestTime = 0;
+
+  constructor(
+    private maxConcurrent: number,
+    private delayMs: number,
+  ) {}
+
+  async acquire(): Promise<void> {
+    if (this.activeCount < this.maxConcurrent) {
+      this.activeCount++;
+      const now = Date.now();
+      const elapsed = now - this.lastRequestTime;
+      if (elapsed < this.delayMs) {
+        await new Promise((resolve) => setTimeout(resolve, this.delayMs - elapsed));
+      }
+      this.lastRequestTime = Date.now();
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push(() => {
+        this.activeCount++;
+        const now = Date.now();
+        const elapsed = now - this.lastRequestTime;
+        if (elapsed < this.delayMs) {
+          setTimeout(() => {
+            this.lastRequestTime = Date.now();
+            resolve();
+          }, this.delayMs - elapsed);
+        } else {
+          this.lastRequestTime = Date.now();
+          resolve();
+        }
+      });
+    });
+  }
+
+  release(): void {
+    this.activeCount--;
+    if (this.queue.length > 0) {
+      const next = this.queue.shift()!;
+      next();
+    }
+  }
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    await this.acquire();
+    try {
+      return await fn();
+    } finally {
+      this.release();
+    }
+  }
+}
+
 
 function writeJsonResponse(res: ServerResponse, status: number, body?: Record<string, unknown>) {
   if (body) {
@@ -50,9 +112,10 @@ function parseWebhookPayload(body: string): WahaWebhookEnvelope | null {
   try {
     const data = JSON.parse(body);
     if (!data || typeof data !== "object") return null;
-    if (!data.event || !data.session || !data.payload) return null;
+    if (typeof data.event !== "string" || typeof data.session !== "string" || !data.payload || typeof data.payload !== "object") return null;
     return data as WahaWebhookEnvelope;
-  } catch {
+  } catch (err) {
+    console.warn(`[waha] JSON parse error: ${String(err)}, body preview: ${body.slice(0, 200)}`);
     return null;
   }
 }
@@ -145,6 +208,7 @@ function payloadToReaction(payload: Record<string, unknown>): WahaReactionEvent 
 function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
   const result = { ...target };
   for (const key of Object.keys(source)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
     if (
       source[key] !== null &&
       typeof source[key] === "object" &&
@@ -168,8 +232,12 @@ function getConfigPath(): string {
   return process.env.OPENCLAW_CONFIG_PATH ?? join(homedir(), ".openclaw", "workspace", "openclaw.json");
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWahaAccount>): string {
-  const session = account.config.session ?? "unknown";
+  const session = escapeHtml(account.config.session ?? "unknown");
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -280,6 +348,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .save-contact-btn { background: #10b981; color: #fff; border: none; padding: 6px 18px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; font-weight: 600; margin-top: 6px; }
   .load-more-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 8px 24px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-top: 12px; width: 100%; transition: background .1s; }
   .load-more-btn:hover { background: #334155; }
+  /* DIR TABS */
+  .dir-tab { background: none; border: none; color: #94a3b8; padding: 10px 16px; cursor: pointer; font-size: 0.85rem; border-bottom: 2px solid transparent; transition: color .15s; }
+  .dir-tab:hover { color: #e2e8f0; }
+  .dir-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
   /* DOCS */
   .docs-section { margin-bottom: 4px; }
   .docs-section summary { cursor: pointer; font-size: 1rem; font-weight: 600; color: #e2e8f0; padding: 12px 0; list-style: none; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #334155; }
@@ -324,6 +396,12 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="stat-row" id="filter-stats"></div>
     <div id="filter-patterns" style="margin-top:12px;"></div>
     <div class="event-list" id="filter-events"></div>
+  </div>
+  <div class="card" id="group-filter-card">
+    <h2>Group Keyword Filter</h2>
+    <div class="stat-row" id="group-filter-stats"></div>
+    <div id="group-filter-patterns" style="margin-top:12px;"></div>
+    <div class="event-list" id="group-filter-events"></div>
   </div>
   <div class="card" id="presence-card">
     <h2>Presence System</h2>
@@ -432,6 +510,40 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
         <div class="field">
           <label>Token Estimate <span class="tip" data-tip="Estimated tokens saved per dropped DM. Used for stats display only. Default: 2500.">?</span></label>
           <input type="number" id="s-tokenEstimate" name="tokenEstimate" min="100" max="100000" step="100">
+        </div>
+        <div class="field">
+          <label>God Mode Users <span class="tip" data-tip="JIDs that bypass the DM keyword filter entirely. One per line. Supports @c.us, @lid, phone numbers. Include both formats for NOWEB compatibility.">?</span></label>
+          <textarea id="s-godModeSuperUsers" name="godModeSuperUsers" rows="3" placeholder="972544329000@c.us&#10;271862907039996@lid"></textarea>
+        </div>
+      </div>
+    </details>
+
+    <details class="settings-section">
+      <summary>Group Keyword Filter</summary>
+      <div class="field-group">
+        <div class="field">
+          <label class="toggle-wrap">
+            <span>Enabled <span class="tip" data-tip="When on, group messages must contain at least one mention pattern to get a response. Works the same as DM Keyword Filter but for group messages. Saves tokens by filtering irrelevant group chatter.">?</span></span>
+            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-groupFilterEnabled" name="groupFilterEnabled"><span class="slider"></span></label>
+          </label>
+        </div>
+        <div class="field">
+          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). Group messages must match at least one. One per line. This uses OpenClaw's built-in group interaction filtering with regex support.">?</span></label>
+          <textarea id="s-groupMentionPatterns" name="groupMentionPatterns" rows="4" placeholder="sammie&#10;@bot&#10;help"></textarea>
+        </div>
+        <div class="field">
+          <label class="toggle-wrap">
+            <span>God Mode Bypass <span class="tip" data-tip="When on, super-users bypass the group keyword filter entirely.">?</span></span>
+            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-groupGodModeBypass" name="groupGodModeBypass"><span class="slider"></span></label>
+          </label>
+        </div>
+        <div class="field">
+          <label>Token Estimate <span class="tip" data-tip="Estimated tokens saved per dropped group message. Default: 2500.">?</span></label>
+          <input type="number" id="s-groupTokenEstimate" name="groupTokenEstimate" min="100" max="100000" step="100">
+        </div>
+        <div class="field">
+          <label>God Mode Users <span class="tip" data-tip="JIDs that bypass the group keyword filter entirely. One per line. Supports @c.us, @lid, phone numbers.">?</span></label>
+          <textarea id="s-groupGodModeSuperUsers" name="groupGodModeSuperUsers" rows="3" placeholder="972544329000@c.us&#10;271862907039996@lid"></textarea>
         </div>
       </div>
     </details>
@@ -590,9 +702,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       </div>
     </details>
 
-    <div style="padding-top:8px;">
+    <div style="padding-top:8px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
       <button type="submit" class="save-btn">Save Settings</button>
-      <div id="save-note" style="font-size:0.78rem;color:#64748b;margin-top:6px;display:none">Some settings require a gateway restart to take effect.</div>
+      <button type="button" class="save-btn" style="background:#f59e0b;" onclick="saveAndRestart()">Save &amp; Restart</button>
+      <div id="save-note" style="font-size:0.78rem;color:#64748b;margin-top:6px;display:none;width:100%;">Some settings require a gateway restart to take effect.</div>
     </div>
   </form>
 </div>
@@ -604,9 +717,15 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <main class="tab-pane">
 <div class="card">
   <h2>Contact Directory</h2>
+  <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #334155;">
+    <button class="dir-tab active" onclick="switchDirTab('contacts',this)" id="dtab-contacts">Contacts</button>
+    <button class="dir-tab" onclick="switchDirTab('groups',this)" id="dtab-groups">Groups</button>
+    <button class="dir-tab" onclick="switchDirTab('newsletters',this)" id="dtab-newsletters">Newsletters</button>
+  </div>
   <div class="dir-header">
     <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()">
-    <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Import contacts and groups from WAHA API">Refresh from WAHA</button>
+    <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectoryTab()" title="Refresh current tab from WAHA API">Refresh</button>
+    <button class="refresh-btn" style="background:#7c3aed;" id="dir-refresh-all-btn" onclick="refreshDirectory()" title="Import all contacts, groups and newsletters from WAHA API">Refresh All</button>
     <div class="dir-stats" id="dir-stats"></div>
   </div>
   <div class="contact-list" id="contact-list"></div>
@@ -713,11 +832,36 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   </details>
 
   <details class="docs-section">
-    <summary>Directory Refresh (v1.4.0)</summary>
+    <summary>Directory Refresh (v1.5.0)</summary>
     <div class="docs-body">
       <p>The <strong>Refresh from WAHA</strong> button in the Directory tab bulk-imports all contacts and groups from your WAHA session into the local SQLite directory.</p>
-      <p>This is useful for pre-populating the directory on first setup, or syncing after adding new contacts to WhatsApp. The import uses <code>INSERT OR REPLACE</code>, so existing contact settings and message counts are preserved.</p>
-      <p>Under the hood, it calls <code>GET /api/{session}/contacts</code> and <code>GET /api/{session}/groups</code> on your WAHA server.</p>
+      <p>As of v1.5.0, the refresh now calls three WAHA APIs: <code>/chats</code> (primary, always works on NOWEB), <code>/contacts</code> (fallback, may 400 on NOWEB without store), and <code>/groups</code>. Names are merged with contact names taking priority.</p>
+      <p>Participants are loaded lazily when you click a group card (not during bulk refresh). This avoids hammering the WAHA API.</p>
+    </div>
+  </details>
+
+  <details class="docs-section">
+    <summary>Allow List (v1.5.0)</summary>
+    <div class="docs-body">
+      <p>The <strong>Allow List</strong> feature lets you manage who can interact with the bot directly from the Directory tab, without manually editing JSON config files.</p>
+      <p><strong>DM Contacts:</strong> Each contact card has an "Allow DM" button. Clicking it adds/removes the JID from <code>channels.waha.allowFrom</code> in <code>openclaw.json</code>.</p>
+      <p><strong>Groups:</strong> Click a group card to expand the participant list. Each participant has two toggles:</p>
+      <ul>
+        <li><strong>Allow in Group</strong> - adds the participant JID to <code>groupAllowFrom</code> (they can trigger the bot in that group)</li>
+        <li><strong>Allow DM</strong> - adds the participant JID to <code>allowFrom</code> (they can DM the bot directly)</li>
+      </ul>
+      <p>The <strong>Allow All</strong> button sets all participants in a group as allowed in <code>groupAllowFrom</code>.</p>
+      <p>All changes are persisted immediately to both the SQLite directory and <code>openclaw.json</code>.</p>
+    </div>
+  </details>
+
+  <details class="docs-section">
+    <summary>Group Keyword Filter (v1.5.0)</summary>
+    <div class="docs-body">
+      <p>The Group Keyword Filter works identically to the DM Keyword Filter, but applies to group messages. This saves tokens by filtering out irrelevant group chatter before it reaches the AI.</p>
+      <p><strong>How it works:</strong> When enabled, group messages must match at least one mention pattern (regex, case-insensitive) to be forwarded to the AI. Non-matching messages are silently dropped.</p>
+      <p>Configure it in the Settings tab under "Group Keyword Filter". The patterns, god mode bypass, and token estimate work exactly the same as the DM version.</p>
+      <p>Stats are shown on the Dashboard tab in the "Group Keyword Filter" card.</p>
     </div>
   </details>
 
@@ -830,6 +974,31 @@ async function loadStats() {
           '<span class="preview">' + esc(e.preview) + '</span>' +
         '</div>'; }).join('')
       : '<div style="color:#64748b;margin-top:8px;font-size:.8rem">No events yet</div>';
+    // Group filter card
+    if (d.groupFilter) {
+      var gf = d.groupFilter;
+      var gs = gf.stats || {allowed:0,dropped:0,tokensEstimatedSaved:0};
+      document.getElementById('group-filter-stats').innerHTML = [
+        stat('Allowed', gs.allowed, '#10b981'),
+        stat('Dropped', gs.dropped, '#f87171'),
+        stat('Tokens Saved (est)', (gs.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8'),
+      ].join('');
+      var gpats = gf.patterns || [];
+      document.getElementById('group-filter-patterns').innerHTML = '<div style="color:#94a3b8;font-size:.8rem;margin-bottom:6px;">Patterns</div><div class="pattern-list">' +
+        (gpats.length ? gpats.map(function(p) { return '<span class="pattern">' + esc(p) + '</span>'; }).join('') : '<span style="color:#64748b">none</span>') + '</div>';
+      var gevents = gf.recentEvents || [];
+      document.getElementById('group-filter-events').innerHTML = gevents.length
+        ? '<div style="color:#94a3b8;font-size:.8rem;margin:10px 0 6px;">Recent Events (last ' + gevents.length + ')</div>' +
+          gevents.slice(0,20).map(function(e) { return '<div class="event ' + (e.pass ? 'pass' : 'fail') + '">' +
+            '<span class="ts">' + new Date(e.ts).toLocaleTimeString() + '</span>' +
+            '<span class="reason">' + esc(e.reason) + '</span>' +
+            '<span class="preview">' + esc(e.preview) + '</span>' +
+          '</div>'; }).join('')
+        : '<div style="color:#64748b;margin-top:8px;font-size:.8rem">No events yet</div>';
+      document.getElementById('group-filter-card').style.display = '';
+    } else {
+      document.getElementById('group-filter-card').style.display = 'none';
+    }
     var pr = d.presence;
     document.getElementById('presence-kv').innerHTML = kvRow('enabled', pr.enabled !== false) +
       kvRow('wpm', pr.wpm) + kvRow('readDelayMs', JSON.stringify(pr.readDelayMs)) +
@@ -860,6 +1029,7 @@ async function loadConfig() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     var w = d.waha || {};
+    var NL = String.fromCharCode(10);
     var setVal = function(id, v) { var el = document.getElementById(id); if (el) el.value = v != null ? v : ''; };
     var setChk = function(id, v) { var el = document.getElementById(id); if (el) el.checked = Boolean(v); };
     setVal('s-baseUrl', w.baseUrl || '');
@@ -893,7 +1063,16 @@ async function loadConfig() {
     setChk('s-dmFilterEnabled', dm.enabled);
     setVal('s-mentionPatterns', (dm.mentionPatterns || []).join('\\n'));
     setChk('s-godModeBypass', dm.godModeBypass !== false);
+    var dmGodUsers = (dm.godModeSuperUsers || []).map(function(u) { return typeof u === 'string' ? u : (u.identifier || ''); }).filter(Boolean);
+    setVal('s-godModeSuperUsers', dmGodUsers.join(NL));
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
+    var gf = w.groupFilter || {};
+    setChk('s-groupFilterEnabled', gf.enabled);
+    setVal('s-groupMentionPatterns', (gf.mentionPatterns || []).join('\\n'));
+    setChk('s-groupGodModeBypass', gf.godModeBypass !== false);
+    var gfGodUsers = (gf.godModeSuperUsers || []).map(function(u) { return typeof u === 'string' ? u : (u.identifier || ''); }).filter(Boolean);
+    setVal('s-groupGodModeSuperUsers', gfGodUsers.join(NL));
+    setVal('s-groupTokenEstimate', gf.tokenEstimate || 2500);
     var pr = w.presence || {};
     setChk('s-presenceEnabled', pr.enabled !== false);
     setChk("s-sendSeen", pr.sendSeen === true);
@@ -948,7 +1127,15 @@ async function saveSettings(e) {
         enabled: getChk('s-dmFilterEnabled'),
         mentionPatterns: splitLines(getVal('s-mentionPatterns')),
         godModeBypass: getChk('s-godModeBypass'),
+        godModeSuperUsers: splitLines(getVal('s-godModeSuperUsers')).map(function(id) { return { identifier: id }; }),
         tokenEstimate: parseNum(getVal('s-tokenEstimate'), 2500),
+      },
+      groupFilter: {
+        enabled: getChk('s-groupFilterEnabled'),
+        mentionPatterns: splitLines(getVal('s-groupMentionPatterns')),
+        godModeBypass: getChk('s-groupGodModeBypass'),
+        godModeSuperUsers: splitLines(getVal('s-groupGodModeSuperUsers')).map(function(id) { return { identifier: id }; }),
+        tokenEstimate: parseNum(getVal('s-groupTokenEstimate'), 2500),
       },
       presence: {
         enabled: getChk('s-presenceEnabled'),
@@ -991,6 +1178,17 @@ async function saveSettings(e) {
   }
 }
 
+// ---- Save & Restart ----
+async function saveAndRestart() {
+  if (!confirm('Are you sure? This will save settings and restart the gateway. It will be back online in a few seconds.')) return;
+  await saveSettings(new Event('submit'));
+  try {
+    await fetch('/api/admin/restart', { method: 'POST' });
+  } catch(e) { /* expected - server is restarting */ }
+  showToast('Gateway restarting...');
+  setTimeout(function() { location.reload(); }, 5000);
+}
+
 // ---- Media sub-toggles visibility ----
 function toggleMediaSubToggles() {
   var masterEl = document.getElementById('s-mediaEnabled');
@@ -998,21 +1196,36 @@ function toggleMediaSubToggles() {
   if (masterEl && subDiv) subDiv.style.display = masterEl.checked ? 'grid' : 'none';
 }
 
+// ---- Directory sub-tabs ----
+var currentDirTab = 'contacts';
+var dirAutoImported = false;
+function switchDirTab(tab, btn) {
+  currentDirTab = tab;
+  document.querySelectorAll('.dir-tab').forEach(function(el) { el.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  dirOffset = 0;
+  dirAutoImported = false;
+  loadDirectory();
+}
+function refreshDirectoryTab() {
+  refreshDirectory();
+}
+
 // ---- Directory refresh ----
 async function refreshDirectory() {
-  var btn = document.getElementById('dir-refresh-btn');
+  var btn = document.getElementById('dir-refresh-all-btn');
   if (btn) { btn.textContent = 'Importing...'; btn.disabled = true; }
   try {
     var r = await fetch('/api/admin/directory/refresh', { method: 'POST' });
     var d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Refresh failed');
-    showToast('Imported ' + d.contacts + ' contacts, ' + d.groups + ' groups');
+    showToast('Imported ' + d.contacts + ' contacts, ' + d.groups + ' groups' + (d.namesResolved ? ', resolved ' + d.namesResolved + ' names' : ''));
     dirOffset = 0;
     await loadDirectory();
   } catch(e) {
     showToast('Refresh error: ' + e.message, true);
   } finally {
-    if (btn) { btn.textContent = 'Refresh from WAHA'; btn.disabled = false; }
+    if (btn) { btn.textContent = 'Refresh All'; btn.disabled = false; }
   }
 }
 
@@ -1025,19 +1238,27 @@ function debouncedDirSearch() {
 }
 async function loadDirectory() {
   var search = document.getElementById('dir-search').value.trim();
-  var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + (search ? '&search=' + encodeURIComponent(search) : '');
+  var typeParam = currentDirTab === 'contacts' ? '&type=contact' : currentDirTab === 'groups' ? '&type=group' : '&type=newsletter';
+  var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + typeParam + (search ? '&search=' + encodeURIComponent(search) : '');
   try {
     var r = await fetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     document.getElementById('dir-stats').innerHTML =
-      '<div class="dir-stat">Total <span>' + d.total + '</span></div>' +
-      '<div class="dir-stat">DMs <span>' + d.dms + '</span></div>' +
-      '<div class="dir-stat">Groups <span>' + d.groups + '</span></div>';
+      '<div class="dir-stat">Contacts <span>' + d.dms + '</span></div>' +
+      '<div class="dir-stat">Groups <span>' + d.groups + '</span></div>' +
+      '<div class="dir-stat">Newsletters <span>' + (d.newsletters || 0) + '</span></div>' +
+      '<div class="dir-stat">Showing <span>' + d.total + '</span></div>';
     var list = document.getElementById('contact-list');
     if (dirOffset === 0) list.innerHTML = '';
+    // Auto-import if empty
+    if (dirOffset === 0 && d.total === 0 && !dirAutoImported) {
+      dirAutoImported = true;
+      refreshDirectory();
+      return;
+    }
     if (!d.contacts || d.contacts.length === 0) {
-      if (dirOffset === 0) list.innerHTML = '<div style="color:#64748b;text-align:center;padding:32px;">No contacts yet. Send a message to Sammie!</div>';
+      if (dirOffset === 0) list.innerHTML = '<div style="color:#64748b;text-align:center;padding:32px;">No entries found.</div>';
       document.getElementById('load-more-btn').style.display = 'none';
       return;
     }
@@ -1055,20 +1276,31 @@ function buildContactCard(c) {
   var inits = initials(c.displayName || '', c.jid);
   var dm = c.dmSettings || {mode:'active',mentionOnly:false,customKeywords:'',canInitiate:true};
   var id = 'card-' + c.jid.replace(/[^a-zA-Z0-9]/g, '_');
-  return '<div class="contact-card" id="' + id + '">' +
-    '<div class="contact-header" onclick="toggleContactSettings(\\'' + esc(c.jid) + '\\')">' +
-      '<div class="avatar" style="background:' + color + ';color:#fff">' + esc(inits) + '</div>' +
-      '<div class="contact-info">' +
-        '<div class="contact-name">' + esc(name) + '</div>' +
-        '<div class="contact-jid">' + esc(c.jid) + '</div>' +
-      '</div>' +
-      '<div class="contact-meta">' +
-        '<span class="contact-time">' + relTime(c.lastMessageAt) + '</span>' +
-        '<span class="badge-count">' + c.messageCount + ' msg' + (c.messageCount !== 1 ? 's' : '') + '</span>' +
-        '<button class="settings-toggle-btn" onclick="event.stopPropagation();toggleContactSettings(\\'' + esc(c.jid) + '\\')">Settings</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="contact-settings-panel" id="panel-' + id + '">' +
+  var isGroup = c.isGroup;
+  var avatarBg = isGroup ? '#1e3a5f' : color;
+  var avatarContent = isGroup ? '&#128101;' : esc(inits);
+  var borderStyle = c.allowedDm ? 'border-left:3px solid #10b981;' : '';
+
+  var allowBtn = '';
+  if (!isGroup) {
+    if (c.allowedDm) {
+      allowBtn = '<button style="background:#10b981;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleAllowDm(\\'' + esc(c.jid) + '\\',true)">Allowed (DM)</button>';
+    } else {
+      allowBtn = '<button style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleAllowDm(\\'' + esc(c.jid) + '\\',false)">Allow DM</button>';
+    }
+  }
+
+  var clickAction = isGroup
+    ? 'loadGroupParticipants(\\'' + esc(c.jid) + '\\')'
+    : 'toggleContactSettings(\\'' + esc(c.jid) + '\\')';
+
+  var panelContent = '';
+  if (isGroup) {
+    panelContent = '<div class="contact-settings-panel" id="panel-' + id + '">' +
+      '<div style="color:#64748b;padding:8px">Click to load participants...</div>' +
+    '</div>';
+  } else {
+    panelContent = '<div class="contact-settings-panel" id="panel-' + id + '">' +
       '<div class="settings-fields">' +
         '<div class="settings-field"><label>Mode</label><select id="mode-' + id + '"><option value="active"' + (dm.mode==='active'?' selected':'') + '>Active</option><option value="listen_only"' + (dm.mode==='listen_only'?' selected':'') + '>Listen Only</option></select></div>' +
         '<div class="settings-field"><label><input type="checkbox" id="mo-' + id + '"' + (dm.mentionOnly?' checked':'') + '> Mention Only</label></div>' +
@@ -1076,7 +1308,24 @@ function buildContactCard(c) {
         '<div class="settings-field"><label><input type="checkbox" id="ci-' + id + '"' + (dm.canInitiate?' checked':'') + '> Can Initiate</label></div>' +
         '<button class="save-contact-btn" onclick="saveContactSettings(\\'' + esc(c.jid) + '\\', \\'' + id + '\\')">Save</button>' +
       '</div>' +
+    '</div>';
+  }
+
+  return '<div class="contact-card" id="' + id + '" style="' + borderStyle + '">' +
+    '<div class="contact-header" onclick="' + clickAction + '">' +
+      '<div class="avatar" style="background:' + avatarBg + ';color:#fff">' + avatarContent + '</div>' +
+      '<div class="contact-info">' +
+        '<div class="contact-name">' + esc(name) + '</div>' +
+        '<div class="contact-jid">' + esc(c.jid) + '</div>' +
+      '</div>' +
+      '<div class="contact-meta">' +
+        '<span class="contact-time">' + relTime(c.lastMessageAt) + '</span>' +
+        (c.messageCount > 0 ? '<span class="badge-count">' + c.messageCount + ' msg' + (c.messageCount !== 1 ? 's' : '') + '</span>' : '') +
+        allowBtn +
+        (isGroup ? '' : '<button class="settings-toggle-btn" onclick="event.stopPropagation();toggleContactSettings(\\'' + esc(c.jid) + '\\')">Settings</button>') +
+      '</div>' +
     '</div>' +
+    panelContent +
   '</div>';
 }
 function toggleContactSettings(jid) {
@@ -1103,6 +1352,88 @@ async function saveContactSettings(jid, id) {
     showToast('Error: ' + e.message, true);
   }
 }
+
+// ---- Allow-list toggles ----
+async function toggleAllowDm(jid, currentlyAllowed) {
+  try {
+    var r = await fetch('/api/admin/directory/' + encodeURIComponent(jid) + '/allow-dm', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ allowed: !currentlyAllowed })
+    });
+    if (!r.ok) throw new Error('Failed');
+    showToast((!currentlyAllowed ? 'Added' : 'Removed') + ' ' + jid + ' DM access');
+    dirOffset = 0; loadDirectory();
+  } catch(e) { showToast('Error: ' + e.message, true); }
+}
+
+async function loadGroupParticipants(groupJid, forceOpen) {
+  var id = 'card-' + groupJid.replace(/[^a-zA-Z0-9]/g, '_');
+  var panel = document.getElementById('panel-' + id);
+  if (!panel) return;
+  if (!forceOpen) {
+    panel.classList.toggle('open');
+    if (!panel.classList.contains('open')) return;
+  } else {
+    panel.classList.add('open');
+  }
+  panel.innerHTML = '<div style="color:#64748b;padding:8px">Loading participants...</div>';
+  try {
+    var r = await fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/participants');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var parts = d.participants || [];
+    var allowAll = d.allowAll;
+    var html = '<div style="padding:12px;">';
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
+    html += '<span style="font-size:0.85rem;color:#94a3b8;font-weight:600;">' + parts.length + ' participants</span>';
+    html += '<button style="background:' + (allowAll ? '#10b981' : '#1d4ed8') + ';color:#fff;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;margin-left:auto;" onclick="toggleGroupAllowAll(\\'' + esc(groupJid) + '\\',' + (allowAll ? 'true' : 'false') + ')">' + (allowAll ? 'Revoke All' : 'Allow All') + '</button>';
+    html += '</div>';
+    if (parts.length === 0) {
+      html += '<div style="color:#64748b;font-size:0.85rem;">No participants found. Try refreshing from WAHA first.</div>';
+    } else {
+      parts.forEach(function(p) {
+        var pName = p.displayName || p.participantJid;
+        var pColor = avatarColor(p.participantJid);
+        var pInits = initials(p.displayName || '', p.participantJid);
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e293b;">';
+        html += '<div class="avatar" style="width:32px;height:32px;font-size:0.8rem;background:' + pColor + ';color:#fff">' + esc(pInits) + '</div>';
+        html += '<div style="flex:1;min-width:0;">';
+        html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + '</div>';
+        html += '<div style="font-size:0.72rem;color:#64748b;font-family:monospace;">' + esc(p.participantJid) + '</div>';
+        html += '</div>';
+        html += '<button style="background:' + (p.allowInGroup ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-group\\',' + (p.allowInGroup ? 'true' : 'false') + ')">' + (p.allowInGroup ? 'In Group' : 'Allow Group') + '</button>';
+        html += '<button style="background:' + (p.allowDm ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-dm\\',' + (p.allowDm ? 'true' : 'false') + ')">' + (p.allowDm ? 'DM OK' : 'Allow DM') + '</button>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  } catch(e) { panel.innerHTML = '<div style="color:#ef4444;padding:8px">' + esc(e.message) + '</div>'; }
+}
+
+async function toggleParticipantAllow(groupJid, participantJid, type, currentlyAllowed) {
+  try {
+    var r = await fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/participants/' + encodeURIComponent(participantJid) + '/' + type, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ allowed: !currentlyAllowed })
+    });
+    if (!r.ok) throw new Error('Failed');
+    showToast('Updated ' + participantJid);
+    loadGroupParticipants(groupJid, true);
+  } catch(e) { showToast('Error: ' + e.message, true); }
+}
+
+async function toggleGroupAllowAll(groupJid, currentlyAll) {
+  try {
+    var r = await fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/allow-all', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ allowed: !currentlyAll })
+    });
+    if (!r.ok) throw new Error('Failed');
+    showToast((!currentlyAll ? 'Allowed all' : 'Revoked all') + ' in group');
+    loadGroupParticipants(groupJid, true);
+  } catch(e) { showToast('Error: ' + e.message, true); }
+}
 </script>
 </body>
 </html>`;
@@ -1113,6 +1444,30 @@ export function readWahaWebhookBody(req: IncomingMessage, maxBodyBytes: number):
     maxBytes: maxBodyBytes,
     timeoutMs: DEFAULT_WEBHOOK_BODY_TIMEOUT_MS,
   });
+}
+
+function syncAllowListBatch(configPath: string, field: "allowFrom" | "groupAllowFrom", jids: string[], add: boolean): void {
+  const raw = readFileSync(configPath, "utf-8");
+  const config = JSON.parse(raw) as Record<string, unknown>;
+  const channels = (config.channels as Record<string, unknown>) ?? {};
+  const waha = (channels.waha as Record<string, unknown>) ?? {};
+  const list: string[] = Array.isArray(waha[field]) ? (waha[field] as string[]) : [];
+  for (const jid of jids) {
+    if (add && !list.includes(jid)) {
+      list.push(jid);
+    }
+    if (!add) {
+      const idx = list.indexOf(jid);
+      if (idx >= 0) list.splice(idx, 1);
+    }
+  }
+  waha[field] = list;
+  config.channels = { ...channels, waha };
+  writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+}
+
+function syncAllowList(configPath: string, field: "allowFrom" | "groupAllowFrom", jid: string, add: boolean): void {
+  syncAllowListBatch(configPath, field, [jid], add);
 }
 
 export function createWahaWebhookServer(opts: {
@@ -1140,6 +1495,14 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
+    // POST /api/admin/restart
+    if (req.url === "/api/admin/restart" && req.method === "POST") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      setTimeout(() => process.exit(0), 500); // systemd auto-restarts
+      return;
+    }
+
     // Admin panel
     if (req.url === "/admin" || req.url === "/admin/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -1151,6 +1514,8 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/api/admin/stats" && req.method === "GET") {
       const dmFilter = getDmFilterForAdmin(opts.config, opts.accountId);
       const dmCfg = account.config.dmFilter ?? {};
+      const groupFilter = getGroupFilterForAdmin(opts.config, opts.accountId);
+      const groupFilterCfg = ((account.config as Record<string, unknown>).groupFilter as Record<string, unknown> | undefined) ?? {};
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         dmFilter: {
@@ -1161,6 +1526,14 @@ export function createWahaWebhookServer(opts: {
           tokenEstimate: dmCfg.tokenEstimate ?? 2500,
           stats: dmFilter.stats,
           recentEvents: dmFilter.recentEvents,
+        },
+        groupFilter: {
+          enabled: Boolean(groupFilterCfg.enabled),
+          patterns: Array.isArray(groupFilterCfg.mentionPatterns) ? groupFilterCfg.mentionPatterns : [],
+          godModeBypass: groupFilterCfg.godModeBypass !== false,
+          tokenEstimate: typeof groupFilterCfg.tokenEstimate === "number" ? groupFilterCfg.tokenEstimate : 2500,
+          stats: groupFilter.stats,
+          recentEvents: groupFilter.recentEvents,
         },
         presence: account.config.presence ?? {},
         access: {
@@ -1207,14 +1580,7 @@ export function createWahaWebhookServer(opts: {
         if (currentWaha.apiKey) merged.apiKey = currentWaha.apiKey;
         if (currentWaha.webhookHmacKey) merged.webhookHmacKey = currentWaha.webhookHmacKey;
         if (currentWaha.webhookHmacKeyFile) merged.webhookHmacKeyFile = currentWaha.webhookHmacKeyFile;
-        if (currentWaha.godModeSuperUsers) {
-          merged.godModeSuperUsers = currentWaha.godModeSuperUsers;
-        }
-        const currentDmFilter = currentWaha.dmFilter as Record<string, unknown> | undefined;
-        const mergedDmFilter = merged.dmFilter as Record<string, unknown> | undefined;
-        if (currentDmFilter?.godModeSuperUsers && mergedDmFilter) {
-          mergedDmFilter.godModeSuperUsers = currentDmFilter.godModeSuperUsers;
-        }
+        // godModeSuperUsers are now editable via the admin panel UI
 
         const updatedConfig = {
           ...currentConfig,
@@ -1234,14 +1600,14 @@ export function createWahaWebhookServer(opts: {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, restartRequired }));
       } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(err) }));
+        console.error(`[waha] config save failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
     }
 
     // GET /api/admin/directory
-    if (req.url?.startsWith("/api/admin/directory") && req.method === "GET") {
+    if (req.url?.startsWith("/api/admin/directory") && req.method === "GET" && !/\/group\/[^/]+\/participants/.test(req.url)) {
       const url = new URL(req.url, "http://localhost");
       const pathParts = url.pathname.replace("/api/admin/directory", "").split("/").filter(Boolean);
 
@@ -1259,8 +1625,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(contact));
         } catch (err) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: String(err) }));
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
       }
@@ -1269,24 +1634,32 @@ export function createWahaWebhookServer(opts: {
       const search = url.searchParams.get("search") ?? undefined;
       const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10) || 50, 200);
       const offset = parseInt(url.searchParams.get("offset") ?? "0", 10) || 0;
+      const type = (url.searchParams.get("type") ?? undefined) as "contact" | "group" | "newsletter" | undefined;
       try {
         const db = getDirectoryDb(opts.accountId);
-        const contacts = db.getContacts({ search, limit, offset });
-        const total = db.getContactCount(search);
+        const contacts = db.getContacts({ search, limit, offset, type });
+        const total = db.getContactCount(search, type);
         const dms = db.getDmCount();
         const groups = db.getGroupCount();
+        const newsletters = db.getNewsletterCount();
+        // Enrich with allowedDm status from config
+        const configAllowFrom: string[] = account.config.allowFrom ?? [];
+        // Filter out @lid entries at display level as a fallback
+        const enriched = contacts.filter((c) => !c.jid.endsWith("@lid") && !c.jid.endsWith("@s.whatsapp.net")).map((c) => ({
+          ...c,
+          allowedDm: configAllowFrom.includes(c.jid),
+        }));
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ contacts, total, dms, groups }));
+        res.end(JSON.stringify({ contacts: enriched, total, dms, groups, newsletters }));
       } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(err) }));
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
     }
 
     // PUT /api/admin/directory/:jid/settings
     if (req.url?.startsWith("/api/admin/directory/") && req.method === "PUT" && req.url.endsWith("/settings")) {
-      const pathMatch = req.url.match(/^\/api\/admin\/directory\/(.+)\/settings$/);
+      const pathMatch = req.url.match(/^\/api\/admin\/directory\/([^/]+)\/settings$/);
       if (pathMatch) {
         const jid = decodeURIComponent(pathMatch[1]);
         try {
@@ -1316,8 +1689,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: String(err) }));
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
       } else {
         res.writeHead(404);
@@ -1349,31 +1721,335 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/api/admin/directory/refresh" && req.method === "POST") {
       try {
         const db = getDirectoryDb(opts.accountId);
-        const [rawContacts, rawGroups] = await Promise.all([
-          getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch(() => []),
-          getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch(() => []),
+        const rateLimiter = new RateLimiter(3, 200);
+
+        // Fetch bulk data with rate limiting
+        const [rawChats, rawContacts, rawGroups, rawLids] = await Promise.all([
+          rateLimiter.run(() => getWahaChats({ cfg: opts.config, accountId: opts.accountId }).catch(() => [])),
+          rateLimiter.run(() => getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch(() => [])),
+          rateLimiter.run(() => getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch(() => [])),
+          rateLimiter.run(() => getWahaAllLids({ cfg: opts.config, accountId: opts.accountId }).catch(() => [])),
         ]);
-        const contactsArr = Array.isArray(rawContacts) ? rawContacts : [];
-        const groupsArr = Array.isArray(rawGroups) ? rawGroups : [];
-        const mappedContacts = contactsArr.map((c: Record<string, unknown>) => ({
-          jid: String(c.id ?? ""),
-          name: (c.name as string) || (c.pushName as string) || undefined,
-          isGroup: false,
-        })).filter((c) => c.jid);
-        const mappedGroups = groupsArr.map((g: Record<string, unknown>) => ({
-          jid: String(g.id ?? ""),
-          name: (g.subject as string) || (g.name as string) || undefined,
-          isGroup: true,
-        })).filter((g) => g.jid);
-        const combined = [...mappedContacts, ...mappedGroups];
-        const imported = db.bulkUpsertContacts(combined);
+        const toArr = (v: unknown): unknown[] => Array.isArray(v) ? v : (v && typeof v === "object" ? Object.values(v) : []);
+        const chatsArr = toArr(rawChats);
+        const contactsArr = toArr(rawContacts);
+        const groupsArr = toArr(rawGroups);
+        const lidsArr = toArr(rawLids);
+
+        // Build LID -> @c.us mapping from the WAHA LID API and contacts API
+        const lidToCus = new Map<string, string>();
+        for (const entry of lidsArr) {
+          const rec = entry as Record<string, unknown>;
+          const lid = String(rec.lid ?? rec.id ?? "");
+          const phone = String(rec.phone ?? rec.contactId ?? "");
+          if (lid && lid.endsWith("@lid") && phone) {
+            const cusJid = phone.includes("@") ? phone : `${phone}@c.us`;
+            lidToCus.set(lid, cusJid);
+          }
+        }
+        // Also build from contacts API (contacts may have linkedDevices or server-reported LIDs)
+        for (const c of contactsArr) {
+          const rec = c as Record<string, unknown>;
+          const jid = String(rec.id ?? "");
+          if (!jid || !jid.endsWith("@c.us")) continue;
+          const lid = (rec.lid as string) || (rec.linkedDeviceId as string) || undefined;
+          if (lid && lid.endsWith("@lid")) {
+            lidToCus.set(lid, jid);
+          }
+        }
+
+        // Build contact map from chats (primary source -- always works on NOWEB)
+        const contactMap = new Map<string, { jid: string; name?: string; isGroup: boolean }>();
+        for (const c of chatsArr) {
+          const rec = c as Record<string, unknown>;
+          const jid = String(rec.id ?? "");
+          if (!jid) continue;
+          const isGroup = jid.endsWith("@g.us");
+          const name = (rec.name as string) || undefined;
+          contactMap.set(jid, { jid, name, isGroup });
+        }
+
+        // Merge contacts API results (prefer contact name over chat name)
+        for (const c of contactsArr) {
+          const rec = c as Record<string, unknown>;
+          const jid = String(rec.id ?? "");
+          if (!jid) continue;
+          const name = (rec.name as string) || (rec.pushName as string) || undefined;
+          const existing = contactMap.get(jid);
+          if (existing) {
+            if (name) existing.name = name;
+          } else {
+            contactMap.set(jid, { jid, name, isGroup: jid.endsWith("@g.us") });
+          }
+        }
+
+        // Add groups from groups API (use subject for name)
+        for (const g of groupsArr) {
+          const rec = g as Record<string, unknown>;
+          const jid = String(rec.id ?? "");
+          if (!jid) continue;
+          const name = (rec.subject as string) || (rec.name as string) || undefined;
+          const existing = contactMap.get(jid);
+          if (existing) {
+            if (name) existing.name = name;
+            existing.isGroup = true;
+          } else {
+            contactMap.set(jid, { jid, name, isGroup: true });
+          }
+        }
+
+        // Normalize @s.whatsapp.net → @c.us (same person, different format)
+        for (const [jid, entry] of contactMap) {
+          if (!jid.endsWith("@s.whatsapp.net")) continue;
+          const cusJid = jid.replace("@s.whatsapp.net", "@c.us");
+          const cusEntry = contactMap.get(cusJid);
+          if (cusEntry) {
+            if (!cusEntry.name && entry.name) cusEntry.name = entry.name;
+          } else {
+            contactMap.set(cusJid, { jid: cusJid, name: entry.name, isGroup: entry.isGroup });
+          }
+          contactMap.delete(jid);
+        }
+
+        // Merge @lid entries into their @c.us counterparts using the LID map
+        for (const [jid, entry] of contactMap) {
+          if (!jid.endsWith("@lid")) continue;
+          const cusJid = lidToCus.get(jid);
+          if (cusJid) {
+            const cusEntry = contactMap.get(cusJid);
+            if (cusEntry) {
+              if (!cusEntry.name && entry.name) cusEntry.name = entry.name;
+            } else {
+              contactMap.set(cusJid, { jid: cusJid, name: entry.name, isGroup: false });
+            }
+          }
+          contactMap.delete(jid);
+        }
+
+        // Filter out any remaining @lid and @s.whatsapp.net entries
+        const filteredEntries = [...contactMap.values()].filter((e) => !e.jid.endsWith("@lid") && !e.jid.endsWith("@s.whatsapp.net"));
+        const mappedContacts = filteredEntries.filter((e) => !e.isGroup);
+        const mappedGroups = filteredEntries.filter((e) => e.isGroup);
+        const imported = db.bulkUpsertContacts(filteredEntries);
+
+        // Merge existing @lid and @s.whatsapp.net DB entries into their @c.us counterparts
+        let lidsMerged = 0;
+        try {
+          const allDbContacts = db.getContacts({ limit: 10000 });
+          for (const c of allDbContacts) {
+            if (c.jid.endsWith("@lid")) {
+              const cusJid = lidToCus.get(c.jid);
+              if (cusJid) {
+                db.mergeContacts(c.jid, cusJid);
+                lidsMerged++;
+              }
+            } else if (c.jid.endsWith("@s.whatsapp.net")) {
+              const cusJid = c.jid.replace("@s.whatsapp.net", "@c.us");
+              db.mergeContacts(c.jid, cusJid);
+              lidsMerged++;
+            }
+          }
+        } catch (mergeErr) {
+          console.warn(`[waha] LID merge partially failed: ${String(mergeErr)}`);
+        }
+
+        // Participants are loaded lazily when user clicks a group (not during bulk refresh)
+
+        // Second pass: resolve names for contacts/newsletters that still have no display_name
+        let namesResolved = 0;
+        try {
+          // Resolve nameless contacts via WAHA contacts API
+          const allContacts = db.getContacts({ limit: 5000, type: "contact" });
+          const namelessContacts = allContacts.filter((c) => !c.displayName && !c.jid.endsWith("@lid"));
+          const BATCH_SIZE = 5;
+          for (let i = 0; i < namelessContacts.length; i += BATCH_SIZE) {
+            const batch = namelessContacts.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+              batch.map((c) =>
+                rateLimiter.run(() =>
+                  getWahaContact({ cfg: opts.config, contactId: c.jid, accountId: opts.accountId })
+                    .then((result) => ({ jid: c.jid, result: result as Record<string, unknown> }))
+                )
+              ),
+            );
+            for (const r of results) {
+              if (r.status !== "fulfilled") continue;
+              const { jid, result } = r.value;
+              const resolvedName =
+                (result.name as string) || (result.pushName as string) || (result.pushname as string) || undefined;
+              if (resolvedName) {
+                db.upsertContact(jid, resolvedName, false);
+                namesResolved++;
+              }
+            }
+            // Delay between batches for proper rate limiting
+            if (i + BATCH_SIZE < namelessContacts.length) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+          }
+
+          // Resolve nameless newsletters via WAHA channels API
+          const allNewsletters = db.getContacts({ limit: 5000, type: "newsletter" });
+          const namelessNewsletters = allNewsletters.filter((c) => !c.displayName);
+          for (let i = 0; i < namelessNewsletters.length; i += BATCH_SIZE) {
+            const batch = namelessNewsletters.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+              batch.map((c) =>
+                rateLimiter.run(() =>
+                  getWahaNewsletter({ cfg: opts.config, newsletterId: c.jid, accountId: opts.accountId })
+                    .then((result) => ({ jid: c.jid, result }))
+                )
+              ),
+            );
+            for (const r of results) {
+              if (r.status !== "fulfilled") continue;
+              const { jid, result } = r.value;
+              if (!result) continue;
+              const resolvedName =
+                (result.name as string) || (result.subject as string) || (result.title as string) || undefined;
+              if (resolvedName) {
+                db.upsertContact(jid, resolvedName, false);
+                namesResolved++;
+              }
+            }
+            if (i + BATCH_SIZE < namelessNewsletters.length) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+          }
+        } catch (err) {
+          console.warn(`[waha] per-contact name resolution partially failed: ${String(err)}`);
+        }
+
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ imported, contacts: mappedContacts.length, groups: mappedGroups.length }));
+        res.end(JSON.stringify({ imported, contacts: mappedContacts.length, groups: mappedGroups.length, participants: 0, namesResolved, lidsMerged }));
       } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(err) }));
+        console.error(`[waha] directory refresh failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
+    }
+
+
+    // POST /api/admin/directory/:jid/allow-dm
+    {
+      const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/([^/]+)\/allow-dm$/);
+      if (m) {
+        try {
+          const jid = decodeURIComponent(m[1]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          const db = getDirectoryDb(opts.accountId);
+          db.setContactAllowDm(jid, allowed);
+          syncAllowList(getConfigPath(), "allowFrom", jid, allowed);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // GET /api/admin/directory/group/:groupJid/participants
+    {
+      const m = req.method === "GET" && req.url?.match(/^\/api\/admin\/directory\/group\/([^/]+)\/participants$/);
+      if (m) {
+        try {
+          const groupJid = decodeURIComponent(m[1]);
+          const db = getDirectoryDb(opts.accountId);
+          let participants = db.getGroupParticipants(groupJid);
+
+          // Lazy-fetch from WAHA if no participants in DB yet
+          if (participants.length === 0) {
+            try {
+              const rawParticipants = await getWahaGroupParticipants({ cfg: opts.config, groupId: groupJid, accountId: opts.accountId });
+              const parts = Array.isArray(rawParticipants) ? rawParticipants : [];
+              const mapped = parts.map((p: Record<string, unknown>) => ({
+                jid: String(p.id ?? ""),
+                name: (p.name as string) || (p.pushName as string) || undefined,
+                isAdmin: (p.admin as string) === "admin" || (p.admin as string) === "superadmin" || p.isAdmin === true,
+              })).filter((p) => p.jid);
+              if (mapped.length > 0) {
+                db.bulkUpsertGroupParticipants(groupJid, mapped);
+                participants = db.getGroupParticipants(groupJid);
+              }
+            } catch (fetchErr) {
+              console.warn(`[waha] Failed to lazy-fetch participants for ${groupJid}: ${String(fetchErr)}`);
+            }
+          }
+
+          const allowAll = db.getGroupAllowAllStatus(groupJid);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ participants, allowAll }));
+        } catch (err) {
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-group
+    {
+      const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/group\/([^/]+)\/participants\/([^/]+)\/allow-group$/);
+      if (m) {
+        try {
+          const groupJid = decodeURIComponent(m[1]);
+          const participantJid = decodeURIComponent(m[2]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          const db = getDirectoryDb(opts.accountId);
+          db.setParticipantAllowInGroup(groupJid, participantJid, allowed);
+          syncAllowList(getConfigPath(), "groupAllowFrom", participantJid, allowed);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-dm
+    {
+      const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/group\/([^/]+)\/participants\/([^/]+)\/allow-dm$/);
+      if (m) {
+        try {
+          const groupJid = decodeURIComponent(m[1]);
+          const participantJid = decodeURIComponent(m[2]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          const db = getDirectoryDb(opts.accountId);
+          db.setParticipantAllowDm(groupJid, participantJid, allowed);
+          syncAllowList(getConfigPath(), "allowFrom", participantJid, allowed);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // POST /api/admin/directory/group/:groupJid/allow-all
+    {
+      const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/group\/([^/]+)\/allow-all$/);
+      if (m) {
+        try {
+          const groupJid = decodeURIComponent(m[1]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          const db = getDirectoryDb(opts.accountId);
+          db.setGroupAllowAll(groupJid, allowed);
+          const participants = db.getGroupParticipants(groupJid);
+          const configPath = getConfigPath();
+          syncAllowListBatch(configPath, "groupAllowFrom", participants.map(p => p.participantJid), allowed);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
     }
 
     if (req.method !== "POST" || !req.url || !req.url.startsWith(path)) {
@@ -1541,13 +2217,14 @@ export function createWahaWebhookServer(opts: {
   });
 
   const start = async () => {
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
+      server.on("error", reject);
       server.listen(port, host, () => resolve());
     });
   };
 
   const stop = () => {
-    server.close();
+    server.close((err) => { if (err) console.error("[waha] Server close error:", err); });
   };
 
   if (opts.abortSignal) {
