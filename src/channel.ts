@@ -64,6 +64,8 @@ import {
   findWahaPhoneByLid, findWahaLidByPhone, getWahaAllLids,
   // Calls
   rejectWahaCall,
+  // Name resolution
+  resolveWahaTarget,
 } from "./send.js";
 import type { CoreConfig } from "./types.js";
 
@@ -207,6 +209,11 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getAllLids: (p, cfg, aid) => getWahaAllLids({ cfg, accountId: aid }),
   // Calls
   rejectCall: (p, cfg, aid) => rejectWahaCall({ cfg, callId: String(p.callId), accountId: aid }),
+  // ── resolveTarget — DO NOT CHANGE / DO NOT REMOVE ────────────────────
+  // Fuzzy name-to-JID resolver. The ONLY way agents can resolve human-readable
+  // names to WhatsApp JIDs. Removing this breaks all name-based targeting.
+  // Added: 2026-03-10
+  resolveTarget: (p, cfg, aid) => resolveWahaTarget({ cfg, query: String(p.query ?? ""), type: (p.type as "group" | "contact" | "channel" | "auto") ?? "auto", accountId: aid }),
 };
 
 // ======================================================================
@@ -241,6 +248,7 @@ const UTILITY_ACTIONS = [
   "sendTextStatus", "sendImageStatus",
   "sendImage", "sendVideo", "sendFile",
   "joinGroup", "followChannel", "unfollowChannel",
+  "resolveTarget",
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.

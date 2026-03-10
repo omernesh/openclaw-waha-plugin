@@ -1425,3 +1425,144 @@ export async function rejectWahaCall(params: { cfg: CoreConfig; callId: string; 
     path: resolveSessionPath("/api/{session}/calls/reject", params.cfg, params.accountId),
     body: { callId: params.callId } });
 }
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  resolveWahaTarget — DO NOT CHANGE / DO NOT REMOVE                  ║
+// ║                                                                      ║
+// ║  Fuzzy name-to-JID resolver for groups, contacts, and channels.     ║
+// ║  This is the ONLY way agents can resolve human-readable names       ║
+// ║  (e.g., "test group", "zeev nesher") to WhatsApp JIDs.             ║
+// ║  Removing this will break all name-based targeting for the agent.   ║
+// ║                                                                      ║
+// ║  Added: 2026-03-10                                                   ║
+// ║  Verified: 2026-03-10                                                ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+interface ResolveTargetMatch {
+  jid: string;
+  name: string;
+  type: "group" | "contact" | "channel";
+  confidence: number;
+}
+
+interface ResolveTargetResult {
+  matches: ResolveTargetMatch[];
+  query: string;
+  searchedTypes: string[];
+}
+
+function fuzzyScore(query: string, name: string): number {
+  const q = query.toLowerCase().trim();
+  const n = name.toLowerCase().trim();
+  if (!n) return 0;
+  // Empty query = list all (return low confidence so sorted by name effectively)
+  if (!q) return 0.1;
+
+  // Exact match
+  if (q === n) return 1.0;
+  // Name starts with query
+  if (n.startsWith(q)) return 0.9;
+  // Query starts with name
+  if (q.startsWith(n)) return 0.85;
+  // All query words found in name
+  const qWords = q.split(/\s+/).filter(Boolean);
+  const allFound = qWords.every((w) => n.includes(w));
+  if (allFound && qWords.length > 0) return 0.8;
+  // Contains query as substring
+  if (n.includes(q)) return 0.7;
+  // Any query word found in name
+  const anyFound = qWords.some((w) => n.includes(w));
+  if (anyFound) return 0.5;
+
+  return 0;
+}
+
+function toArr(val: unknown): unknown[] {
+  if (Array.isArray(val)) return val;
+  if (val && typeof val === "object") return Object.values(val);
+  return [];
+}
+
+export async function resolveWahaTarget(params: {
+  cfg: CoreConfig;
+  query: string;
+  type: "group" | "contact" | "channel" | "auto";
+  accountId?: string;
+}): Promise<ResolveTargetResult> {
+  const { cfg, query, type, accountId } = params;
+  const matches: ResolveTargetMatch[] = [];
+  const searchedTypes: string[] = [];
+
+  const fetchGroups = async () => {
+    searchedTypes.push("group");
+    try {
+      const raw = await getWahaGroups({ cfg, accountId });
+      const groups = toArr(raw);
+      for (const g of groups) {
+        const entry = g as Record<string, unknown>;
+        const jid = String(entry.id ?? entry.jid ?? "");
+        const name = String(entry.subject ?? entry.name ?? "");
+        if (!jid || !name) continue;
+        const score = fuzzyScore(query, name);
+        if (score > 0) matches.push({ jid, name, type: "group", confidence: score });
+      }
+    } catch (err) {
+      console.warn("[resolveWahaTarget] groups fetch failed:", (err as Error).message);
+    }
+  };
+
+  const fetchContacts = async () => {
+    searchedTypes.push("contact");
+    try {
+      const raw = await getWahaChatsOverview({ cfg, limit: 500, accountId });
+      const chats = toArr(raw);
+      for (const c of chats) {
+        const entry = c as Record<string, unknown>;
+        const jid = String(entry.id ?? entry.jid ?? "");
+        // Only include DM contacts (@c.us and @lid), not groups or channels
+        if (!jid || (!jid.endsWith("@c.us") && !jid.endsWith("@lid"))) continue;
+        const name = String(entry.name ?? entry.pushName ?? "");
+        if (!name) continue;
+        const score = fuzzyScore(query, name);
+        if (score > 0) matches.push({ jid, name, type: "contact", confidence: score });
+      }
+    } catch (err) {
+      console.warn("[resolveWahaTarget] contacts fetch failed:", (err as Error).message);
+    }
+  };
+
+  const fetchChannels = async () => {
+    searchedTypes.push("channel");
+    try {
+      const raw = await getWahaChannels({ cfg, accountId });
+      const channels = toArr(raw);
+      for (const ch of channels) {
+        const entry = ch as Record<string, unknown>;
+        const jid = String(entry.id ?? entry.jid ?? "");
+        const name = String(entry.name ?? entry.subject ?? "");
+        if (!jid || !name) continue;
+        const score = fuzzyScore(query, name);
+        if (score > 0) matches.push({ jid, name, type: "channel", confidence: score });
+      }
+    } catch (err) {
+      console.warn("[resolveWahaTarget] channels fetch failed:", (err as Error).message);
+    }
+  };
+
+  if (type === "group") {
+    await fetchGroups();
+  } else if (type === "contact") {
+    await fetchContacts();
+  } else if (type === "channel") {
+    await fetchChannels();
+  } else {
+    // "auto" — fetch all in parallel
+    await Promise.all([fetchGroups(), fetchContacts(), fetchChannels()]);
+  }
+
+  // Sort by confidence descending, limit to top 20
+  matches.sort((a, b) => b.confidence - a.confidence);
+  const topMatches = matches.slice(0, 20);
+
+  return { matches: topMatches, query, searchedTypes };
+}

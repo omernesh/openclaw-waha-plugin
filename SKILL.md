@@ -1,7 +1,7 @@
 ---
 name: whatsapp-actions
 description: Use when the user asks to send a WhatsApp message, create a poll, share a location, manage groups, send a contact card, forward a message, react to a message, pin a message, edit or delete a message, create an event, manage labels, post a status/story, manage channels, join a group, follow a channel, change profile, block/unblock contacts, or perform any WhatsApp action through WAHA.
-version: 3.1.0
+version: 3.2.0
 ---
 
 > **IMPORTANT — Standard Action Names**: For targeted actions (those that send to a chat), use these standard names:
@@ -23,6 +23,60 @@ version: 3.1.0
 | Follow channel | `followChannel` | channelId (newsletter JID) |
 | Share location | `sendLocation` | chatId, latitude, longitude, title |
 | Create group event | `sendEvent` | chatId, name, startTime |
+| Resolve name to JID | `resolveTarget` | query, type ("group"|"contact"|"channel"|"auto") |
+
+---
+
+# Resolving Names to JIDs (resolveTarget)
+
+Use the **`resolveTarget`** action to find groups, contacts, or channels by name. This converts human-readable names into WhatsApp JIDs that other actions require.
+
+## Parameters
+- **query**: The name (or partial name) to search for
+- **type**: What to search -- `"group"`, `"contact"`, `"channel"`, or `"auto"` (searches all three)
+
+## Returns
+An object with `matches` (array of `{jid, name, type, confidence}`), `query`, and `searchedTypes`.
+Confidence scores range from 0.5 to 1.0:
+- 1.0 = exact match
+- 0.9 = name starts with query
+- 0.85 = query starts with name
+- 0.8 = all query words found in name
+- 0.7 = query is a substring of name
+- 0.5 = at least one query word found in name
+
+## Examples
+
+**Find a group:**
+```
+Action: resolveTarget
+Parameters: { "query": "test group", "type": "group" }
+```
+
+**Find a contact:**
+```
+Action: resolveTarget
+Parameters: { "query": "zeev nesher", "type": "contact" }
+```
+
+**Find anything (auto-search groups, contacts, and channels):**
+```
+Action: resolveTarget
+Parameters: { "query": "sammie", "type": "auto" }
+```
+
+**List all groups (empty query returns everything):**
+```
+Action: resolveTarget
+Parameters: { "query": "", "type": "group" }
+```
+Then filter the results yourself for batch operations (e.g., "send to all Hebrew-named groups").
+
+## Rules
+- **ALWAYS resolve names to JIDs before using send/poll/react/etc.** Never guess JIDs.
+- If multiple matches are returned with similar confidence, **ask the user** which one they meant.
+- For batch operations (e.g., "send to all Hebrew groups"), use resolveTarget with type "group" and a broad query, then filter the results.
+- Results are sorted by confidence (highest first), limited to top 20 matches.
 
 ---
 
