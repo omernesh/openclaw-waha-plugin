@@ -1483,6 +1483,25 @@ function toArr(val: unknown): unknown[] {
   return [];
 }
 
+// ── Rate-limiting cache for resolveTarget ──────────────────────
+// Prevents hammering WAHA API when the agent calls resolveTarget
+// multiple times in quick succession. Cache TTL = 30 seconds.
+// DO NOT REMOVE — protects WAHA from excessive API load.
+const _resolveCache = new Map<string, { data: unknown[]; ts: number }>();
+const RESOLVE_CACHE_TTL_MS = 30_000; // 30 seconds
+
+function getCachedOrFetch(key: string, fetcher: () => Promise<unknown>): Promise<unknown[]> {
+  const cached = _resolveCache.get(key);
+  if (cached && Date.now() - cached.ts < RESOLVE_CACHE_TTL_MS) {
+    return Promise.resolve(cached.data);
+  }
+  return fetcher().then((raw) => {
+    const arr = toArr(raw);
+    _resolveCache.set(key, { data: arr, ts: Date.now() });
+    return arr;
+  });
+}
+
 export async function resolveWahaTarget(params: {
   cfg: CoreConfig;
   query: string;
@@ -1496,8 +1515,7 @@ export async function resolveWahaTarget(params: {
   const fetchGroups = async () => {
     searchedTypes.push("group");
     try {
-      const raw = await getWahaGroups({ cfg, accountId });
-      const groups = toArr(raw);
+      const groups = await getCachedOrFetch("groups", () => getWahaGroups({ cfg, accountId }));
       for (const g of groups) {
         const entry = g as Record<string, unknown>;
         const jid = String(entry.id ?? entry.jid ?? "");
@@ -1514,8 +1532,7 @@ export async function resolveWahaTarget(params: {
   const fetchContacts = async () => {
     searchedTypes.push("contact");
     try {
-      const raw = await getWahaChatsOverview({ cfg, limit: 500, accountId });
-      const chats = toArr(raw);
+      const chats = await getCachedOrFetch("contacts", () => getWahaChatsOverview({ cfg, limit: 500, accountId }));
       for (const c of chats) {
         const entry = c as Record<string, unknown>;
         const jid = String(entry.id ?? entry.jid ?? "");
@@ -1534,8 +1551,7 @@ export async function resolveWahaTarget(params: {
   const fetchChannels = async () => {
     searchedTypes.push("channel");
     try {
-      const raw = await getWahaChannels({ cfg, accountId });
-      const channels = toArr(raw);
+      const channels = await getCachedOrFetch("channels", () => getWahaChannels({ cfg, accountId }));
       for (const ch of channels) {
         const entry = ch as Record<string, unknown>;
         const jid = String(entry.id ?? entry.jid ?? "");
@@ -1556,8 +1572,12 @@ export async function resolveWahaTarget(params: {
   } else if (type === "channel") {
     await fetchChannels();
   } else {
-    // "auto" — fetch all in parallel
-    await Promise.all([fetchGroups(), fetchContacts(), fetchChannels()]);
+    // "auto" — fetch sequentially with small delay to avoid burst load on WAHA
+    await fetchGroups();
+    await new Promise(r => setTimeout(r, 200));
+    await fetchContacts();
+    await new Promise(r => setTimeout(r, 200));
+    await fetchChannels();
   }
 
   // Sort by confidence descending, limit to top 20

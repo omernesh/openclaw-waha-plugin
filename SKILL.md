@@ -72,6 +72,18 @@ Parameters: { "query": "", "type": "group" }
 ```
 Then filter the results yourself for batch operations (e.g., "send to all Hebrew-named groups").
 
+## CRITICAL — No Target Parameter
+**resolveTarget is a utility action. Do NOT pass a target/recipient. Only pass query and type as parameters.**
+The gateway will reject resolveTarget if you include a target. The name goes in `query`, NOT in the target field.
+
+**WRONG:** `Action: resolveTarget, Target: "sammie test group"` ← WILL FAIL
+**RIGHT:** `Action: resolveTarget, Parameters: { "query": "sammie test group", "type": "group" }` ← CORRECT
+
+## Workflow: Send Message by Name
+1. Call `resolveTarget` with `{query: "name", type: "group"}` (no target!)
+2. Get back matches with JIDs
+3. Use the JID in a `send` action: `Action: send, Target: "120363...@g.us", Parameters: {text: "hello"}`
+
 ## Rules
 - **ALWAYS resolve names to JIDs before using send/poll/react/etc.** Never guess JIDs.
 - If multiple matches are returned with similar confidence, **ask the user** which one they meant.
