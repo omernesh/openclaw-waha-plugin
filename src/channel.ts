@@ -24,7 +24,7 @@ import { monitorWahaProvider } from "./monitor.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
 import { getWahaRuntime } from "./runtime.js";
 import {
-  sendWahaMediaBatch, sendWahaReaction, sendWahaText,
+  sendWahaMediaBatch, sendWahaImage, sendWahaVideo, sendWahaFile, sendWahaReaction, sendWahaText,
   // Rich messages
   sendWahaPoll, sendWahaPollVote, sendWahaLocation, sendWahaContactVcard,
   sendWahaList, forwardWahaMessage, sendWahaLinkPreview, sendWahaButtonsReply,
@@ -67,6 +67,25 @@ import {
 } from "./send.js";
 import type { CoreConfig } from "./types.js";
 
+// Cached config for outbound adapter — handleAction receives cfg as a param
+// and caches it here so outbound methods (sendText, sendMedia, sendPoll) can
+// access config without calling readConfigFile() which may crash.
+let _cachedConfig: CoreConfig | null = null;
+function getCachedConfig(): CoreConfig {
+  if (_cachedConfig) return _cachedConfig;
+  // Try SDK methods as fallback
+  try {
+    const rt = getWahaRuntime();
+    if (typeof rt.config.readConfigFileSnapshot === "function") {
+      return rt.config.readConfigFileSnapshot() as CoreConfig;
+    }
+    if (typeof rt.config.readConfigFile === "function") {
+      return rt.config.readConfigFile() as CoreConfig;
+    }
+  } catch { /* fall through */ }
+  throw new Error("WAHA config not available — no cached config and SDK methods failed");
+}
+
 const meta = {
   id: "waha",
   label: "WAHA",
@@ -90,6 +109,13 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   sendLinkPreview: (p, cfg, aid) => sendWahaLinkPreview({ cfg, chatId: String(p.chatId), url: String(p.url), title: String(p.title ?? ""), description: p.description ? String(p.description) : undefined, image: p.image ? String(p.image) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
   sendButtonsReply: (p, cfg, aid) => sendWahaButtonsReply({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), buttonId: String(p.buttonId), accountId: aid }),
   sendEvent: (p, cfg, aid) => sendWahaEvent({ cfg, chatId: String(p.chatId), name: String(p.name), startTime: Number(p.startTime), endTime: p.endTime != null ? Number(p.endTime) : undefined, description: p.description ? String(p.description) : undefined, location: p.location as any, extraGuestsAllowed: p.extraGuestsAllowed != null ? Boolean(p.extraGuestsAllowed) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  // Media sending — explicit type-specific actions for the agent
+  // DO NOT CHANGE sendImage/sendVideo/sendFile to use sendWahaMediaBatch — they must call WAHA API directly.
+  // sendWahaMediaBatch does MIME detection which re-routes the call based on content type.
+  // When the agent says sendImage, it MUST go to /api/sendImage. Verified 2026-03-10.
+  sendImage: (p, cfg, aid) => sendWahaImage({ cfg, chatId: String(p.chatId || p.to), file: String(p.image || p.url || p.file), caption: p.caption ? String(p.caption) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  sendVideo: (p, cfg, aid) => sendWahaVideo({ cfg, chatId: String(p.chatId || p.to), file: String(p.video || p.url || p.file), caption: p.caption ? String(p.caption) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
+  sendFile: (p, cfg, aid) => sendWahaFile({ cfg, chatId: String(p.chatId || p.to), file: String(p.file || p.url), caption: p.caption ? String(p.caption) : undefined, replyToId: p.replyToId ? String(p.replyToId) : undefined, accountId: aid }),
   // Message management
   editMessage: (p, cfg, aid) => editWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), text: String(p.text), accountId: aid }),
   deleteMessage: (p, cfg, aid) => deleteWahaMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
@@ -213,6 +239,7 @@ const UTILITY_ACTIONS = [
   "getPresence", "findPhoneByLid", "findLidByPhone", "getAllLids",
   "createGroup", "sendEvent", "sendLocation", "sendContactVcard",
   "sendTextStatus", "sendImageStatus",
+  "sendImage", "sendVideo", "sendFile",
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.
@@ -233,6 +260,9 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     const p = params as Record<string, unknown>;
     const coreCfg = cfg as CoreConfig;
     const aid = accountId ?? undefined;
+
+    // Cache config for outbound adapter (sendText/sendMedia/sendPoll)
+    _cachedConfig = coreCfg;
 
     // --- Standard targeted actions (gateway-recognized names) ---
 
@@ -494,7 +524,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     textChunkLimit: 4000,
     sendText: async ({ to, text, accountId, replyToId }) => {
       const result = await sendWahaText({
-        cfg: getWahaRuntime().config.readConfigFile() as CoreConfig,
+        cfg: getCachedConfig(),
         to: normalizeWahaMessagingTarget(to),
         text,
         replyToId: replyToId ?? undefined,
@@ -504,7 +534,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     },
     sendMedia: async ({ to, text, mediaUrl, accountId, replyToId }) => {
       await sendWahaMediaBatch({
-        cfg: getWahaRuntime().config.readConfigFile() as CoreConfig,
+        cfg: getCachedConfig(),
         to: normalizeWahaMessagingTarget(to),
         mediaUrls: mediaUrl ? [mediaUrl] : [],
         caption: text,
@@ -515,7 +545,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     },
     sendPoll: async ({ to, poll, accountId }) => {
       const result = await sendWahaPoll({
-        cfg: getWahaRuntime().config.readConfigFile() as CoreConfig,
+        cfg: getCachedConfig(),
         chatId: normalizeWahaMessagingTarget(to),
         name: poll.question,
         options: poll.options,

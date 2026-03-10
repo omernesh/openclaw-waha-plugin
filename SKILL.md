@@ -4,6 +4,55 @@ description: Use when the user asks to send a WhatsApp message, create a poll, s
 version: 3.0.0
 ---
 
+> **IMPORTANT — Standard Action Names**: For targeted actions (those that send to a chat), use these standard names:
+> `poll` (create poll), `send` (send text/DM), `edit` (edit message), `unsend` (delete message), `pin`/`unpin`, `read` (mark read), `react` (add reaction).
+> Do NOT use custom names like sendPoll, editMessage, deleteMessage — they will be rejected by the gateway.
+
+
+
+# Sending Media (Images, Videos, Documents, Contacts)
+
+## Sending Images
+Use the `sendImage` action with a **direct image URL** (not a JSON API response):
+```
+Action: sendImage
+Parameters: { "chatId": "<target>", "file": "https://example.com/actual-image.jpg", "caption": "optional caption" }
+```
+
+**IMPORTANT**: The `file` parameter must point to an actual image file (JPEG, PNG, GIF, WebP), NOT to an API endpoint that returns JSON. If you fetch an API that returns JSON with an image URL inside, extract the actual URL first.
+
+## Sending Videos
+Use the `sendVideo` action:
+```
+Action: sendVideo
+Parameters: { "chatId": "<target>", "file": "https://example.com/video.mp4", "caption": "optional caption" }
+```
+
+## Sending Documents/Files
+Use the `sendFile` action for PDFs, documents, and other non-media files:
+```
+Action: sendFile
+Parameters: { "chatId": "<target>", "file": "https://example.com/document.pdf", "caption": "optional caption" }
+```
+
+## Sending Contact Cards (vCards)
+Use the `sendContactVcard` action:
+```
+Action: sendContactVcard
+Parameters: { "chatId": "<target>", "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }] }
+```
+
+## Media URL Rules
+- **Direct URLs only**: Always use a URL that points directly to the media file
+- **No API responses**: Never pass a JSON API response URL as media content
+- **Supported image formats**: JPEG, PNG, GIF, WebP, BMP, SVG
+- **Supported video formats**: MP4, WebM, MOV, AVI
+- **For web images**: Use the direct image URL (right-click -> "Copy image address" equivalent)
+- **Local files**: Use the full absolute path (e.g., `/tmp/openclaw/image.png`)
+- **Alternative parameters**: `image`/`url` also accepted for sendImage; `video`/`url` for sendVideo; `url` for sendFile
+
+---
+
 # WhatsApp Actions Reference
 
 You have full control of WhatsApp through the WAHA plugin's native action system. Use the `message` tool with actions to perform rich WhatsApp operations.
@@ -16,7 +65,7 @@ Use the `message` tool with an action parameter. Available actions are listed be
 
 | Action | Parameters | Notes |
 |--------|-----------|-------|
-| `sendPoll` | chatId, name, options[], multipleAnswers | Poll wrapper required |
+| `poll` | chatId, name, options[], multipleAnswers | Poll wrapper required |
 | `sendPollVote` | chatId, pollMessageId, votes[] | Vote on existing poll |
 | `sendLocation` | chatId, latitude, longitude, title | Share GPS coordinates |
 | `sendContactVcard` | chatId, contacts[{fullName, phoneNumber}] | Share contact cards |
@@ -31,10 +80,10 @@ Use the `message` tool with an action parameter. Available actions are listed be
 
 | Action | Parameters |
 |--------|-----------|
-| `editMessage` | chatId, messageId, text |
-| `deleteMessage` | chatId, messageId |
-| `pinMessage` | chatId, messageId |
-| `unpinMessage` | chatId, messageId |
+| `edit` | chatId, messageId, text |
+| `unsend` | chatId, messageId |
+| `pin` | chatId, messageId |
+| `unpin` | chatId, messageId |
 | `starMessage` | chatId, messageId, star (boolean) |
 
 ## Chat Management
@@ -50,7 +99,7 @@ Use the `message` tool with an action parameter. Available actions are listed be
 | `archiveChat` | chatId |
 | `unarchiveChat` | chatId |
 | `unreadChat` | chatId |
-| `readChatMessages` | chatId |
+| `read` | chatId |
 | `getChatPicture` | chatId |
 
 ## Group Admin

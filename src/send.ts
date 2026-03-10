@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import { extname } from "path";
+import { extname, basename } from "path";
 import { detectMime, sendMediaWithLeadingCaption, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import { resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
@@ -102,6 +102,17 @@ const EXTENSION_MIME_MAP: Record<string, string> = {
   ".webp": "image/webp",
   ".mp4": "video/mp4",
   ".pdf": "application/pdf",
+  ".svg": "image/svg+xml",
+  ".bmp": "image/bmp",
+  ".tiff": "image/tiff",
+  ".tif": "image/tiff",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".avi": "video/x-msvideo",
+  ".mkv": "video/x-matroska",
+  ".flac": "audio/flac",
+  ".aac": "audio/aac",
+  ".wma": "audio/x-ms-wma",
 };
 
 /**
@@ -110,7 +121,13 @@ const EXTENSION_MIME_MAP: Record<string, string> = {
 function resolveMime(url: string): string {
   const mimeRaw = detectMime(url);
   if (typeof mimeRaw === "string" && mimeRaw) return mimeRaw;
-  const ext = extname(url).toLowerCase();
+  // Strip query params and fragments before extension detection
+  let cleanPath = url;
+  try {
+    const parsed = new URL(url, "file://localhost/");
+    cleanPath = parsed.pathname;
+  } catch { /* use raw url */ }
+  const ext = extname(cleanPath).toLowerCase();
   return EXTENSION_MIME_MAP[ext] ?? "";
 }
 
@@ -127,6 +144,18 @@ export function buildFilePayload(url: string): Record<string, string> {
     const mimetype = EXTENSION_MIME_MAP[ext] ?? "application/octet-stream";
     const filename = filePath.split("/").pop() ?? "file";
     return { data, mimetype, filename };
+  }
+  // For HTTP URLs, include mimetype + filename so WAHA sends as proper media
+  // (without mimetype, WAHA may send as generic file attachment)
+  let cleanPath = url;
+  try {
+    const parsed = new URL(url, "file://localhost/");
+    cleanPath = parsed.pathname;
+  } catch { /* use raw url */ }
+  const mime = resolveMime(url);
+  if (mime) {
+    const filename = basename(cleanPath) || "file";
+    return { url, mimetype: mime, filename };
   }
   return { url };
 }
@@ -199,6 +228,26 @@ export async function sendWahaText(params: {
   });
 }
 
+/**
+ * Attempt to detect MIME type via HTTP HEAD request.
+ * Returns empty string if detection fails or URL is not HTTP.
+ * DO NOT CHANGE — verified 2026-03-10 (media type routing fix)
+ */
+async function detectMimeViaHead(url: string): Promise<string> {
+  if (!url.startsWith("http://") && !url.startsWith("https://")) return "";
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, { method: "HEAD", signal: controller.signal, redirect: "follow" });
+    clearTimeout(timeout);
+    const ct = res.headers.get("content-type") || "";
+    // Extract just the MIME type (before any ;charset= or parameters)
+    return ct.split(";")[0].trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 async function sendWahaMedia(params: {
   cfg: CoreConfig;
   to: string;
@@ -212,10 +261,19 @@ async function sendWahaMedia(params: {
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendMedia requires chatId");
 
-  const mime = resolveMime(params.mediaUrl);
+  // ── MIME detection: extension-based, then HTTP HEAD fallback ──────
+  // DO NOT CHANGE this detection logic — verified 2026-03-10 (media routing fix)
+  let mime = resolveMime(params.mediaUrl);
+
+  // If extension-based detection failed, try HTTP HEAD request
+  if (!mime && (params.mediaUrl.startsWith("http://") || params.mediaUrl.startsWith("https://"))) {
+    mime = await detectMimeViaHead(params.mediaUrl);
+  }
+
   const isImage = mime.startsWith("image/");
   const isVideo = mime.startsWith("video/");
   const isAudio = mime.startsWith("audio/");
+  const isDocument = mime.startsWith("application/") || mime.startsWith("text/");
 
   const filePayload = buildFilePayload(params.mediaUrl);
 
@@ -277,10 +335,30 @@ async function sendWahaMedia(params: {
     });
   }
 
+  // ── DEFAULT ROUTING — DO NOT CHANGE ────────────────────────────
+  // When MIME is unknown (empty), default to sendImage (not sendFile).
+  // Most outbound media in chat contexts are images (e.g. URLs without
+  // file extensions like https://placecats.com/400/300).
+  // Only use sendFile for known document MIME types (application/*, text/*).
+  // Verified 2026-03-10 (media routing fix).
+  // ───────────────────────────────────────────────────────────────
+  if (isDocument) {
+    return callWahaApi({
+      baseUrl: account.baseUrl,
+      apiKey: account.apiKey,
+      path: "/api/sendFile",
+      body: {
+        ...base,
+        ...(params.text ? { caption: params.text } : {}),
+      },
+    });
+  }
+
+  // Unknown or undetectable MIME → default to sendImage
   return callWahaApi({
     baseUrl: account.baseUrl,
     apiKey: account.apiKey,
-    path: "/api/sendFile",
+    path: "/api/sendImage",
     body: {
       ...base,
       ...(params.text ? { caption: params.text } : {}),
@@ -314,6 +392,97 @@ export async function sendWahaMediaBatch(params: {
     },
     onError: (err, mediaUrl) => {
       console.warn(`[waha] failed to send media ${mediaUrl}: ${String(err)}`);
+    },
+  });
+}
+
+
+// ── DIRECT MEDIA SENDERS (DO NOT CHANGE) ─────────────────────────
+// These call WAHA API directly without MIME detection.
+// sendImage → /api/sendImage, sendVideo → /api/sendVideo, sendFile → /api/sendFile
+// When the agent explicitly picks sendImage, it MUST go to /api/sendImage.
+// DO NOT route through sendWahaMediaBatch which does MIME sniffing.
+// Verified working 2026-03-10.
+// ─────────────────────────────────────────────────────────────────
+
+export async function sendWahaImage(params: {
+  cfg: CoreConfig;
+  chatId: string;
+  file: string;
+  caption?: string;
+  replyToId?: string;
+  accountId?: string;
+}) {
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertAllowedSession(account.session);
+  const chatId = normalizeWahaMessagingTarget(params.chatId);
+  if (!chatId) throw new Error("sendImage requires chatId");
+  const filePayload = buildFilePayload(params.file);
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendImage",
+    body: {
+      chatId,
+      file: filePayload,
+      session: account.session,
+      ...(params.caption ? { caption: params.caption } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
+  });
+}
+
+export async function sendWahaVideo(params: {
+  cfg: CoreConfig;
+  chatId: string;
+  file: string;
+  caption?: string;
+  replyToId?: string;
+  accountId?: string;
+}) {
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertAllowedSession(account.session);
+  const chatId = normalizeWahaMessagingTarget(params.chatId);
+  if (!chatId) throw new Error("sendVideo requires chatId");
+  const filePayload = buildFilePayload(params.file);
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendVideo",
+    body: {
+      chatId,
+      file: filePayload,
+      session: account.session,
+      convert: true,
+      ...(params.caption ? { caption: params.caption } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
+  });
+}
+
+export async function sendWahaFile(params: {
+  cfg: CoreConfig;
+  chatId: string;
+  file: string;
+  caption?: string;
+  replyToId?: string;
+  accountId?: string;
+}) {
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertAllowedSession(account.session);
+  const chatId = normalizeWahaMessagingTarget(params.chatId);
+  if (!chatId) throw new Error("sendFile requires chatId");
+  const filePayload = buildFilePayload(params.file);
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendFile",
+    body: {
+      chatId,
+      file: filePayload,
+      session: account.session,
+      ...(params.caption ? { caption: params.caption } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
     },
   });
 }

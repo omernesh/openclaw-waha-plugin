@@ -3,9 +3,18 @@
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
 **Last updated:** 2026-03-10
-**Version:** 1.9.2
+**Version:** 1.9.3
 
 ## Changelog
+
+### v1.9.3 (2026-03-10) -- Outbound Media Fix
+- **Fixed**: Images/videos sent by Sammie now arrive as proper WhatsApp media (imageMessage/videoMessage) instead of file attachments (documentMessage)
+- **Fixed**: MIME detection for URLs with query parameters (e.g., `image.png?token=abc`)
+- **Fixed**: HTTP HEAD fallback for MIME detection on extensionless URLs
+- **Fixed**: Outbound adapter config crash (`readConfigFile is not a function`) — replaced with cached config
+- **Added**: Direct `sendImage`/`sendVideo`/`sendFile` actions (bypass MIME detection, route to correct WAHA endpoint)
+- **Added**: Extended MIME type map (+11 formats: SVG, BMP, TIFF, WebM, MOV, AVI, MKV, FLAC, AAC, WMA)
+- **Updated**: SKILL.md with media sending instructions for the agent
 
 ### v1.9.2 (2026-03-10) -- Fix: Image Analysis via Native Pipeline
 - **Bug fix**: Images sent via WhatsApp were not being analyzed by Sammie. Root cause: `downloadWahaMedia()` saved temp files to `/tmp/waha-media-*` which is outside OpenClaw's allowed media path roots (`/tmp/openclaw/`). The native `applyMediaUnderstanding()` pipeline silently rejected these paths.
