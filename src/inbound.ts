@@ -33,18 +33,45 @@ const _dmFilterInstance = new Map<string, DmFilter>();
 
 function getDmFilter(cfg: CoreConfig, accountId: string): DmFilter {
   const dmFilterCfg = cfg.channels?.waha?.dmFilter ?? {};
-  const key = accountId;
-  if (!_dmFilterInstance.has(key)) {
-    _dmFilterInstance.set(key, new DmFilter(dmFilterCfg));
+  if (!_dmFilterInstance.has(accountId)) {
+    _dmFilterInstance.set(accountId, new DmFilter(dmFilterCfg));
   } else {
-    _dmFilterInstance.get(key)!.updateConfig(dmFilterCfg);
+    _dmFilterInstance.get(accountId)!.updateConfig(dmFilterCfg);
   }
-  return _dmFilterInstance.get(key)!;
+  return _dmFilterInstance.get(accountId)!;
 }
 
 // Exported for admin panel stats access
 export function getDmFilterForAdmin(cfg: CoreConfig, accountId: string): DmFilter {
   return getDmFilter(cfg, accountId);
+}
+
+// Module-level Group filter singleton (shared across invocations, reuses regex cache)
+const _groupFilterInstance = new Map<string, DmFilter>();
+
+// Default group filter patterns — keywords that trigger bot responses in groups
+const DEFAULT_GROUP_FILTER_PATTERNS = ["sammie", "סמי", "help", "hello", "bot", "ai"];
+
+function getGroupFilter(cfg: CoreConfig, accountId: string): DmFilter {
+  const wahaConfig = (cfg.channels?.waha ?? {}) as Record<string, unknown>;
+  const rawGroupFilterCfg = (wahaConfig.groupFilter ?? {}) as Record<string, unknown>;
+  // Apply defaults: enabled=true, default mentionPatterns if not explicitly set
+  const groupFilterCfg = {
+    enabled: true,
+    mentionPatterns: DEFAULT_GROUP_FILTER_PATTERNS,
+    ...rawGroupFilterCfg,
+  } as Parameters<typeof DmFilter.prototype.updateConfig>[0];
+  if (!_groupFilterInstance.has(accountId)) {
+    _groupFilterInstance.set(accountId, new DmFilter(groupFilterCfg));
+  } else {
+    _groupFilterInstance.get(accountId)!.updateConfig(groupFilterCfg);
+  }
+  return _groupFilterInstance.get(accountId)!;
+}
+
+// Exported for admin panel stats access
+export function getGroupFilterForAdmin(cfg: CoreConfig, accountId: string): DmFilter {
+  return getGroupFilter(cfg, accountId);
 }
 
 async function deliverWahaReply(params: {
@@ -81,12 +108,11 @@ async function deliverWahaReply(params: {
     return;
   }
 
-  const combined = formatTextWithAttachmentLinks(text, mediaUrls);
-  if (!combined) return;
+  if (!text) return;
   await sendWahaText({
     cfg,
     to: chatId,
-    text: combined,
+    text,
     replyToId: payload.replyToId,
     accountId,
   });
@@ -127,6 +153,13 @@ export async function handleWahaInbound(params: {
     || Boolean(_rawMsg?.eventCreationMessage);       // event creation
   if (rawPayload && needsPreprocessing && !_preCheckDropped) {
     try {
+      // !! DO NOT CHANGE — Media preprocessing config passthrough !!
+      // Reads mediaPreprocessing from account config. Defaults to { enabled: true }.
+      // CRITICAL: If mediaPreprocessing.enabled is false in openclaw.json, ALL media
+      // preprocessing is disabled (audio transcription, image analysis, etc.).
+      // The agent will receive raw media URLs and won't be able to understand
+      // voice messages, images, or other media content.
+      // Bug fixed 2026-03-10: config had enabled:false, broke voice transcription.
       const mediaConfig = account.config.mediaPreprocessing ?? { enabled: true };
       message = await preprocessInboundMessage({
         message: rawMessage,
@@ -216,6 +249,20 @@ export async function handleWahaInbound(params: {
     if (allowedGroups && allowedGroups.length > 0 && !allowedGroups.includes(chatId)) {
       runtime.log?.(`waha: drop group ${chatId} (not in allowedGroups)`);
       return;
+    }
+  }
+
+  // Group keyword filter: silently drop group messages that don't match patterns
+  // (enabled by default — getGroupFilter applies defaults internally)
+  if (isGroup) {
+    const groupFilter = getGroupFilter(config, account.accountId);
+    const filterResult = groupFilter.check({
+      text: rawBody,
+      senderId,
+      log: (msg) => runtime.log?.(msg),
+    });
+    if (!filterResult.pass) {
+      return; // Silent drop
     }
   }
 
@@ -334,10 +381,17 @@ export async function handleWahaInbound(params: {
     }
   }
 
+  // Extract sender's pushName from raw payload for directory tracking
+  const senderPushName =
+    (rawPayload as Record<string, unknown> | undefined)?.pushName as string | undefined
+    ?? ((rawPayload as Record<string, unknown> | undefined)?._data as Record<string, unknown> | undefined)?.notifyName as string | undefined
+    ?? (rawPayload as Record<string, unknown> | undefined)?.from_name as string | undefined
+    ?? undefined;
+
   // Track contact in directory (fire-and-forget, errors non-fatal)
   try {
     const dirDb = getDirectoryDb(account.accountId);
-    dirDb.upsertContact(senderId, undefined, isGroup);
+    dirDb.upsertContact(senderId, senderPushName || undefined, isGroup);
   } catch (err) {
     runtime.log?.(`waha: directory upsert failed for ${senderId}: ${String(err)}`);
   }

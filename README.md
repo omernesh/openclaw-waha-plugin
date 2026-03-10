@@ -3,9 +3,16 @@
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
 **Last updated:** 2026-03-10
-**Version:** 1.9.0
+**Version:** 1.9.1
 
 ## Changelog
+
+### v1.9.1 (2026-03-10) -- Fix: Voice Transcription Disabled by Config
+- **Bug fix**: `mediaPreprocessing.enabled` was `false` in openclaw.json, silently disabling ALL media preprocessing (voice transcription, image analysis, video analysis, location resolution, vCard parsing, document analysis)
+- Voice messages were passed through as raw media URLs, causing the agent to reply "can't transcribe audio"
+- Added DO NOT CHANGE warnings to `media.ts` and `inbound.ts` around the preprocessing master switch and config passthrough
+- Root cause: `enabled: false` is a master kill switch that overrides all individual sub-toggles (`audioTranscription`, `imageAnalysis`, etc.)
+- **Config requirement**: `channels.waha.mediaPreprocessing.enabled` MUST be `true` for any media processing to occur
 
 ### v1.9.0 (2026-03-10) -- BREAKING: Action Names Fix
 - **BREAKING**: `listActions()` now returns only gateway-standard names (send, poll, react, edit, unsend, pin, unpin, read, delete, reply) plus curated utility actions
@@ -103,7 +110,7 @@ Test results from manual verification on 2026-03-10:
 | `runtime.ts` | ~15 | Runtime singleton access. `setWahaRuntime()` / `getWahaRuntime()` store and retrieve the OpenClaw `PluginRuntime` instance for use across modules. |
 | `signature.ts` | ~30 | HMAC webhook verification. `verifyWahaWebhookHmac()` validates the `X-Webhook-Hmac` header using SHA-512, accepting hex or base64 signature formats. Uses `crypto.timingSafeEqual()` for constant-time comparison. |
 | `secret-input.ts` | ~15 | Secret field schema. Re-exports OpenClaw SDK secret input utilities and provides `buildSecretInputSchema()` which accepts either a plain string or a `{ source, provider, id }` object for env/file/exec-based secret resolution. |
-| `media.ts` | -- | Media preprocessing configuration and handling. |
+| `media.ts` | ~470 | Media preprocessing pipeline. Downloads media from WAHA, transcribes audio via local faster-whisper, analyzes images via Vision API, describes videos via Gemini, reverse-geocodes locations, parses vCards, extracts document metadata. **DO NOT disable `mediaPreprocessing.enabled`** -- it is the master kill switch for all processing. |
 
 ---
 
@@ -325,6 +332,17 @@ All configuration lives in `~/.openclaw/openclaw.json` under `channels.waha`. Th
         "enabled": false
       },
       "blockStreaming": false,
+
+      // --- Media Preprocessing (DO NOT set enabled: false!) ---
+      "mediaPreprocessing": {
+        "enabled": true,           // MASTER SWITCH — false disables ALL processing
+        "audioTranscription": true, // Local Whisper transcription for voice messages
+        "imageAnalysis": true,      // Vision API image description
+        "videoAnalysis": true,      // Gemini video description
+        "locationResolution": true, // Nominatim reverse geocoding
+        "vcardParsing": true,       // Contact card parsing
+        "documentAnalysis": true    // Document metadata extraction
+      },
 
       // --- Multi-Account (optional) ---
       "accounts": {

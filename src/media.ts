@@ -3,6 +3,24 @@
  *
  * Handles: audio transcription, image analysis, video analysis,
  * location geocoding, vCard parsing, document metadata.
+ *
+ * !! DO NOT CHANGE THIS FILE without understanding the full preprocessing pipeline !!
+ *
+ * CRITICAL: The `enabled` flag in MediaPreprocessingConfig is a MASTER KILL SWITCH.
+ * If `config.enabled` is `false`, ALL media preprocessing is disabled — audio
+ * transcription, image analysis, video analysis, everything. Individual sub-toggles
+ * (audio.enabled, image.enabled, etc.) are only checked AFTER the master switch.
+ *
+ * The config is read from `channels.waha.mediaPreprocessing` in openclaw.json.
+ * Setting `mediaPreprocessing.enabled: false` silently disables all processing,
+ * causing the agent to receive raw media URLs instead of transcribed/analyzed content.
+ *
+ * Bug history:
+ * - 2026-03-10: mediaPreprocessing.enabled was false, causing voice messages to
+ *   pass through without transcription. Agent replied "can't transcribe audio"
+ *   because it only received a media URL, not transcribed text.
+ *
+ * Verified working: 2026-03-10
  */
 
 import { execFile } from "node:child_process";
@@ -397,6 +415,10 @@ export async function preprocessInboundMessage(params: {
 }): Promise<WahaInboundMessage> {
   const { message, rawPayload, account, config } = params;
 
+  // !! DO NOT CHANGE — Master kill switch for ALL media preprocessing !!
+  // If enabled is false, no audio/image/video/location/vcard/document processing occurs.
+  // The agent will receive raw media URLs instead of transcribed/analyzed content.
+  // See openclaw.json → channels.waha.mediaPreprocessing.enabled
   if (config?.enabled === false) return message;
 
   const data = rawPayload._data as Record<string, unknown> | undefined;
