@@ -96,7 +96,6 @@ const meta = {
   docsLabel: "whatsapp",
   blurb: "Self-hosted WhatsApp via WAHA webhooks + REST API bridge.",
   order: 70,
-  quickstartAllowFrom: true,
 } as const;
 
 // Action name → handler function map
@@ -262,6 +261,37 @@ function resolveChatId(params: Record<string, unknown>, toolContext?: { currentC
     : (toolContext?.currentChannelId ?? "");
 }
 
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  autoResolveTarget — DO NOT CHANGE / DO NOT REMOVE                 ║
+// ║                                                                    ║
+// ║  Auto-resolves human-readable names to WhatsApp JIDs.              ║
+// ║  Called by standard action handlers (send, poll, etc.) when the    ║
+// ║  chatId doesn't look like a JID or phone number.                  ║
+// ║  This is what allows "send hello to sammie test group" to work.   ║
+// ║                                                                    ║
+// ║  Added: 2026-03-10                                                 ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const JID_RE = /@(c\.us|g\.us|lid|s\.whatsapp\.net|newsletter|broadcast)$/i;
+const PHONE_RE = /^\+?\d{6,}$/;
+
+async function autoResolveTarget(chatId: string, cfg: CoreConfig, accountId?: string): Promise<string> {
+  // Already a JID or phone number — pass through unchanged
+  if (JID_RE.test(chatId) || PHONE_RE.test(chatId)) return chatId;
+
+  // Try to resolve as a human-readable name
+  const resolved = await resolveWahaTarget({ cfg, query: chatId, type: "auto", accountId });
+  if (resolved.matches.length === 0) {
+    throw new Error(`Could not resolve "${chatId}" to a WhatsApp JID. No matches found. Use a JID (e.g. 120363...@g.us) or phone number.`);
+  }
+  // Single high-confidence match — use it
+  if (resolved.matches[0].confidence >= 0.7) {
+    return resolved.matches[0].jid;
+  }
+  // Low confidence — report what we found
+  const summary = resolved.matches.slice(0, 5).map(m => `${m.name} (${m.jid})`).join(", ");
+  throw new Error(`Ambiguous target "${chatId}". Possible matches: ${summary}. Please specify the exact JID.`);
+}
+
 const wahaMessageActions: ChannelMessageActionAdapter = {
   listActions: () => EXPOSED_ACTIONS, // !!! DO NOT CHANGE to ALL_ACTIONS -- breaks gateway target resolution
   supportsAction: ({ action }) => EXPOSED_ACTIONS.includes(action) || action in ACTION_HANDLERS,
@@ -295,7 +325,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     //   1. params.to  2. params.chatId  3. toolContext.currentChannelId
     // The poll:{} wrapper is required by WAHA API.
     if (action === "poll") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
       const question = typeof p.pollQuestion === "string" ? p.pollQuestion : (typeof p.name === "string" ? p.name : "");
       const options = Array.isArray(p.pollOption) ? p.pollOption as string[] : (Array.isArray(p.options) ? p.options as string[] : []);
       const multipleAnswers = Boolean(p.multipleAnswers);
@@ -311,7 +342,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     // Send DM uses sendWahaText with chatId from target resolution.
     // Target can come from: params.to, params.chatId, or toolContext.currentChannelId
     if (action === "send" || action === "reply") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
 
       // Handle contact card (vcard) when contacts param is present
       // Routes through "send" action to leverage gateway target resolution
@@ -342,7 +374,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     // Edit requires full serialized message ID: "true_<chatId>_<shortId>"
     // The LLM gets this from webhook payloads. Don't try to construct it.
     if (action === "edit") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
       const messageId = typeof p.messageId === "string" ? p.messageId : "";
       const text = typeof p.text === "string" ? p.text : "";
       if (!chatId || !messageId || !text) throw new Error("edit action requires chatId, messageId, and text");
@@ -355,7 +388,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     // Unsend/delete also requires full serialized message ID format.
     // WAHA returns protocolMessage type "REVOKE" on success.
     if (action === "unsend" || action === "delete") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
       const messageId = typeof p.messageId === "string" ? p.messageId : "";
       if (!chatId || !messageId) throw new Error("unsend action requires chatId and messageId");
 
@@ -364,7 +398,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     }
 
     if (action === "pin") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
       const messageId = typeof p.messageId === "string" ? p.messageId : "";
       if (!chatId || !messageId) throw new Error("pin action requires chatId and messageId");
 
@@ -373,7 +408,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     }
 
     if (action === "unpin") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
       const messageId = typeof p.messageId === "string" ? p.messageId : "";
       if (!chatId || !messageId) throw new Error("unpin action requires chatId and messageId");
 
@@ -382,7 +418,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     }
 
     if (action === "read") {
-      const chatId = resolveChatId(p, toolContext);
+      let chatId = resolveChatId(p, toolContext);
+      if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
       if (!chatId) throw new Error("read action requires chatId");
 
       const result = await readWahaChatMessages({ cfg: coreCfg, chatId, accountId: aid });
@@ -438,13 +475,13 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     targetResolver: {
       looksLikeId: (raw: string) => {
         const trimmed = raw.trim();
-        // WAHA JID formats: 123@c.us, 123@g.us, 123@lid, 123@s.whatsapp.net, 123@newsletter
-        if (/@(c\.us|g\.us|lid|s\.whatsapp\.net|newsletter|broadcast)$/i.test(trimmed)) return true;
-        // Plain phone number (6+ digits, optional + prefix)
-        if (/^\+?\d{6,}$/.test(trimmed)) return true;
-        return false;
+        if (!trimmed) return false;
+        // Accept JIDs, phone numbers, AND human-readable names
+        // Non-JID names will be auto-resolved in handleAction via autoResolveTarget
+        // Changed 2026-03-10 — DO NOT revert to JID-only matching
+        return true;
       },
-      hint: "Use a WhatsApp JID (e.g. 123456@c.us, 120363...@g.us) or a phone number",
+      hint: "Use a WhatsApp JID (e.g. 123456@c.us, 120363...@g.us), a phone number, or a group/contact name",
     },
   },
   actions: wahaMessageActions,

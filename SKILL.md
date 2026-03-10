@@ -1,7 +1,7 @@
 ---
 name: whatsapp-actions
 description: Use when the user asks to send a WhatsApp message, create a poll, share a location, manage groups, send a contact card, forward a message, react to a message, pin a message, edit or delete a message, create an event, manage labels, post a status/story, manage channels, join a group, follow a channel, change profile, block/unblock contacts, or perform any WhatsApp action through WAHA.
-version: 3.2.0
+version: 3.3.0
 ---
 
 > **IMPORTANT — Standard Action Names**: For targeted actions (those that send to a chat), use these standard names:
@@ -23,20 +23,49 @@ version: 3.2.0
 | Follow channel | `followChannel` | channelId (newsletter JID) |
 | Share location | `sendLocation` | chatId, latitude, longitude, title |
 | Create group event | `sendEvent` | chatId, name, startTime |
-| Resolve name to JID | `resolveTarget` | query, type ("group"|"contact"|"channel"|"auto") |
+| Resolve name to JID | `resolveTarget` | query, type ("group"\|"contact"\|"channel"\|"auto") |
 
 ---
 
-# Resolving Names to JIDs (resolveTarget)
+# Auto-Resolution (Preferred)
 
-Use the **`resolveTarget`** action to find groups, contacts, or channels by name. This converts human-readable names into WhatsApp JIDs that other actions require.
+**You can use human-readable names directly as targets in send/poll/edit/unsend/pin/unpin/read.** The plugin automatically resolves names to JIDs via fuzzy matching.
 
-## Parameters
+Example: To send "hello world" to a group called "test group":
+```
+Action: send
+Target: "test group"
+Parameters: { "text": "hello world" }
+```
+The plugin will find the group JID and send the message. If the name is ambiguous, you'll get an error listing possible matches — ask the user which one they meant.
+
+More examples:
+```
+Action: poll
+Target: "sammie test group"
+Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
+```
+
+```
+Action: send
+Target: "zeev nesher"
+Parameters: { "text": "Hey Zeev!" }
+```
+
+## Manual Resolution (resolveTarget)
+
+For batch operations or listing, use `resolveTarget` directly (no target parameter):
+```
+Action: resolveTarget
+Parameters: { "query": "test group", "type": "group" }
+```
+
+**Parameters:**
 - **query**: The name (or partial name) to search for
 - **type**: What to search -- `"group"`, `"contact"`, `"channel"`, or `"auto"` (searches all three)
 
-## Returns
-An object with `matches` (array of `{jid, name, type, confidence}`), `query`, and `searchedTypes`.
+**Returns:** An object with `matches` (array of `{jid, name, type, confidence}`), `query`, and `searchedTypes`.
+
 Confidence scores range from 0.5 to 1.0:
 - 1.0 = exact match
 - 0.9 = name starts with query
@@ -45,49 +74,24 @@ Confidence scores range from 0.5 to 1.0:
 - 0.7 = query is a substring of name
 - 0.5 = at least one query word found in name
 
-## Examples
-
-**Find a group:**
+**Examples:**
 ```
 Action: resolveTarget
 Parameters: { "query": "test group", "type": "group" }
 ```
-
-**Find a contact:**
 ```
 Action: resolveTarget
 Parameters: { "query": "zeev nesher", "type": "contact" }
 ```
-
-**Find anything (auto-search groups, contacts, and channels):**
-```
-Action: resolveTarget
-Parameters: { "query": "sammie", "type": "auto" }
-```
-
-**List all groups (empty query returns everything):**
 ```
 Action: resolveTarget
 Parameters: { "query": "", "type": "group" }
 ```
-Then filter the results yourself for batch operations (e.g., "send to all Hebrew-named groups").
+(Empty query returns all groups — useful for batch operations like "send to all Hebrew-named groups".)
 
-## CRITICAL — No Target Parameter
-**resolveTarget is a utility action. Do NOT pass a target/recipient. Only pass query and type as parameters.**
-The gateway will reject resolveTarget if you include a target. The name goes in `query`, NOT in the target field.
-
-**WRONG:** `Action: resolveTarget, Target: "sammie test group"` ← WILL FAIL
-**RIGHT:** `Action: resolveTarget, Parameters: { "query": "sammie test group", "type": "group" }` ← CORRECT
-
-## Workflow: Send Message by Name
-1. Call `resolveTarget` with `{query: "name", type: "group"}` (no target!)
-2. Get back matches with JIDs
-3. Use the JID in a `send` action: `Action: send, Target: "120363...@g.us", Parameters: {text: "hello"}`
-
-## Rules
-- **ALWAYS resolve names to JIDs before using send/poll/react/etc.** Never guess JIDs.
+**Rules:**
+- `resolveTarget` is a utility action. Do NOT pass a target/recipient — only pass query and type as parameters.
 - If multiple matches are returned with similar confidence, **ask the user** which one they meant.
-- For batch operations (e.g., "send to all Hebrew groups"), use resolveTarget with type "group" and a broad query, then filter the results.
 - Results are sorted by confidence (highest first), limited to top 20 matches.
 
 ---
