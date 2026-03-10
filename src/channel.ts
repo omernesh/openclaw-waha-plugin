@@ -213,6 +213,25 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   // names to WhatsApp JIDs. Removing this breaks all name-based targeting.
   // Added: 2026-03-10
   resolveTarget: (p, cfg, aid) => resolveWahaTarget({ cfg, query: String(p.query ?? ""), type: (p.type as "group" | "contact" | "channel" | "auto") ?? "auto", accountId: aid }),
+  // ── search — DO NOT CHANGE / DO NOT REMOVE ─────────────────────────
+  // Gateway-recognized action name (mode "none" in MESSAGE_ACTION_TARGET_MODE).
+  // Wraps resolveWahaTarget for listing/searching groups, contacts, channels.
+  //
+  // WHY THIS EXISTS:
+  // Utility actions (getGroups, resolveTarget, etc.) fail when the LLM passes
+  // a target — the gateway hardcodes MESSAGE_ACTION_TARGET_MODE and rejects
+  // mode "none" actions that have targets with "does not accept a target" error.
+  // The name "search" makes the LLM naturally put queries in PARAMETERS (not
+  // as a target), solving the rejection issue without any core gateway changes.
+  //
+  // Verified: 2026-03-11 — "list all Hebrew groups" works via Sammie
+  // Added: 2026-03-11
+  search: (p, cfg, aid) => resolveWahaTarget({
+    cfg,
+    query: String(p.query ?? ""),
+    type: (p.scope as "group" | "contact" | "channel" | "auto") ?? (p.type as "group" | "contact" | "channel" | "auto") ?? "auto",
+    accountId: aid,
+  }),
 };
 
 // ======================================================================
@@ -238,6 +257,7 @@ const STANDARD_ACTIONS = ["send", "poll", "react", "edit", "unsend", "pin", "unp
 // as available tools. Keep this list curated -- too many actions overwhelm the
 // model's context and degrade response quality. Each action here costs ~50 tokens.
 const UTILITY_ACTIONS = [
+  "search", // DO NOT REMOVE — gateway-recognized name for listing/searching. See search handler above.
   "getGroups", "getGroup", "getGroupsCount", "getParticipants",
   "getContacts", "getContact", "checkContactExists",
   "getChatsOverview", "getChats", "getChatMessages",

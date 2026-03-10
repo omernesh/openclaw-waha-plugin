@@ -23,7 +23,7 @@ version: 3.3.0
 | Follow channel | `followChannel` | channelId (newsletter JID) |
 | Share location | `sendLocation` | chatId, latitude, longitude, title |
 | Create group event | `sendEvent` | chatId, name, startTime |
-| Resolve name to JID | `resolveTarget` | query, type ("group"\|"contact"\|"channel"\|"auto") |
+| Search/list groups, contacts, channels | `search` | query, scope ("group"\|"contact"\|"channel"\|"auto") |
 
 ---
 
@@ -52,47 +52,42 @@ Target: "zeev nesher"
 Parameters: { "text": "Hey Zeev!" }
 ```
 
-## Manual Resolution (resolveTarget)
+## Searching & Listing (search action)
 
-For batch operations or listing, use `resolveTarget` directly (no target parameter):
+Use `search` to find groups, contacts, or channels by name. **This is a utility action — do NOT pass a target. Only use parameters.**
+
 ```
-Action: resolveTarget
-Parameters: { "query": "test group", "type": "group" }
+Action: search
+Parameters: { "query": "hebrew", "scope": "group" }
 ```
 
 **Parameters:**
-- **query**: The name (or partial name) to search for
-- **type**: What to search -- `"group"`, `"contact"`, `"channel"`, or `"auto"` (searches all three)
+- **query**: The name (or partial name) to search for. Empty string = list all.
+- **scope**: What to search — `"group"`, `"contact"`, `"channel"`, or `"auto"` (searches all three)
 
-**Returns:** An object with `matches` (array of `{jid, name, type, confidence}`), `query`, and `searchedTypes`.
-
-Confidence scores range from 0.5 to 1.0:
-- 1.0 = exact match
-- 0.9 = name starts with query
-- 0.85 = query starts with name
-- 0.8 = all query words found in name
-- 0.7 = query is a substring of name
-- 0.5 = at least one query word found in name
+**Returns:** `{ matches: [{jid, name, type, confidence}], query, searchedTypes }`
 
 **Examples:**
 ```
-Action: resolveTarget
-Parameters: { "query": "test group", "type": "group" }
+Action: search
+Parameters: { "query": "test group", "scope": "group" }
 ```
 ```
-Action: resolveTarget
-Parameters: { "query": "zeev nesher", "type": "contact" }
+Action: search
+Parameters: { "query": "zeev nesher", "scope": "contact" }
 ```
 ```
-Action: resolveTarget
-Parameters: { "query": "", "type": "group" }
+Action: search
+Parameters: { "query": "", "scope": "group" }
 ```
-(Empty query returns all groups — useful for batch operations like "send to all Hebrew-named groups".)
+(Empty query returns all groups — useful for "list all groups" or "find Hebrew groups".)
 
-**Rules:**
-- `resolveTarget` is a utility action. Do NOT pass a target/recipient — only pass query and type as parameters.
+**CRITICAL RULES:**
+- `search` does NOT accept a target. Pass query and scope as **parameters only**.
+- If the user says "list all Hebrew groups", call `search` with `query: ""` and `scope: "group"`, then filter the results by Hebrew names.
 - If multiple matches are returned with similar confidence, **ask the user** which one they meant.
 - Results are sorted by confidence (highest first), limited to top 20 matches.
+- `resolveTarget` is an alias for `search` — same rules apply (no target, parameters only).
 
 ---
 
