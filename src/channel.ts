@@ -240,6 +240,7 @@ const UTILITY_ACTIONS = [
   "createGroup", "sendEvent", "sendLocation", "sendContactVcard",
   "sendTextStatus", "sendImageStatus",
   "sendImage", "sendVideo", "sendFile",
+  "joinGroup", "followChannel", "unfollowChannel",
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.
@@ -303,6 +304,23 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     // Target can come from: params.to, params.chatId, or toolContext.currentChannelId
     if (action === "send" || action === "reply") {
       const chatId = resolveChatId(p, toolContext);
+
+      // Handle contact card (vcard) when contacts param is present
+      // Routes through "send" action to leverage gateway target resolution
+      // (sendContactVcard custom action has mode "none" and cannot accept targets)
+      // Added 2026-03-10 -- DO NOT REMOVE
+      if (p.contacts && Array.isArray(p.contacts)) {
+        if (!chatId) throw new Error("send action with contacts requires chatId (resolved from target)");
+        const result = await sendWahaContactVcard({
+          cfg: coreCfg,
+          chatId,
+          contacts: p.contacts as any[],
+          replyToId: typeof p.replyToId === "string" ? p.replyToId : undefined,
+          accountId: aid,
+        });
+        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      }
+
       const text = typeof p.text === "string" ? p.text : (typeof p.message === "string" ? p.message : "");
       const replyToId = typeof p.replyToId === "string" ? p.replyToId : undefined;
       if (!chatId) throw new Error("send action requires chatId (resolved from target)");

@@ -3,9 +3,16 @@
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
 **Last updated:** 2026-03-10
-**Version:** 1.9.3
+**Version:** 1.9.4
 
 ## Changelog
+
+### v1.9.4 — Contact Cards, Group Join & Channel Follow (2026-03-10)
+- **Added**: Contact card (vCard) sending via `send` action with `contacts` parameter
+- **Added**: `joinGroup` action — join groups via WhatsApp invite link code
+- **Added**: `followChannel` / `unfollowChannel` actions for newsletters
+- **Added**: `sendImage`, `sendVideo`, `sendFile` exposed as explicit actions
+- **Updated**: SKILL.md v3.1.0 with comprehensive action documentation and quick reference
 
 ### v1.9.3 (2026-03-10) -- Outbound Media Fix
 - **Fixed**: Images/videos sent by Sammie now arrive as proper WhatsApp media (imageMessage/videoMessage) instead of file attachments (documentMessage)
