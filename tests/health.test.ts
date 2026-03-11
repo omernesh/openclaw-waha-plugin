@@ -17,7 +17,7 @@ describe("startHealthCheck", () => {
     vi.restoreAllMocks();
   });
 
-  it("calls callWahaApi with correct /api/{session}/me path", async () => {
+  it("calls callWahaApi with correct /api/sessions/{session} path", async () => {
     const ac = new AbortController();
     mockCallWahaApi.mockResolvedValue({ id: "123" });
 
@@ -36,7 +36,7 @@ describe("startHealthCheck", () => {
 
     expect(mockCallWahaApi).toHaveBeenCalled();
     const call = mockCallWahaApi.mock.calls[0][0];
-    expect(call.path).toBe("/api/test_session/me");
+    expect(call.path).toBe("/api/sessions/test_session");
   });
 
   it("uses skipRateLimit: true and timeoutMs: 10000", async () => {

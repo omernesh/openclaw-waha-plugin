@@ -1,7 +1,7 @@
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  HEALTH MONITOR — DO NOT CHANGE                                     ║
 // ║                                                                     ║
-// ║  Session health monitor. Pings WAHA /api/{session}/me at a          ║
+// ║  Session health monitor. Pings WAHA /api/sessions/{session} at a     ║
 // ║  configurable interval to detect silent disconnects before they     ║
 // ║  cause message delivery failures.                                   ║
 // ║                                                                     ║
@@ -113,7 +113,7 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
     await callWahaApi({
       baseUrl: opts.baseUrl,
       apiKey: opts.apiKey,
-      path: `/api/${opts.session}/me`,
+      path: `/api/sessions/${opts.session}`,
       method: "GET",
       skipRateLimit: true,
       timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
