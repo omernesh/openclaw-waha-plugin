@@ -77,6 +77,8 @@ export type WahaAccountConfig = {
   healthCheckIntervalMs?: number;
   dmQueueSize?: number;
   groupQueueSize?: number;
+  // Phase 3 config — auto link preview in sendWahaText. Added Phase 3, Plan 01. DO NOT REMOVE.
+  autoLinkPreview?: boolean;
   mediaPreprocessing?: {
     enabled?: boolean;
     audio?: { enabled?: boolean; whisperScript?: string };
@@ -124,6 +126,7 @@ export type WahaInboundMessage = {
   mediaMime?: string;
   participant?: string;
   replyToId?: string | null;
+  mentionedJids?: string[];  // Phase 3 Plan 02: @mentioned JIDs extracted from NOWEB _data, normalized to @c.us
   source?: string;
   location?: {
     latitude?: string;

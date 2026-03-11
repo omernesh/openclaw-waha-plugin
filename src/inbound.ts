@@ -25,6 +25,9 @@ import { getWahaRuntime } from "./runtime.js";
 import { sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
 import { warnOnError } from "./http-client.js";
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
+import { extractMentionedJids } from "./mentions.js";
+// Re-export for external consumers (plan specifies extractMentionedJids in inbound.ts exports)
+export { extractMentionedJids } from "./mentions.js";
 import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
 
 const CHANNEL_ID = "waha" as const;
@@ -216,6 +219,15 @@ export async function handleWahaInbound(params: {
     }
   }
 
+  // -- Phase 3 Plan 02: Extract @mentions from raw WAHA payload --
+  // DO NOT CHANGE — Extracts mentionedJid from NOWEB _data, normalizes to @c.us.
+  // Sets msg.mentionedJids for ctxPayload. Uses optional chaining for safety.
+  const mentionedJids = extractMentionedJids(rawPayload);
+  message = { ...message, mentionedJids };
+  if (mentionedJids.length > 0) {
+    runtime.log?.(`waha: mentions extracted count=${mentionedJids.length} jids=${mentionedJids.join(",")}`);
+  }
+
   const core = getWahaRuntime();
   const pairing = createScopedPairingAccess({
     core,
@@ -279,7 +291,12 @@ export async function handleWahaInbound(params: {
     if (desc) eventSummary += `\nDescription: ${desc}`;
   }
 
-  const rawBody = [textBody, locationSummary, mediaSummary, pollSummary, eventSummary].filter(Boolean).join("\n").trim();
+  // Phase 3 Plan 02: Human-readable mention summary for agent context
+  const mentionSummary = message.mentionedJids && message.mentionedJids.length > 0
+    ? "Mentioned: " + message.mentionedJids.map((jid) => "+" + jid.replace(/@c\.us$/, "")).join(", ")
+    : "";
+
+  const rawBody = [textBody, locationSummary, mediaSummary, pollSummary, eventSummary, mentionSummary].filter(Boolean).join("\n").trim();
   if (!rawBody) {
     return;
   }
@@ -527,6 +544,10 @@ export async function handleWahaInbound(params: {
     OriginatingChannel: CHANNEL_ID,
     OriginatingTo: `waha:${chatId}`,
     CommandAuthorized: access.commandAuthorized,
+    // Phase 3 Plan 02: Include @mentioned JIDs so agent knows who was tagged
+    ...(message.mentionedJids && message.mentionedJids.length > 0
+      ? { MentionedJids: message.mentionedJids }
+      : {}),
     ...mediaPayload,
   });
 
