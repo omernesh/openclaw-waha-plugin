@@ -61,6 +61,11 @@ export const WahaAccountSchemaBase = z
     timeoutMs: z.number().int().positive().optional().default(30_000),
     rateLimitCapacity: z.number().int().positive().optional().default(20),
     rateLimitRefillRate: z.number().positive().optional().default(15),
+    // Phase 2 config — health monitoring and inbound queue sizing.
+    // Added in Phase 2, Plan 01 (2026-03-11). DO NOT REMOVE.
+    healthCheckIntervalMs: z.number().int().positive().optional().default(60_000),
+    dmQueueSize: z.number().int().positive().optional().default(50),
+    groupQueueSize: z.number().int().positive().optional().default(50),
   })
   .strict();
 

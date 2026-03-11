@@ -22,6 +22,7 @@ import {
 } from "./accounts.js";
 import { monitorWahaProvider } from "./monitor.js";
 import { configureReliability } from "./http-client.js";
+import { formatActionError } from "./error-formatter.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
 import { getWahaRuntime } from "./runtime.js";
 import {
@@ -331,6 +332,13 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     // Cache config for outbound adapter (sendText/sendMedia/sendPoll)
     _cachedConfig = coreCfg;
 
+    // Extract target for error formatting — DO NOT CHANGE
+    // formatActionError wraps all action errors with LLM-friendly messages.
+    // Added Phase 2, Plan 01 (2026-03-11).
+    const target = typeof p.to === "string" ? p.to : (typeof p.chatId === "string" ? p.chatId : undefined);
+
+    try {
+
     // --- Standard targeted actions (gateway-recognized names) ---
 
     if (action === "react") {
@@ -462,6 +470,17 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       details: {},
     };
+
+    } catch (err) {
+      // Outer error handler — formats all action errors for LLM consumption.
+      // DO NOT CHANGE — all action errors must flow through formatActionError.
+      // Added Phase 2, Plan 01 (2026-03-11).
+      console.warn(`[WAHA] handleAction error (${action}):`, err);
+      return {
+        content: [{ type: "text" as const, text: formatActionError(err, { action, target }) }],
+        isError: true,
+      };
+    }
   },
 };
 

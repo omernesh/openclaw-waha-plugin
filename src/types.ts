@@ -73,6 +73,10 @@ export type WahaAccountConfig = {
   timeoutMs?: number;
   rateLimitCapacity?: number;
   rateLimitRefillRate?: number;
+  // Phase 2 config — health monitoring and inbound queue sizing. Added Phase 2, Plan 01.
+  healthCheckIntervalMs?: number;
+  dmQueueSize?: number;
+  groupQueueSize?: number;
   mediaPreprocessing?: {
     enabled?: boolean;
     audio?: { enabled?: boolean; whisperScript?: string };
