@@ -37,14 +37,14 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ R5: Request timeouts (AbortController, 30s) and webhook deduplication by messageId — Phase 1
 - ✓ F5: Message queue with flood protection (bounded queue, priority DMs) — Phase 2
 - ✓ F7: Better error messages (context-rich, suggested fixes) — Phase 2
+- ✓ F1: Mute/unmute chat actions (muteChat/unmuteChat utility actions with duration support) — Phase 3
+- ✓ F3: Mentions detection (@mentions extracted from inbound NOWEB messages, normalized to @c.us) — Phase 3
+- ✓ F4: Multi-recipient send (sendMulti, sequential, 10-cap, per-recipient results, text-only v1) — Phase 3
+- ✓ F6: URL preview send (auto linkPreview in sendWahaText + existing sendLinkPreview action) — Phase 3
 
 ### Active
 
-- [ ] F1: Mute/unmute chat actions
 - [ ] F2: Inbound group events (join/leave/promote/demote)
-- [ ] F3: Mentions detection (@mentions extracted from inbound messages)
-- [ ] F4: Multi-recipient send (batch with per-recipient results)
-- [ ] F6: URL preview send (WAHA link-preview endpoint)
 - [ ] M1: Multi-session support (session registry, roles, trigger word activation)
 - [ ] D1: SKILL.md refresh, unit tests, integration tests, README
 
@@ -91,6 +91,11 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | setTimeout chain for health pings (not setInterval) | Prevents timer pile-up when pings take longer than interval | — Pending |
 | Two separate bounded queues (DM + group) | Simpler than priority queue, DM priority via drain order | — Pending |
 | Always return HTTP 200 on webhook even on queue overflow | Prevents WAHA retry storms | — Pending |
+| Auto link preview defaults to true | Most users want rich previews; opt-out via autoLinkPreview: false | ✓ Good |
+| Sequential sends for sendMulti (not parallel) | Respects token-bucket rate limiter from Phase 1 | ✓ Good |
+| Pure-function extraction for testability (mentions.ts) | inbound.ts has heavy openclaw deps that break vitest | ✓ Good |
+| Text-only sendMulti v1 | Media multi-send deferred; keeps implementation simple | ✓ Good |
+| 10-recipient cap on sendMulti | Prevents abuse, respects rate limits | ✓ Good |
 
 ---
-*Last updated: 2026-03-11 after Phase 2*
+*Last updated: 2026-03-11 after Phase 3*
