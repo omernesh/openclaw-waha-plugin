@@ -15,6 +15,7 @@ import { getDirectoryDb } from "./directory.js";
 import { assertAllowedSession, getWahaChats, getWahaContact, getWahaContacts, getWahaGroups, getWahaGroupParticipants, getWahaNewsletter, getWahaAllLids } from "./send.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
+import { isDuplicate } from "./dedup.js";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
@@ -2111,6 +2112,12 @@ export function createWahaWebhookServer(opts: {
         writeJsonResponse(res, 200, { status: "ignored" });
         return;
       }
+      // Dedup check: filter duplicate webhook deliveries by composite key
+      // Primary guard is message vs message.any event filter; this is secondary protection (REL-09)
+      if (isDuplicate(payload.event, message.messageId)) {
+        writeJsonResponse(res, 200, { status: "duplicate" });
+        return;
+      }
       try {
         await handleWahaInbound({
           message,
@@ -2132,6 +2139,10 @@ export function createWahaWebhookServer(opts: {
       const reaction = payloadToReaction(payload.payload);
       if (!reaction) {
         writeWebhookError(res, 400, WEBHOOK_ERRORS.invalidPayloadFormat);
+        return;
+      }
+      if (isDuplicate(payload.event, reaction.messageId)) {
+        writeJsonResponse(res, 200, { status: "duplicate" });
         return;
       }
       writeJsonResponse(res, 200, { status: "ok" });

@@ -1,3 +1,10 @@
+// Memory audit (REL-11, 2026-03-11):
+// All Maps bounded: _resolveCache (LRU max:1000, ttl:30s in send.ts),
+// _dedupEntries (max:200 + 5min TTL in dedup.ts),
+// _dmFilterInstance/_groupFilterInstance/_directoryInstances (by account count in inbound.ts/directory.ts),
+// _regexCache (by config pattern count in dm-filter.ts),
+// TokenBucket.queue (bounded by concurrency). No unbounded growth found.
+
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  HTTP CLIENT — DO NOT CHANGE                                        ║
 // ║                                                                     ║
