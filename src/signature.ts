@@ -17,11 +17,13 @@ export function verifyWahaWebhookHmac(params: {
   const expectedHex = crypto.createHmac("sha512", params.secret).update(params.body).digest("hex");
   const expectedBase64 = crypto.createHmac("sha512", params.secret).update(params.body).digest("base64");
 
-  const safeEq = (a: string, b: string) => {
+  const safeEq = (a: string, b: string): boolean => {
+    if (a.length !== b.length) return false;
     try {
       return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
-    } catch {
-      return a === b;
+    } catch (err) {
+      console.warn(`[waha] timingSafeEqual failed, rejecting: ${String(err)}`);
+      return false;
     }
   };
 

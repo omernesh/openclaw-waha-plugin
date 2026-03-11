@@ -459,7 +459,8 @@ export async function handleWahaInbound(params: {
           mentionPatterns.some((p) => {
             try {
               return new RegExp(p, "i").test(rawBody);
-            } catch {
+            } catch (err) {
+              console.warn(`[waha] invalid mentionPattern regex "${p}": ${String(err)}`);
               return false;
             }
           });

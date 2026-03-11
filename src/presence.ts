@@ -1,6 +1,9 @@
 import { sendWahaPresence, sendWahaSeen } from "./send.js";
-import { warnOnError } from "./http-client.js";
+import { sleep, warnOnError } from "./http-client.js";
 import type { CoreConfig, PresenceConfig } from "./types.js";
+
+/** Hard ceiling: never flicker longer than this (safety net for leaked loops). */
+const MAX_FLICKER_MS = 90_000;
 
 const DEFAULTS: Required<PresenceConfig> = {
   enabled: true,
@@ -40,10 +43,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function calcReadDelay(incomingText: string, cfg: Required<PresenceConfig>): number {
   const chars = incomingText.length;
   const base = chars * cfg.msPerReadChar;
@@ -57,39 +56,6 @@ function calcTypingDuration(replyText: string, cfg: Required<PresenceConfig>): n
   const baseMs = (chars / charsPerSecond) * 1000;
   const jittered = baseMs * rand(cfg.jitter[0], cfg.jitter[1]);
   return clamp(jittered, cfg.typingDurationMs[0], cfg.typingDurationMs[1]);
-}
-
-async function typingFlickerLoop(params: {
-  cfg: Required<PresenceConfig>;
-  coreCfg: CoreConfig;
-  chatId: string;
-  accountId?: string;
-  durationMs: number;
-  startedAt: number;
-}): Promise<void> {
-  const { cfg, coreCfg, chatId, accountId, durationMs, startedAt } = params;
-  const deadline = startedAt + durationMs;
-
-  while (Date.now() < deadline) {
-    const interval = rand(cfg.pauseIntervalMs[0], cfg.pauseIntervalMs[1]);
-    const remaining = deadline - Date.now();
-    if (remaining <= 500) break;
-
-    await sleep(Math.min(interval, remaining));
-    if (Date.now() >= deadline) break;
-
-    if (Math.random() < cfg.pauseChance) {
-      await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
-      const pauseDuration = rand(cfg.pauseDurationMs[0], cfg.pauseDurationMs[1]);
-      const pauseRemaining = deadline - Date.now();
-      if (pauseRemaining <= 0) break;
-      await sleep(Math.min(pauseDuration, pauseRemaining));
-      if (Date.now() >= deadline) break;
-      await sendWahaPresence({ cfg: coreCfg, chatId, typing: true, accountId }).catch(warnOnError(`presence typing-start ${chatId}`));
-    }
-  }
-  // Guarantee typing is stopped on exit — loop may have resumed typing:true just before deadline
-  await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
 }
 
 export async function startHumanPresence(params: {
@@ -125,19 +91,18 @@ export async function startHumanPresence(params: {
   const typingStartedAt = Date.now();
 
   let flickerAborted = false;
-  // Hard ceiling: never flicker longer than 90s (safety net for leaked loops)
-  const maxFlickerMs = 90_000;
+  // Hard ceiling: never flicker longer than MAX_FLICKER_MS (safety net for leaked loops)
   const flickerPromise = (async () => {
-    while (!flickerAborted && Date.now() - typingStartedAt < maxFlickerMs) {
+    while (!flickerAborted && Date.now() - typingStartedAt < MAX_FLICKER_MS) {
       const interval = rand(presenceCfg.pauseIntervalMs[0], presenceCfg.pauseIntervalMs[1]);
       await sleep(interval);
-      if (flickerAborted || Date.now() - typingStartedAt >= maxFlickerMs) break;
+      if (flickerAborted || Date.now() - typingStartedAt >= MAX_FLICKER_MS) break;
 
       if (Math.random() < presenceCfg.pauseChance) {
         await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
         const pauseDuration = rand(presenceCfg.pauseDurationMs[0], presenceCfg.pauseDurationMs[1]);
         await sleep(pauseDuration);
-        if (flickerAborted || Date.now() - typingStartedAt >= maxFlickerMs) break;
+        if (flickerAborted || Date.now() - typingStartedAt >= MAX_FLICKER_MS) break;
         await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(warnOnError(`presence typing-start ${chatId}`));
       }
     }

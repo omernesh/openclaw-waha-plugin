@@ -29,6 +29,8 @@
  * Default: 20 burst capacity, refilling at 15 tokens/sec.
  * Exported for testing and for Phase 4 per-session buckets.
  */
+const MAX_QUEUE_SIZE = 1000;
+
 export class TokenBucket {
   private tokens: number;
   private readonly capacity: number;
@@ -43,6 +45,9 @@ export class TokenBucket {
     this.tokens = capacity;
     this.lastRefill = Date.now();
   }
+
+  getCapacity(): number { return this.capacity; }
+  getRefillRate(): number { return this.refillRate; }
 
   private refill(): void {
     const now = Date.now();
@@ -81,6 +86,9 @@ export class TokenBucket {
       this.tokens -= 1;
       return;
     }
+    if (this.queue.length >= MAX_QUEUE_SIZE) {
+      throw new Error("[WAHA] Rate limit queue full, rejecting request");
+    }
     return new Promise<void>((resolve) => {
       this.queue.push(resolve);
       this.startDrain();
@@ -92,11 +100,15 @@ export class TokenBucket {
 // Module-level shared state
 // ---------------------------------------------------------------------------
 
+const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_BUCKET_CAPACITY = 20;
+const DEFAULT_BUCKET_REFILL_RATE = 15;
+
 /** Global token bucket for all WAHA API calls (20 burst, 15/sec sustained). */
-let globalBucket = new TokenBucket(20, 15);
+let globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
 
 /** Default timeout for API calls (ms). Overridable via configureReliability(). */
-let defaultTimeoutMs = 30_000;
+let defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
 
 /**
  * Configure reliability defaults from plugin config.
@@ -114,8 +126,8 @@ export function configureReliability(opts: {
     defaultTimeoutMs = opts.timeoutMs;
   }
   if (opts.capacity !== undefined || opts.refillRate !== undefined) {
-    const cap = opts.capacity ?? globalBucket["capacity"];
-    const rate = opts.refillRate ?? globalBucket["refillRate"];
+    const cap = opts.capacity ?? globalBucket.getCapacity();
+    const rate = opts.refillRate ?? globalBucket.getRefillRate();
     globalBucket = new TokenBucket(cap, rate);
   }
 }
@@ -157,6 +169,7 @@ export interface CallWahaApiParams {
  * 6. Error logging — structured console.warn with context
  * 7. Response parsing — JSON or text
  */
+// TODO: Change return to Promise<unknown> for type safety
 export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   const method = params.method ?? "POST";
   const timeout = params.timeoutMs ?? defaultTimeoutMs;
@@ -207,9 +220,11 @@ async function fetchWithRetry(
       ...(hasBody ? { body: JSON.stringify(params.body) } : {}),
       signal: AbortSignal.timeout(timeout),
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     // 4. Timeout error handling
-    if (err?.name === "TimeoutError" || err?.name === "AbortError" || err?.message?.includes("abort")) {
+    const errName = err instanceof Error ? err.name : String(err);
+    const errMessage = err instanceof Error ? err.message : String(err);
+    if (errName === "TimeoutError" || errName === "AbortError" || errMessage.includes("abort")) {
       if (isMutation) {
         throw new Error(
           `[WAHA] ${contextLabel} timed out after ${timeout}ms — request may have succeeded (mutation: ${method} ${params.path})`
@@ -263,7 +278,11 @@ async function fetchWithRetry(
   // 7. Response parsing
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    return await response.json();
+    try {
+      return await response.json();
+    } catch (parseErr) {
+      throw new Error(`[WAHA] Failed to parse JSON from ${method} ${params.path}: ${String(parseErr)}`);
+    }
   }
   return await response.text();
 }
@@ -281,7 +300,7 @@ async function waitForBackoffClear(): Promise<void> {
 }
 
 /** Promise-based sleep using setTimeout (works with fake timers). */
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -291,9 +310,10 @@ function sleep(ms: number): Promise<void> {
  *
  * Usage: somePromise.catch(warnOnError("presence update"))
  */
-export function warnOnError(context: string): (err: Error) => void {
-  return (err: Error) => {
-    console.warn(`[WAHA] ${context}: ${err.message}`);
+export function warnOnError(context: string, extra?: string): (err: unknown) => void {
+  return (err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[WAHA] ${context}${extra ? ` (${extra})` : ""}: ${msg}`);
   };
 }
 
@@ -303,6 +323,6 @@ export function warnOnError(context: string): (err: Error) => void {
  */
 export function _resetForTesting(): void {
   backoffUntil = 0;
-  defaultTimeoutMs = 30_000;
-  globalBucket = new TokenBucket(20, 15);
+  defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
+  globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
 }

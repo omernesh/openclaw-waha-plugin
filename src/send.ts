@@ -7,6 +7,9 @@ import { normalizeWahaMessagingTarget } from "./normalize.js";
 import { callWahaApi, warnOnError } from "./http-client.js";
 import type { CoreConfig } from "./types.js";
 
+const HEAD_DETECT_TIMEOUT_MS = 5000;
+const RESOLVE_FETCH_DELAY_MS = 200;
+
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  SESSION GUARDRAIL — DO NOT REMOVE                                   ║
 // ║                                                                      ║
@@ -145,6 +148,7 @@ export async function sendWahaPresence(params: {
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
   assertAllowedSession(account.session);
+  // Let callers handle errors — they already use .catch(warnOnError(...))
   return callWahaApi({
     baseUrl: account.baseUrl,
     apiKey: account.apiKey,
@@ -153,7 +157,7 @@ export async function sendWahaPresence(params: {
       chatId: params.chatId,
       session: account.session,
     },
-  }).catch(warnOnError(`presence ${params.typing ? "/api/startTyping" : "/api/stopTyping"} ${params.chatId}`));
+  });
 }
 
 /**
@@ -211,13 +215,14 @@ async function detectMimeViaHead(url: string): Promise<string> {
   if (!url.startsWith("http://") && !url.startsWith("https://")) return "";
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), HEAD_DETECT_TIMEOUT_MS);
     const res = await fetch(url, { method: "HEAD", signal: controller.signal, redirect: "follow" });
     clearTimeout(timeout);
     const ct = res.headers.get("content-type") || "";
     // Extract just the MIME type (before any ;charset= or parameters)
     return ct.split(";")[0].trim().toLowerCase();
-  } catch {
+  } catch (err) {
+    console.warn(`[waha] MIME HEAD detection failed for ${url}: ${String(err)}`);
     return "";
   }
 }
@@ -1280,7 +1285,8 @@ export async function getWahaNewsletter(params: { cfg: CoreConfig; newsletterId:
   try {
     const result = await getWahaChannel({ cfg: params.cfg, channelId: params.newsletterId, accountId: params.accountId });
     return result as Record<string, unknown>;
-  } catch {
+  } catch (err) {
+    console.warn(`[waha] getWahaNewsletter failed: ${String(err)}`);
     return null;
   }
 }
@@ -1451,7 +1457,7 @@ function fuzzyScore(query: string, name: string): number {
   return 0;
 }
 
-function toArr(val: unknown): unknown[] {
+export function toArr(val: unknown): unknown[] {
   if (Array.isArray(val)) return val;
   if (val && typeof val === "object") return Object.values(val);
   return [];
@@ -1551,9 +1557,9 @@ export async function resolveWahaTarget(params: {
   } else {
     // "auto" — fetch sequentially with small delay to avoid burst load on WAHA
     await fetchGroups();
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, RESOLVE_FETCH_DELAY_MS));
     await fetchContacts();
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, RESOLVE_FETCH_DELAY_MS));
     await fetchChannels();
   }
 

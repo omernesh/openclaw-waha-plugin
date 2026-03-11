@@ -68,6 +68,7 @@ export type WahaAccountConfig = {
   blockStreaming?: boolean;
   presence?: PresenceConfig;
   dmFilter?: DmFilterConfig;
+  groupFilter?: DmFilterConfig;
   // Reliability config — wired to http-client.ts. Added Phase 1, Plan 03.
   timeoutMs?: number;
   rateLimitCapacity?: number;

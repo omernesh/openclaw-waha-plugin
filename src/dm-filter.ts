@@ -61,7 +61,8 @@ export class DmFilter {
   check(params: { text: string; senderId: string; log?: (msg: string) => void }): DmFilterResult {
     try {
       return this._check(params);
-    } catch {
+    } catch (err) {
+      console.warn(`[waha] DmFilter.check() threw: ${String(err)}`);
       return { pass: true, reason: "error" };
     }
   }

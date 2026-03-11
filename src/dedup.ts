@@ -31,6 +31,15 @@ export function isDuplicate(eventType: string, messageId: string | undefined): b
     for (const [k, ts] of _dedupEntries) {
       if (now - ts > DEDUP_TTL_MS) _dedupEntries.delete(k);
     }
+    // Hard cap: remove oldest entries if still over limit after TTL pruning
+    if (_dedupEntries.size > DEDUP_MAX) {
+      const excess = _dedupEntries.size - DEDUP_MAX;
+      const iter = _dedupEntries.keys();
+      for (let i = 0; i < excess; i++) {
+        const oldest = iter.next().value;
+        if (oldest) _dedupEntries.delete(oldest);
+      }
+    }
   }
 
   if (_dedupEntries.has(key)) return true;

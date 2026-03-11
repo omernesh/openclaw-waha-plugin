@@ -85,8 +85,9 @@ function getCachedConfig(): CoreConfig {
     if (typeof rt.config.readConfigFile === "function") {
       return rt.config.readConfigFile() as CoreConfig;
     }
-  } catch { /* fall through */ }
-  throw new Error("WAHA config not available — no cached config and SDK methods failed");
+  } catch (sdkErr) {
+    throw new Error(`WAHA config not available — no cached config and SDK methods failed: ${String(sdkErr)}`);
+  }
 }
 
 const meta = {
@@ -277,9 +278,13 @@ const EXPOSED_ACTIONS = [...STANDARD_ACTIONS, ...UTILITY_ACTIONS];
 
 // Resolve chatId from gateway target resolution params
 function resolveChatId(params: Record<string, unknown>, toolContext?: { currentChannelId?: string }): string {
-  return (typeof params.chatId === "string" && params.chatId) ? params.chatId
-    : (typeof params.to === "string" && params.to) ? params.to
-    : (toolContext?.currentChannelId ?? "");
+  if (typeof params.chatId === "string" && params.chatId) {
+    return params.chatId;
+  }
+  if (typeof params.to === "string" && params.to) {
+    return params.to;
+  }
+  return toolContext?.currentChannelId ?? "";
 }
 
 // ╔══════════════════════════════════════════════════════════════════════╗
@@ -294,6 +299,7 @@ function resolveChatId(params: Record<string, unknown>, toolContext?: { currentC
 // ╚══════════════════════════════════════════════════════════════════════╝
 const JID_RE = /@(c\.us|g\.us|lid|s\.whatsapp\.net|newsletter|broadcast)$/i;
 const PHONE_RE = /^\+?\d{6,}$/;
+const AUTO_RESOLVE_MIN_CONFIDENCE = 0.7;
 
 async function autoResolveTarget(chatId: string, cfg: CoreConfig, accountId?: string): Promise<string> {
   // Already a JID or phone number — pass through unchanged
@@ -305,7 +311,7 @@ async function autoResolveTarget(chatId: string, cfg: CoreConfig, accountId?: st
     throw new Error(`Could not resolve "${chatId}" to a WhatsApp JID. No matches found. Use a JID (e.g. 120363...@g.us) or phone number.`);
   }
   // Single high-confidence match — use it
-  if (resolved.matches[0].confidence >= 0.7) {
+  if (resolved.matches[0].confidence >= AUTO_RESOLVE_MIN_CONFIDENCE) {
     return resolved.matches[0].jid;
   }
   // Low confidence — report what we found
@@ -684,9 +690,9 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       // DO NOT REMOVE — configureReliability() sets timeout and rate limiter defaults.
       // Added Phase 1 gap closure (2026-03-11).
       configureReliability({
-        timeoutMs: account.timeoutMs,
-        capacity: account.rateLimitCapacity,
-        refillRate: account.rateLimitRefillRate,
+        timeoutMs: account.config.timeoutMs,
+        capacity: account.config.rateLimitCapacity,
+        refillRate: account.config.rateLimitRefillRate,
       });
 
       const { stop } = await monitorWahaProvider({
