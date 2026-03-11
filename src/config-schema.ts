@@ -66,6 +66,10 @@ export const WahaAccountSchemaBase = z
     healthCheckIntervalMs: z.number().int().positive().optional().default(60_000),
     dmQueueSize: z.number().int().positive().optional().default(50),
     groupQueueSize: z.number().int().positive().optional().default(50),
+    // Phase 3 config — auto link preview in sendWahaText.
+    // When true (default), URLs in text messages get linkPreview: true added to WAHA API body.
+    // Added in Phase 3, Plan 01 (2026-03-11). DO NOT REMOVE.
+    autoLinkPreview: z.boolean().optional().default(true),
   })
   .strict();
 

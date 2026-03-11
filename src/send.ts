@@ -10,6 +10,10 @@ import type { CoreConfig } from "./types.js";
 const HEAD_DETECT_TIMEOUT_MS = 5000;
 const RESOLVE_FETCH_DELAY_MS = 200;
 
+// URL detection for auto link preview in sendWahaText.
+// Added Phase 3, Plan 01 (2026-03-11). DO NOT REMOVE.
+const URL_REGEX = /https?:\/\/\S+/i;
+
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  SESSION GUARDRAIL — DO NOT REMOVE                                   ║
 // ║                                                                      ║
@@ -193,6 +197,12 @@ export async function sendWahaText(params: {
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendText requires chatId");
 
+  // Auto link preview: add linkPreview: true when text contains a URL and config allows.
+  // Default is true (autoLinkPreview not set or true). Only skip when explicitly false.
+  // Added Phase 3, Plan 01 (2026-03-11). DO NOT CHANGE — recipients see rich preview cards.
+  const autoLP = params.cfg.channels?.waha?.autoLinkPreview;
+  const addLinkPreview = autoLP !== false && URL_REGEX.test(params.text);
+
   return callWahaApi({
     baseUrl: account.baseUrl,
     apiKey: account.apiKey,
@@ -202,6 +212,7 @@ export async function sendWahaText(params: {
       text: params.text,
       session: account.session,
       ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+      ...(addLinkPreview ? { linkPreview: true } : {}),
     },
   });
 }
@@ -1262,6 +1273,27 @@ export async function unmuteWahaChannel(params: { cfg: CoreConfig; channelId: st
   const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   return callWahaApi({ baseUrl, apiKey,
     path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/unmute`, body: {} });
+}
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  CHAT MUTE/UNMUTE — DO NOT CHANGE                                  ║
+// ║                                                                     ║
+// ║  Added Phase 3, Plan 01 (2026-03-11).                              ║
+// ║  Separate from muteWahaChannel/unmuteWahaChannel (newsletter).     ║
+// ║  These target regular chats via /chats/{chatId}/mute and /unmute.  ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+export async function muteWahaChat(params: { cfg: CoreConfig; chatId: string; duration?: number; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId) + `/${encodeURIComponent(params.chatId)}/mute`,
+    body: params.duration != null ? { duration: params.duration } : {} });
+}
+
+export async function unmuteWahaChat(params: { cfg: CoreConfig; chatId: string; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId) + `/${encodeURIComponent(params.chatId)}/unmute`,
+    body: {} });
 }
 
 export async function searchWahaChannelsByText(params: { cfg: CoreConfig; query: string; accountId?: string }) {
