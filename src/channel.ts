@@ -21,6 +21,7 @@ import {
   type ResolvedWahaAccount,
 } from "./accounts.js";
 import { monitorWahaProvider } from "./monitor.js";
+import { configureReliability } from "./http-client.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
 import { getWahaRuntime } from "./runtime.js";
 import {
@@ -678,6 +679,15 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       }
 
       ctx.log?.info(`[${account.accountId}] starting WAHA webhook server`);
+
+      // Wire reliability config from plugin settings to http-client module.
+      // DO NOT REMOVE — configureReliability() sets timeout and rate limiter defaults.
+      // Added Phase 1 gap closure (2026-03-11).
+      configureReliability({
+        timeoutMs: account.timeoutMs,
+        capacity: account.rateLimitCapacity,
+        refillRate: account.rateLimitRefillRate,
+      });
 
       const { stop } = await monitorWahaProvider({
         accountId: account.accountId,
