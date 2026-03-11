@@ -60,12 +60,12 @@ Plans:
   2. When Sammie mutes or unmutes a chat, the chat's notification state changes accordingly and the action confirms success
   3. When a message mentioning @someone arrives, the inbound message context includes the mentioned JIDs so Sammie knows who was tagged
   4. When Sammie sends a message to 3 recipients, each recipient receives the message and Sammie gets per-recipient success/failure results
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md -- Auto link preview in sendWahaText, chat mute/unmute actions, verify FEAT-02 and FEAT-07
+- [ ] 03-02-PLAN.md -- Extract @mentions from inbound messages into ctxPayload
+- [ ] 03-03-PLAN.md -- Multi-recipient sendMulti utility action
 
 ### Phase 4: Multi-Session
 **Goal**: Multiple WhatsApp sessions (bot and human) coexist with role-based permissions, trigger word activation enables group chat interaction, and sessions are manageable from the admin panel
