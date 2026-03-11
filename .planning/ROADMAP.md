@@ -48,7 +48,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Health monitor module (setTimeout chain, HealthState), error formatter (LLM-friendly messages), config schema fields for Phase 2
+- [x] 02-01-PLAN.md -- Health monitor module (setTimeout chain, HealthState), error formatter (LLM-friendly messages), config schema fields for Phase 2
 - [ ] 02-02-PLAN.md -- Inbound queue with DM priority, wire health + queue into monitor.ts, admin panel health dots + Queue tab, deploy to hpg6
 
 ### Phase 3: Feature Gaps
@@ -110,7 +110,7 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Reliability Foundation | 3/3 | Complete   | 2026-03-11 |
-| 2. Resilience and Observability | 0/2 | Not started | - |
+| 2. Resilience and Observability | 1/2 | In progress | - |
 | 3. Feature Gaps | 0/3 | Not started | - |
 | 4. Multi-Session | 0/4 | Not started | - |
 | 5. Documentation and Testing | 0/3 | Not started | - |
