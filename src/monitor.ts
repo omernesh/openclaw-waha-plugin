@@ -1716,6 +1716,7 @@ export function createWahaWebhookServer(opts: {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(sessions));
       } catch (err) {
+        console.error(`[waha] GET /api/admin/sessions failed: ${String(err)}`);
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Failed to fetch sessions" }));
       }
@@ -2271,7 +2272,7 @@ function resolveWebhookHmacSecret(account: ReturnType<typeof resolveWahaAccount>
     try {
       return readFileSync(account.config.webhookHmacKeyFile, "utf-8").trim();
     } catch (err) {
-      console.error(`[waha] CRITICAL: webhookHmacKeyFile "${account.config.webhookHmacKeyFile}" unreadable: ${String(err)}`);
+      throw new Error(`[waha] webhookHmacKeyFile "${account.config.webhookHmacKeyFile}" unreadable: ${String(err)}. Fix the file path or remove webhookHmacKeyFile from config.`);
     }
   }
   const inline = normalizeResolvedSecretInputString({

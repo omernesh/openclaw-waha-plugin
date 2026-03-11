@@ -88,6 +88,7 @@ function getCachedConfig(): CoreConfig {
   } catch (sdkErr) {
     throw new Error(`WAHA config not available — no cached config and SDK methods failed: ${String(sdkErr)}`);
   }
+  throw new Error("WAHA config not available — no cached config and no SDK config reader methods found on runtime");
 }
 
 const meta = {
