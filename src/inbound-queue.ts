@@ -25,6 +25,7 @@ export interface QueueStats {
   dmOverflowDrops: number;
   groupOverflowDrops: number;
   totalProcessed: number;
+  totalErrors: number;
 }
 
 /** Shape of items enqueued -- mirrors handleWahaInbound params. */
@@ -57,6 +58,7 @@ export class InboundQueue {
   private dmOverflowDrops = 0;
   private groupOverflowDrops = 0;
   private totalProcessed = 0;
+  private totalErrors = 0;
 
   constructor(
     dmCapacity: number,
@@ -76,14 +78,20 @@ export class InboundQueue {
   enqueue(item: QueueItem, isGroup: boolean): void {
     if (isGroup) {
       if (this.groupQueue.length >= this.groupCapacity) {
-        this.groupQueue.shift(); // drop oldest
+        const dropped = this.groupQueue.shift(); // drop oldest
         this.groupOverflowDrops++;
+        console.warn(
+          `[WAHA] InboundQueue group overflow: dropped message from ${dropped?.message?.chatId ?? "unknown"} (queue depth: ${this.groupCapacity})`
+        );
       }
       this.groupQueue.push(item);
     } else {
       if (this.dmQueue.length >= this.dmCapacity) {
-        this.dmQueue.shift(); // drop oldest
+        const dropped = this.dmQueue.shift(); // drop oldest
         this.dmOverflowDrops++;
+        console.warn(
+          `[WAHA] InboundQueue DM overflow: dropped message from ${dropped?.message?.chatId ?? "unknown"} (queue depth: ${this.dmCapacity})`
+        );
       }
       this.dmQueue.push(item);
     }
@@ -98,6 +106,7 @@ export class InboundQueue {
       dmOverflowDrops: this.dmOverflowDrops,
       groupOverflowDrops: this.groupOverflowDrops,
       totalProcessed: this.totalProcessed,
+      totalErrors: this.totalErrors,
     };
   }
 
@@ -114,20 +123,26 @@ export class InboundQueue {
       while (this.dmQueue.length > 0 || this.groupQueue.length > 0) {
         // DM priority: always drain DM queue first
         const item = this.dmQueue.length > 0
-          ? this.dmQueue.shift()!
-          : this.groupQueue.shift()!;
+          ? this.dmQueue.shift()
+          : this.groupQueue.shift();
+        if (!item) break;
 
         try {
           await this.processor(item);
+          this.totalProcessed++;
         } catch (err) {
+          this.totalErrors++;
           console.error(
             `[WAHA] InboundQueue processor error for ${item.message.chatId}: ${String(err)}`
           );
         }
-        this.totalProcessed++;
       }
     } finally {
       this.processing = false;
+      // Re-check: items may have been enqueued while we were in the finally block
+      if (this.dmQueue.length > 0 || this.groupQueue.length > 0) {
+        this.drain();
+      }
     }
   }
 }

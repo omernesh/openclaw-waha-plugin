@@ -77,26 +77,6 @@ describe("InboundQueue", () => {
     expect(stats.groupDepth).toBe(2);
   });
 
-  it("drain processes DM messages before group messages regardless of enqueue order", async () => {
-    const order: string[] = [];
-    const slowProcessor = async (item: QueueItem) => {
-      order.push(item.message.chatId);
-    };
-    const q = new InboundQueue(50, 50, slowProcessor);
-    // Enqueue group first, then DM
-    q.enqueue(makeItem("group@g.us"), true);
-    q.enqueue(makeItem("dm@c.us"), false);
-    // Wait for drain to complete
-    await new Promise((r) => setTimeout(r, 100));
-    // First item processed is whichever started drain, but after that DM should come before group
-    // The first enqueue starts the drain loop. The group message is picked first since it started drain.
-    // Then dm is enqueued. When drain loop continues, it checks DM queue first.
-    // Actually: first enqueue(group) starts drain, processes group immediately.
-    // Then dm is enqueued, drain picks it up. So order = [group, dm].
-    // To properly test priority: enqueue both while processor is blocked, then release.
-    // Let me redesign this test:
-    expect(order.length).toBeGreaterThanOrEqual(2);
-  });
 
   it("drain processes DM before group when both queued", async () => {
     const order: string[] = [];

@@ -97,7 +97,7 @@ class RateLimiter {
 }
 
 
-function writeJsonResponse(res: ServerResponse, status: number, body?: Record<string, unknown>) {
+function writeJsonResponse(res: ServerResponse, status: number, body?: object) {
   if (body) {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(body));
@@ -115,8 +115,14 @@ function writeWebhookError(res: ServerResponse, status: number, error: string) {
 function parseWebhookPayload(body: string): WahaWebhookEnvelope | null {
   try {
     const data = JSON.parse(body);
-    if (!data || typeof data !== "object") return null;
-    if (typeof data.event !== "string" || typeof data.session !== "string" || !data.payload || typeof data.payload !== "object") return null;
+    if (!data || typeof data !== "object") {
+      console.warn("[waha] Webhook payload is not an object");
+      return null;
+    }
+    if (typeof data.event !== "string" || typeof data.session !== "string" || !data.payload || typeof data.payload !== "object") {
+      console.warn(`[waha] Webhook payload missing required fields: event=${typeof data.event}, session=${typeof data.session}, payload=${typeof data.payload}`);
+      return null;
+    }
     return data as WahaWebhookEnvelope;
   } catch (err) {
     console.warn(`[waha] JSON parse error: ${String(err)}, body preview: ${body.slice(0, 200)}`);
@@ -1061,7 +1067,10 @@ async function loadHealth() {
       kvRow('Last Success', d.lastSuccessAt ? relTime(d.lastSuccessAt) : 'never') +
       kvRow('Last Check', d.lastCheckAt ? relTime(d.lastCheckAt) : 'never');
     hkv.innerHTML = healthHtml;
-  } catch(e) { /* silent */ }
+  } catch(e) {
+  var dot = document.getElementById('health-dot');
+  if (dot) { dot.style.background = '#94a3b8'; dot.title = 'Health check error: ' + (e.message || e); }
+}
 }
 
 // ---- Queue Stats (Phase 2, Plan 02) ----
@@ -1080,7 +1089,7 @@ async function loadQueue() {
       kvRow('Group Overflow Drops', d.groupOverflowDrops);
     document.getElementById('queue-kv').innerHTML = qkvHtml;
   } catch(e) {
-    document.getElementById('queue-stats').textContent = 'Failed to load queue stats';
+    document.getElementById('queue-stats').textContent = 'Failed to load queue stats: ' + (e.message || e);
   }
 }
 setInterval(function() { if (document.getElementById('content-dashboard').classList.contains('active')) loadStats(); }, 30000);
@@ -1555,8 +1564,8 @@ export function createWahaWebhookServer(opts: {
   // Wraps handleWahaInbound calls with bounded queue and DM priority.
   // All webhook handler call sites enqueue instead of calling directly.
   const inboundQueue = new InboundQueue(
-    cfg.dmQueueSize ?? 50,
-    cfg.groupQueueSize ?? 50,
+    cfg.dmQueueSize,
+    cfg.groupQueueSize,
     async (queueItem: QueueItem) => {
       await handleWahaInbound({
         message: queueItem.message,
@@ -1573,16 +1582,20 @@ export function createWahaWebhookServer(opts: {
   // Start health check loop for this session. State is stored in module-level
   // Map and accessible via getHealthState(session).
   let healthState: HealthState | undefined;
-  if (opts.abortSignal) {
+  if (!opts.abortSignal) {
+    console.warn("[WAHA] Health check skipped: no abortSignal provided");
+  } else {
     const baseUrl = cfg.baseUrl ?? "http://127.0.0.1:3004";
-    const apiKey = typeof cfg.apiKey === "string" ? cfg.apiKey : "";
+    const apiKey = account.apiKey;
     const session = cfg.session ?? "";
-    if (session) {
+    if (!session) {
+      console.warn("[WAHA] Health check skipped: no session configured");
+    } else {
       healthState = startHealthCheck({
         baseUrl,
         apiKey,
         session,
-        intervalMs: cfg.healthCheckIntervalMs ?? 60_000,
+        intervalMs: cfg.healthCheckIntervalMs,
         abortSignal: opts.abortSignal,
       });
     }
@@ -1619,7 +1632,7 @@ export function createWahaWebhookServer(opts: {
 
     // GET /api/admin/queue -- inbound queue stats (Phase 2, Plan 02)
     if (req.url === "/api/admin/queue" && req.method === "GET") {
-      writeJsonResponse(res, 200, inboundQueue.getStats() as unknown as Record<string, unknown>);
+      writeJsonResponse(res, 200, inboundQueue.getStats());
       return;
     }
 
@@ -1825,7 +1838,7 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/api/admin/sessions" && req.method === "GET") {
       try {
         const baseUrl = account.config.baseUrl ?? "";
-        const apiKey = typeof account.config.apiKey === "string" ? account.config.apiKey : "";
+        const apiKey = account.apiKey;
         const response = await fetch(`${baseUrl}/api/sessions/`, {
           headers: { "x-api-key": apiKey },
         });

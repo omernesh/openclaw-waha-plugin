@@ -15,6 +15,13 @@
 
 import { callWahaApi } from "./http-client.js";
 
+// ── Named constants (no magic numbers) ──────────────────────────────
+/** Timeout for the health check fetch call. */
+const HEALTH_CHECK_TIMEOUT_MS = 10_000;
+
+/** Default initial delay before first health ping. */
+const DEFAULT_INITIAL_DELAY_MS = 5_000;
+
 /** Health state for a WAHA session. */
 export interface HealthState {
   status: "healthy" | "degraded" | "unhealthy";
@@ -37,6 +44,15 @@ export interface HealthCheckOptions {
   abortSignal: AbortSignal;
   /** Override initial delay (default 5000ms, shorter for tests). */
   initialDelayMs?: number;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/** Call .unref() on a timer so it doesn't keep the process alive. */
+function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
+  if (typeof timer === "object" && timer && "unref" in timer) {
+    (timer as NodeJS.Timeout).unref();
+  }
 }
 
 /**
@@ -62,7 +78,12 @@ export function startHealthCheck(opts: HealthCheckOptions): HealthState {
   // Store in module-level map for getHealthState()
   sessionHealthStates.set(opts.session, state);
 
-  const initialDelay = opts.initialDelayMs ?? 5000;
+  // Clean up the Map entry when the session is aborted to prevent memory leaks
+  opts.abortSignal.addEventListener("abort", () => {
+    sessionHealthStates.delete(opts.session);
+  }, { once: true });
+
+  const initialDelay = opts.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
 
   // Schedule first tick after initial delay (don't block startup)
   const timer = setTimeout(() => {
@@ -70,9 +91,7 @@ export function startHealthCheck(opts: HealthCheckOptions): HealthState {
   }, initialDelay);
 
   // Unref so timer doesn't keep process alive
-  if (typeof timer === "object" && timer && "unref" in timer) {
-    (timer as NodeJS.Timeout).unref();
-  }
+  unrefTimer(timer);
 
   return state;
 }
@@ -97,7 +116,7 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
       path: `/api/${opts.session}/me`,
       method: "GET",
       skipRateLimit: true,
-      timeoutMs: 10_000,
+      timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
       context: { action: "health-check" },
     });
 
@@ -108,16 +127,20 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
   } catch (err) {
     // Failure: increment and evaluate
     state.consecutiveFailures += 1;
+    const msg = err instanceof Error ? err.message : String(err);
 
     if (state.consecutiveFailures >= UNHEALTHY_THRESHOLD) {
       state.status = "unhealthy";
-      const msg = err instanceof Error ? err.message : String(err);
       console.warn(
         `[WAHA] Health check UNHEALTHY for session ${opts.session} ` +
         `(${state.consecutiveFailures} consecutive failures): ${msg}`
       );
     } else {
       state.status = "degraded";
+      console.warn(
+        `[WAHA] Health check DEGRADED for session ${opts.session} ` +
+        `(${state.consecutiveFailures} consecutive failure(s)): ${msg}`
+      );
     }
   }
 
@@ -130,8 +153,6 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
     }, opts.intervalMs);
 
     // Unref so timer doesn't keep process alive
-    if (typeof nextTimer === "object" && nextTimer && "unref" in nextTimer) {
-      (nextTimer as NodeJS.Timeout).unref();
-    }
+    unrefTimer(nextTimer);
   }
 }

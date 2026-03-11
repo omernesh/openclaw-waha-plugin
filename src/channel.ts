@@ -475,7 +475,6 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       // Outer error handler — formats all action errors for LLM consumption.
       // DO NOT CHANGE — all action errors must flow through formatActionError.
       // Added Phase 2, Plan 01 (2026-03-11).
-      console.warn(`[WAHA] handleAction error (${action}):`, err);
       return {
         content: [{ type: "text" as const, text: formatActionError(err, { action, target }) }],
         isError: true,

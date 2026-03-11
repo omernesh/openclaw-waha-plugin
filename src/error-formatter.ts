@@ -50,9 +50,9 @@ export function formatActionError(
   err: unknown,
   ctx: { action: string; target?: string },
 ): string {
-  const rawMsg = err instanceof Error ? err.message : String(err);
+  const rawMsg = err instanceof Error ? err.message : (err ? String(err) : "unknown error (no details provided)");
 
-  // Log full original error for operators BEFORE formatting (Pitfall 5)
+  // Log full original error for operators BEFORE formatting — raw context helps debug issues that the cleaned LLM message omits
   console.warn(`[WAHA] Action error in ${ctx.action}${ctx.target ? ` (${ctx.target})` : ""}: ${rawMsg}`);
 
   // Strip [WAHA] prefix for clean LLM output
