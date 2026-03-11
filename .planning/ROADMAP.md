@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Extract callWahaApi into http-client.ts with timeout, rate limiting, 429 backoff, structured logging; set up vitest
-- [ ] 01-02-PLAN.md -- Replace silent .catch patterns, swap resolveTarget to LRU cache, add webhook dedup, memory audit
-- [ ] 01-03-PLAN.md -- Add reliability config fields to schema, deploy to hpg6, verify end-to-end
+- [x] 01-01-PLAN.md -- Extract callWahaApi into http-client.ts with timeout, rate limiting, 429 backoff, structured logging; set up vitest
+- [x] 01-02-PLAN.md -- Replace silent .catch patterns, swap resolveTarget to LRU cache, add webhook dedup, memory audit
+- [x] 01-03-PLAN.md -- Add reliability config fields to schema, deploy to hpg6, verify end-to-end
 
 ### Phase 2: Resilience and Observability
 **Goal**: The plugin detects session disconnects, handles webhook floods gracefully, and provides actionable error context to the LLM
@@ -45,11 +45,11 @@ Plans:
   1. When the WAHA session disconnects, the admin panel Status tab shows a health warning within 3 minutes (after 3 consecutive failed pings)
   2. When a burst of 200+ webhook messages arrives simultaneously, the inbound queue accepts up to 100, drops oldest on overflow, and processes DMs before group messages
   3. When an action handler fails, the LLM receives an error message containing the action name, target, what went wrong, and a suggested fix -- not a raw stack trace or generic "error"
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- Health monitor module (setTimeout chain, HealthState), error formatter (LLM-friendly messages), config schema fields for Phase 2
+- [ ] 02-02-PLAN.md -- Inbound queue with DM priority, wire health + queue into monitor.ts, admin panel health dots + Queue tab, deploy to hpg6
 
 ### Phase 3: Feature Gaps
 **Goal**: Sammie can send URL previews, mute/unmute chats, detect @mentions in received messages, send to multiple recipients at once, and provide context-rich error guidance
