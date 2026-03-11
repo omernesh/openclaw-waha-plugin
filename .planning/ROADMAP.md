@@ -12,7 +12,7 @@ This roadmap hardens a production WhatsApp plugin (v1.10.4, ~87% API coverage) f
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Reliability Foundation** - Production-grade HTTP client with timeouts, rate limiting, structured logging, and bounded caches
+- [x] **Phase 1: Reliability Foundation** - Production-grade HTTP client with timeouts, rate limiting, structured logging, and bounded caches (completed 2026-03-11)
 - [ ] **Phase 2: Resilience and Observability** - Session health monitoring, inbound message queue, and actionable error messages
 - [ ] **Phase 3: Feature Gaps** - URL previews, mute/unmute, mentions detection, multi-recipient send, and better errors
 - [ ] **Phase 4: Multi-Session** - Session registry with roles, trigger word activation, cross-session routing, and admin panel management
@@ -109,7 +109,7 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Reliability Foundation | 2/3 | In Progress|  |
+| 1. Reliability Foundation | 3/3 | Complete   | 2026-03-11 |
 | 2. Resilience and Observability | 0/2 | Not started | - |
 | 3. Feature Gaps | 0/3 | Not started | - |
 | 4. Multi-Session | 0/4 | Not started | - |
