@@ -36,7 +36,7 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [ ] **FEAT-03**: Mute chat action via WAHA `/api/{session}/chats/{chatId}/mute`
 - [ ] **FEAT-04**: Unmute chat action via WAHA `/api/{session}/chats/{chatId}/unmute`
 - [x] **FEAT-05**: Extract @mentioned JIDs from inbound messages and include in message context
-- [ ] **FEAT-06**: Multi-recipient send — sequential send to multiple chats with per-recipient results
+- [x] **FEAT-06**: Multi-recipient send — sequential send to multiple chats with per-recipient results
 - [ ] **FEAT-07**: Context-rich error messages with suggested fixes (e.g., "contact not found — verify phone number")
 
 ### Multi-Session
@@ -117,7 +117,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | FEAT-03 | Phase 3 | Pending |
 | FEAT-04 | Phase 3 | Pending |
 | FEAT-05 | Phase 3 | Complete |
-| FEAT-06 | Phase 3 | Pending |
+| FEAT-06 | Phase 3 | Complete |
 | FEAT-07 | Phase 3 | Pending |
 | MSESS-01 | Phase 4 | Pending |
 | MSESS-02 | Phase 4 | Pending |

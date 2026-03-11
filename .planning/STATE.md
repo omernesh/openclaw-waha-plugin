@@ -60,13 +60,13 @@ Progress: [████████░░] 80%
 |-------|-------|-------|----------|
 | 01-reliability-foundation | 3/3 | 17min | 6min |
 | 02-resilience-and-observability | 2/2 | 8min | 4min |
+| 03-feature-gaps | 3/? | 6min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (8min), 01-02 (6min), 01-03 (3min), 02-01 (4min), 02-02 (4min)
-- Trend: stable
+- Last 5 plans: 02-01 (4min), 02-02 (4min), 03-01 (?), 03-02 (3min), 03-03 (2min)
+- Trend: stable/improving
 
 *Updated after each plan completion*
-| Phase 03 P02 | 3min | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -93,6 +93,8 @@ Recent decisions affecting current work:
 - [02-02]: Drop-oldest overflow policy (newest messages more relevant than stale)
 - [02-02]: Always return HTTP 200 after enqueue -- never 500 on queue full to prevent WAHA retry floods
 - [Phase 03]: Extracted extractMentionedJids into src/mentions.ts for testability (inbound.ts has heavy openclaw deps)
+- [03-03]: Sequential sends (not parallel) for sendMulti to respect token-bucket rate limiter
+- [03-03]: Text only for sendMulti v1 -- media multi-send deferred per user decision
 
 ### Pending Todos
 
@@ -106,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:45:51.130Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-11T15:44:41Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
