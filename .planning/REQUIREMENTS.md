@@ -35,7 +35,7 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [ ] **FEAT-02**: Custom link preview send via WAHA `/api/send/link-custom-preview` endpoint
 - [ ] **FEAT-03**: Mute chat action via WAHA `/api/{session}/chats/{chatId}/mute`
 - [ ] **FEAT-04**: Unmute chat action via WAHA `/api/{session}/chats/{chatId}/unmute`
-- [ ] **FEAT-05**: Extract @mentioned JIDs from inbound messages and include in message context
+- [x] **FEAT-05**: Extract @mentioned JIDs from inbound messages and include in message context
 - [ ] **FEAT-06**: Multi-recipient send — sequential send to multiple chats with per-recipient results
 - [ ] **FEAT-07**: Context-rich error messages with suggested fixes (e.g., "contact not found — verify phone number")
 
@@ -116,7 +116,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | FEAT-02 | Phase 3 | Pending |
 | FEAT-03 | Phase 3 | Pending |
 | FEAT-04 | Phase 3 | Pending |
-| FEAT-05 | Phase 3 | Pending |
+| FEAT-05 | Phase 3 | Complete |
 | FEAT-06 | Phase 3 | Pending |
 | FEAT-07 | Phase 3 | Pending |
 | MSESS-01 | Phase 4 | Pending |
