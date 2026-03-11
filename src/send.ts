@@ -3,6 +3,7 @@ import { extname, basename } from "path";
 import { detectMime, sendMediaWithLeadingCaption, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import { resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
+import { callWahaApi } from "./http-client.js";
 import type { CoreConfig } from "./types.js";
 
 // ╔══════════════════════════════════════════════════════════════════════╗
@@ -31,43 +32,15 @@ export function assertAllowedSession(session: string) {
   }
 }
 
-// Core HTTP client for all WAHA API calls. All functions below use this.
-// Handles method, headers, query params, body serialization.
-// ⚠️ Do not add retry logic here — the gateway handles retries upstream.
-async function callWahaApi(params: {
-  baseUrl: string;
-  apiKey: string;
-  path: string;
-  method?: "GET" | "POST" | "PUT" | "DELETE";
-  body?: Record<string, unknown>;
-  query?: Record<string, string>;
-}) {
-  const method = params.method ?? "POST";
-  const url = new URL(params.path, params.baseUrl);
-  if (params.query) {
-    for (const [k, v] of Object.entries(params.query)) {
-      url.searchParams.set(k, v);
-    }
-  }
-  const hasBody = method !== "GET" && method !== "DELETE" && params.body;
-  const response = await fetch(url.toString(), {
-    method,
-    headers: {
-      ...(hasBody ? { "Content-Type": "application/json" } : {}),
-      ...(params.apiKey ? { "x-api-key": params.apiKey } : {}),
-    },
-    ...(hasBody ? { body: JSON.stringify(params.body) } : {}),
-  });
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    throw new Error(`WAHA ${method} ${params.path} failed: ${response.status} ${errorText}`);
-  }
-  const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    return await response.json();
-  }
-  return await response.text();
-}
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  callWahaApi is now imported from ./http-client.ts — DO NOT CHANGE  ║
+// ║                                                                     ║
+// ║  The function was extracted to http-client.ts in Phase 1, Plan 01   ║
+// ║  to add timeout, rate limiting, 429 backoff, and structured logging.║
+// ║  All 60+ functions below reference callWahaApi by name unchanged.   ║
+// ║                                                                     ║
+// ║  DO NOT re-define callWahaApi here. It comes from the import above. ║
+// ╚══════════════════════════════════════════════════════════════════════╝
 
 function resolveSessionPath(template: string, cfg: CoreConfig, accountId?: string): string {
   const account = resolveWahaAccount({ cfg, accountId: accountId ?? DEFAULT_ACCOUNT_ID });
