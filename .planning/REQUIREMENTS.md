@@ -25,8 +25,8 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 
 - [x] **RES-01**: Session health check pings WAHA `/api/{session}/me` every 60s
 - [x] **RES-02**: Log warning after 3 consecutive health check failures, surface in admin panel Status tab
-- [ ] **RES-03**: Inbound message queue with bounded size (100 messages), drop oldest on overflow
-- [ ] **RES-04**: DM messages get priority over group messages in the inbound queue
+- [x] **RES-03**: Inbound message queue with bounded size (100 messages), drop oldest on overflow
+- [x] **RES-04**: DM messages get priority over group messages in the inbound queue
 - [x] **RES-05**: All action handler errors return LLM-friendly messages with action name, target, and suggested fix
 
 ### Features
@@ -109,8 +109,8 @@ Deferred to future release. Tracked but not in current roadmap.
 | REL-11 | Phase 1 | Complete |
 | RES-01 | Phase 2 | Complete |
 | RES-02 | Phase 2 | Complete |
-| RES-03 | Phase 2 | Pending |
-| RES-04 | Phase 2 | Pending |
+| RES-03 | Phase 2 | Complete |
+| RES-04 | Phase 2 | Complete |
 | RES-05 | Phase 2 | Complete |
 | FEAT-01 | Phase 3 | Pending |
 | FEAT-02 | Phase 3 | Pending |
