@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. When Sammie sends messages rapidly (>20/s), the rate limiter queues excess requests instead of flooding WAHA, and fire-and-forget calls (presence, typing) do not starve user-facing sends
   4. When WAHA returns 429, the plugin backs off with exponential delay and jitter, reading Retry-After when present, and caps at 3 retries
   5. The resolveTarget cache uses LRU eviction with max 1000 entries, and webhook deduplication filters duplicate messages by composite key without over-filtering distinct events
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- Extract callWahaApi into http-client.ts with timeout, rate limiting, 429 backoff, structured logging; set up vitest
+- [ ] 01-02-PLAN.md -- Replace silent .catch patterns, swap resolveTarget to LRU cache, add webhook dedup, memory audit
+- [ ] 01-03-PLAN.md -- Add reliability config fields to schema, deploy to hpg6, verify end-to-end
 
 ### Phase 2: Resilience and Observability
 **Goal**: The plugin detects session disconnects, handles webhook floods gracefully, and provides actionable error context to the LLM
@@ -109,7 +109,7 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Reliability Foundation | 0/3 | Not started | - |
+| 1. Reliability Foundation | 0/3 | Planned | - |
 | 2. Resilience and Observability | 0/2 | Not started | - |
 | 3. Feature Gaps | 0/3 | Not started | - |
 | 4. Multi-Session | 0/4 | Not started | - |
