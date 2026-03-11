@@ -30,21 +30,21 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Webhook handler with duplicate event filtering (message vs message.any) — v1.8.x
 - ✓ vCard interception in deliverWahaReply — v1.9.5
 - ✓ Call rejection — v1.8.x
+- ✓ R1: Structured error logging on all WAHA API calls — Phase 1
+- ✓ R2: Proactive outbound rate limiter (token bucket) + 429 backoff safety net — Phase 1
+- ✓ R3: Session health monitoring (periodic ping, disconnect detection) — Phase 2
+- ✓ R4: Cache bounds (LRU eviction, max size) and memory leak prevention — Phase 1
+- ✓ R5: Request timeouts (AbortController, 30s) and webhook deduplication by messageId — Phase 1
+- ✓ F5: Message queue with flood protection (bounded queue, priority DMs) — Phase 2
+- ✓ F7: Better error messages (context-rich, suggested fixes) — Phase 2
 
 ### Active
 
-- [ ] R1: Structured error logging on all WAHA API calls (no silent failures)
-- [ ] R2: Proactive outbound rate limiter (token bucket) + 429 backoff safety net
-- [ ] R3: Session health monitoring (periodic ping, disconnect detection)
-- [ ] R4: Cache bounds (LRU eviction, max size) and memory leak prevention
-- [ ] R5: Request timeouts (AbortController, 30s) and webhook deduplication by messageId
 - [ ] F1: Mute/unmute chat actions
 - [ ] F2: Inbound group events (join/leave/promote/demote)
 - [ ] F3: Mentions detection (@mentions extracted from inbound messages)
 - [ ] F4: Multi-recipient send (batch with per-recipient results)
-- [ ] F5: Message queue with flood protection (bounded queue, priority DMs)
 - [ ] F6: URL preview send (WAHA link-preview endpoint)
-- [ ] F7: Better error messages (context-rich, suggested fixes)
 - [ ] M1: Multi-session support (session registry, roles, trigger word activation)
 - [ ] D1: SKILL.md refresh, unit tests, integration tests, README
 
@@ -88,6 +88,9 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | DO NOT CHANGE markers on critical code | Prevents regression on hard-won fixes | ✓ Good |
 | Proactive rate limiter + 429 backoff | Prevent overload rather than just react to it | — Pending |
 | Multi-session with role-based access | Support bot + human sessions with configurable permissions | — Pending |
+| setTimeout chain for health pings (not setInterval) | Prevents timer pile-up when pings take longer than interval | — Pending |
+| Two separate bounded queues (DM + group) | Simpler than priority queue, DM priority via drain order | — Pending |
+| Always return HTTP 200 on webhook even on queue overflow | Prevents WAHA retry storms | — Pending |
 
 ---
-*Last updated: 2026-03-11 after initialization*
+*Last updated: 2026-03-11 after Phase 2*
