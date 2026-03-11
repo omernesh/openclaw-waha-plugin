@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-11)
 ## Current Position
 
 Phase: 1 of 5 (Reliability Foundation)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-11 -- Roadmap created
+Plan: 1 of 3 in current phase
+Status: Executing
+Last activity: 2026-03-11 -- Completed 01-01 (HTTP Client Extraction)
 
-Progress: [..........] 0%
+Progress: [==........] 7%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 8min
+- Total execution time: 0.13 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-reliability-foundation | 1/3 | 8min | 8min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 01-01 (8min)
+- Trend: baseline
 
 *Updated after each plan completion*
 
@@ -45,6 +45,9 @@ Recent decisions affecting current work:
 - [Roadmap]: Extract callWahaApi into http-client.ts (single chokepoint gives all 60+ functions reliability for free)
 - [Roadmap]: Use lru-cache (npm) over custom LRU implementation for edge case handling
 - [Roadmap]: Phase 2 and 3 can run in parallel after Phase 1 completes
+- [01-01]: Used AbortSignal.timeout() for request timeouts instead of manual AbortController
+- [01-01]: Custom TokenBucket implementation instead of external library
+- [01-01]: Module-level shared backoff state for 429 responses
 
 ### Pending Todos
 
@@ -59,5 +62,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-11
-Stopped at: Roadmap created, ready to plan Phase 1
+Stopped at: Completed 01-01-PLAN.md
 Resume file: None

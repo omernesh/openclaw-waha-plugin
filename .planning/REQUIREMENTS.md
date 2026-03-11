@@ -9,14 +9,14 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 
 ### Reliability
 
-- [ ] **REL-01**: All WAHA API calls have structured error logging with action name, chatId, and error context
+- [x] **REL-01**: All WAHA API calls have structured error logging with action name, chatId, and error context
 - [ ] **REL-02**: All silent `.catch(() => {})` patterns replaced with warning logs (presence, typing, seen calls)
-- [ ] **REL-03**: All WAHA API fetch() calls have 30s AbortController-based timeouts
-- [ ] **REL-04**: Timeout errors on mutation endpoints return "may have succeeded" warnings instead of retrying
-- [ ] **REL-05**: Proactive token-bucket rate limiter on all outbound WAHA API calls (configurable, default ~20 req/s)
-- [ ] **REL-06**: Fire-and-forget calls (presence, typing) exempt from or deprioritized in rate limiter
-- [ ] **REL-07**: Exponential backoff with jitter on 429 responses (1s/2s/4s, max 3 retries, cap 30s)
-- [ ] **REL-08**: Read `Retry-After` header from 429 responses when present
+- [x] **REL-03**: All WAHA API fetch() calls have 30s AbortController-based timeouts
+- [x] **REL-04**: Timeout errors on mutation endpoints return "may have succeeded" warnings instead of retrying
+- [x] **REL-05**: Proactive token-bucket rate limiter on all outbound WAHA API calls (configurable, default ~20 req/s)
+- [x] **REL-06**: Fire-and-forget calls (presence, typing) exempt from or deprioritized in rate limiter
+- [x] **REL-07**: Exponential backoff with jitter on 429 responses (1s/2s/4s, max 3 retries, cap 30s)
+- [x] **REL-08**: Read `Retry-After` header from 429 responses when present
 - [ ] **REL-09**: Webhook deduplication by composite key `${eventType}:${messageId}` (sliding window of 200, 5-min TTL)
 - [ ] **REL-10**: resolveTarget cache replaced with LRU cache (max 1000 entries, 30s TTL)
 - [ ] **REL-11**: Memory audit — verify no unbounded growth in caches, event listeners, or webhook handler state
@@ -96,14 +96,14 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REL-01 | Phase 1 | Pending |
+| REL-01 | Phase 1 | Complete |
 | REL-02 | Phase 1 | Pending |
-| REL-03 | Phase 1 | Pending |
-| REL-04 | Phase 1 | Pending |
-| REL-05 | Phase 1 | Pending |
-| REL-06 | Phase 1 | Pending |
-| REL-07 | Phase 1 | Pending |
-| REL-08 | Phase 1 | Pending |
+| REL-03 | Phase 1 | Complete |
+| REL-04 | Phase 1 | Complete |
+| REL-05 | Phase 1 | Complete |
+| REL-06 | Phase 1 | Complete |
+| REL-07 | Phase 1 | Complete |
+| REL-08 | Phase 1 | Complete |
 | REL-09 | Phase 1 | Pending |
 | REL-10 | Phase 1 | Pending |
 | REL-11 | Phase 1 | Pending |
