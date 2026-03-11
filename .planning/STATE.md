@@ -3,30 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-11T15:45:51.134Z"
-last_activity: 2026-03-11 -- Phase 3 Plan 03 complete (sendMulti utility action)
+stopped_at: Completed 03-01-PLAN.md (Phase 3 fully complete)
+last_updated: "2026-03-11T15:49:09Z"
+last_activity: 2026-03-11 -- Phase 3 fully complete (all 3 plans done)
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 7
-  percent: 88
----
-
----
-gsd_state_version: 1.0
-milestone: v1.10
-milestone_name: milestone
-status: in-progress
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-03-11T15:44:41Z"
-last_activity: 2026-03-11 -- Phase 3 Plan 03 complete (sendMulti utility action)
-progress:
-  [█████████░] 88%
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
   completed_plans: 8
+  percent: 100
 ---
 
 # Project State
@@ -41,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-03-11)
 ## Current Position
 
 Phase: 3 of 5 (Feature Gaps)
-Plan: 3 complete
-Status: In progress
-Last activity: 2026-03-11 -- Phase 3 Plan 03 complete (sendMulti utility action)
+Plan: 3/3 complete (Phase 3 done)
+Status: Phase 3 complete, ready for Phase 4 planning
+Last activity: 2026-03-11 -- Phase 3 fully complete (link preview, mute, mentions, sendMulti)
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100% (Phases 1-3)
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 8
-- Average duration: 4min
-- Total execution time: 0.48 hours
+- Average duration: 5min
+- Total execution time: 0.55 hours
 
 **By Phase:**
 
@@ -60,11 +45,11 @@ Progress: [████████░░] 80%
 |-------|-------|-------|----------|
 | 01-reliability-foundation | 3/3 | 17min | 6min |
 | 02-resilience-and-observability | 2/2 | 8min | 4min |
-| 03-feature-gaps | 3/? | 6min | 2min |
+| 03-feature-gaps | 3/3 | 13min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (4min), 02-02 (4min), 03-01 (?), 03-02 (3min), 03-03 (2min)
-- Trend: stable/improving
+- Last 5 plans: 02-01 (4min), 02-02 (4min), 03-01 (7min), 03-02 (3min), 03-03 (2min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -95,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Extracted extractMentionedJids into src/mentions.ts for testability (inbound.ts has heavy openclaw deps)
 - [03-03]: Sequential sends (not parallel) for sendMulti to respect token-bucket rate limiter
 - [03-03]: Text only for sendMulti v1 -- media multi-send deferred per user decision
+- [03-01]: Auto link preview defaults to true (autoLinkPreview config) -- most users want rich previews
+- [03-01]: URL_REGEX uses simple /https?:\/\/\S+/i -- sufficient for link preview triggering, not full URL validation
+- [03-01]: Chat mute/unmute uses /chats/ endpoint, separate from /channels/ endpoint for newsletter mute
 
 ### Pending Todos
 
@@ -108,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-11T15:44:41Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-03-11T15:49:09Z
+Stopped at: Completed 03-01-PLAN.md (Phase 3 fully complete)
 Resume file: None

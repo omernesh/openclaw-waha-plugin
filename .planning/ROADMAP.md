@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Reliability Foundation** - Production-grade HTTP client with timeouts, rate limiting, structured logging, and bounded caches (completed 2026-03-11)
 - [x] **Phase 2: Resilience and Observability** - Session health monitoring, inbound message queue, and actionable error messages (completed 2026-03-11)
-- [ ] **Phase 3: Feature Gaps** - URL previews, mute/unmute, mentions detection, multi-recipient send, and better errors
+- [x] **Phase 3: Feature Gaps** - URL previews, mute/unmute, mentions detection, multi-recipient send, and better errors (completed 2026-03-11)
 - [ ] **Phase 4: Multi-Session** - Session registry with roles, trigger word activation, cross-session routing, and admin panel management
 - [ ] **Phase 5: Documentation and Testing** - SKILL.md refresh, unit tests, integration tests, and README
 
@@ -63,9 +63,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Auto link preview in sendWahaText, chat mute/unmute actions, verify FEAT-02 and FEAT-07
-- [ ] 03-02-PLAN.md -- Extract @mentions from inbound messages into ctxPayload
-- [ ] 03-03-PLAN.md -- Multi-recipient sendMulti utility action
+- [x] 03-01-PLAN.md -- Auto link preview in sendWahaText, chat mute/unmute actions, verify FEAT-02 and FEAT-07
+- [x] 03-02-PLAN.md -- Extract @mentions from inbound messages into ctxPayload
+- [x] 03-03-PLAN.md -- Multi-recipient sendMulti utility action
 
 ### Phase 4: Multi-Session
 **Goal**: Multiple WhatsApp sessions (bot and human) coexist with role-based permissions, trigger word activation enables group chat interaction, and sessions are manageable from the admin panel
@@ -111,6 +111,6 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 |-------|----------------|--------|-----------|
 | 1. Reliability Foundation | 3/3 | Complete   | 2026-03-11 |
 | 2. Resilience and Observability | 2/2 | Complete   | 2026-03-11 |
-| 3. Feature Gaps | 2/3 | In Progress|  |
+| 3. Feature Gaps | 3/3 | Complete   | 2026-03-11 |
 | 4. Multi-Session | 0/4 | Not started | - |
 | 5. Documentation and Testing | 0/3 | Not started | - |
