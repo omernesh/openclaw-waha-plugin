@@ -55,6 +55,7 @@ import {
   // Channels
   getWahaChannels, createWahaChannel, getWahaChannel, deleteWahaChannel,
   followWahaChannel, unfollowWahaChannel, muteWahaChannel, unmuteWahaChannel,
+  muteWahaChat, unmuteWahaChat,
   searchWahaChannelsByText, previewWahaChannelMessages,
   // Events
   sendWahaEvent,
@@ -139,6 +140,9 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   unreadChat: (p, cfg, aid) => unreadWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
   readChatMessages: (p, cfg, aid) => readWahaChatMessages({ cfg, chatId: String(p.chatId), accountId: aid }),
   getChatPicture: (p, cfg, aid) => getWahaChatPicture({ cfg, chatId: String(p.chatId), accountId: aid }),
+  // Chat mute/unmute — Added Phase 3, Plan 01. DO NOT REMOVE.
+  muteChat: (p, cfg, aid) => muteWahaChat({ cfg, chatId: String(p.chatId), duration: p.duration ? Number(p.duration) : undefined, accountId: aid }),
+  unmuteChat: (p, cfg, aid) => unmuteWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
   // Group admin
   createGroup: (p, cfg, aid) => createWahaGroup({ cfg, name: String(p.name), participants: p.participants as string[], accountId: aid }),
   getGroups: (p, cfg, aid) => getWahaGroups({ cfg, accountId: aid }),
@@ -277,6 +281,7 @@ const UTILITY_ACTIONS = [
   "sendImage", "sendVideo", "sendFile",
   "joinGroup", "followChannel", "unfollowChannel",
   "resolveTarget",
+  "muteChat", "unmuteChat", // Chat mute/unmute — Added Phase 3, Plan 01. DO NOT REMOVE.
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.
