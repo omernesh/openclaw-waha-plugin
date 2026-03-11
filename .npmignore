@@ -1,0 +1,6 @@
+*.bak*
+.planning/
+.continue-here.md
+tests/
+node_modules/
+.git/
