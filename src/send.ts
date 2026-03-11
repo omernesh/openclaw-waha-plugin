@@ -1,9 +1,10 @@
 import { readFileSync } from "fs";
 import { extname, basename } from "path";
+import { LRUCache } from "lru-cache";
 import { detectMime, sendMediaWithLeadingCaption, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import { resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
-import { callWahaApi } from "./http-client.js";
+import { callWahaApi, warnOnError } from "./http-client.js";
 import type { CoreConfig } from "./types.js";
 
 // ╔══════════════════════════════════════════════════════════════════════╗
@@ -152,7 +153,7 @@ export async function sendWahaPresence(params: {
       chatId: params.chatId,
       session: account.session,
     },
-  }).catch(() => {});
+  }).catch(warnOnError(`presence ${params.typing ? "/api/startTyping" : "/api/stopTyping"} ${params.chatId}`));
 }
 
 /**
@@ -173,7 +174,7 @@ export async function sendWahaSeen(params: {
       chatId: params.chatId,
       session: account.session,
     },
-  }).catch(() => {});
+  }).catch(warnOnError(`presence /api/sendSeen ${params.chatId}`));
 }
 
 export async function sendWahaText(params: {
@@ -1458,19 +1459,22 @@ function toArr(val: unknown): unknown[] {
 
 // ── Rate-limiting cache for resolveTarget ──────────────────────
 // Prevents hammering WAHA API when the agent calls resolveTarget
-// multiple times in quick succession. Cache TTL = 30 seconds.
+// multiple times in quick succession. LRU cache with max 1000 entries, TTL = 30 seconds.
 // DO NOT REMOVE — protects WAHA from excessive API load.
-const _resolveCache = new Map<string, { data: unknown[]; ts: number }>();
-const RESOLVE_CACHE_TTL_MS = 30_000; // 30 seconds
+// Replaced unbounded Map with LRUCache in Phase 1, Plan 02 (2026-03-11) — REL-10.
+const _resolveCache = new LRUCache<string, unknown[]>({
+  max: 1000,
+  ttl: 30_000, // 30 seconds
+});
 
 function getCachedOrFetch(key: string, fetcher: () => Promise<unknown>): Promise<unknown[]> {
   const cached = _resolveCache.get(key);
-  if (cached && Date.now() - cached.ts < RESOLVE_CACHE_TTL_MS) {
-    return Promise.resolve(cached.data);
+  if (cached) {
+    return Promise.resolve(cached);
   }
   return fetcher().then((raw) => {
     const arr = toArr(raw);
-    _resolveCache.set(key, { data: arr, ts: Date.now() });
+    _resolveCache.set(key, arr);
     return arr;
   });
 }

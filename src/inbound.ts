@@ -23,6 +23,7 @@ import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.
 import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
 import { sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
+import { warnOnError } from "./http-client.js";
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
 import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
 
@@ -88,9 +89,9 @@ async function deliverWahaReply(params: {
 
   // Stop typing before sending (reply is ready)
   if (presenceCtrl) {
-    await presenceCtrl.finishTyping(text).catch(() => {});
+    await presenceCtrl.finishTyping(text).catch(warnOnError(`inbound presence finish-typing ${chatId}`));
   } else {
-    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
   }
 
   if (mediaUrls.length > 0) {
@@ -103,7 +104,7 @@ async function deliverWahaReply(params: {
       accountId,
     });
     // Safety net: ensure typing stopped after delivery
-    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
     statusSink?.({ lastOutboundAt: Date.now() });
     return;
   }
@@ -117,7 +118,7 @@ async function deliverWahaReply(params: {
     accountId,
   });
   // Safety net: ensure typing stopped after delivery
-  await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+  await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
   statusSink?.({ lastOutboundAt: Date.now() });
 }
 
@@ -573,7 +574,7 @@ export async function handleWahaInbound(params: {
         deliver: deliverReply,
         onError: (err, info) => {
           // Cancel typing on error
-          presenceCtrl.cancelTyping().catch(() => {});
+          presenceCtrl.cancelTyping().catch(warnOnError(`inbound presence cancel-typing ${chatId}`));
           runtime.error?.(`waha ${info.kind} reply failed: ${String(err)}`);
         },
       },
@@ -588,8 +589,8 @@ export async function handleWahaInbound(params: {
   } finally {
     // Guarantee typing is stopped after dispatch — handles empty responses,
     // errors, and any path where deliverReply was never called
-    await presenceCtrl.cancelTyping().catch(() => {});
+    await presenceCtrl.cancelTyping().catch(warnOnError(`inbound presence cancel-typing ${chatId}`));
     // Clean up image temp file after native pipeline has processed it
-    if (mediaDownload) await mediaDownload.cleanup().catch(() => {});
+    if (mediaDownload) await mediaDownload.cleanup().catch(warnOnError("media cleanup"));
   }
 }

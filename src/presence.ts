@@ -1,4 +1,5 @@
 import { sendWahaPresence, sendWahaSeen } from "./send.js";
+import { warnOnError } from "./http-client.js";
 import type { CoreConfig, PresenceConfig } from "./types.js";
 
 const DEFAULTS: Required<PresenceConfig> = {
@@ -78,17 +79,17 @@ async function typingFlickerLoop(params: {
     if (Date.now() >= deadline) break;
 
     if (Math.random() < cfg.pauseChance) {
-      await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(() => {});
+      await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
       const pauseDuration = rand(cfg.pauseDurationMs[0], cfg.pauseDurationMs[1]);
       const pauseRemaining = deadline - Date.now();
       if (pauseRemaining <= 0) break;
       await sleep(Math.min(pauseDuration, pauseRemaining));
       if (Date.now() >= deadline) break;
-      await sendWahaPresence({ cfg: coreCfg, chatId, typing: true, accountId }).catch(() => {});
+      await sendWahaPresence({ cfg: coreCfg, chatId, typing: true, accountId }).catch(warnOnError(`presence typing-start ${chatId}`));
     }
   }
   // Guarantee typing is stopped on exit — loop may have resumed typing:true just before deadline
-  await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(() => {});
+  await sendWahaPresence({ cfg: coreCfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
 }
 
 export async function startHumanPresence(params: {
@@ -102,25 +103,25 @@ export async function startHumanPresence(params: {
   const presenceCfg = resolvePresenceConfig(cfg);
 
   if (!presenceCfg.enabled) {
-    await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(() => {});
+    await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(warnOnError(`presence typing-start ${chatId}`));
     return {
       finishTyping: async (_replyText?: string) => {
-        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
       },
       cancelTyping: async () => {
-        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
       },
     };
   }
 
   if (presenceCfg.sendSeen && messageId) {
-    await sendWahaSeen({ cfg, chatId, accountId }).catch(() => {});
+    await sendWahaSeen({ cfg, chatId, accountId }).catch(warnOnError(`presence seen ${chatId}`));
   }
 
   const readDelay = calcReadDelay(incomingText, presenceCfg);
   await sleep(readDelay);
 
-  await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(() => {});
+  await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(warnOnError(`presence typing-start ${chatId}`));
   const typingStartedAt = Date.now();
 
   let flickerAborted = false;
@@ -133,15 +134,15 @@ export async function startHumanPresence(params: {
       if (flickerAborted || Date.now() - typingStartedAt >= maxFlickerMs) break;
 
       if (Math.random() < presenceCfg.pauseChance) {
-        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
         const pauseDuration = rand(presenceCfg.pauseDurationMs[0], presenceCfg.pauseDurationMs[1]);
         await sleep(pauseDuration);
         if (flickerAborted || Date.now() - typingStartedAt >= maxFlickerMs) break;
-        await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(() => {});
+        await sendWahaPresence({ cfg, chatId, typing: true, accountId }).catch(warnOnError(`presence typing-start ${chatId}`));
       }
     }
     // Guarantee typing is stopped when loop exits
-    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+    await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
   })();
 
   let finishTypingDone = false;
@@ -150,7 +151,7 @@ export async function startHumanPresence(params: {
     finishTyping: async (replyText?: string) => {
       // Subsequent calls (e.g., voice after text) — just stop typing immediately
       if (finishTypingDone) {
-        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+        await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
         return;
       }
 
@@ -158,12 +159,12 @@ export async function startHumanPresence(params: {
       await flickerPromise; // Wait for in-flight flicker to drain
       await sleep(100); // drain delay for protocol to settle
       finishTypingDone = true;
-      await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+      await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
     },
     cancelTyping: async () => {
       flickerAborted = true;
       await flickerPromise; // Wait for in-flight flicker to drain
-      await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(() => {});
+      await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`presence typing-stop ${chatId}`));
     },
   };
 }
