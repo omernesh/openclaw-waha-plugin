@@ -212,6 +212,10 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getAllLids: (p, cfg, aid) => getWahaAllLids({ cfg, accountId: aid }),
   // Calls
   rejectCall: (p, cfg, aid) => rejectWahaCall({ cfg, callId: String(p.callId), accountId: aid }),
+  // ── sendMulti — DO NOT CHANGE / DO NOT REMOVE ─────────────────────
+  // Multi-recipient text send. Sends same text to up to 10 recipients
+  // sequentially with per-recipient results. Added Phase 3, Plan 03.
+  sendMulti: (p, cfg, aid) => handleSendMulti(p, cfg, aid),
   // ── resolveTarget — DO NOT CHANGE / DO NOT REMOVE ────────────────────
   // Fuzzy name-to-JID resolver. The ONLY way agents can resolve human-readable
   // names to WhatsApp JIDs. Removing this breaks all name-based targeting.
@@ -261,6 +265,7 @@ const STANDARD_ACTIONS = ["send", "poll", "react", "edit", "unsend", "pin", "unp
 // as available tools. Keep this list curated -- too many actions overwhelm the
 // model's context and degrade response quality. Each action here costs ~50 tokens.
 const UTILITY_ACTIONS = [
+  "sendMulti", // Multi-recipient text send — up to 10 recipients. Added Phase 3, Plan 03.
   "search", // DO NOT REMOVE — gateway-recognized name for listing/searching. See search handler above.
   "getGroups", "getGroup", "getGroupsCount", "getParticipants",
   "getContacts", "getContact", "checkContactExists",
@@ -319,6 +324,50 @@ async function autoResolveTarget(chatId: string, cfg: CoreConfig, accountId?: st
   // Low confidence — report what we found
   const summary = resolved.matches.slice(0, 5).map(m => `${m.name} (${m.jid})`).join(", ");
   throw new Error(`Ambiguous target "${chatId}". Possible matches: ${summary}. Please specify the exact JID.`);
+}
+
+// ── handleSendMulti — Multi-recipient text send ─────────────────────
+// Sends the same text message to multiple recipients sequentially.
+// Each recipient name is resolved via autoResolveTarget before sending.
+// No fail-fast: if one recipient fails, remaining recipients still get attempted.
+// Returns per-recipient results with sent/failed counts.
+// Text only — media multi-send deferred per user decision.
+// DO NOT parallelize sends — sequential loop respects rate limiter.
+// Added Phase 3, Plan 03 (2026-03-11).
+async function handleSendMulti(params: Record<string, unknown>, cfg: CoreConfig, accountId?: string): Promise<unknown> {
+  // Extract recipients — handles both string and array via inline normalization
+  const rawRecipients = params.recipients;
+  const recipients: string[] = Array.isArray(rawRecipients)
+    ? rawRecipients.map((r) => String(r)).filter(Boolean)
+    : (typeof rawRecipients === "string" && rawRecipients.trim())
+      ? [rawRecipients.trim()]
+      : [];
+
+  const text = String(params.text || "").trim();
+  const replyToId = params.replyToId ? String(params.replyToId) : undefined;
+
+  // Validate inputs
+  if (!text) throw new Error("sendMulti requires text parameter");
+  if (recipients.length === 0) throw new Error("sendMulti requires at least one recipient");
+  if (recipients.length > 10) throw new Error("sendMulti supports a maximum of 10 recipients");
+
+  const results: Array<{ recipient: string; status: "sent" | "failed"; error?: string }> = [];
+
+  // Sequential sends — DO NOT parallelize (respects token-bucket rate limiter)
+  for (const recipient of recipients) {
+    try {
+      const resolved = await autoResolveTarget(recipient, cfg, accountId);
+      await sendWahaText({ cfg, to: resolved, text, replyToId, accountId });
+      results.push({ recipient, status: "sent" });
+    } catch (err) {
+      results.push({ recipient, status: "failed", error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  const sent = results.filter((r) => r.status === "sent").length;
+  const failed = results.filter((r) => r.status === "failed").length;
+
+  return { results, sent, failed };
 }
 
 const wahaMessageActions: ChannelMessageActionAdapter = {
