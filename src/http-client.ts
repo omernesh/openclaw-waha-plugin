@@ -93,7 +93,32 @@ export class TokenBucket {
 // ---------------------------------------------------------------------------
 
 /** Global token bucket for all WAHA API calls (20 burst, 15/sec sustained). */
-const globalBucket = new TokenBucket(20, 15);
+let globalBucket = new TokenBucket(20, 15);
+
+/** Default timeout for API calls (ms). Overridable via configureReliability(). */
+let defaultTimeoutMs = 30_000;
+
+/**
+ * Configure reliability defaults from plugin config.
+ * Call during plugin startup (channel.ts) with values from WahaAccountConfig.
+ * Re-creates the global token bucket with new capacity/rate.
+ *
+ * Added in Phase 1, Plan 03 (2026-03-11). DO NOT REMOVE.
+ */
+export function configureReliability(opts: {
+  timeoutMs?: number;
+  capacity?: number;
+  refillRate?: number;
+}): void {
+  if (opts.timeoutMs !== undefined) {
+    defaultTimeoutMs = opts.timeoutMs;
+  }
+  if (opts.capacity !== undefined || opts.refillRate !== undefined) {
+    const cap = opts.capacity ?? globalBucket["capacity"];
+    const rate = opts.refillRate ?? globalBucket["refillRate"];
+    globalBucket = new TokenBucket(cap, rate);
+  }
+}
 
 /**
  * Shared backoff timestamp. When a 429 is received, all pending calls
@@ -134,7 +159,7 @@ export interface CallWahaApiParams {
  */
 export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   const method = params.method ?? "POST";
-  const timeout = params.timeoutMs ?? 30_000;
+  const timeout = params.timeoutMs ?? defaultTimeoutMs;
   const ctx = params.context ?? {};
   const contextLabel = `${ctx.action ?? method} ${ctx.chatId ?? ""}`.trim();
 
@@ -278,4 +303,6 @@ export function warnOnError(context: string): (err: Error) => void {
  */
 export function _resetForTesting(): void {
   backoffUntil = 0;
+  defaultTimeoutMs = 30_000;
+  globalBucket = new TokenBucket(20, 15);
 }
