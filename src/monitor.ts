@@ -16,6 +16,9 @@ import { assertAllowedSession, getWahaChats, getWahaContact, getWahaContacts, ge
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
+import { startHealthCheck, getHealthState, type HealthState } from "./health.js";
+import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.js";
+import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
@@ -382,6 +385,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button class="active" onclick="switchTab('dashboard', this)" id="tab-dashboard">Dashboard</button>
     <button onclick="switchTab('settings', this)" id="tab-settings">Settings</button>
     <button onclick="switchTab('directory', this)" id="tab-directory">Directory</button>
+    <button onclick="switchTab('queue', this)" id="tab-queue">Queue</button>
     <button onclick="switchTab('docs', this)" id="tab-docs">Docs</button>
   </nav>
   <span class="badge" id="status-badge">Loading...</span>
@@ -414,8 +418,9 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="kv" id="access-kv"></div>
   </div>
   <div class="card" id="session-card">
-    <h2>Session Info</h2>
+    <h2>Session Info <span id="health-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:8px;vertical-align:middle;background:#94a3b8;" title="Loading..."></span></h2>
     <div class="kv" id="session-kv"></div>
+    <div class="kv" id="health-kv" style="margin-top:8px;border-top:1px solid #334155;padding-top:8px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
       <div id="last-refresh"></div>
       <button class="refresh-btn" onclick="loadStats()">Refresh</button>
@@ -736,6 +741,20 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 </main>
 </div>
 
+<!-- TAB: QUEUE (Phase 2, Plan 02) -->
+<div class="tab-content" id="content-queue">
+<main class="tab-pane">
+  <div class="card">
+    <h2>Inbound Queue</h2>
+    <div class="stat-row" id="queue-stats"></div>
+    <div class="kv" id="queue-kv" style="margin-top:12px;"></div>
+    <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+      <button class="refresh-btn" onclick="loadQueue()">Refresh</button>
+    </div>
+  </div>
+</main>
+</div>
+
 <!-- TAB: DOCS -->
 <div class="tab-content" id="content-docs">
 <main class="tab-pane">
@@ -904,13 +923,14 @@ function switchTab(name, btn) {
   if (name === 'dashboard') loadStats();
   if (name === 'settings') loadConfig();
   if (name === 'directory') loadDirectory();
+  if (name === 'queue') loadQueue();
   location.hash = name;
 }
 
 // Init from hash
 (function() {
   var hash = location.hash.replace('#','') || 'dashboard';
-  var valid = ['dashboard','settings','directory','docs'];
+  var valid = ['dashboard','settings','directory','docs','queue'];
   if (!valid.includes(hash)) hash = 'dashboard';
   var btn = document.getElementById('tab-' + hash);
   switchTab(hash, btn);
@@ -1016,12 +1036,53 @@ async function loadStats() {
       kvRow('session', d.session) + kvRow('baseUrl', d.baseUrl) +
       kvRow('webhookPort', d.webhookPort) + kvRow('serverTime', d.serverTime);
     document.getElementById('last-refresh').textContent = 'Last refreshed: ' + new Date().toLocaleTimeString();
+    // Load health status for session card (Phase 2, Plan 02)
+    loadHealth();
   } catch(e) {
     document.getElementById('status-badge').textContent = 'Error';
     document.getElementById('status-badge').style.background = '#ef4444';
   }
 }
 if (location.hash === '' || location.hash === '#dashboard') loadStats();
+
+// ---- Health Status (Phase 2, Plan 02) ----
+async function loadHealth() {
+  try {
+    var r = await fetch('/api/admin/health');
+    if (!r.ok) return;
+    var d = await r.json();
+    var dot = document.getElementById('health-dot');
+    var colors = { healthy: '#10b981', degraded: '#f59e0b', unhealthy: '#ef4444', unknown: '#94a3b8' };
+    dot.style.background = colors[d.status] || '#94a3b8';
+    dot.title = 'Session health: ' + d.status;
+    var hkv = document.getElementById('health-kv');
+    var healthHtml = kvRow('Health', d.status) +
+      kvRow('Consecutive Failures', d.consecutiveFailures) +
+      kvRow('Last Success', d.lastSuccessAt ? relTime(d.lastSuccessAt) : 'never') +
+      kvRow('Last Check', d.lastCheckAt ? relTime(d.lastCheckAt) : 'never');
+    hkv.innerHTML = healthHtml;
+  } catch(e) { /* silent */ }
+}
+
+// ---- Queue Stats (Phase 2, Plan 02) ----
+async function loadQueue() {
+  try {
+    var r = await fetch('/api/admin/queue');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var statsHtml = [
+      stat('DM Depth', d.dmDepth, '#0284c7'),
+      stat('Group Depth', d.groupDepth, '#7c3aed'),
+      stat('Processed', d.totalProcessed, '#10b981'),
+    ].join('');
+    document.getElementById('queue-stats').innerHTML = statsHtml;
+    var qkvHtml = kvRow('DM Overflow Drops', d.dmOverflowDrops) +
+      kvRow('Group Overflow Drops', d.groupOverflowDrops);
+    document.getElementById('queue-kv').innerHTML = qkvHtml;
+  } catch(e) {
+    document.getElementById('queue-stats').textContent = 'Failed to load queue stats';
+  }
+}
 setInterval(function() { if (document.getElementById('content-dashboard').classList.contains('active')) loadStats(); }, 30000);
 
 // ---- Settings ----
@@ -1490,6 +1551,43 @@ export function createWahaWebhookServer(opts: {
   const readBody = opts.readBody ?? readWahaWebhookBody;
   const hmacSecret = resolveWebhookHmacSecret(account);
 
+  // ── Inbound Queue (Phase 2, Plan 02) ── DO NOT REMOVE
+  // Wraps handleWahaInbound calls with bounded queue and DM priority.
+  // All webhook handler call sites enqueue instead of calling directly.
+  const inboundQueue = new InboundQueue(
+    cfg.dmQueueSize ?? 50,
+    cfg.groupQueueSize ?? 50,
+    async (queueItem: QueueItem) => {
+      await handleWahaInbound({
+        message: queueItem.message,
+        rawPayload: queueItem.rawPayload,
+        account: queueItem.account,
+        config: queueItem.config,
+        runtime: queueItem.runtime,
+        statusSink: queueItem.statusSink,
+      });
+    },
+  );
+
+  // ── Health Check (Phase 2, Plan 02) ── DO NOT REMOVE
+  // Start health check loop for this session. State is stored in module-level
+  // Map and accessible via getHealthState(session).
+  let healthState: HealthState | undefined;
+  if (opts.abortSignal) {
+    const baseUrl = cfg.baseUrl ?? "http://127.0.0.1:3004";
+    const apiKey = typeof cfg.apiKey === "string" ? cfg.apiKey : "";
+    const session = cfg.session ?? "";
+    if (session) {
+      healthState = startHealthCheck({
+        baseUrl,
+        apiKey,
+        session,
+        intervalMs: cfg.healthCheckIntervalMs ?? 60_000,
+        abortSignal: opts.abortSignal,
+      });
+    }
+  }
+
   const server = createServer(async (req, res) => {
     if (req.url === HEALTH_PATH) {
       res.writeHead(200, { "Content-Type": "text/plain" });
@@ -1502,6 +1600,26 @@ export function createWahaWebhookServer(opts: {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
       setTimeout(() => process.exit(0), 500); // systemd auto-restarts
+      return;
+    }
+
+    // GET /api/admin/health -- session health status (Phase 2, Plan 02)
+    if (req.url === "/api/admin/health" && req.method === "GET") {
+      const session = cfg.session ?? "";
+      const state = healthState ?? getHealthState(session);
+      writeJsonResponse(res, 200, {
+        session,
+        status: state?.status ?? "unknown",
+        consecutiveFailures: state?.consecutiveFailures ?? 0,
+        lastSuccessAt: state?.lastSuccessAt ?? null,
+        lastCheckAt: state?.lastCheckAt ?? null,
+      });
+      return;
+    }
+
+    // GET /api/admin/queue -- inbound queue stats (Phase 2, Plan 02)
+    if (req.url === "/api/admin/queue" && req.method === "GET") {
+      writeJsonResponse(res, 200, inboundQueue.getStats() as unknown as Record<string, unknown>);
       return;
     }
 
@@ -2130,20 +2248,17 @@ export function createWahaWebhookServer(opts: {
         writeJsonResponse(res, 200, { status: "duplicate" });
         return;
       }
-      try {
-        await handleWahaInbound({
-          message,
-          rawPayload: payload.payload,
-          account,
-          config: opts.config,
-          runtime,
-          statusSink: opts.statusSink,
-        });
-        writeJsonResponse(res, 200, { status: "ok" });
-      } catch (err) {
-        console.error(`[waha] handleWahaInbound failed: ${String(err)}`);
-        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
-      }
+      // Enqueue instead of direct call -- bounded queue with DM priority (Phase 2, Plan 02)
+      // ALWAYS return 200 after enqueue. Never return 500 on queue full -- WAHA retries cause flood.
+      inboundQueue.enqueue({
+        message,
+        rawPayload: payload.payload,
+        account,
+        config: opts.config,
+        runtime,
+        statusSink: opts.statusSink,
+      }, isWhatsAppGroupJid(message.chatId));
+      writeJsonResponse(res, 200, { status: "queued" });
       return;
     }
 
@@ -2181,20 +2296,16 @@ export function createWahaWebhookServer(opts: {
           participant: vote.participant as string | undefined,
         };
         if (!syntheticMessage.fromMe && syntheticMessage.chatId) {
-          try {
-            await handleWahaInbound({
-              message: syntheticMessage,
-              rawPayload: voteData,
-              account,
-              config: opts.config,
-              runtime,
-              statusSink: opts.statusSink,
-            });
-            writeJsonResponse(res, 200, { status: "ok" });
-          } catch (err) {
-            console.error(`[waha] poll.vote handleWahaInbound failed: ${String(err)}`);
-            writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
-          }
+          // Enqueue poll vote -- always return 200 (Phase 2, Plan 02)
+          inboundQueue.enqueue({
+            message: syntheticMessage,
+            rawPayload: voteData,
+            account,
+            config: opts.config,
+            runtime,
+            statusSink: opts.statusSink,
+          }, isWhatsAppGroupJid(syntheticMessage.chatId));
+          writeJsonResponse(res, 200, { status: "queued" });
           return;
         }
       }
@@ -2221,20 +2332,16 @@ export function createWahaWebhookServer(opts: {
           participant: rsvpData.participant as string | undefined,
         };
         if (!syntheticMessage.fromMe && syntheticMessage.chatId) {
-          try {
-            await handleWahaInbound({
-              message: syntheticMessage,
-              rawPayload: rsvpData,
-              account,
-              config: opts.config,
-              runtime,
-              statusSink: opts.statusSink,
-            });
-            writeJsonResponse(res, 200, { status: "ok" });
-          } catch (err) {
-            console.error(`[waha] event.response handleWahaInbound failed: ${String(err)}`);
-            writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
-          }
+          // Enqueue event RSVP -- always return 200 (Phase 2, Plan 02)
+          inboundQueue.enqueue({
+            message: syntheticMessage,
+            rawPayload: rsvpData,
+            account,
+            config: opts.config,
+            runtime,
+            statusSink: opts.statusSink,
+          }, isWhatsAppGroupJid(syntheticMessage.chatId));
+          writeJsonResponse(res, 200, { status: "queued" });
           return;
         }
       }
