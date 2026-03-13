@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import { extname, basename } from "path";
 import { LRUCache } from "lru-cache";
 import { detectMime, sendMediaWithLeadingCaption, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
-import { resolveWahaAccount } from "./accounts.js";
+import { listEnabledWahaAccounts, resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
 import { callWahaApi, warnOnError } from "./http-client.js";
 import type { CoreConfig } from "./types.js";
@@ -15,28 +15,25 @@ const RESOLVE_FETCH_DELAY_MS = 200;
 const URL_REGEX = /https?:\/\/\S+/i;
 
 // ╔══════════════════════════════════════════════════════════════════════╗
-// ║  SESSION GUARDRAIL — DO NOT REMOVE                                   ║
+// ║  assertCanSend — Role-based send guardrail (Phase 4, Plan 01)       ║
 // ║                                                                      ║
-// ║  This blocks the "omer" session from sending messages.               ║
-// ║  Only "logan" (or *_logan) sessions are allowed to send.             ║
-// ║  Without this, the bot could send messages AS Omer — dangerous.      ║
+// ║  Replaces old assertAllowedSession which hardcoded session names.   ║
+// ║  Now reads role/subRole from config. Listener sessions CANNOT send. ║
+// ║  Default: bot/full-access (backward compatible with no-role configs)║
 // ║                                                                      ║
-// ║  The guardrail was accidentally removed in an earlier version,       ║
-// ║  then a different hardcoded restriction was added that blocked ALL    ║
-// ║  sessions except logan. Fixed in v1.9.0 to allow any non-omer.       ║
-// ║                                                                      ║
-// ║  If you need to test with omer session, temporarily comment out      ║
-// ║  the throw — but NEVER deploy without this guardrail.                ║
+// ║  History: v1.8.x had no guardrail, v1.9.0 hardcoded omer block,    ║
+// ║  Phase 4 replaced with config-driven role check.                    ║
+// ║  DO NOT REMOVE — prevents listener sessions from sending messages.  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
-export function assertAllowedSession(session: string) {
-  const normalized = session.trim();
-  // Block "omer" and any prefixed variant like "3cf11776_omer"
-  if (normalized === "omer" || normalized.endsWith("_omer")) {
-    throw new Error(`WAHA session '${normalized}' is explicitly blocked by guardrail`);
-  }
-  // Allow "logan" and any prefixed variant like "3cf11776_logan"
-  if (normalized !== "logan" && !normalized.endsWith("_logan")) {
-    throw new Error(`WAHA session '${normalized}' is not allowed (only 'logan' or '*_logan')`);
+export function assertCanSend(session: string, cfg: CoreConfig): void {
+  const accounts = listEnabledWahaAccounts(cfg);
+  const match = accounts.find(a => a.session === session);
+  const subRole = match?.subRole ?? "full-access";
+  if (subRole === "listener") {
+    throw new Error(
+      `Session '${session}' has sub-role 'listener' and cannot send messages. ` +
+      `Change sub-role to 'full-access' in config to enable sending.`
+    );
   }
 }
 
@@ -62,7 +59,7 @@ function resolveSessionPath(template: string, cfg: CoreConfig, accountId?: strin
 function resolveAccountParams(cfg: CoreConfig, accountId?: string) {
   const account = resolveWahaAccount({ cfg, accountId: accountId ?? DEFAULT_ACCOUNT_ID });
   const session = account.session ?? "default";
-  assertAllowedSession(session);
+  assertCanSend(session, cfg);
   return {
     baseUrl: account.baseUrl ?? "",
     apiKey: typeof account.apiKey === "string" ? account.apiKey : "",
@@ -151,7 +148,7 @@ export async function sendWahaPresence(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   // Let callers handle errors — they already use .catch(warnOnError(...))
   return callWahaApi({
     baseUrl: account.baseUrl,
@@ -173,7 +170,7 @@ export async function sendWahaSeen(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   return callWahaApi({
     baseUrl: account.baseUrl,
     apiKey: account.apiKey,
@@ -193,7 +190,7 @@ export async function sendWahaText(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendText requires chatId");
 
@@ -247,7 +244,7 @@ async function sendWahaMedia(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendMedia requires chatId");
 
@@ -404,7 +401,7 @@ export async function sendWahaImage(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendImage requires chatId");
   const filePayload = buildFilePayload(params.file);
@@ -431,7 +428,7 @@ export async function sendWahaVideo(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendVideo requires chatId");
   const filePayload = buildFilePayload(params.file);
@@ -459,7 +456,7 @@ export async function sendWahaFile(params: {
   accountId?: string;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendFile requires chatId");
   const filePayload = buildFilePayload(params.file);
@@ -488,7 +485,7 @@ export async function sendWahaReaction(params: {
   remove?: boolean;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
-  assertAllowedSession(account.session);
+  assertCanSend(account.session, params.cfg);
 
   const reaction = params.remove ? "" : params.emoji;
   if (!params.messageId) {

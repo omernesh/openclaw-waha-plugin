@@ -12,7 +12,8 @@ import {
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb } from "./directory.js";
-import { assertAllowedSession, getWahaChats, getWahaContact, getWahaContacts, getWahaGroups, getWahaGroupParticipants, getWahaNewsletter, getWahaAllLids, toArr } from "./send.js";
+import { getWahaChats, getWahaContact, getWahaContacts, getWahaGroups, getWahaGroupParticipants, getWahaNewsletter, getWahaAllLids, toArr } from "./send.js";
+import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
@@ -128,6 +129,15 @@ function parseWebhookPayload(body: string): WahaWebhookEnvelope | null {
     console.warn(`[waha] JSON parse error: ${String(err)}, body preview: ${body.slice(0, 200)}`);
     return null;
   }
+}
+
+// Phase 4, Plan 01: replaces assertAllowedSession for webhook session validation.
+// Accepts messages from ANY session registered in config (not just logan).
+// Returns false for sessions NOT in config — those are silently ignored.
+// DO NOT REMOVE — prevents unregistered sessions from being processed.
+function isRegisteredSession(session: string, cfg: CoreConfig): boolean {
+  const accounts = listEnabledWahaAccounts(cfg);
+  return accounts.some(a => a.session === session);
 }
 
 function normalizeTimestamp(timestamp: number): number {
@@ -2234,10 +2244,8 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
-    try {
-      assertAllowedSession(payload.session);
-    } catch (err) {
-      writeJsonResponse(res, 200, { status: "ignored", reason: String(err) });
+    if (!isRegisteredSession(payload.session, opts.config)) {
+      writeJsonResponse(res, 200, { status: "ignored", reason: `Session '${payload.session}' not registered in config` });
       return;
     }
 

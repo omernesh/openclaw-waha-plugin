@@ -11,7 +11,18 @@ vi.mock("../src/accounts.js", () => ({
     baseUrl: "http://localhost:3004",
     apiKey: "test-key",
     session: "3cf11776_logan",
+    role: "bot",
+    subRole: "full-access",
   }),
+  listEnabledWahaAccounts: vi.fn().mockReturnValue([{
+    accountId: "default",
+    enabled: true,
+    baseUrl: "http://localhost:3004",
+    apiKey: "test-key",
+    session: "3cf11776_logan",
+    role: "bot",
+    subRole: "full-access",
+  }]),
 }));
 
 vi.mock("../src/normalize.js", () => ({
