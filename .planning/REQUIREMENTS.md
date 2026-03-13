@@ -44,10 +44,10 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [x] **MSESS-01**: Session registry in plugin config — each session has name, sessionId, role (bot/human), sub-role (full-access/listener)
 - [x] **MSESS-02**: Roles are extensible — new role types can be added without code changes
 - [x] **MSESS-03**: Listener sub-role blocks all outgoing message sends
-- [ ] **MSESS-04**: Admin panel tab to manage sessions — assign roles/sub-roles, view connection status
-- [ ] **MSESS-05**: Configurable trigger word (e.g., `!sammie`) — when detected in any chat, strip prefix and route text as bot prompt
-- [ ] **MSESS-06**: Trigger word matching is case-insensitive
-- [ ] **MSESS-07**: Bot responds to trigger-word prompts via DM to the requesting user by default
+- [x] **MSESS-04**: Admin panel tab to manage sessions — assign roles/sub-roles, view connection status
+- [x] **MSESS-05**: Configurable trigger word (e.g., `!sammie`) — when detected in any chat, strip prefix and route text as bot prompt
+- [x] **MSESS-06**: Trigger word matching is case-insensitive
+- [x] **MSESS-07**: Bot responds to trigger-word prompts via DM to the requesting user by default
 - [ ] **MSESS-08**: If user requests group delivery and bot is a member, bot sends from its own session
 - [ ] **MSESS-09**: If bot is not a member of the target group, send via user's session (respecting role/sub-role permissions)
 - [ ] **MSESS-10**: Bot can read recent messages from chats it monitors (via listener sessions) to fulfill context prompts
@@ -122,10 +122,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | MSESS-01 | Phase 4 | Complete |
 | MSESS-02 | Phase 4 | Complete |
 | MSESS-03 | Phase 4 | Complete |
-| MSESS-04 | Phase 4 | Pending |
-| MSESS-05 | Phase 4 | Pending |
-| MSESS-06 | Phase 4 | Pending |
-| MSESS-07 | Phase 4 | Pending |
+| MSESS-04 | Phase 4 | Complete |
+| MSESS-05 | Phase 4 | Complete |
+| MSESS-06 | Phase 4 | Complete |
+| MSESS-07 | Phase 4 | Complete |
 | MSESS-08 | Phase 4 | Pending |
 | MSESS-09 | Phase 4 | Pending |
 | MSESS-10 | Phase 4 | Pending |
