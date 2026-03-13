@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 04-multi-session 04-01-PLAN.md
-last_updated: "2026-03-13T20:59:39.553Z"
+stopped_at: Completed 04-multi-session 04-04-PLAN.md
+last_updated: "2026-03-13T21:06:04.033Z"
 last_activity: 2026-03-11 -- Phase 03→04 transition
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 ---
@@ -67,6 +67,7 @@ Progress: [████████████████████] 8/8 pla
 
 *Updated after each plan completion*
 | Phase 04-multi-session P04-01 | 10 | 2 tasks | 7 files |
+| Phase 04-multi-session P04 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Recent decisions affecting current work:
 - [Phase 04-multi-session]: String-based roles (not enum) — new roles addable without code changes
 - [Phase 04-multi-session]: assertCanSend defaults to full-access for unregistered sessions (backward compatible)
 - [Phase 04-multi-session]: isRegisteredSession replaces assertAllowedSession in webhook handler — accepts all config sessions
+- [Phase 04-multi-session]: Sessions tab is read-only — role changes via Config tab or config API, not inline editing
+- [Phase 04-multi-session]: Sessions endpoint enriched: merges config role/subRole with live health state and WAHA status per session
 
 ### Pending Todos
 
@@ -107,6 +110,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T20:59:39.548Z
-Stopped at: Completed 04-multi-session 04-01-PLAN.md
+Last session: 2026-03-13T21:06:04.022Z
+Stopped at: Completed 04-multi-session 04-04-PLAN.md
 Resume file: None
