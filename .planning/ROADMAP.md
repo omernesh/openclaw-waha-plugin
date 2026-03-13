@@ -113,3 +113,13 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 | 3. Feature Gaps | 3/3 | Complete   | 2026-03-11 |
 | 4. Multi-Session | 4/4 | Complete   | 2026-03-13 |
 | 5. Documentation and Testing | 2/2 | Complete   | 2026-03-13 |
+
+### Phase 6: WhatsApp Rules and Policy System
+
+**Goal:** Lazy-loaded, file-based rules system with hierarchical contact/group policies, sparse overrides, compact resolved-policy injection per event, participant allowlists, and manager authorization — without increasing startup context load
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 6 to break down)

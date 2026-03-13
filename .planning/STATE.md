@@ -109,6 +109,10 @@ Recent decisions affecting current work:
 - [Phase 05-documentation-and-testing]: README troubleshooting section structured as named issues with symptom/cause/fix for scannability
 - [Phase 05-01]: Wrote tests matching actual implementation behavior — toArr returns [] for primitives not [val], resolveChatId returns empty string not throws
 
+### Roadmap Evolution
+
+- Phase 6 added: WhatsApp Rules and Policy System
+
 ### Pending Todos
 
 None.
