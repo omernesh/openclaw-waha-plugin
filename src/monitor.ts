@@ -1953,12 +1953,12 @@ export function createWahaWebhookServer(opts: {
               if (sessionName) wahaSessionMap[sessionName] = sessionStatus;
             }
           }
-        } catch {
-          // WAHA unavailable — continue with config-only data
+        } catch (err) {
+          console.warn(`[waha] Failed to fetch WAHA sessions: ${err}`);
         }
 
         // Build enriched session list from config accounts
-        const configAccounts = listEnabledWahaAccounts(cfg);
+        const configAccounts = listEnabledWahaAccounts(opts.config);
         const enriched = configAccounts.map((acc) => {
           const health = getHealthState(acc.session);
           return {

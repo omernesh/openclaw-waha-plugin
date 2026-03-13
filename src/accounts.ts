@@ -99,8 +99,8 @@ function resolveWahaApiKey(cfg: CoreConfig, opts: { accountId?: string }): {
       if (fileKey) {
         return { apiKey: fileKey, source: "secretFile" };
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn(`[waha] apiKeyFile "${merged.apiKeyFile}" unreadable: ${err}, falling back to inline apiKey`);
     }
   }
 
@@ -205,7 +205,10 @@ export async function resolveSessionForTarget(params: {
       isMember = await params.checkMembership(
         account.session, account.baseUrl, account.apiKey, params.targetChatId
       );
-      membershipCache.set(cacheKey, isMember);
+      // Only cache positive results — false results should be re-checked on next request
+      if (isMember) {
+        membershipCache.set(cacheKey, true);
+      }
     }
     if (isMember) return account;
   }

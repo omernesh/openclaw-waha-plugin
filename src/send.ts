@@ -28,6 +28,9 @@ const URL_REGEX = /https?:\/\/\S+/i;
 export function assertCanSend(session: string, cfg: CoreConfig): void {
   const accounts = listEnabledWahaAccounts(cfg);
   const match = accounts.find(a => a.session === session);
+  if (!match) {
+    console.warn(`[waha] assertCanSend: session "${session}" not found in config, defaulting to full-access`);
+  }
   const subRole = match?.subRole ?? "full-access";
   if (subRole === "listener") {
     throw new Error(

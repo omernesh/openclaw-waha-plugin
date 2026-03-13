@@ -30,9 +30,9 @@ import { extractMentionedJids } from "./mentions.js";
 export { extractMentionedJids } from "./mentions.js";
 import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
 // Phase 4 Plan 02: Trigger word detection — pure functions extracted to trigger-word.ts for testability.
-// Re-exported here so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
-export { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
+// Imported for local use and re-exported so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
 import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
+export { detectTriggerWord, resolveTriggerTarget };
 
 const CHANNEL_ID = "waha" as const;
 
@@ -481,7 +481,7 @@ export async function handleWahaInbound(params: {
     (rawPayload as Record<string, unknown> | undefined)?.pushName as string | undefined
     ?? ((rawPayload as Record<string, unknown> | undefined)?._data as Record<string, unknown> | undefined)?.notifyName as string | undefined
     ?? (rawPayload as Record<string, unknown> | undefined)?.from_name as string | undefined
-    ?? undefined;
+    ;
 
   // Track contact in directory (fire-and-forget, errors non-fatal)
   try {

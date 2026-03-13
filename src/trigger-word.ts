@@ -8,7 +8,7 @@ export function detectTriggerWord(
   text: string,
   triggerWord: string | undefined
 ): { triggered: boolean; strippedText: string } {
-  if (!triggerWord) return { triggered: false, strippedText: text };
+  if (!triggerWord?.trim()) return { triggered: false, strippedText: text };
   const trimmed = text.trimStart();
   const lower = trimmed.toLowerCase();
   const trigger = triggerWord.toLowerCase();

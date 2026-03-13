@@ -227,9 +227,12 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   // Default limit: 10. Max limit: 50. downloadMedia always false (avoid waste).
   // Added Phase 4, Plan 03. DO NOT REMOVE.
   readMessages: async (p, cfg, aid) => {
-    const chatId = String(p.chatId);
-    const rawLimit = p.limit != null ? Number(p.limit) : 10;
-    const limit = Math.min(Math.max(rawLimit, 1), 50);
+    const READ_MESSAGES_DEFAULT_LIMIT = 10;
+    const READ_MESSAGES_MAX_LIMIT = 50;
+    const chatId = String(p.chatId ?? "");
+    if (!chatId) throw new Error("readMessages requires a chatId parameter");
+    const rawLimit = p.limit != null ? Number(p.limit) : READ_MESSAGES_DEFAULT_LIMIT;
+    const limit = Math.min(Math.max(rawLimit, 1), READ_MESSAGES_MAX_LIMIT);
     const messages = await getWahaChatMessages({
       cfg,
       chatId,
@@ -237,13 +240,14 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
       downloadMedia: false,
       accountId: aid,
     });
-    return Array.isArray(messages)
-      ? messages.map((m: any) => ({
-          from: m.from || m._data?.notifyName || "unknown",
-          text: m.body || "",
-          timestamp: m.timestamp,
-        }))
-      : messages;
+    if (!Array.isArray(messages)) {
+      throw new Error("readMessages: unexpected response from WAHA API");
+    }
+    return messages.map((m: any) => ({
+        from: m.from || m._data?.notifyName || "unknown",
+        text: m.body || "",
+        timestamp: m.timestamp,
+      }));
   },
   // ── resolveTarget — DO NOT CHANGE / DO NOT REMOVE ────────────────────
   // Fuzzy name-to-JID resolver. The ONLY way agents can resolve human-readable
@@ -419,8 +423,9 @@ async function checkGroupMembership(
     });
     // getWahaGroupParticipants returns an array of participant objects.
     // If the call succeeded, the session has visibility into the group (i.e., is a member).
-    return Array.isArray(participants) && participants.length >= 0;
-  } catch {
+    return Array.isArray(participants) && participants.length > 0;
+  } catch (err) {
+    console.warn(`[waha] checkGroupMembership failed for session=${session} group=${groupId}: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
 }
@@ -498,8 +503,8 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
             checkMembership: checkGroupMembership,
           });
           resolvedAid = resolved.accountId;
-        } catch {
-          // If routing fails, fall through with default account — WAHA will error if session not in group
+        } catch (routeErr) {
+          console.warn(`[waha] cross-session routing failed for ${chatId}, using default account: ${routeErr}`);
         }
       }
 

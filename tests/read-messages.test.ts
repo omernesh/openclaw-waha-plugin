@@ -238,16 +238,6 @@ function makeCfg(): CoreConfig {
   } as unknown as CoreConfig;
 }
 
-type RawMessage = { from?: string; body?: string; timestamp?: number; _data?: { notifyName?: string } };
-
-function makeRawMessages(count: number): RawMessage[] {
-  return Array.from({ length: count }, (_, i) => ({
-    from: `user${i}@c.us`,
-    body: `Message ${i}`,
-    timestamp: 1000000 + i,
-  }));
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
