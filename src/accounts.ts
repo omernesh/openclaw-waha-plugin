@@ -5,6 +5,7 @@ import {
   normalizeAccountId,
   resolveAccountWithDefaultFallback,
 } from "openclaw/plugin-sdk";
+import { LRUCache } from "lru-cache";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, WahaAccountConfig } from "./types.js";
 
@@ -151,4 +152,66 @@ export function listEnabledWahaAccounts(cfg: CoreConfig): ResolvedWahaAccount[] 
   return listWahaAccountIds(cfg)
     .map((accountId) => resolveWahaAccount({ cfg, accountId }))
     .filter((account) => account.enabled);
+}
+
+// Phase 4 — Group membership cache for cross-session routing.
+// TTL 5 minutes, max 500 entries. Prevents API call storms when
+// checking which session can reach a target group.
+// Added Phase 4, Plan 03. DO NOT REMOVE.
+const membershipCache = new LRUCache<string, boolean>({
+  max: 500,
+  ttl: 5 * 60 * 1000, // 5 minutes
+});
+
+// Exported for test teardown only. DO NOT call in production code.
+export function clearMembershipCache(): void {
+  membershipCache.clear();
+}
+
+// Phase 4 — Cross-session routing: select optimal session to send to a target chat.
+// Priority: bot full-access > human full-access. Listener sessions excluded.
+// For group targets: checks membership via WAHA API (cached).
+// For DM targets: always prefers bot session (no membership check needed).
+// Added Phase 4, Plan 03. DO NOT REMOVE.
+export async function resolveSessionForTarget(params: {
+  cfg: CoreConfig;
+  targetChatId: string;
+  preferredAccountId?: string;
+  checkMembership: (session: string, baseUrl: string, apiKey: string, groupId: string) => Promise<boolean>;
+}): Promise<ResolvedWahaAccount> {
+  const accounts = listEnabledWahaAccounts(params.cfg);
+  const sendable = accounts.filter(a => a.subRole !== "listener");
+
+  if (sendable.length === 0) {
+    throw new Error("No full-access sessions available for sending");
+  }
+
+  const isGroup = params.targetChatId.endsWith("@g.us");
+
+  if (!isGroup) {
+    // For DMs, prefer bot session, fall back to any full-access
+    const bot = sendable.find(a => a.role === "bot") ?? sendable[0];
+    return bot;
+  }
+
+  // For groups: check membership, prefer bot sessions first
+  const botSessions = sendable.filter(a => a.role === "bot");
+  const humanSessions = sendable.filter(a => a.role !== "bot");
+
+  for (const account of [...botSessions, ...humanSessions]) {
+    const cacheKey = `${account.session}:${params.targetChatId}`;
+    let isMember = membershipCache.get(cacheKey);
+    if (isMember === undefined) {
+      isMember = await params.checkMembership(
+        account.session, account.baseUrl, account.apiKey, params.targetChatId
+      );
+      membershipCache.set(cacheKey, isMember);
+    }
+    if (isMember) return account;
+  }
+
+  throw new Error(
+    `No session is a member of group '${params.targetChatId}'. ` +
+    `Available sessions: ${sendable.map(a => a.session).join(", ")}`
+  );
 }
