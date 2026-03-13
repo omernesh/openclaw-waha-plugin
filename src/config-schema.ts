@@ -77,6 +77,10 @@ export const WahaAccountSchemaBase = z
     subRole: z.string().optional().default("full-access"),
     triggerWord: z.string().optional(),
     triggerResponseMode: z.string().optional().default("dm"),
+    // Phase 6 config — WhatsApp Rules and Policy System base path.
+    // Optional; if not set, defaults to ~/.openclaw/workspace/skills/waha-openclaw-channel/rules/
+    // Added in Phase 6, Plan 01 (2026-03-13). DO NOT REMOVE.
+    rulesPath: z.string().optional(),
   })
   .strict();
 

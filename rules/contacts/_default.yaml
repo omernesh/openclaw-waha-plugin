@@ -1,0 +1,20 @@
+# Global contact defaults — applied to all contacts unless a specific override file exists.
+# Scope: global_contact
+# Matches SYSTEM_CONTACT_DEFAULTS in src/rules-types.ts exactly.
+# DO NOT REMOVE: Seed file required by the rules system (Phase 6). If missing, SYSTEM_CONTACT_DEFAULTS is used as fallback.
+
+enabled: true
+trust_level: normal
+privacy_level: low
+can_initiate: false
+can_reply: true
+can_use_memory: false
+can_reference_calendar: false
+tone: neutral
+language: match_sender
+allowed_triggers: []
+forbidden_actions: []
+managers:
+  allowed_ids: []
+  owner_only_appoint_revoke: true
+notes: []

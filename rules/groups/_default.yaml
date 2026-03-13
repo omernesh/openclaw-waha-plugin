@@ -1,0 +1,25 @@
+# Global group defaults — applied to all groups unless a specific override file exists.
+# Scope: global_group
+# Matches SYSTEM_GROUP_DEFAULTS in src/rules-types.ts exactly.
+# DO NOT REMOVE: Seed file required by the rules system (Phase 6). If missing, SYSTEM_GROUP_DEFAULTS is used as fallback.
+
+enabled: true
+group_type: other
+participation_mode: mention_only
+proactive_allowed: false
+who_can_trigger_me: none
+participants_allowlist:
+  mode: none
+  ids: []
+  aliases: []
+unknown_participant_policy: fallback_to_global_contact
+privacy_level: low
+tone: neutral
+language_policy: match_room
+allowed_topics: []
+forbidden_topics: []
+contact_rule_mode: restricted
+managers:
+  allowed_ids: []
+  owner_only_appoint_revoke: true
+notes: []
