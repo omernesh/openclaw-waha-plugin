@@ -94,12 +94,11 @@ Plans:
   2. Unit tests pass for fuzzyScore, toArr, resolveChatId, autoResolveTarget, LRU cache, and token bucket -- covering happy paths and edge cases
   3. Integration tests exercise action handlers (send, poll, edit, search) against a mock WAHA API and verify correct HTTP calls and error handling
   4. README contains installation steps, configuration reference, deployment instructions (both hpg6 locations), and troubleshooting guide
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md -- Unit tests for fuzzyScore, toArr, resolveChatId, autoResolveTarget + integration tests for send, poll, edit, search handlers
+- [ ] 05-02-PLAN.md -- SKILL.md refresh (error scenarios, rate limits, multi-session) + README.md update (config, deploy, troubleshooting)
 
 ## Progress
 
@@ -113,4 +112,4 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 | 2. Resilience and Observability | 2/2 | Complete   | 2026-03-11 |
 | 3. Feature Gaps | 3/3 | Complete   | 2026-03-11 |
 | 4. Multi-Session | 4/4 | Complete   | 2026-03-13 |
-| 5. Documentation and Testing | 0/3 | Not started | - |
+| 5. Documentation and Testing | 0/2 | Not started | - |
