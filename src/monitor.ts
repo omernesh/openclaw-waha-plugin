@@ -402,6 +402,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button onclick="switchTab('settings', this)" id="tab-settings">Settings</button>
     <button onclick="switchTab('directory', this)" id="tab-directory">Directory</button>
     <button onclick="switchTab('queue', this)" id="tab-queue">Queue</button>
+    <button onclick="switchTab('sessions', this)" id="tab-sessions">Sessions</button>
     <button onclick="switchTab('docs', this)" id="tab-docs">Docs</button>
   </nav>
   <span class="badge" id="status-badge">Loading...</span>
@@ -771,6 +772,22 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 </main>
 </div>
 
+<!-- TAB: SESSIONS (Phase 4, Plan 04) -->
+<div class="tab-content" id="content-sessions">
+<main class="tab-pane">
+  <div class="card">
+    <h2>Registered Sessions</h2>
+    <div id="sessions-list" style="display:grid;gap:12px;margin-top:4px;"></div>
+    <p style="margin-top:16px;font-size:0.78rem;color:#64748b;border-top:1px solid #334155;padding-top:12px;">
+      Roles are configured via the Config tab or config API. This view is read-only.
+    </p>
+    <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+      <button class="refresh-btn" onclick="loadSessions()">Refresh</button>
+    </div>
+  </div>
+</main>
+</div>
+
 <!-- TAB: DOCS -->
 <div class="tab-content" id="content-docs">
 <main class="tab-pane">
@@ -940,13 +957,14 @@ function switchTab(name, btn) {
   if (name === 'settings') loadConfig();
   if (name === 'directory') loadDirectory();
   if (name === 'queue') loadQueue();
+  if (name === 'sessions') loadSessions();
   location.hash = name;
 }
 
 // Init from hash
 (function() {
   var hash = location.hash.replace('#','') || 'dashboard';
-  var valid = ['dashboard','settings','directory','docs','queue'];
+  var valid = ['dashboard','settings','directory','docs','queue','sessions'];
   if (!valid.includes(hash)) hash = 'dashboard';
   var btn = document.getElementById('tab-' + hash);
   switchTab(hash, btn);
@@ -1104,6 +1122,73 @@ async function loadQueue() {
 }
 setInterval(function() { if (document.getElementById('content-dashboard').classList.contains('active')) loadStats(); }, 30000);
 
+// ---- Sessions Tab (Phase 4, Plan 04) ----
+async function loadSessions() {
+  var container = document.getElementById('sessions-list');
+  if (!container) return;
+  container.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Loading...</div>';
+  try {
+    var r = await fetch('/api/admin/sessions');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var sessions = await r.json();
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      container.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">No sessions configured.</div>';
+      return;
+    }
+    var roleBadgeColor = function(role) {
+      if (role === 'bot') return '#1d4ed8';
+      if (role === 'human') return '#059669';
+      return '#64748b';
+    };
+    var subRoleBadgeColor = function(subRole) {
+      if (subRole === 'full-access') return '#059669';
+      if (subRole === 'listener') return '#d97706';
+      return '#64748b';
+    };
+    var healthDotColor = function(healthy, healthStatus) {
+      if (healthy === null) return '#94a3b8'; // unknown
+      if (healthStatus === 'healthy') return '#10b981';
+      if (healthStatus === 'degraded') return '#f59e0b';
+      return '#ef4444'; // unhealthy
+    };
+    var html = sessions.map(function(s) {
+      var displayName = esc(s.name || s.sessionId);
+      var sessionId = esc(s.sessionId || '');
+      var role = esc(s.role || 'unknown');
+      var subRole = esc(s.subRole || 'unknown');
+      var dotColor = healthDotColor(s.healthy, s.healthStatus);
+      var dotTitle = 'Health: ' + esc(s.healthStatus || 'unknown');
+      var lastCheckStr = s.lastCheck ? relTime(s.lastCheck) : 'never';
+      var wahaStatus = esc(s.wahaStatus || 'UNKNOWN');
+      return '<div class="contact-card" style="background:#0f172a;">' +
+        '<div class="contact-header" style="cursor:default;">' +
+          '<div class="avatar" style="background:' + roleBadgeColor(s.role) + ';font-size:0.85rem;">' + esc((s.name || s.sessionId || '?').substring(0, 2).toUpperCase()) + '</div>' +
+          '<div class="contact-info">' +
+            '<div class="contact-name">' + displayName + '</div>' +
+            '<div class="contact-jid">' + sessionId + '</div>' +
+          '</div>' +
+          '<div class="contact-meta">' +
+            '<span style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">' + role + '</span>' +
+            '<span style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;margin-left:4px;">' + subRole + '</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:0.78rem;color:#94a3b8;" title="' + dotTitle + '">' +
+              '<span style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;display:inline-block;"></span>' +
+              esc(s.healthStatus || 'unknown') +
+            '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:8px 16px 12px;border-top:1px solid #334155;font-size:0.78rem;display:grid;grid-template-columns:130px 1fr;gap:4px 12px;background:#1a2540;">' +
+          '<span style="color:#64748b;">WAHA Status</span><span style="font-family:monospace;color:#e2e8f0;">' + wahaStatus + '</span>' +
+          '<span style="color:#64748b;">Failures</span><span style="color:#e2e8f0;">' + esc(String(s.consecutiveFailures ?? 0)) + '</span>' +
+          '<span style="color:#64748b;">Last Check</span><span style="color:#e2e8f0;">' + esc(lastCheckStr) + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div style="color:#ef4444;font-size:0.85rem;">Failed to load sessions: ' + esc(e.message || String(e)) + '</div>';
+  }
+}
+
 // ---- Settings ----
 async function loadConfig() {
   try {
@@ -1125,8 +1210,11 @@ async function loadConfig() {
           var sessions = await sr.json();
           var currentSession = w.session || '';
           sel.innerHTML = sessions.map(function(s) {
-            var name = typeof s === 'string' ? s : (s.name || s.id || JSON.stringify(s));
-            return '<option value="' + esc(name) + '"' + (name === currentSession ? ' selected' : '') + '>' + esc(name) + '</option>';
+            // Phase 4, Plan 04: sessions endpoint now returns enriched objects with sessionId + name.
+            // Use sessionId as value (matches config w.session), show name as label.
+            var sessionId = typeof s === 'string' ? s : (s.sessionId || s.name || s.id || JSON.stringify(s));
+            var label = typeof s === 'string' ? s : (s.name || s.sessionId || s.id || sessionId);
+            return '<option value="' + esc(sessionId) + '"' + (sessionId === currentSession ? ' selected' : '') + '>' + esc(label) + '</option>';
           }).join('') || '<option value="' + esc(currentSession) + '" selected>' + esc(currentSession || 'unknown') + '</option>';
         }
       } catch(e) {
@@ -1844,22 +1932,52 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
-    // GET /api/admin/sessions — proxy to WAHA sessions API
+    // GET /api/admin/sessions — enhanced: merges WAHA session status + config role/subRole + health state
+    // Phase 4, Plan 04. DO NOT revert to bare WAHA proxy — admin Sessions tab depends on this format.
     if (req.url === "/api/admin/sessions" && req.method === "GET") {
       try {
         const baseUrl = account.config.baseUrl ?? "";
         const apiKey = account.apiKey;
-        const response = await fetch(`${baseUrl}/api/sessions/`, {
-          headers: { "x-api-key": apiKey },
+
+        // Fetch raw WAHA session list (array of session objects with .name/.status)
+        let wahaSessionMap: Record<string, string> = {};
+        try {
+          const response = await fetch(`${baseUrl}/api/sessions/`, {
+            headers: { "x-api-key": apiKey },
+          });
+          if (response.ok) {
+            const raw = await response.json() as Array<Record<string, unknown>>;
+            for (const s of (Array.isArray(raw) ? raw : [])) {
+              const sessionName = typeof s.name === "string" ? s.name : "";
+              const sessionStatus = typeof s.status === "string" ? s.status : "UNKNOWN";
+              if (sessionName) wahaSessionMap[sessionName] = sessionStatus;
+            }
+          }
+        } catch {
+          // WAHA unavailable — continue with config-only data
+        }
+
+        // Build enriched session list from config accounts
+        const configAccounts = listEnabledWahaAccounts(cfg);
+        const enriched = configAccounts.map((acc) => {
+          const health = getHealthState(acc.session);
+          return {
+            sessionId: acc.session,
+            name: acc.name ?? acc.session,
+            role: acc.role,
+            subRole: acc.subRole,
+            healthy: health ? health.status === "healthy" : null,
+            healthStatus: health?.status ?? "unknown",
+            consecutiveFailures: health?.consecutiveFailures ?? 0,
+            lastCheck: health?.lastCheckAt ?? null,
+            wahaStatus: wahaSessionMap[acc.session] ?? "UNKNOWN",
+          };
         });
-        if (!response.ok) throw new Error(`WAHA sessions API returned ${response.status}`);
-        const sessions = await response.json();
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(sessions));
+
+        writeJsonResponse(res, 200, enriched);
       } catch (err) {
         console.error(`[waha] GET /api/admin/sessions failed: ${String(err)}`);
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Failed to fetch sessions" }));
+        writeJsonResponse(res, 500, { error: "Failed to fetch sessions" });
       }
       return;
     }
