@@ -61,8 +61,8 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 
 ### Rules and Policy System
 
-- [ ] **RULES-01**: YAML file loader for _default.yaml and sparse override files with safe parse and zod validation
-- [ ] **RULES-02**: Identity normalizer: JID/LID -> @c:/@lid:/@g: stable IDs for policy resolution
+- [x] **RULES-01**: YAML file loader for _default.yaml and sparse override files with safe parse and zod validation
+- [x] **RULES-02**: Identity normalizer: JID/LID -> @c:/@lid:/@g: stable IDs for policy resolution
 - [ ] **RULES-03**: 5-layer merge engine: scalar replace, object deep merge, array replace, missing=inherit
 - [ ] **RULES-04**: Inbound DM policy resolver: load global contact default + override, merge, return compact payload
 - [ ] **RULES-05**: Inbound group policy resolver: load group default + override, evaluate contact_rule_mode and participant allowlist
@@ -72,7 +72,7 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [ ] **RULES-09**: Compact resolved-payload builder: DM and group serializers producing minimal ResolvedPolicy objects
 - [ ] **RULES-10**: ctxPayload injection: WahaResolvedPolicy field attached to inbound context before model turn
 - [ ] **RULES-11**: Policy edit command: authorized field update + YAML file write via editPolicy action
-- [ ] **RULES-12**: Seed _default.yaml files: contacts and groups global defaults with schema-compliant values
+- [x] **RULES-12**: Seed _default.yaml files: contacts and groups global defaults with schema-compliant values
 - [ ] **RULES-13**: Unit tests for merge engine, identity normalizer, payload builder, auth matrix
 - [ ] **RULES-14**: Integration tests for DM resolution, group resolution, unknown participant, outbound enforcement
 
