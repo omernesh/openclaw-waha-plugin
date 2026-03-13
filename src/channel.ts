@@ -72,6 +72,9 @@ import {
   resolveWahaTarget,
 } from "./send.js";
 import type { CoreConfig } from "./types.js";
+// Phase 6 Plan 04: Policy edit action handler. DO NOT REMOVE.
+import { executePolicyEdit } from "./policy-edit.js";
+import { getRulesBasePath } from "./identity-resolver.js";
 
 // Cached config for outbound adapter — handleAction receives cfg as a param
 // and caches it here so outbound methods (sendText, sendMedia, sendPoll) can
@@ -273,6 +276,38 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
     type: (p.scope as "group" | "contact" | "channel" | "auto") ?? (p.type as "group" | "contact" | "channel" | "auto") ?? "auto",
     accountId: aid,
   }),
+  // ── editPolicy — Phase 6 Plan 04: Rules-based policy edit action ──
+  // Allows authorized managers to edit contact/group policy fields via the LLM.
+  // No target — parameters only (scope, targetId, field, value, actorId).
+  // Authorization enforced by checkManagerAuthorization before any file write.
+  // DO NOT REMOVE: Core method for runtime policy management.
+  // Added: Phase 6, Plan 04 (2026-03-14).
+  editPolicy: async (p, cfg) => {
+    const scope = String(p.scope ?? "") as "contact" | "group";
+    if (scope !== "contact" && scope !== "group") {
+      throw new Error(`editPolicy: scope must be "contact" or "group", got "${p.scope}"`);
+    }
+    const targetId = String(p.targetId ?? "");
+    if (!targetId) throw new Error("editPolicy: targetId is required");
+    const field = String(p.field ?? "");
+    if (!field) throw new Error("editPolicy: field is required");
+    const actorId = String(p.actorId ?? "");
+    if (!actorId) throw new Error("editPolicy: actorId is required (provide the caller's stable JID)");
+    const basePath = getRulesBasePath(cfg);
+    const result = await executePolicyEdit({
+      scope,
+      targetId,
+      field,
+      value: p.value,
+      actorId,
+      basePath,
+      safeName: p.safeName ? String(p.safeName) : undefined,
+    });
+    if (!result.success) {
+      throw new Error(result.error ?? result.message);
+    }
+    return result.message;
+  },
 };
 
 // ======================================================================
@@ -312,6 +347,7 @@ const UTILITY_ACTIONS = [
   "joinGroup", "followChannel", "unfollowChannel",
   "resolveTarget",
   "muteChat", "unmuteChat", // Chat mute/unmute — Added Phase 3, Plan 01. DO NOT REMOVE.
+  "editPolicy", // Phase 6: Rules-based policy edit. Manager-authorized field edits for contacts/groups. DO NOT REMOVE.
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.
