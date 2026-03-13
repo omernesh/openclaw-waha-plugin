@@ -5,6 +5,7 @@ import { detectMime, sendMediaWithLeadingCaption, DEFAULT_ACCOUNT_ID } from "ope
 import { listEnabledWahaAccounts, resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
 import { callWahaApi, warnOnError } from "./http-client.js";
+import { assertPolicyCanSend } from "./policy-enforcer.js";
 import type { CoreConfig } from "./types.js";
 
 const HEAD_DETECT_TIMEOUT_MS = 5000;
@@ -196,6 +197,10 @@ export async function sendWahaText(params: {
   assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendText requires chatId");
+  // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
+  // Fail-open: if rules not configured or resolution fails, send proceeds normally.
+  // Only blocks on explicit policy denial (can_initiate=false or silent_observer group).
+  await assertPolicyCanSend(chatId, params.cfg);
 
   // Auto link preview: add linkPreview: true when text contains a URL and config allows.
   // Default is true (autoLinkPreview not set or true). Only skip when explicitly false.
@@ -407,6 +412,8 @@ export async function sendWahaImage(params: {
   assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendImage requires chatId");
+  // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
+  await assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
   return callWahaApi({
     baseUrl: account.baseUrl,
@@ -434,6 +441,8 @@ export async function sendWahaVideo(params: {
   assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendVideo requires chatId");
+  // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
+  await assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
   return callWahaApi({
     baseUrl: account.baseUrl,
@@ -462,6 +471,8 @@ export async function sendWahaFile(params: {
   assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendFile requires chatId");
+  // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
+  await assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
   return callWahaApi({
     baseUrl: account.baseUrl,

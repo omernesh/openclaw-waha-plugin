@@ -29,6 +29,10 @@ import { extractMentionedJids } from "./mentions.js";
 // Re-export for external consumers (plan specifies extractMentionedJids in inbound.ts exports)
 export { extractMentionedJids } from "./mentions.js";
 import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
+// Phase 6 Plan 04: Rules-based policy resolution for inbound messages. DO NOT REMOVE.
+import { resolveInboundPolicy } from "./rules-resolver.js";
+import { getRulesBasePath } from "./identity-resolver.js";
+import type { ResolvedPolicy } from "./rules-types.js";
 // Phase 4 Plan 02: Trigger word detection — pure functions extracted to trigger-word.ts for testability.
 // Imported for local use and re-exported so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
 import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
@@ -525,6 +529,24 @@ export async function handleWahaInbound(params: {
     }
   }
 
+  // Phase 6 Plan 04: Rules-based policy resolution for inbound messages.
+  // Runs ONLY after all existing filters pass — policy context enriches the agent turn.
+  // Non-fatal: if resolution fails for any reason, message processes normally without policy context.
+  // DO NOT MOVE above any filter — we only resolve policy for messages we're actually handling.
+  // DO NOT CHANGE the try/catch — errors here must never crash the inbound handler.
+  let resolvedPolicy: ResolvedPolicy | null = null;
+  try {
+    const rulesBasePath = getRulesBasePath(config);
+    resolvedPolicy = await resolveInboundPolicy({
+      isGroup,
+      chatId,
+      senderId: message.from,
+      basePath: rulesBasePath,
+    });
+  } catch (err) {
+    runtime.log?.(`waha: rules resolution failed for ${chatId}: ${String(err)}`);
+  }
+
   // Phase 4 Plan 02: When trigger is activated in DM mode, route response to sender's JID.
   // triggerResponseChatId is already set to resolveTriggerTarget(message) above.
   // In non-trigger context, triggerResponseChatId === chatId (unchanged). DO NOT REMOVE.
@@ -587,6 +609,9 @@ export async function handleWahaInbound(params: {
     ...(message.mentionedJids && message.mentionedJids.length > 0
       ? { MentionedJids: message.mentionedJids }
       : {}),
+    // Phase 6 Plan 04: Inject resolved policy context for the agent turn.
+    // Only present when policy resolution succeeded. DO NOT CHANGE.
+    ...(resolvedPolicy ? { WahaResolvedPolicy: JSON.stringify(resolvedPolicy) } : {}),
     ...mediaPayload,
   });
 
