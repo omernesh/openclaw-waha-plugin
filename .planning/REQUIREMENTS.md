@@ -54,10 +54,10 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOC-01**: SKILL.md refreshed with error scenarios, rate limit guidance, and multi-session examples
+- [x] **DOC-01**: SKILL.md refreshed with error scenarios, rate limit guidance, and multi-session examples
 - [ ] **DOC-02**: Unit tests for fuzzyScore, toArr, resolveChatId, autoResolveTarget, LRU cache, token bucket
 - [ ] **DOC-03**: Integration tests for action handlers with mock WAHA API
-- [ ] **DOC-04**: README updated with installation, configuration, deployment guide
+- [x] **DOC-04**: README updated with installation, configuration, deployment guide
 
 ## v2 Requirements
 
@@ -129,10 +129,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | MSESS-08 | Phase 4 | Complete |
 | MSESS-09 | Phase 4 | Complete |
 | MSESS-10 | Phase 4 | Complete |
-| DOC-01 | Phase 5 | Pending |
+| DOC-01 | Phase 5 | Complete |
 | DOC-02 | Phase 5 | Pending |
 | DOC-03 | Phase 5 | Pending |
-| DOC-04 | Phase 5 | Pending |
+| DOC-04 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 36 total
