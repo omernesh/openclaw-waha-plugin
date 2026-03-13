@@ -77,13 +77,13 @@ Plans:
   3. The admin panel has a Sessions tab showing all registered sessions with their roles, sub-roles, and live connection status
   4. When Sammie needs to send to a group the bot session belongs to, the message goes from the bot session; when the bot is not a member, it falls back to the user's session (respecting permissions)
   5. Sammie can read recent messages from chats monitored by listener sessions to fulfill context prompts (e.g., "what were the last messages in the family group")
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
-- [ ] 04-04: TBD
+- [ ] 04-01-PLAN.md -- Types, config schema, role-based guardrail (assertCanSend replacing assertAllowedSession), webhook session validation
+- [ ] 04-02-PLAN.md -- Trigger word detection in inbound messages, DM response routing
+- [ ] 04-03-PLAN.md -- Cross-session routing (resolveSessionForTarget), readMessages utility action
+- [ ] 04-04-PLAN.md -- Admin panel Sessions tab with role/subRole display and connection status
 
 ### Phase 5: Documentation and Testing
 **Goal**: SKILL.md accurately documents all capabilities including error handling and multi-session, tests cover core utilities and action handlers, and README enables new users to install and configure the plugin
