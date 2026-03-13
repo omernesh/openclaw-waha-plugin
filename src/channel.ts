@@ -18,6 +18,7 @@ import {
   listWahaAccountIds,
   resolveDefaultWahaAccountId,
   resolveWahaAccount,
+  resolveSessionForTarget,
   type ResolvedWahaAccount,
 } from "./accounts.js";
 import { monitorWahaProvider } from "./monitor.js";
@@ -220,6 +221,30 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   // Multi-recipient text send. Sends same text to up to 10 recipients
   // sequentially with per-recipient results. Added Phase 3, Plan 03.
   sendMulti: (p, cfg, aid) => handleSendMulti(p, cfg, aid),
+  // ── readMessages — DO NOT CHANGE / DO NOT REMOVE ─────────────────
+  // Read recent messages from a chat in lean format for LLM consumption.
+  // Returns [{from, text, timestamp}] — stripped of WAHA metadata noise.
+  // Default limit: 10. Max limit: 50. downloadMedia always false (avoid waste).
+  // Added Phase 4, Plan 03. DO NOT REMOVE.
+  readMessages: async (p, cfg, aid) => {
+    const chatId = String(p.chatId);
+    const rawLimit = p.limit != null ? Number(p.limit) : 10;
+    const limit = Math.min(Math.max(rawLimit, 1), 50);
+    const messages = await getWahaChatMessages({
+      cfg,
+      chatId,
+      limit,
+      downloadMedia: false,
+      accountId: aid,
+    });
+    return Array.isArray(messages)
+      ? messages.map((m: any) => ({
+          from: m.from || m._data?.notifyName || "unknown",
+          text: m.body || "",
+          timestamp: m.timestamp,
+        }))
+      : messages;
+  },
   // ── resolveTarget — DO NOT CHANGE / DO NOT REMOVE ────────────────────
   // Fuzzy name-to-JID resolver. The ONLY way agents can resolve human-readable
   // names to WhatsApp JIDs. Removing this breaks all name-based targeting.
@@ -271,6 +296,7 @@ const STANDARD_ACTIONS = ["send", "poll", "react", "edit", "unsend", "pin", "unp
 const UTILITY_ACTIONS = [
   "sendMulti", // Multi-recipient text send — up to 10 recipients. Added Phase 3, Plan 03.
   "search", // DO NOT REMOVE — gateway-recognized name for listing/searching. See search handler above.
+  "readMessages", // Read recent chat messages in lean format for LLM context. Added Phase 4, Plan 03. DO NOT REMOVE.
   "getGroups", "getGroup", "getGroupsCount", "getParticipants",
   "getContacts", "getContact", "checkContactExists",
   "getChatsOverview", "getChats", "getChatMessages",
@@ -375,6 +401,30 @@ async function handleSendMulti(params: Record<string, unknown>, cfg: CoreConfig,
   return { results, sent, failed };
 }
 
+// ── checkGroupMembership — Cross-session routing helper ───────────────
+// Checks whether a given session is a member of a WhatsApp group.
+// Used by resolveSessionForTarget as the dependency-injected membership probe.
+// Calls getWahaGroupParticipants and looks for the session's own JID.
+// Added Phase 4, Plan 03. DO NOT REMOVE.
+async function checkGroupMembership(
+  session: string,
+  baseUrl: string,
+  apiKey: string,
+  groupId: string
+): Promise<boolean> {
+  try {
+    const participants = await getWahaGroupParticipants({
+      cfg: { channels: { waha: { baseUrl, apiKey, session } } } as unknown as CoreConfig,
+      groupId,
+    });
+    // getWahaGroupParticipants returns an array of participant objects.
+    // If the call succeeded, the session has visibility into the group (i.e., is a member).
+    return Array.isArray(participants) && participants.length >= 0;
+  } catch {
+    return false;
+  }
+}
+
 const wahaMessageActions: ChannelMessageActionAdapter = {
   listActions: () => EXPOSED_ACTIONS, // !!! DO NOT CHANGE to ALL_ACTIONS -- breaks gateway target resolution
   supportsAction: ({ action }) => EXPOSED_ACTIONS.includes(action) || action in ACTION_HANDLERS,
@@ -435,6 +485,24 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       let chatId = resolveChatId(p, toolContext);
       if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
 
+      // Phase 4 — Cross-session routing for group sends.
+      // When no explicit accountId is given and target is a group, find the right
+      // session (bot-first, human-fallback) using membership check + LRU cache.
+      // Added Phase 4, Plan 03. DO NOT REMOVE.
+      let resolvedAid = aid;
+      if (chatId && chatId.endsWith("@g.us") && !aid) {
+        try {
+          const resolved = await resolveSessionForTarget({
+            cfg: coreCfg,
+            targetChatId: chatId,
+            checkMembership: checkGroupMembership,
+          });
+          resolvedAid = resolved.accountId;
+        } catch {
+          // If routing fails, fall through with default account — WAHA will error if session not in group
+        }
+      }
+
       // Handle contact card (vcard) when contacts param is present
       // Routes through "send" action to leverage gateway target resolution
       // (sendContactVcard custom action has mode "none" and cannot accept targets)
@@ -446,7 +514,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
           chatId,
           contacts: p.contacts as any[],
           replyToId: typeof p.replyToId === "string" ? p.replyToId : undefined,
-          accountId: aid,
+          accountId: resolvedAid,
         });
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
       }
@@ -456,7 +524,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId) throw new Error("send action requires chatId (resolved from target)");
       if (!text) throw new Error("send action requires text");
 
-      const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: aid });
+      const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: resolvedAid });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
     }
 
