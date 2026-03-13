@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 06-whatsapp-rules-and-policy-system 06-01-PLAN.md
-last_updated: "2026-03-13T22:55:13.099Z"
+stopped_at: Completed 06-whatsapp-rules-and-policy-system 06-02-PLAN.md
+last_updated: "2026-03-13T23:00:34.457Z"
 last_activity: 2026-03-11 -- Phase 03→04 transition
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 18
-  completed_plans: 15
+  completed_plans: 16
   percent: 83
 ---
 
@@ -89,6 +89,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 05-documentation-and-testing P02 | 4 | 2 tasks | 2 files |
 | Phase 05-documentation-and-testing P05-01 | 5 | 2 tasks | 5 files |
 | Phase 06-whatsapp-rules-and-policy-system P01 | 5 | 2 tasks | 11 files |
+| Phase 06-whatsapp-rules-and-policy-system P02 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,8 @@ Recent decisions affecting current work:
 - [Phase 05-01]: Wrote tests matching actual implementation behavior — toArr returns [] for primitives not [val], resolveChatId returns empty string not throws
 - [Phase 06-whatsapp-rules-and-policy-system]: Synchronous fs reads in rules-loader: YAML files <1KB, async adds complexity with no benefit
 - [Phase 06-whatsapp-rules-and-policy-system]: All zod schemas use optional fields (no .strict()): sparse overrides must not fail on unknown keys in future
+- [Phase 06-whatsapp-rules-and-policy-system]: Arrays in mergeRuleLayers use replace semantics (not append): later layer's array fully replaces lower layer's array
+- [Phase 06-whatsapp-rules-and-policy-system]: PolicyCache key is scope+mtime: different mtime for same scope is a natural miss, no explicit invalidation needed for file changes
 
 ### Roadmap Evolution
 
@@ -144,6 +147,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T22:55:13.095Z
-Stopped at: Completed 06-whatsapp-rules-and-policy-system 06-01-PLAN.md
+Last session: 2026-03-13T23:00:34.453Z
+Stopped at: Completed 06-whatsapp-rules-and-policy-system 06-02-PLAN.md
 Resume file: None

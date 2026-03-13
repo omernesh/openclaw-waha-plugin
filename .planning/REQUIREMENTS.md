@@ -63,12 +63,12 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 
 - [x] **RULES-01**: YAML file loader for _default.yaml and sparse override files with safe parse and zod validation
 - [x] **RULES-02**: Identity normalizer: JID/LID -> @c:/@lid:/@g: stable IDs for policy resolution
-- [ ] **RULES-03**: 5-layer merge engine: scalar replace, object deep merge, array replace, missing=inherit
+- [x] **RULES-03**: 5-layer merge engine: scalar replace, object deep merge, array replace, missing=inherit
 - [ ] **RULES-04**: Inbound DM policy resolver: load global contact default + override, merge, return compact payload
 - [ ] **RULES-05**: Inbound group policy resolver: load group default + override, evaluate contact_rule_mode and participant allowlist
 - [ ] **RULES-06**: Outbound policy enforcer: assertPolicyCanSend blocks sends when can_initiate=false or participation_mode=silent_observer
-- [ ] **RULES-07**: Policy-keyed LRU cache: scope ID + mtime key, short TTL, invalidate on edit
-- [ ] **RULES-08**: Manager authorization: owner-only appoint/revoke, global manager edit access, scope manager limited access
+- [x] **RULES-07**: Policy-keyed LRU cache: scope ID + mtime key, short TTL, invalidate on edit
+- [x] **RULES-08**: Manager authorization: owner-only appoint/revoke, global manager edit access, scope manager limited access
 - [ ] **RULES-09**: Compact resolved-payload builder: DM and group serializers producing minimal ResolvedPolicy objects
 - [ ] **RULES-10**: ctxPayload injection: WahaResolvedPolicy field attached to inbound context before model turn
 - [ ] **RULES-11**: Policy edit command: authorized field update + YAML file write via editPolicy action
