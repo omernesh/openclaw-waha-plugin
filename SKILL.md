@@ -1,7 +1,7 @@
 ---
 name: whatsapp-actions
 description: Use when the user asks to send a WhatsApp message, create a poll, share a location, manage groups, send a contact card, forward a message, react to a message, pin a message, edit or delete a message, create an event, manage labels, post a status/story, manage channels, join a group, follow a channel, change profile, block/unblock contacts, or perform any WhatsApp action through WAHA.
-version: 3.3.0
+version: 4.0.0
 ---
 
 > **IMPORTANT — Standard Action Names**: For targeted actions (those that send to a chat), use these standard names:
@@ -13,16 +13,21 @@ version: 3.3.0
 | Task | Action | Key Parameters |
 |------|--------|---------------|
 | Send text | `send` | text (via target resolution) |
+| Send text to multiple chats | `sendMulti` | targets[], text |
 | Send contact card | `send` | contacts: [{fullName, phoneNumber}] |
 | Create poll | `poll` | name, options[], multipleAnswers |
 | Send image | `sendImage` | chatId, file (direct URL), caption? |
 | Send video | `sendVideo` | chatId, file (direct URL), caption? |
 | Send document | `sendFile` | chatId, file (direct URL), caption? |
+| Send link preview card | `sendLinkPreview` | chatId, url, title, description? |
 | React to message | `react` | messageId, emoji |
 | Join group via link | `joinGroup` | inviteCode (code from URL) |
 | Follow channel | `followChannel` | channelId (newsletter JID) |
 | Share location | `sendLocation` | chatId, latitude, longitude, title |
 | Create group event | `sendEvent` | chatId, name, startTime |
+| Mute a chat | `muteChat` | chatId, duration? |
+| Unmute a chat | `unmuteChat` | chatId |
+| Read recent messages | `readMessages` | chatId, limit? (1-50, default 10) |
 | Search/list groups, contacts, channels | `search` | query, scope ("group"\|"contact"\|"channel"\|"auto") |
 
 ---
@@ -242,6 +247,10 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 | `unreadChat` | chatId |
 | `read` | chatId |
 | `getChatPicture` | chatId |
+| `muteChat` | chatId, duration? (seconds) |
+| `unmuteChat` | chatId |
+| `readMessages` | chatId, limit? (1-50, default 10) |
+| `sendMulti` | targets[], text |
 
 ## Group Management
 
@@ -364,3 +373,101 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 - sendButtons is deprecated — use polls or lists for interactive options
 - pinMessage and sendTextStatus may behave differently across WAHA builds
 - Event RSVPs arrive as `[event_rsvp]` messages
+
+---
+
+# Error Handling and Recovery
+
+When actions fail, use the table below to diagnose the issue and recover.
+
+| Error Pattern | What Happened | What To Do |
+|---------------|---------------|------------|
+| `"Session '...' has sub-role 'listener' and cannot send"` | Bot tried to send from a listener session (monitoring-only) | Use the bot session — listener sessions only receive messages, they cannot send |
+| `"Could not resolve '...' to a WhatsApp JID"` | Target name not found in contacts or groups directory | Run `search` action first to find the correct JID, then retry with the exact JID |
+| `"Ambiguous target '...'. Possible matches: ..."` | Multiple contacts/groups match the given name | Disambiguate: ask the user which one, or use the exact JID from `search` results |
+| `"WAHA API rate limited (429)"` | Too many requests sent in a short window | Wait ~1 second before retrying. The plugin retries up to 3 times automatically with exponential backoff (1s / 2s / 4s) — if you see this, the auto-retry already occurred |
+| `"timed out after 30000ms"` | WAHA server did not respond within 30 seconds | Check WAHA health via the admin panel Status tab. Note: for mutation operations (send, edit, delete) the action may have already succeeded even if the response timed out |
+| `"Session health: unhealthy"` | WAHA session has lost its WhatsApp connection | Reconnect the session in the WAHA dashboard or admin panel. No messages will be processed until the session is healthy again |
+
+**General guidance:**
+- If a send action fails unexpectedly, check whether the target is a valid JID using `search` first.
+- If multiple consecutive actions fail, check the admin panel Status tab for session health.
+- If you see many timeouts, WAHA may be overloaded — wait a few seconds between actions.
+
+---
+
+# Rate Limiting
+
+The plugin uses a token-bucket rate limiter to protect WAHA from being overwhelmed.
+
+**How it works:**
+- Default capacity: 20 tokens, refill rate: 15 tokens/second
+- Each WAHA API call consumes one token
+- When tokens run out, calls are queued and released as tokens refill
+- If WAHA returns HTTP 429 (Too Many Requests), the plugin applies exponential backoff: 1s wait, then 2s, then 4s — up to 3 automatic retries
+
+**Configurable** (in `channels.waha` config):
+- `rateLimitCapacity`: Maximum burst size (default 20)
+- `rateLimitRefillRate`: Tokens refilled per second (default 15)
+
+**For you (the agent):**
+- Most rate limiting is handled automatically — you do not need to add delays between actions
+- If you see persistent 429 errors after the auto-retries, wait 5-10 seconds before retrying
+- Rapid bulk operations (like sending to 20 groups in a loop) may hit rate limits; use `sendMulti` for multi-recipient sends instead
+
+---
+
+# Multi-Session
+
+The plugin supports multiple WhatsApp sessions with different roles, enabling a monitored human session alongside a bot session.
+
+## Session Roles
+
+| Role | Sub-Role | Can Send? | Receives Messages? | Purpose |
+|------|----------|-----------|-------------------|---------|
+| `bot` | `full-access` | Yes | Yes (all chats) | Primary bot session — Sammie's active session |
+| `human` | `listener` | No | Yes (monitored chats) | Human operator's session — monitored but cannot send |
+| `human` | `full-access` | Yes | Yes | Human session with full access |
+
+**Key rule:** Only `full-access` sub-role sessions can send messages. Attempting to send from a `listener` session will fail with an error.
+
+## Trigger Word Activation
+
+When `triggerWord` is configured (e.g., `"!sammie"`), the bot only activates in group chats when a message starts with that trigger word.
+
+**Example:** If `triggerWord: "!sammie"`, only messages like `"!sammie what's the weather?"` will activate the bot. Other group messages are monitored but ignored.
+
+```
+User in group: "!sammie what time is the meeting?"
+Bot activates → processes and replies via DM (triggerResponseMode: "dm") or in-group
+```
+
+**`triggerResponseMode` options:**
+- `"dm"` (default): Bot sends its reply as a DM to the triggering user
+- `"group"`: Bot replies in the group chat directly
+
+## readMessages Action
+
+Use `readMessages` to retrieve recent messages from a monitored chat.
+
+```
+Action: readMessages
+Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
+```
+
+**Parameters:**
+- `chatId`: The JID of the chat to read from
+- `limit`: Number of recent messages to fetch (1-50, default 10)
+
+**Returns:** Array of recent messages with sender, text, timestamp, and message type.
+
+**Use cases:**
+- Check what's been said in a group since last check
+- Get context before replying to a thread
+- Monitor a human session's conversation history
+
+## Cross-Session Routing
+
+When the bot needs to send a message to a group it belongs to via its own session, it uses that session directly. If the bot is not a member of the target group, it falls back to using the human session as a proxy.
+
+This is automatic — you do not need to specify which session to use for sends.
