@@ -319,7 +319,8 @@ const UTILITY_ACTIONS = [
 const EXPOSED_ACTIONS = [...STANDARD_ACTIONS, ...UTILITY_ACTIONS];
 
 // Resolve chatId from gateway target resolution params
-function resolveChatId(params: Record<string, unknown>, toolContext?: { currentChannelId?: string }): string {
+// Exported for testing -- DO NOT CHANGE signature
+export function resolveChatId(params: Record<string, unknown>, toolContext?: { currentChannelId?: string }): string {
   if (typeof params.chatId === "string" && params.chatId) {
     return params.chatId;
   }
@@ -343,7 +344,8 @@ const JID_RE = /@(c\.us|g\.us|lid|s\.whatsapp\.net|newsletter|broadcast)$/i;
 const PHONE_RE = /^\+?\d{6,}$/;
 const AUTO_RESOLVE_MIN_CONFIDENCE = 0.7;
 
-async function autoResolveTarget(chatId: string, cfg: CoreConfig, accountId?: string): Promise<string> {
+// Exported for testing -- DO NOT CHANGE signature
+export async function autoResolveTarget(chatId: string, cfg: CoreConfig, accountId?: string): Promise<string> {
   // Already a JID or phone number — pass through unchanged
   if (JID_RE.test(chatId) || PHONE_RE.test(chatId)) return chatId;
 

@@ -1463,7 +1463,8 @@ interface ResolveTargetResult {
   searchedTypes: string[];
 }
 
-function fuzzyScore(query: string, name: string): number {
+// Exported for testing -- DO NOT CHANGE signature
+export function fuzzyScore(query: string, name: string): number {
   const q = query.toLowerCase().trim();
   const n = name.toLowerCase().trim();
   if (!n) return 0;
