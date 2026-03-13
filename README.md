@@ -2,10 +2,27 @@
 
 **Plugin ID:** `waha`
 **Platform:** WhatsApp (via WAHA HTTP API)
-**Last updated:** 2026-03-10
-**Version:** 1.9.4
+**Last updated:** 2026-03-13
+**Version:** 1.11.0
 
 ## Changelog
+
+### v1.11.0 — Multi-Session Support (2026-03-13)
+- **Phase 4**: Multi-session roles: `bot` / `human` with `full-access` / `listener` sub-roles
+- **Phase 4**: Trigger word activation: `triggerWord` config gates bot activation in group chats
+- **Phase 4**: Cross-session routing: bot uses its own session when a group member, falls back to human session
+- **Phase 4**: `readMessages` action: read recent messages from any monitored chat (limit 1-50)
+- **Phase 4**: Sessions tab in admin panel: live session health enriched with role and WAHA status
+- **Phase 3**: `muteChat` / `unmuteChat` actions for chat notification control
+- **Phase 3**: `sendMulti` action: send text to multiple chats in a single action (sequential, rate-limited)
+- **Phase 3**: Auto link preview: URLs in text messages automatically get rich link preview cards (`autoLinkPreview: true` by default)
+- **Phase 3**: Mention extraction: `@mentions` in inbound messages are extracted and surfaced to the agent
+- **Phase 2**: Session health monitoring: automatic health pings detect disconnects before they affect messages
+- **Phase 2**: Inbound message queue: prevents message loss under bursts; DM/group queues configurable
+- **Phase 1**: Request timeouts: all WAHA API calls time out after 30 seconds (configurable)
+- **Phase 1**: Rate limiter: token-bucket rate limiting protects WAHA from being overwhelmed
+- **Phase 1**: Automatic retry: 429 responses retried up to 3 times with exponential backoff (1s/2s/4s)
+- **Phase 1**: Webhook deduplication: composite key (eventType:messageId) prevents double-processing
 
 ### v1.9.4 — Contact Cards, Group Join & Channel Follow (2026-03-10)
 - **Added**: Contact card (vCard) sending via `send` action with `contacts` parameter
@@ -75,8 +92,28 @@ The plugin operates as a channel adapter within the OpenClaw plugin-sdk framewor
 - Applies access control (DM policy, group allowlists with both `@c.us` and `@lid` JID formats)
 - Simulates human-like presence (read receipts, typing indicators with random pauses) before replying
 - Delivers AI-generated text and voice replies through WAHA's REST API
-- Enforces session guardrails (the "omer" session is explicitly blocked from sending outbound messages)
+- Enforces session role guardrails (listener sessions cannot send; bot sessions have full access)
 - Exposes only gateway-standard action names (v1.9.0+) for reliable LLM tool invocation
+
+### Feature Highlights by Phase
+
+| Phase | Feature | Config / Action |
+|-------|---------|----------------|
+| Phase 1 — Reliability | Request timeouts (30s default) | `timeoutMs` |
+| Phase 1 — Reliability | Token-bucket rate limiting | `rateLimitCapacity`, `rateLimitRefillRate` |
+| Phase 1 — Reliability | Automatic 429 retry (1s/2s/4s backoff) | automatic |
+| Phase 1 — Reliability | Webhook deduplication (no duplicate events) | automatic |
+| Phase 2 — Resilience | Session health monitoring (auto-detect disconnects) | `healthCheckIntervalMs` |
+| Phase 2 — Resilience | Inbound message queue (no message loss under bursts) | `dmQueueSize`, `groupQueueSize` |
+| Phase 3 — Features | Auto link preview in text messages | `autoLinkPreview` (default true) |
+| Phase 3 — Features | Chat mute / unmute | `muteChat`, `unmuteChat` actions |
+| Phase 3 — Features | Multi-recipient send | `sendMulti` action |
+| Phase 3 — Features | Mention extraction from inbound messages | automatic |
+| Phase 4 — Multi-Session | Bot / human session roles | `role`, `subRole` config |
+| Phase 4 — Multi-Session | Trigger word activation in group chats | `triggerWord`, `triggerResponseMode` |
+| Phase 4 — Multi-Session | Cross-session routing for group sends | automatic |
+| Phase 4 — Multi-Session | Read recent messages from any chat | `readMessages` action |
+| Phase 4 — Multi-Session | Sessions tab in admin panel | admin panel |
 
 ---
 
@@ -366,12 +403,38 @@ All configuration lives in `~/.openclaw/openclaw.json` under `channels.waha`. Th
         "documentAnalysis": true    // Document metadata extraction
       },
 
+      // --- Phase 1: Reliability (added v1.10.x) ---
+      "timeoutMs": 30000,                           // WAHA API request timeout (ms, default 30000)
+      "rateLimitCapacity": 20,                      // Token bucket max burst size (default 20)
+      "rateLimitRefillRate": 15,                    // Tokens refilled per second (default 15)
+
+      // --- Phase 2: Resilience (added v1.10.x) ---
+      "healthCheckIntervalMs": 60000,               // Session health ping interval (ms, default 60000)
+      "dmQueueSize": 50,                            // Max queued inbound DMs before drop (default 50)
+      "groupQueueSize": 50,                         // Max queued inbound group messages (default 50)
+
+      // --- Phase 3: Features (added v1.11.0) ---
+      "autoLinkPreview": true,                      // Auto-add link preview to text messages with URLs (default true)
+
+      // --- Phase 4: Multi-Session (added v1.11.0) ---
+      // Role for this session: "bot" (can send) or "human" (monitoring)
+      "role": "bot",
+      // Sub-role: "full-access" (can send) or "listener" (receive only)
+      "subRole": "full-access",
+      // Trigger word for group chat activation (optional, e.g. "!sammie")
+      "triggerWord": "!sammie",
+      // How bot responds when triggered: "dm" (reply in DM) or "group" (reply in-group)
+      "triggerResponseMode": "dm",
+
       // --- Multi-Account (optional) ---
+      // Add additional WAHA sessions under "accounts" for multi-session routing
       "accounts": {
-        "secondary": {
-          "baseUrl": "http://other-waha:3004",
+        "omer": {
+          "baseUrl": "http://127.0.0.1:3004",
           "apiKey": "...",
-          "session": "other_session"
+          "session": "3cf11776_omer",
+          "role": "human",
+          "subRole": "listener"
         }
       },
       "defaultAccount": "default"
@@ -379,6 +442,33 @@ All configuration lives in `~/.openclaw/openclaw.json` under `channels.waha`. Th
   }
 }
 ```
+
+### Config Field Reference (v1.11.0)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable the WAHA channel |
+| `baseUrl` | string | — | WAHA server URL (e.g. `http://127.0.0.1:3004`) |
+| `apiKey` | string | — | WAHA API key — use `WHATSAPP_API_KEY`, not `WAHA_API_KEY` |
+| `session` | string | — | WAHA session name (e.g. `3cf11776_logan`) |
+| `webhookPort` | number | `8050` | Port for incoming WAHA webhooks |
+| `webhookPath` | string | `/webhook/waha` | Path for webhook endpoint |
+| `webhookHmacKey` | string | — | HMAC-SHA512 key for webhook signature verification |
+| `dmPolicy` | string | `"pairing"` | DM access policy: `"pairing"` \| `"open"` \| `"closed"` \| `"allowlist"` |
+| `groupPolicy` | string | `"allowlist"` | Group message policy: `"allowlist"` \| `"open"` \| `"closed"` |
+| `allowFrom` | string[] | — | Allowed DM sender JIDs (when dmPolicy=allowlist) |
+| `groupAllowFrom` | string[] | — | Allowed group sender JIDs — include BOTH @c.us AND @lid formats |
+| `timeoutMs` | number | `30000` | WAHA API request timeout in milliseconds (Phase 1) |
+| `rateLimitCapacity` | number | `20` | Token bucket maximum burst tokens (Phase 1) |
+| `rateLimitRefillRate` | number | `15` | Token refill rate per second (Phase 1) |
+| `healthCheckIntervalMs` | number | `60000` | Session health check interval in milliseconds (Phase 2) |
+| `dmQueueSize` | number | `50` | Max inbound DM queue depth before drop (Phase 2) |
+| `groupQueueSize` | number | `50` | Max inbound group message queue depth before drop (Phase 2) |
+| `autoLinkPreview` | boolean | `true` | Auto-add link preview to text messages containing URLs (Phase 3) |
+| `role` | string | `"bot"` | Session role: `"bot"` or `"human"` (Phase 4) |
+| `subRole` | string | `"full-access"` | Sub-role: `"full-access"` (can send) or `"listener"` (receive only) (Phase 4) |
+| `triggerWord` | string | — | If set, bot only activates in groups when message starts with this word (Phase 4) |
+| `triggerResponseMode` | string | `"dm"` | Trigger response mode: `"dm"` (reply in DM) or `"group"` (reply in chat) (Phase 4) |
 
 ### Access Control Notes
 
@@ -397,56 +487,174 @@ docker exec -i postgres-waha psql -U admin -d waha_noweb_3cf11776_logan \
 
 ---
 
-## 7. Installation / Reinstallation
+## 7. Installation and Deployment
 
-### File Locations
+### npm Installation
 
-The plugin source exists in TWO locations that must always be kept in sync:
+```bash
+npm install waha-openclaw-channel
+```
+
+Then enable the plugin in `~/.openclaw/openclaw.json`:
+```json
+{
+  "plugins": { "allow": ["waha"] },
+  "tools": { "alsoAllow": ["message"] },
+  "channels": { "waha": { "enabled": true, "baseUrl": "...", "apiKey": "...", "session": "..." } }
+}
+```
+
+**CRITICAL:** `tools.alsoAllow: ["message"]` is mandatory. Without it, the `coding` tools profile filters out the `message` tool and the LLM cannot invoke any WhatsApp actions.
+
+### File Locations — ALWAYS Deploy to BOTH
+
+> **WARNING:** The plugin source exists in TWO locations that must ALWAYS be kept in sync. Forgetting one causes a silent version mismatch where the gateway runs stale code.
 
 | Location | Purpose |
 |----------|---------|
-| `/home/omer/.openclaw/extensions/waha/src/` | **Runtime** -- what OpenClaw actually loads |
-| `/home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/` | **Development** -- workspace copy |
+| `~/.openclaw/extensions/waha/` | **Runtime** — what OpenClaw actually loads at startup |
+| `~/.openclaw/workspace/skills/waha-openclaw-channel/` | **Dev/workspace** — source of truth for reinstalls |
 
 The main config file is at `/home/omer/.openclaw/openclaw.json` under `channels.waha`.
 
-### Deploying Changes
+### Deploying Changes (Local on hpg6)
 
-After editing source files, deploy to BOTH locations and restart:
+After editing source files locally on hpg6, deploy to BOTH locations and restart:
 
 ```bash
-# 1. Copy files (if editing in workspace)
-cp /home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts \
-   /home/omer/.openclaw/extensions/waha/src/
+# 1. Copy files from workspace to runtime (both locations must match)
+cp ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts \
+   ~/.openclaw/extensions/waha/src/
 
 # 2. Verify both copies match
-md5sum /home/omer/.openclaw/extensions/waha/src/*.ts
-md5sum /home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts
+md5sum ~/.openclaw/extensions/waha/src/*.ts
+md5sum ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts
 
-# 3. Restart gateway (systemd auto-restarts on kill)
-kill -9 $(pgrep -f "openclaw-gatewa") 2>/dev/null
+# 3. Restart gateway
+systemctl --user restart openclaw-gateway
 
-# 4. Wait ~5 seconds, then verify it came back up
-ss -tlnp | grep 18789
+# 4. Check logs
+journalctl --user -u openclaw-gateway --since "1 minute ago" --no-pager
+
+# 5. Verify webhook is listening
 curl -s http://127.0.0.1:8050/healthz
 ```
 
-### Remote Deployment (from Windows dev machine)
-
-Use base64 transfer to avoid shell escaping issues with TypeScript `!==` operators:
+### Remote Deployment (from Windows dev machine via SSH/SCP)
 
 ```bash
-# Encode locally
-B64=$(base64 -w 0 /path/to/file.ts)
+# SCP to BOTH locations (always update both)
+scp src/file.ts omer@100.114.126.43:~/.openclaw/extensions/waha/src/file.ts
+scp src/file.ts omer@100.114.126.43:~/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts
 
-# Transfer to both locations
-ssh omer@100.114.126.43 "echo '$B64' | base64 -d > /home/omer/.openclaw/extensions/waha/src/file.ts"
-ssh omer@100.114.126.43 "echo '$B64' | base64 -d > /home/omer/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts"
+# Restart gateway
+ssh omer@100.114.126.43 'systemctl --user restart openclaw-gateway'
+
+# Check logs
+ssh omer@100.114.126.43 'journalctl --user -u openclaw-gateway --since "2 minutes ago" --no-pager'
 ```
+
+**Shell escaping note:** TypeScript files containing `!==` or `!` characters cause bash history expansion in heredocs over SSH. Use `scp` (not SSH heredocs) to transfer TypeScript files, or use the base64 encode/decode pattern:
+
+```bash
+# Base64 transfer pattern (avoids ! escaping issues)
+B64=$(base64 -w 0 src/file.ts)
+ssh omer@100.114.126.43 "echo '$B64' | base64 -d > ~/.openclaw/extensions/waha/src/file.ts"
+ssh omer@100.114.126.43 "echo '$B64' | base64 -d > ~/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts"
+```
+
+### npm Publish Workflow
+
+1. Bump version in `package.json`
+2. Run `npm publish --access public`
+3. SCP built files to BOTH hpg6 locations (see above)
+4. Restart gateway: `ssh omer@100.114.126.43 'systemctl --user restart openclaw-gateway'`
+5. Test via WhatsApp (send test message to Sammie)
 
 ---
 
 ## 8. Troubleshooting
+
+### Quick Diagnostic Checklist
+
+1. **Gateway running?** `pgrep -af "openclaw-gateway"`
+2. **Webhook port bound?** `ss -tlnp | grep 8050`
+3. **Session healthy?** `curl -s http://127.0.0.1:8050/api/admin/sessions | python3 -m json.tool`
+4. **Recent errors?** `journalctl --user -u openclaw-gateway --since "5 minutes ago" --no-pager`
+
+---
+
+### "Listener cannot send" / Session sub-role error
+
+**Symptom:** `"Session '...' has sub-role 'listener' and cannot send"`
+**Cause:** A session configured as `subRole: "listener"` (human monitoring session) tried to send.
+**Fix:** This is expected behavior — listener sessions are read-only by design. Configure a `bot` session with `subRole: "full-access"` for sending. If both sessions need sending ability, set `subRole: "full-access"` on both.
+
+### "Could not resolve target" / Target not found
+
+**Symptom:** `"Could not resolve '...' to a WhatsApp JID"` in gateway logs
+**Cause:** The name provided as a target does not match any contact or group in the directory.
+**Fix:** Use the `search` action first to find the correct name/JID:
+```
+Action: search
+Parameters: { "query": "group name", "scope": "group" }
+```
+Then retry the action with the exact JID from search results.
+
+### Session disconnected / "Session health: unhealthy"
+
+**Symptom:** Messages not being processed; health check logs show "unhealthy"
+**Cause:** WAHA session lost its WhatsApp connection (phone offline, QR re-scan needed, etc.)
+**Fix:**
+1. Open the admin panel Status tab: `http://YOUR_HOST:8050/admin`
+2. Check the WAHA dashboard for the disconnected session
+3. Re-scan the QR code if needed
+4. After reconnection, the health check will automatically detect recovery within `healthCheckIntervalMs` (default 60s)
+
+### Rate limited (429) errors
+
+**Symptom:** `"WAHA API rate limited (429)"` in logs; actions failing intermittently
+**Cause:** Too many WAHA API calls in a short period
+**Fix:** The plugin retries automatically up to 3 times with exponential backoff (1s/2s/4s). If errors persist:
+1. Reduce `rateLimitCapacity` or `rateLimitRefillRate` in config
+2. Wait 10-15 seconds between bulk operations
+3. Use `sendMulti` instead of looping `send` actions for multi-recipient sends
+
+### Inbound queue overflow / messages dropped
+
+**Symptom:** Log message `"inbound queue full, dropping message"`
+**Cause:** Messages arriving faster than the bot can process them; queue capacity exceeded
+**Fix:** Increase `dmQueueSize` or `groupQueueSize` in config (default 50 each). If the queue is regularly overflowing, the bot is receiving more traffic than it can handle.
+
+### Request timeout errors
+
+**Symptom:** `"timed out after 30000ms"` errors
+**Cause:** WAHA API not responding within the timeout window
+**Fix:**
+1. Check WAHA server health: `curl -s -H "X-Api-Key: YOUR_KEY" http://127.0.0.1:3004/api/sessions`
+2. If WAHA is busy (many media downloads, large group), increase `timeoutMs` in config
+3. For mutation operations (send, edit, delete) — the action MAY have succeeded even if the response timed out. Check the chat before retrying.
+
+### Trigger word not activating bot
+
+**Symptom:** Bot not responding to messages in groups that have `triggerWord` configured
+**Cause:** Message does not start with the trigger word (case-insensitive, leading whitespace stripped)
+**Fix:**
+1. Ensure messages start with the exact trigger word: e.g. `"!sammie what's up?"`
+2. Check the `triggerWord` config value matches exactly what users type
+3. In `triggerResponseMode: "dm"`, the reply goes to the user's DM — not visible in the group
+
+### Both deploy locations must match
+
+**Symptom:** Code changes deployed but old behavior persists; or inconsistent behavior after restart
+**Cause:** Only one of the two hpg6 locations was updated
+**Fix:** Always deploy to BOTH locations:
+- `~/.openclaw/extensions/waha/` (runtime)
+- `~/.openclaw/workspace/skills/waha-openclaw-channel/` (workspace)
+
+Verify they match: `md5sum ~/.openclaw/extensions/waha/src/*.ts && md5sum ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts`
+
+---
 
 ### CRITICAL: Gateway Uses Workspace Config, Not ~/.openclaw/openclaw.json
 
