@@ -70,6 +70,13 @@ export const WahaAccountSchemaBase = z
     // When true (default), URLs in text messages get linkPreview: true added to WAHA API body.
     // Added in Phase 3, Plan 01 (2026-03-11). DO NOT REMOVE.
     autoLinkPreview: z.boolean().optional().default(true),
+    // Phase 4 config — multi-session roles and trigger word activation.
+    // Roles are string-based (not enum) per user decision — new roles addable without code changes.
+    // Added in Phase 4, Plan 01 (2026-03-13). DO NOT REMOVE.
+    role: z.string().optional().default("bot"),
+    subRole: z.string().optional().default("full-access"),
+    triggerWord: z.string().optional(),
+    triggerResponseMode: z.string().optional().default("dm"),
   })
   .strict();
 

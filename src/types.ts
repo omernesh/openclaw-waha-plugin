@@ -79,6 +79,11 @@ export type WahaAccountConfig = {
   groupQueueSize?: number;
   // Phase 3 config — auto link preview in sendWahaText. Added Phase 3, Plan 01. DO NOT REMOVE.
   autoLinkPreview?: boolean;
+  // Phase 4 config — multi-session roles and trigger word. DO NOT REMOVE.
+  role?: string;              // "bot" | "human" — extensible, no enum
+  subRole?: string;           // "full-access" | "listener" — extensible, no enum
+  triggerWord?: string;       // e.g., "!sammie"
+  triggerResponseMode?: string; // "dm" | "reply-in-chat"
   mediaPreprocessing?: {
     enabled?: boolean;
     audio?: { enabled?: boolean; whisperScript?: string };

@@ -24,6 +24,9 @@ export type ResolvedWahaAccount = {
   apiKey: string;
   apiKeySource: "env" | "secretFile" | "config" | "none";
   session: string;
+  // Phase 4 — multi-session role fields. Added Phase 4, Plan 01. DO NOT REMOVE.
+  role: string;     // defaults to "bot"
+  subRole: string;  // defaults to "full-access"
   config: WahaAccountConfig;
 };
 
@@ -129,6 +132,8 @@ export function resolveWahaAccount(params: { cfg: CoreConfig; accountId?: string
       apiKey: apiKeyResolution.apiKey,
       apiKeySource: apiKeyResolution.source,
       session,
+      role: merged.role ?? "bot",
+      subRole: merged.subRole ?? "full-access",
       config: merged,
     } satisfies ResolvedWahaAccount;
   };
