@@ -17,6 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Feature Gaps** - URL previews, mute/unmute, mentions detection, multi-recipient send, and better errors (completed 2026-03-11)
 - [x] **Phase 4: Multi-Session** - Session registry with roles, trigger word activation, cross-session routing, and admin panel management (completed 2026-03-13)
 - [x] **Phase 5: Documentation and Testing** - SKILL.md refresh, unit tests, integration tests, and README (completed 2026-03-13)
+- [ ] **Phase 6: WhatsApp Rules and Policy System** - Lazy-loaded YAML rules with hierarchical policies, merge engine, manager authorization, and compact policy injection
 
 ## Phase Details
 
@@ -100,10 +101,29 @@ Plans:
 - [ ] 05-01-PLAN.md -- Unit tests for fuzzyScore, toArr, resolveChatId, autoResolveTarget + integration tests for send, poll, edit, search handlers
 - [ ] 05-02-PLAN.md -- SKILL.md refresh (error scenarios, rate limits, multi-session) + README.md update (config, deploy, troubleshooting)
 
+### Phase 6: WhatsApp Rules and Policy System
+**Goal:** Lazy-loaded, file-based rules system with hierarchical contact/group policies, sparse overrides, compact resolved-policy injection per event, participant allowlists, and manager authorization — without increasing startup context load
+**Depends on:** Phase 5
+**Requirements**: RULES-01, RULES-02, RULES-03, RULES-04, RULES-05, RULES-06, RULES-07, RULES-08, RULES-09, RULES-10, RULES-11, RULES-12, RULES-13, RULES-14
+**Success Criteria** (what must be TRUE):
+  1. When a DM arrives, the plugin loads global contact defaults + specific contact override (if present), merges them, and injects a compact resolved policy into the model context
+  2. When a group message arrives, the plugin resolves group policy + evaluates participant allowlist + optionally loads speaker contact policy based on contact_rule_mode
+  3. When Sammie tries to send a DM to a contact with can_initiate=false, the send is blocked with a policy error
+  4. When the owner asks to edit a contact's policy, the change is authorized and persisted to the YAML override file
+  5. When a non-manager tries to edit policy, the request is denied with "not authorized"
+  6. Rules load lazily — only after all existing WAHA/OpenClaw message filters pass, never at startup
+**Plans**: 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md -- Types, zod schemas, YAML dependency, seed default files, identity resolver, rules loader
+- [ ] 06-02-PLAN.md -- Merge engine, policy cache, manager authorization matrix
+- [ ] 06-03-PLAN.md -- Rules resolver (DM + group flows), resolved payload builder
+- [ ] 06-04-PLAN.md -- Outbound policy enforcer, inbound hook wiring, policy edit action handler
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 
 | Phase | Plans Complete | Status | Completed |
@@ -113,13 +133,4 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 | 3. Feature Gaps | 3/3 | Complete   | 2026-03-11 |
 | 4. Multi-Session | 4/4 | Complete   | 2026-03-13 |
 | 5. Documentation and Testing | 2/2 | Complete   | 2026-03-13 |
-
-### Phase 6: WhatsApp Rules and Policy System
-
-**Goal:** Lazy-loaded, file-based rules system with hierarchical contact/group policies, sparse overrides, compact resolved-policy injection per event, participant allowlists, and manager authorization — without increasing startup context load
-**Requirements**: TBD
-**Depends on:** Phase 5
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 6 to break down)
+| 6. WhatsApp Rules and Policy System | 0/4 | Planned | - |

@@ -59,6 +59,23 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [x] **DOC-03**: Integration tests for action handlers with mock WAHA API
 - [x] **DOC-04**: README updated with installation, configuration, deployment guide
 
+### Rules and Policy System
+
+- [ ] **RULES-01**: YAML file loader for _default.yaml and sparse override files with safe parse and zod validation
+- [ ] **RULES-02**: Identity normalizer: JID/LID -> @c:/@lid:/@g: stable IDs for policy resolution
+- [ ] **RULES-03**: 5-layer merge engine: scalar replace, object deep merge, array replace, missing=inherit
+- [ ] **RULES-04**: Inbound DM policy resolver: load global contact default + override, merge, return compact payload
+- [ ] **RULES-05**: Inbound group policy resolver: load group default + override, evaluate contact_rule_mode and participant allowlist
+- [ ] **RULES-06**: Outbound policy enforcer: assertPolicyCanSend blocks sends when can_initiate=false or participation_mode=silent_observer
+- [ ] **RULES-07**: Policy-keyed LRU cache: scope ID + mtime key, short TTL, invalidate on edit
+- [ ] **RULES-08**: Manager authorization: owner-only appoint/revoke, global manager edit access, scope manager limited access
+- [ ] **RULES-09**: Compact resolved-payload builder: DM and group serializers producing minimal ResolvedPolicy objects
+- [ ] **RULES-10**: ctxPayload injection: WahaResolvedPolicy field attached to inbound context before model turn
+- [ ] **RULES-11**: Policy edit command: authorized field update + YAML file write via editPolicy action
+- [ ] **RULES-12**: Seed _default.yaml files: contacts and groups global defaults with schema-compliant values
+- [ ] **RULES-13**: Unit tests for merge engine, identity normalizer, payload builder, auth matrix
+- [ ] **RULES-14**: Integration tests for DM resolution, group resolution, unknown participant, outbound enforcement
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -133,12 +150,27 @@ Deferred to future release. Tracked but not in current roadmap.
 | DOC-02 | Phase 5 | Complete |
 | DOC-03 | Phase 5 | Complete |
 | DOC-04 | Phase 5 | Complete |
+| RULES-01 | Phase 6 | Planned |
+| RULES-02 | Phase 6 | Planned |
+| RULES-03 | Phase 6 | Planned |
+| RULES-04 | Phase 6 | Planned |
+| RULES-05 | Phase 6 | Planned |
+| RULES-06 | Phase 6 | Planned |
+| RULES-07 | Phase 6 | Planned |
+| RULES-08 | Phase 6 | Planned |
+| RULES-09 | Phase 6 | Planned |
+| RULES-10 | Phase 6 | Planned |
+| RULES-11 | Phase 6 | Planned |
+| RULES-12 | Phase 6 | Planned |
+| RULES-13 | Phase 6 | Planned |
+| RULES-14 | Phase 6 | Planned |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 36
-- Unmapped: 0 ✓
+- v1 requirements: 36 total (complete)
+- Phase 6 requirements: 14 total (planned)
+- Mapped to phases: 50
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-11*
-*Last updated: 2026-03-11 after initial definition*
+*Last updated: 2026-03-14 after Phase 6 planning*
