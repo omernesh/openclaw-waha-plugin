@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 05-documentation-and-testing 05-02-PLAN.md
-last_updated: "2026-03-13T22:03:24.566Z"
+stopped_at: Completed 05-documentation-and-testing 05-01-PLAN.md
+last_updated: "2026-03-13T22:05:27.128Z"
 last_activity: 2026-03-11 -- Phase 03→04 transition
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 ---
@@ -71,6 +71,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 04-multi-session P02 | 5 | 1 tasks | 3 files |
 | Phase 04-multi-session P04-03 | 7 | 2 tasks | 4 files |
 | Phase 05-documentation-and-testing P02 | 4 | 2 tasks | 2 files |
+| Phase 05-documentation-and-testing P05-01 | 5 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,7 @@ Recent decisions affecting current work:
 - [Phase 04-multi-session]: readMessages uses p.limit != null guard to correctly handle limit=0 edge case
 - [Phase 05-documentation-and-testing]: SKILL.md bumped to v4.0.0 (major version) to signal significant multi-session capability addition
 - [Phase 05-documentation-and-testing]: README troubleshooting section structured as named issues with symptom/cause/fix for scannability
+- [Phase 05-01]: Wrote tests matching actual implementation behavior — toArr returns [] for primitives not [val], resolveChatId returns empty string not throws
 
 ### Pending Todos
 
@@ -119,6 +121,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T22:03:24.561Z
-Stopped at: Completed 05-documentation-and-testing 05-02-PLAN.md
+Last session: 2026-03-13T22:05:27.123Z
+Stopped at: Completed 05-documentation-and-testing 05-01-PLAN.md
 Resume file: None
