@@ -40,14 +40,14 @@ created: 2026-03-14
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 06-01-01 | 01 | 1 | RULES-01 | unit | `npm test -- tests/rules-loader.test.ts` | ❌ W0 | ⬜ pending |
 | 06-01-02 | 01 | 1 | RULES-02 | unit | `npm test -- tests/identity-resolver.test.ts` | ❌ W0 | ⬜ pending |
-| 06-02-01 | 02 | 1 | RULES-03 | unit | `npm test -- tests/rules-merge.test.ts` | ❌ W0 | ⬜ pending |
-| 06-02-02 | 02 | 1 | RULES-04, RULES-05 | unit | `npm test -- tests/rules-resolver.test.ts` | ❌ W0 | ⬜ pending |
-| 06-03-01 | 03 | 2 | RULES-06 | unit | `npm test -- tests/policy-enforcer.test.ts` | ❌ W0 | ⬜ pending |
-| 06-03-02 | 03 | 2 | RULES-07 | unit | `npm test -- tests/policy-cache.test.ts` | ❌ W0 | ⬜ pending |
-| 06-04-01 | 04 | 2 | RULES-08 | unit | `npm test -- tests/manager-authorizer.test.ts` | ❌ W0 | ⬜ pending |
-| 06-04-02 | 04 | 2 | RULES-09 | unit | `npm test -- tests/resolved-payload-builder.test.ts` | ❌ W0 | ⬜ pending |
-| 06-05-01 | 05 | 3 | RULES-10 | integration | manual verification via gateway logs | N/A | ⬜ pending |
-| 06-05-02 | 05 | 3 | RULES-11 | unit | `npm test -- tests/policy-edit.test.ts` | ❌ W0 | ⬜ pending |
+| 06-02-01 | 02 | 2 | RULES-03 | unit | `npm test -- tests/rules-merge.test.ts` | ❌ W0 | ⬜ pending |
+| 06-02-02 | 02 | 2 | RULES-04, RULES-05 | unit | `npm test -- tests/rules-resolver.test.ts` | ❌ W0 | ⬜ pending |
+| 06-03-01 | 03 | 3 | RULES-06 | unit | `npm test -- tests/policy-enforcer.test.ts` | ❌ W0 | ⬜ pending |
+| 06-03-02 | 03 | 3 | RULES-07 | unit | `npm test -- tests/policy-cache.test.ts` | ❌ W0 | ⬜ pending |
+| 06-04-01 | 04 | 4 | RULES-08 | unit | `npm test -- tests/manager-authorizer.test.ts` | ❌ W0 | ⬜ pending |
+| 06-04-02 | 04 | 4 | RULES-09 | unit | `npm test -- tests/resolved-payload-builder.test.ts` | ❌ W0 | ⬜ pending |
+| 06-05-01 | 05 | 4 | RULES-10 | integration | manual verification via gateway logs | N/A | ⬜ pending |
+| 06-05-02 | 05 | 4 | RULES-11 | unit | `npm test -- tests/policy-edit.test.ts` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
