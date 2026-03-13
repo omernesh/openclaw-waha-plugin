@@ -41,9 +41,9 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 
 ### Multi-Session
 
-- [ ] **MSESS-01**: Session registry in plugin config — each session has name, sessionId, role (bot/human), sub-role (full-access/listener)
-- [ ] **MSESS-02**: Roles are extensible — new role types can be added without code changes
-- [ ] **MSESS-03**: Listener sub-role blocks all outgoing message sends
+- [x] **MSESS-01**: Session registry in plugin config — each session has name, sessionId, role (bot/human), sub-role (full-access/listener)
+- [x] **MSESS-02**: Roles are extensible — new role types can be added without code changes
+- [x] **MSESS-03**: Listener sub-role blocks all outgoing message sends
 - [ ] **MSESS-04**: Admin panel tab to manage sessions — assign roles/sub-roles, view connection status
 - [ ] **MSESS-05**: Configurable trigger word (e.g., `!sammie`) — when detected in any chat, strip prefix and route text as bot prompt
 - [ ] **MSESS-06**: Trigger word matching is case-insensitive
@@ -119,9 +119,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | FEAT-05 | Phase 3 | Complete |
 | FEAT-06 | Phase 3 | Complete |
 | FEAT-07 | Phase 3 | Complete |
-| MSESS-01 | Phase 4 | Pending |
-| MSESS-02 | Phase 4 | Pending |
-| MSESS-03 | Phase 4 | Pending |
+| MSESS-01 | Phase 4 | Complete |
+| MSESS-02 | Phase 4 | Complete |
+| MSESS-03 | Phase 4 | Complete |
 | MSESS-04 | Phase 4 | Pending |
 | MSESS-05 | Phase 4 | Pending |
 | MSESS-06 | Phase 4 | Pending |
