@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 06-whatsapp-rules-and-policy-system 06-03-PLAN.md
-last_updated: "2026-03-13T23:09:57.239Z"
+stopped_at: Completed 06-whatsapp-rules-and-policy-system 06-04-PLAN.md
+last_updated: "2026-03-13T23:21:34.196Z"
 last_activity: 2026-03-11 -- Phase 03→04 transition
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 83
 ---
 
@@ -91,6 +91,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 06-whatsapp-rules-and-policy-system P01 | 5 | 2 tasks | 11 files |
 | Phase 06-whatsapp-rules-and-policy-system P02 | 3 | 2 tasks | 6 files |
 | Phase 06-whatsapp-rules-and-policy-system P03 | 7min | 2 tasks | 4 files |
+| Phase 06-whatsapp-rules-and-policy-system P04 | 9 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ Recent decisions affecting current work:
 - [Phase 06-whatsapp-rules-and-policy-system]: participants_allowlist IDs in YAML stored as raw JIDs (not stable IDs) — resolver normalizes them via normalizeToStableId before comparison
 - [Phase 06-whatsapp-rules-and-policy-system]: admins allowlist mode treated as none in v1 — admin list requires WAHA API call not available synchronously
 - [Phase 06-whatsapp-rules-and-policy-system]: Cache key for group resolver uses stableGroupId+stableSenderId compound to isolate per-sender results
+- [Phase 06-whatsapp-rules-and-policy-system]: Fail-open design for assertPolicyCanSend: rules errors never block sends, only explicit policy denials do
+- [Phase 06-whatsapp-rules-and-policy-system]: executePolicyEdit extracted to policy-edit.ts for testability (follows trigger-word.ts pattern)
 
 ### Roadmap Evolution
 
@@ -151,6 +154,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T23:09:57.228Z
-Stopped at: Completed 06-whatsapp-rules-and-policy-system 06-03-PLAN.md
+Last session: 2026-03-13T23:21:34.191Z
+Stopped at: Completed 06-whatsapp-rules-and-policy-system 06-04-PLAN.md
 Resume file: None

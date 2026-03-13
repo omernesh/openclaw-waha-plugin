@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Feature Gaps** - URL previews, mute/unmute, mentions detection, multi-recipient send, and better errors (completed 2026-03-11)
 - [x] **Phase 4: Multi-Session** - Session registry with roles, trigger word activation, cross-session routing, and admin panel management (completed 2026-03-13)
 - [x] **Phase 5: Documentation and Testing** - SKILL.md refresh, unit tests, integration tests, and README (completed 2026-03-13)
-- [ ] **Phase 6: WhatsApp Rules and Policy System** - Lazy-loaded YAML rules with hierarchical policies, merge engine, manager authorization, and compact policy injection
+- [x] **Phase 6: WhatsApp Rules and Policy System** - Lazy-loaded YAML rules with hierarchical policies, merge engine, manager authorization, and compact policy injection (completed 2026-03-13)
 
 ## Phase Details
 
@@ -133,4 +133,4 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 | 3. Feature Gaps | 3/3 | Complete   | 2026-03-11 |
 | 4. Multi-Session | 4/4 | Complete   | 2026-03-13 |
 | 5. Documentation and Testing | 2/2 | Complete   | 2026-03-13 |
-| 6. WhatsApp Rules and Policy System | 2/4 | In Progress|  |
+| 6. WhatsApp Rules and Policy System | 4/4 | Complete   | 2026-03-13 |
