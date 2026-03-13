@@ -29,6 +29,10 @@ import { extractMentionedJids } from "./mentions.js";
 // Re-export for external consumers (plan specifies extractMentionedJids in inbound.ts exports)
 export { extractMentionedJids } from "./mentions.js";
 import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
+// Phase 4 Plan 02: Trigger word detection — pure functions extracted to trigger-word.ts for testability.
+// Re-exported here so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
+export { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
+import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
 
 const CHANNEL_ID = "waha" as const;
 
@@ -305,7 +309,35 @@ export async function handleWahaInbound(params: {
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
 
+  // Phase 4 Plan 02: Trigger word detection — check before group filters.
+  // Trigger-word messages are explicit bot invocations and bypass group keyword filtering.
+  // triggerWord config is per-account (e.g., "!sammie"). Case-insensitive.
+  // DO NOT MOVE above rawBody calculation — detectTriggerWord needs the text body.
+  // DO NOT MOVE below group filter — trigger must bypass it (see RESEARCH.md Open Question 1).
+  // Added Phase 4, Plan 02. DO NOT REMOVE.
+  let effectiveBody = rawBody;
+  let triggerActivated = false;
+  let triggerResponseChatId = chatId; // default: respond in same chat
+  const triggerWord = account.config.triggerWord;
+  if (isGroup && triggerWord) {
+    const triggerResult = detectTriggerWord(rawBody, triggerWord);
+    if (triggerResult.triggered) {
+      triggerActivated = true;
+      effectiveBody = triggerResult.strippedText || rawBody; // preserve original if stripped is empty
+      const triggerResponseMode = account.config.triggerResponseMode ?? "dm";
+      if (triggerResponseMode === "dm") {
+        // Respond via DM to the sender (participant in group, or from in DM)
+        triggerResponseChatId = resolveTriggerTarget(message);
+        runtime.log?.(`waha: trigger activated in group ${chatId}, responding via DM to ${triggerResponseChatId}`);
+      } else {
+        // "reply-in-chat": respond in the same group chat
+        runtime.log?.(`waha: trigger activated in group ${chatId}, responding in-chat`);
+      }
+    }
+  }
+
   // Group whitelist: if allowedGroups is set, only respond in those groups
+  // Trigger-word activation still respects allowedGroups — only configured groups accepted.
   if (isGroup) {
     const allowedGroups = account.config.allowedGroups;
     if (allowedGroups && allowedGroups.length > 0 && !allowedGroups.includes(chatId)) {
@@ -316,7 +348,8 @@ export async function handleWahaInbound(params: {
 
   // Group keyword filter: silently drop group messages that don't match patterns
   // (enabled by default — getGroupFilter applies defaults internally)
-  if (isGroup) {
+  // SKIP for trigger-word messages — explicit invocation bypasses keyword filter.
+  if (isGroup && !triggerActivated) {
     const groupFilter = getGroupFilter(config, account.accountId);
     const filterResult = groupFilter.check({
       text: rawBody,
@@ -362,7 +395,7 @@ export async function handleWahaInbound(params: {
   });
   const useAccessGroups =
     (config.commands as Record<string, unknown> | undefined)?.useAccessGroups !== false;
-  const hasControlCommand = core.channel.text.hasControlCommand(rawBody, config as OpenClawConfig);
+  const hasControlCommand = core.channel.text.hasControlCommand(effectiveBody, config as OpenClawConfig);
 
   const access = resolveDmGroupAccessWithCommandGate({
     isGroup,
@@ -492,17 +525,23 @@ export async function handleWahaInbound(params: {
     }
   }
 
+  // Phase 4 Plan 02: When trigger is activated in DM mode, route response to sender's JID.
+  // triggerResponseChatId is already set to resolveTriggerTarget(message) above.
+  // In non-trigger context, triggerResponseChatId === chatId (unchanged). DO NOT REMOVE.
+  const responseChatId = triggerResponseChatId;
+  const responseChatIsGroup = isGroup && responseChatId === chatId; // DM-mode trigger routes to user, not group
+
   const route = core.channel.routing.resolveAgentRoute({
     cfg: config as OpenClawConfig,
     channel: CHANNEL_ID,
     accountId: account.accountId,
     peer: {
-      kind: isGroup ? "group" : "direct",
-      id: chatId,
+      kind: responseChatIsGroup ? "group" : "direct",
+      id: responseChatId,
     },
   });
 
-  const fromLabel = isGroup ? `chat:${chatId}` : `user:${senderId}`;
+  const fromLabel = responseChatIsGroup ? `chat:${chatId}` : `user:${senderId}`;
   const storePath = core.channel.session.resolveStorePath(
     (config.session as Record<string, unknown> | undefined)?.store as string | undefined,
     { agentId: route.agentId },
@@ -519,23 +558,23 @@ export async function handleWahaInbound(params: {
     timestamp: message.timestamp,
     previousTimestamp,
     envelope: envelopeOptions,
-    body: rawBody,
+    body: effectiveBody,
   });
 
   const ctxPayload = core.channel.reply.finalizeInboundContext({
     Body: body,
-    BodyForAgent: rawBody,
-    RawBody: rawBody,
-    CommandBody: rawBody,
-    From: isGroup ? `waha:chat:${chatId}` : `waha:${senderId}`,
-    To: `waha:${chatId}`,
+    BodyForAgent: effectiveBody,
+    RawBody: effectiveBody,
+    CommandBody: effectiveBody,
+    From: responseChatIsGroup ? `waha:chat:${chatId}` : `waha:${senderId}`,
+    To: `waha:${responseChatId}`,
     SessionKey: route.sessionKey,
     AccountId: route.accountId,
-    ChatType: isGroup ? "group" : "direct",
+    ChatType: responseChatIsGroup ? "group" : "direct",
     ConversationLabel: fromLabel,
     SenderName: undefined,
     SenderId: senderId,
-    GroupSubject: isGroup ? chatId : undefined,
+    GroupSubject: responseChatIsGroup ? chatId : undefined,
     Provider: CHANNEL_ID,
     Surface: CHANNEL_ID,
     WasMentioned: undefined,
@@ -568,18 +607,19 @@ export async function handleWahaInbound(params: {
   });
 
   // Start human presence simulation (read delay + typing indicator)
+  // Use responseChatId — for trigger DM mode, presence is shown in the DM, not the group.
   const presenceCtrl = await startHumanPresence({
     cfg: config as CoreConfig,
-    chatId,
+    chatId: responseChatId,
     messageId: message.messageId,
-    incomingText: rawBody,
+    incomingText: effectiveBody,
     accountId: account.accountId,
   });
 
   const deliverReply = createNormalizedOutboundDeliverer(async (payload) => {
     await deliverWahaReply({
       payload,
-      chatId,
+      chatId: responseChatId,
       accountId: account.accountId,
       statusSink,
       cfg: config as CoreConfig,
@@ -596,7 +636,7 @@ export async function handleWahaInbound(params: {
         deliver: deliverReply,
         onError: (err, info) => {
           // Cancel typing on error
-          presenceCtrl.cancelTyping().catch(warnOnError(`inbound presence cancel-typing ${chatId}`));
+          presenceCtrl.cancelTyping().catch(warnOnError(`inbound presence cancel-typing ${responseChatId}`));
           runtime.error?.(`waha ${info.kind} reply failed: ${String(err)}`);
         },
       },
@@ -611,7 +651,7 @@ export async function handleWahaInbound(params: {
   } finally {
     // Guarantee typing is stopped after dispatch — handles empty responses,
     // errors, and any path where deliverReply was never called
-    await presenceCtrl.cancelTyping().catch(warnOnError(`inbound presence cancel-typing ${chatId}`));
+    await presenceCtrl.cancelTyping().catch(warnOnError(`inbound presence cancel-typing ${responseChatId}`));
     // Clean up image temp file after native pipeline has processed it
     if (mediaDownload) await mediaDownload.cleanup().catch(warnOnError("media cleanup"));
   }
