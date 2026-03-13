@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 04-multi-session 04-02-PLAN.md
-last_updated: "2026-03-13T21:06:47.998Z"
+stopped_at: Completed 04-multi-session 04-03-PLAN.md
+last_updated: "2026-03-13T21:09:31.191Z"
 last_activity: 2026-03-11 -- Phase 03→04 transition
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 ---
@@ -69,6 +69,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 04-multi-session P04-01 | 10 | 2 tasks | 7 files |
 | Phase 04-multi-session P04 | 8 | 2 tasks | 1 files |
 | Phase 04-multi-session P02 | 5 | 1 tasks | 3 files |
+| Phase 04-multi-session P04-03 | 7 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,9 @@ Recent decisions affecting current work:
 - [Phase 04-multi-session]: Sessions tab is read-only — role changes via Config tab or config API, not inline editing
 - [Phase 04-multi-session]: Sessions endpoint enriched: merges config role/subRole with live health state and WAHA status per session
 - [Phase 04-multi-session]: Extracted detectTriggerWord/resolveTriggerTarget to src/trigger-word.ts for testability — follows mentions.ts pattern from Phase 3 Plan 02
+- [Phase 04-multi-session]: Dependency injection for checkMembership enables unit tests without mocking WAHA API
+- [Phase 04-multi-session]: Cross-session routing in handleAction is best-effort fallback (silent fail, WAHA errors naturally)
+- [Phase 04-multi-session]: readMessages uses p.limit != null guard to correctly handle limit=0 edge case
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T21:06:47.990Z
-Stopped at: Completed 04-multi-session 04-02-PLAN.md
+Last session: 2026-03-13T21:09:31.186Z
+Stopped at: Completed 04-multi-session 04-03-PLAN.md
 Resume file: None

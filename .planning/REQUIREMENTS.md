@@ -48,9 +48,9 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [x] **MSESS-05**: Configurable trigger word (e.g., `!sammie`) — when detected in any chat, strip prefix and route text as bot prompt
 - [x] **MSESS-06**: Trigger word matching is case-insensitive
 - [x] **MSESS-07**: Bot responds to trigger-word prompts via DM to the requesting user by default
-- [ ] **MSESS-08**: If user requests group delivery and bot is a member, bot sends from its own session
-- [ ] **MSESS-09**: If bot is not a member of the target group, send via user's session (respecting role/sub-role permissions)
-- [ ] **MSESS-10**: Bot can read recent messages from chats it monitors (via listener sessions) to fulfill context prompts
+- [x] **MSESS-08**: If user requests group delivery and bot is a member, bot sends from its own session
+- [x] **MSESS-09**: If bot is not a member of the target group, send via user's session (respecting role/sub-role permissions)
+- [x] **MSESS-10**: Bot can read recent messages from chats it monitors (via listener sessions) to fulfill context prompts
 
 ### Documentation
 
@@ -126,9 +126,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | MSESS-05 | Phase 4 | Complete |
 | MSESS-06 | Phase 4 | Complete |
 | MSESS-07 | Phase 4 | Complete |
-| MSESS-08 | Phase 4 | Pending |
-| MSESS-09 | Phase 4 | Pending |
-| MSESS-10 | Phase 4 | Pending |
+| MSESS-08 | Phase 4 | Complete |
+| MSESS-09 | Phase 4 | Complete |
+| MSESS-10 | Phase 4 | Complete |
 | DOC-01 | Phase 5 | Pending |
 | DOC-02 | Phase 5 | Pending |
 | DOC-03 | Phase 5 | Pending |
