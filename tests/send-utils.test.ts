@@ -63,11 +63,20 @@ describe("fuzzyScore", () => {
     expect(fuzzyScore("work", "work channel")).toBe(0.9);
   });
 
+  it("returns 0.85 when query starts with name (name is prefix of query)", () => {
+    expect(fuzzyScore("sammie test group and more", "sammie test group")).toBe(0.85);
+  });
+
   it("returns 0.8 when all query words are found in the name (but not exact or prefix)", () => {
     // "test group" is found in "sammie test group" but "sammie test group".startsWith("test group") = false
     // both "test" and "group" are present → 0.8
     expect(fuzzyScore("test group", "sammie test group")).toBe(0.8);
   });
+
+  // NOTE: The 0.7 tier (n.includes(q)) is unreachable in practice. If the full query
+  // string is a substring of the name, then every individual word of the query is also
+  // a substring of the name, so the 0.8 "all words found" check always fires first.
+  // No test added because no input can reach this code path.
 
   it("returns 0.5 when any query word is found but not all words match", () => {
     // "alice work" — "alice" IS in "alice personal chat" but "work" is NOT
@@ -99,7 +108,7 @@ describe("fuzzyScore", () => {
 describe("toArr", () => {
   it("passes an existing array through unchanged (same reference)", () => {
     const arr = ["a", "b", "c"];
-    expect(toArr(arr)).toBe(arr);
+    expect(toArr(arr)).toBe(arr); // same reference is intentional contract
   });
 
   it("returns Object.values when given a plain object", () => {
@@ -121,5 +130,14 @@ describe("toArr", () => {
 
   it("returns empty array for a number (primitives are not wrapped)", () => {
     expect(toArr(42)).toEqual([]);
+  });
+
+  it("returns empty array for empty object", () => {
+    expect(toArr({})).toEqual([]);
+  });
+
+  it("returns Object.values for JID-keyed dict (WAHA API pattern)", () => {
+    const dict = { "972@c.us": { name: "Omer" }, "120@g.us": { name: "Group" } };
+    expect(toArr(dict)).toEqual([{ name: "Omer" }, { name: "Group" }]);
   });
 });

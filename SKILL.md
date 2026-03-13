@@ -13,7 +13,7 @@ version: 4.0.0
 | Task | Action | Key Parameters |
 |------|--------|---------------|
 | Send text | `send` | text (via target resolution) |
-| Send text to multiple chats | `sendMulti` | targets[], text |
+| Send text to multiple chats | `sendMulti` | recipients[], text |
 | Send contact card | `send` | contacts: [{fullName, phoneNumber}] |
 | Create poll | `poll` | name, options[], multipleAnswers |
 | Send image | `sendImage` | chatId, file (direct URL), caption? |
@@ -250,7 +250,7 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 | `muteChat` | chatId, duration? (seconds) |
 | `unmuteChat` | chatId |
 | `readMessages` | chatId, limit? (1-50, default 10) |
-| `sendMulti` | targets[], text |
+| `sendMulti` | recipients[], text |
 
 ## Group Management
 

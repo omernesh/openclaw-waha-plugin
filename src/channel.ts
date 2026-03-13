@@ -438,7 +438,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
   handleAction: async ({ action, params, cfg, accountId, toolContext }) => {
     const p = params as Record<string, unknown>;
     const coreCfg = cfg as CoreConfig;
-    const aid = accountId ?? undefined;
+    const aid = accountId;
 
     // Cache config for outbound adapter (sendText/sendMedia/sendPoll)
     _cachedConfig = coreCfg;

@@ -201,7 +201,7 @@ vi.mock("../src/normalize.js", () => ({
 }));
 
 vi.mock("../src/error-formatter.js", () => ({
-  formatActionError: vi.fn((err: unknown) => String(err)),
+  formatActionError: vi.fn((err: unknown, _opts?: Record<string, unknown>) => String(err)),
 }));
 
 vi.mock("../src/accounts.js", async () => {
@@ -293,11 +293,30 @@ describe("autoResolveTarget", () => {
     expect(result).toBe("resolved@g.us");
   });
 
+  it("returns a bare phone number (no +) as-is", async () => {
+    const result = await autoResolveTarget("972544329000", makeCfg());
+    expect(result).toBe("972544329000");
+    expect(mockResolveWahaTarget).not.toHaveBeenCalled();
+  });
+
+  it("triggers name resolution for short numbers (< 6 digits)", async () => {
+    mockResolveWahaTarget.mockResolvedValue({ matches: [{ jid: "12345@c.us", name: "Short", confidence: 1 }] });
+    const result = await autoResolveTarget("12345", makeCfg());
+    expect(result).toBe("12345@c.us");
+    expect(mockResolveWahaTarget).toHaveBeenCalled();
+  });
+
+  it("returns exactly 6 digits as phone (PHONE_RE boundary: {6,})", async () => {
+    const result = await autoResolveTarget("123456", makeCfg());
+    expect(result).toBe("123456");
+    expect(mockResolveWahaTarget).not.toHaveBeenCalled();
+  });
+
   it("throws an error when resolveWahaTarget finds no matches", async () => {
     mockResolveWahaTarget.mockResolvedValue({ matches: [] });
 
     await expect(autoResolveTarget("unknown contact", makeCfg())).rejects.toThrow(
-      /Could not resolve/
+      /Could not resolve "unknown contact"/
     );
   });
 });

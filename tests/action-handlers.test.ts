@@ -185,7 +185,7 @@ vi.mock("../src/send.js", () => ({
   getWahaAllLids: vi.fn(),
   rejectWahaCall: vi.fn(),
   assertCanSend: vi.fn(),
-  toArr: (v: unknown) => (Array.isArray(v) ? v : []),
+  toArr: vi.fn((v: unknown) => (Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v as Record<string, unknown>) : [])),
   fuzzyScore: vi.fn(),
 }));
 
@@ -211,7 +211,7 @@ vi.mock("../src/normalize.js", () => ({
 }));
 
 vi.mock("../src/error-formatter.js", () => ({
-  formatActionError: vi.fn((err: unknown) => String(err)),
+  formatActionError: vi.fn((err: unknown, _opts?: Record<string, unknown>) => String(err)),
 }));
 
 vi.mock("../src/accounts.js", async () => {
@@ -229,6 +229,8 @@ vi.mock("../src/accounts.js", async () => {
 
 import { wahaPlugin } from "../src/channel.js";
 import type { CoreConfig } from "../src/types.js";
+
+type ActionResult = { content: Array<{ type: string; text: string }>; isError?: boolean };
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -270,7 +272,7 @@ describe("send action handler", () => {
     expect(mockSendWahaText).toHaveBeenCalledWith(
       expect.objectContaining({ to: "972544329000@c.us", text: "hello" })
     );
-    expect((result as any).content[0].text).toContain("msg-abc");
+    expect((result as ActionResult).content[0].text).toContain("msg-abc");
   });
 
   it("error path: returns formatted error when sendWahaText throws", async () => {
@@ -284,7 +286,7 @@ describe("send action handler", () => {
     });
 
     // Error is formatted and returned (not thrown to caller)
-    expect((result as any).content[0].text).toContain("WAHA unreachable");
+    expect((result as ActionResult).content[0].text).toContain("WAHA unreachable");
   });
 });
 
@@ -319,7 +321,7 @@ describe("poll action handler", () => {
         options: ["A", "B", "C"],
       })
     );
-    expect((result as any).content[0].text).toContain("poll-xyz");
+    expect((result as ActionResult).content[0].text).toContain("poll-xyz");
   });
 
   it("error path: returns formatted error when sendWahaPoll throws", async () => {
@@ -336,7 +338,7 @@ describe("poll action handler", () => {
       accountId: undefined,
     });
 
-    expect((result as any).content[0].text).toContain("Poll creation failed");
+    expect((result as ActionResult).content[0].text).toContain("Poll creation failed");
   });
 });
 
@@ -371,7 +373,7 @@ describe("edit action handler", () => {
         text: "edited text",
       })
     );
-    expect((result as any).content[0].text).toContain("true_xxx_yyy");
+    expect((result as ActionResult).content[0].text).toContain("true_xxx_yyy");
   });
 
   it("error path: returns formatted error when editWahaMessage throws", async () => {
@@ -388,7 +390,7 @@ describe("edit action handler", () => {
       accountId: undefined,
     });
 
-    expect((result as any).content[0].text).toContain("Message not found");
+    expect((result as ActionResult).content[0].text).toContain("Message not found");
   });
 });
 
@@ -419,7 +421,7 @@ describe("search action handler", () => {
     expect(mockResolveWahaTarget).toHaveBeenCalledWith(
       expect.objectContaining({ query: "sammie" })
     );
-    const parsed = JSON.parse((result as any).content[0].text);
+    const parsed = JSON.parse((result as ActionResult).content[0].text);
     expect(parsed.matches).toEqual(matches);
   });
 
@@ -433,6 +435,6 @@ describe("search action handler", () => {
       accountId: undefined,
     });
 
-    expect((result as any).content[0].text).toContain("WAHA search failed");
+    expect((result as ActionResult).content[0].text).toContain("WAHA search failed");
   });
 });
