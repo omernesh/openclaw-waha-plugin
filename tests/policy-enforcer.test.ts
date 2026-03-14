@@ -82,62 +82,52 @@ afterEach(() => {
 // -- Tests --
 
 describe("assertPolicyCanSend", () => {
-  it("blocks DM send when can_initiate=false", async () => {
+  it("blocks DM send when can_initiate=false", () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     writeContactDefault(tmpDir, false); // can_initiate: false
     const cfg = makeCfgWithRulesPath(tmpDir);
 
-    await expect(
-      assertPolicyCanSend("972544329000@c.us", cfg)
-    ).rejects.toThrow(/can_initiate=false/);
+    expect(() => assertPolicyCanSend("972544329000@c.us", cfg)).toThrow(/can_initiate=false/);
   });
 
-  it("passes DM send when can_initiate=true", async () => {
+  it("passes DM send when can_initiate=true", () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     writeContactDefault(tmpDir, true); // can_initiate: true
     const cfg = makeCfgWithRulesPath(tmpDir);
 
-    await expect(
-      assertPolicyCanSend("972544329000@c.us", cfg)
-    ).resolves.toBeUndefined();
+    expect(() => assertPolicyCanSend("972544329000@c.us", cfg)).not.toThrow();
   });
 
-  it("blocks group send when participation_mode=silent_observer", async () => {
+  it("blocks group send when participation_mode=silent_observer", () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     writeContactDefault(tmpDir, false);
     writeGroupDefault(tmpDir, "silent_observer");
     const cfg = makeCfgWithRulesPath(tmpDir);
 
-    await expect(
-      assertPolicyCanSend("120363421825201386@g.us", cfg)
-    ).rejects.toThrow(/silent_observer/);
+    expect(() => assertPolicyCanSend("120363421825201386@g.us", cfg)).toThrow(/silent_observer/);
   });
 
-  it("passes group send when participation_mode is not silent_observer", async () => {
+  it("passes group send when participation_mode is not silent_observer", () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     writeContactDefault(tmpDir, false);
     writeGroupDefault(tmpDir, "open");
     const cfg = makeCfgWithRulesPath(tmpDir);
 
-    await expect(
-      assertPolicyCanSend("120363421825201386@g.us", cfg)
-    ).resolves.toBeUndefined();
+    expect(() => assertPolicyCanSend("120363421825201386@g.us", cfg)).not.toThrow();
   });
 
-  it("passes when rules directory does not exist (fail-open)", async () => {
+  it("passes when rules directory does not exist (fail-open)", () => {
     const cfg = makeCfgWithRulesPath("/non/existent/rules/path/xyz12345");
 
     // Fail-open: if rules directory doesn't exist, pass without error
-    await expect(
-      assertPolicyCanSend("972544329000@c.us", cfg)
-    ).resolves.toBeUndefined();
+    expect(() => assertPolicyCanSend("972544329000@c.us", cfg)).not.toThrow();
   });
 
-  it("passes on resolution error when rules dir exists but YAML is malformed (fail-open)", async () => {
+  it("passes on resolution error when rules dir exists but YAML is malformed (fail-open)", () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     // Create contacts dir with malformed YAML — resolution should fail gracefully
@@ -171,16 +161,12 @@ describe("assertPolicyCanSend", () => {
     writeContactDefault(tmpDir, true); // valid, non-blocking
     const cfg = makeCfgWithRulesPath(tmpDir);
 
-    await expect(
-      assertPolicyCanSend("972544329000@c.us", cfg)
-    ).resolves.toBeUndefined();
+    expect(() => assertPolicyCanSend("972544329000@c.us", cfg)).not.toThrow();
   });
 
-  it("passes when no waha config present in cfg (fail-open)", async () => {
+  it("passes when no waha config present in cfg (fail-open)", () => {
     const cfg: CoreConfig = {} as CoreConfig;
 
-    await expect(
-      assertPolicyCanSend("972544329000@c.us", cfg)
-    ).resolves.toBeUndefined();
+    expect(() => assertPolicyCanSend("972544329000@c.us", cfg)).not.toThrow();
   });
 });

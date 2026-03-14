@@ -12,6 +12,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { parse as parseYaml } from "yaml";
+import { z } from "zod";
 import {
   ContactRuleSchema,
   GroupRuleSchema,
@@ -22,23 +23,16 @@ import {
 } from "./rules-types.js";
 
 /**
- * Load and validate a contact rule override file.
- *
- * @param filePath - Absolute path to the YAML file.
- * @returns Parsed partial ContactRule, or null if missing/malformed.
- *
- * Error handling:
- *   ENOENT   -> return null (missing file is normal — no override for this contact)
- *   Parse error -> return null + log warning
- *   Validation error -> return null + log warning
+ * Generic rule file loader — reads YAML, parses, and validates against a zod schema.
+ * Returns null (never throws) on missing or malformed files.
  */
-export function loadContactRule(filePath: string): Partial<ContactRule> | null {
+function loadRule<T>(filePath: string, schema: z.ZodType<T>, label: string): Partial<T> | null {
   let raw: string;
   try {
     raw = fs.readFileSync(filePath, "utf8");
   } catch (err: unknown) {
     if (isEnoentError(err)) return null;
-    console.warn(`[waha] rules: error reading contact rule ${filePath}:`, err);
+    console.warn(`[waha] rules: error reading ${label} rule ${filePath}:`, err);
     return null;
   }
 
@@ -46,11 +40,11 @@ export function loadContactRule(filePath: string): Partial<ContactRule> | null {
   try {
     parsed = parseYaml(raw);
   } catch (err) {
-    console.warn(`[waha] rules: malformed YAML in contact rule ${filePath}:`, err);
+    console.warn(`[waha] rules: malformed YAML in ${label} rule ${filePath}:`, err);
     return null;
   }
 
-  const result = ContactRuleSchema.safeParse(parsed);
+  const result = schema.safeParse(parsed);
   if (!result.success) {
     console.warn(
       `[waha] rules: malformed override ${filePath}: ${result.error.message}`
@@ -58,7 +52,17 @@ export function loadContactRule(filePath: string): Partial<ContactRule> | null {
     return null;
   }
 
-  return result.data;
+  return result.data as Partial<T>;
+}
+
+/**
+ * Load and validate a contact rule override file.
+ *
+ * @param filePath - Absolute path to the YAML file.
+ * @returns Parsed partial ContactRule, or null if missing/malformed.
+ */
+export function loadContactRule(filePath: string): Partial<ContactRule> | null {
+  return loadRule(filePath, ContactRuleSchema, "contact");
 }
 
 /**
@@ -68,32 +72,7 @@ export function loadContactRule(filePath: string): Partial<ContactRule> | null {
  * @returns Parsed partial GroupRule, or null if missing/malformed.
  */
 export function loadGroupRule(filePath: string): Partial<GroupRule> | null {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(filePath, "utf8");
-  } catch (err: unknown) {
-    if (isEnoentError(err)) return null;
-    console.warn(`[waha] rules: error reading group rule ${filePath}:`, err);
-    return null;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = parseYaml(raw);
-  } catch (err) {
-    console.warn(`[waha] rules: malformed YAML in group rule ${filePath}:`, err);
-    return null;
-  }
-
-  const result = GroupRuleSchema.safeParse(parsed);
-  if (!result.success) {
-    console.warn(
-      `[waha] rules: malformed override ${filePath}: ${result.error.message}`
-    );
-    return null;
-  }
-
-  return result.data;
+  return loadRule(filePath, GroupRuleSchema, "group");
 }
 
 /**

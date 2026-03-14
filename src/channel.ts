@@ -294,7 +294,7 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
     const actorId = String(p.actorId ?? "");
     if (!actorId) throw new Error("editPolicy: actorId is required (provide the caller's stable JID)");
     const basePath = getRulesBasePath(cfg);
-    const result = await executePolicyEdit({
+    const result = executePolicyEdit({
       scope,
       targetId,
       field,

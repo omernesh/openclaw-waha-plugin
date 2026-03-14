@@ -95,7 +95,7 @@ export interface PolicyEditResult {
  *
  * @returns { success, message, error? }
  */
-export async function executePolicyEdit(params: PolicyEditParams): Promise<PolicyEditResult> {
+export function executePolicyEdit(params: PolicyEditParams): PolicyEditResult {
   const { scope, targetId, field, value, actorId, basePath, safeName } = params;
 
   // Step 1: Normalize targetId to stable ID
@@ -160,7 +160,7 @@ export async function executePolicyEdit(params: PolicyEditParams): Promise<Polic
         existingData = parsed as Record<string, unknown>;
       }
     } catch (err) {
-      // Malformed existing override — start fresh rather than corrupting further
+      console.warn(`[waha] policy-edit: failed to parse existing override ${overrideFilePath}, starting fresh:`, err);
       existingData = {};
     }
   }
@@ -174,13 +174,19 @@ export async function executePolicyEdit(params: PolicyEditParams): Promise<Polic
     existingData[field] = value;
   }
 
-  // Step 9: Ensure parent directory exists
+  // Step 9: Ensure parent directory exists and write updated YAML
   const parentDir = path.dirname(overrideFilePath);
-  fs.mkdirSync(parentDir, { recursive: true });
-
-  // Step 10: Write updated YAML
-  const yamlStr = stringifyYaml(existingData);
-  fs.writeFileSync(overrideFilePath, yamlStr, "utf8");
+  try {
+    fs.mkdirSync(parentDir, { recursive: true });
+    const yamlStr = stringifyYaml(existingData);
+    fs.writeFileSync(overrideFilePath, yamlStr, "utf8");
+  } catch (err) {
+    return {
+      success: false,
+      message: `Failed to write policy override for ${targetId}.`,
+      error: `File write failed: ${String(err)}`,
+    };
+  }
 
   // Step 11: Invalidate policy cache for the affected scope
   // Cache key is stableId (contacts) or stableId:senderId (groups with compound key)

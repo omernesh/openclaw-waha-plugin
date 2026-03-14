@@ -200,7 +200,7 @@ export async function sendWahaText(params: {
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
   // Fail-open: if rules not configured or resolution fails, send proceeds normally.
   // Only blocks on explicit policy denial (can_initiate=false or silent_observer group).
-  await assertPolicyCanSend(chatId, params.cfg);
+  assertPolicyCanSend(chatId, params.cfg);
 
   // Auto link preview: add linkPreview: true when text contains a URL and config allows.
   // Default is true (autoLinkPreview not set or true). Only skip when explicitly false.
@@ -413,7 +413,7 @@ export async function sendWahaImage(params: {
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendImage requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
-  await assertPolicyCanSend(chatId, params.cfg);
+  assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
   return callWahaApi({
     baseUrl: account.baseUrl,
@@ -442,7 +442,7 @@ export async function sendWahaVideo(params: {
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendVideo requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
-  await assertPolicyCanSend(chatId, params.cfg);
+  assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
   return callWahaApi({
     baseUrl: account.baseUrl,
@@ -472,7 +472,7 @@ export async function sendWahaFile(params: {
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendFile requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
-  await assertPolicyCanSend(chatId, params.cfg);
+  assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
   return callWahaApi({
     baseUrl: account.baseUrl,

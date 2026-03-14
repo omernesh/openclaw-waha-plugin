@@ -12,7 +12,7 @@
  *   - appoint_manager / revoke_manager: owner-only; all others denied
  */
 
-import { OWNER_ID } from "./rules-types";
+import { OWNER_ID } from "./rules-types.js";
 
 export interface ManagerAuthorizationParams {
   /** The actor requesting the action (stable ID format, e.g. @c:...) */

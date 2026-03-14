@@ -23,6 +23,7 @@
 import * as fs from "fs";
 import { getRulesBasePath } from "./identity-resolver.js";
 import { resolveOutboundPolicy } from "./rules-resolver.js";
+import type { ResolvedPolicy } from "./rules-types.js";
 import type { CoreConfig } from "./types.js";
 
 /**
@@ -33,7 +34,7 @@ import type { CoreConfig } from "./types.js";
  *
  * @throws Error if policy explicitly blocks the send (can_initiate=false or silent_observer)
  */
-export async function assertPolicyCanSend(chatId: string, cfg: CoreConfig): Promise<void> {
+export function assertPolicyCanSend(chatId: string, cfg: CoreConfig): void {
   // Step 1: Get the rules base path
   const basePath = getRulesBasePath(cfg);
 
@@ -43,17 +44,17 @@ export async function assertPolicyCanSend(chatId: string, cfg: CoreConfig): Prom
     if (!fs.existsSync(basePath)) {
       return;
     }
-  } catch {
-    // If existsSync itself fails (permissions, etc.), fail-open
+  } catch (err) {
+    console.warn("[waha] policy-enforcer: failed to check rules directory:", err);
     return;
   }
 
   // Step 3: Attempt policy resolution — fail-open on any error
-  let policy: Awaited<ReturnType<typeof resolveOutboundPolicy>>;
+  let policy: ResolvedPolicy | null;
   try {
-    policy = await resolveOutboundPolicy({ chatId, basePath });
-  } catch {
-    // Resolution error — fail-open, do not block send
+    policy = resolveOutboundPolicy({ chatId, basePath });
+  } catch (err) {
+    console.warn("[waha] policy-enforcer: outbound resolution failed, allowing send:", err);
     return;
   }
 

@@ -36,7 +36,10 @@ import { SYSTEM_CONTACT_DEFAULTS } from "./rules-types.js";
 function getMtime(filePath: string): number {
   try {
     return fs.statSync(filePath).mtimeMs;
-  } catch {
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "code" in err && (err as {code:string}).code !== "ENOENT") {
+      console.warn(`[waha] rules: failed to stat ${filePath}:`, err);
+    }
     return 0;
   }
 }
@@ -67,11 +70,11 @@ function combinedMtime(...mtimes: number[]): number {
  * @param params.basePath - Rules base directory
  * @param params.safeName - Optional human-readable name prefix for override files
  */
-export async function resolveContactPolicy(params: {
+export function resolveContactPolicy(params: {
   chatId: string;
   basePath: string;
   safeName?: string;
-}): Promise<ResolvedPolicy> {
+}): ResolvedPolicy {
   const { chatId, basePath, safeName } = params;
   const stableId = normalizeToStableId(chatId);
 
@@ -90,7 +93,7 @@ export async function resolveContactPolicy(params: {
   const globalDefault = loadDefaultContactRule(basePath);
 
   // Load override (null if missing or malformed — graceful degradation)
-  const override = fs.existsSync(overrideFilePath) ? loadContactRule(overrideFilePath) : null;
+  const override = loadContactRule(overrideFilePath);
 
   // Merge layers: [globalDefault, override]
   const merged = mergeRuleLayers<ContactRule>([globalDefault, override]);
@@ -122,13 +125,13 @@ export async function resolveContactPolicy(params: {
  * @param params.senderId - Raw WAHA JID of the message sender
  * @param params.basePath - Rules base directory
  */
-export async function resolveGroupPolicy(params: {
+export function resolveGroupPolicy(params: {
   chatId: string;
   senderId: string;
   basePath: string;
   safeName?: string;
   senderSafeName?: string;
-}): Promise<ResolvedPolicy> {
+}): ResolvedPolicy {
   const { chatId, senderId, basePath, safeName, senderSafeName } = params;
 
   const stableGroupId = normalizeToStableId(chatId);
@@ -147,7 +150,7 @@ export async function resolveGroupPolicy(params: {
 
   // Load and merge group rule
   const globalGroupDefault = loadDefaultGroupRule(basePath);
-  const groupOverride = fs.existsSync(groupOverridePath) ? loadGroupRule(groupOverridePath) : null;
+  const groupOverride = loadGroupRule(groupOverridePath);
   const mergedGroup = mergeRuleLayers<GroupRule>([globalGroupDefault, groupOverride]);
   const effectiveGroup: GroupRule = { ...globalGroupDefault, ...mergedGroup };
 
@@ -207,10 +210,10 @@ export async function resolveGroupPolicy(params: {
     }
   }
 
-  // Apply participation_mode override from observe_only policy
-  if (participationModeOverride) {
-    (effectiveGroup as GroupRule).participation_mode = participationModeOverride as GroupRule["participation_mode"];
-  }
+  // Apply participation_mode override from observe_only policy (immutable)
+  const finalGroup = participationModeOverride
+    ? { ...effectiveGroup, participation_mode: participationModeOverride as GroupRule["participation_mode"] }
+    : effectiveGroup;
 
   // -- Step 5: Evaluate contact_rule_mode --
   let speakerContactRule: Partial<ContactRule> | undefined;
@@ -220,9 +223,7 @@ export async function resolveGroupPolicy(params: {
     // Load speaker's contact policy (global default + override)
     const contactDefault = loadDefaultContactRule(basePath);
     const contactOverridePath = findOverrideFile(basePath, "contacts", stableSenderId, senderSafeName);
-    const contactOverride = fs.existsSync(contactOverridePath)
-      ? loadContactRule(contactOverridePath)
-      : null;
+    const contactOverride = loadContactRule(contactOverridePath);
 
     const mergedContact = mergeRuleLayers<ContactRule>([contactDefault, contactOverride]);
     const effectiveContact: ContactRule = { ...contactDefault, ...mergedContact };
@@ -241,7 +242,7 @@ export async function resolveGroupPolicy(params: {
 
   // -- Step 6: Build payload --
   const policy = buildGroupPayload({
-    groupRule: effectiveGroup,
+    groupRule: finalGroup,
     targetId: stableGroupId,
     speakerId: stableSenderId,
     speakerAllowed,
@@ -265,23 +266,23 @@ export async function resolveGroupPolicy(params: {
  * @param params.senderId - Raw WAHA sender JID (used for DMs: sender = contact)
  * @param params.basePath - Rules base directory
  */
-export async function resolveInboundPolicy(params: {
+export function resolveInboundPolicy(params: {
   isGroup: boolean;
   chatId: string;
   senderId: string;
   basePath: string;
-}): Promise<ResolvedPolicy | null> {
+}): ResolvedPolicy | null {
   const { isGroup, chatId, senderId, basePath } = params;
 
   try {
     if (isGroup) {
-      return await resolveGroupPolicy({ chatId, senderId, basePath });
+      return resolveGroupPolicy({ chatId, senderId, basePath });
     } else {
-      // For DM: the sender IS the contact (not the chatId, which may differ from sender in some systems)
-      return await resolveContactPolicy({ chatId: senderId, basePath });
+      return resolveContactPolicy({ chatId: senderId, basePath });
     }
   } catch (err) {
-    console.warn("[waha] rules resolution failed:", err);
+    const errName = err instanceof Error ? err.constructor.name : "unknown";
+    console.warn(`[waha] rules resolution failed (${errName}):`, err);
     return null;
   }
 }
@@ -296,21 +297,22 @@ export async function resolveInboundPolicy(params: {
  *
  * Returns null on error (non-fatal).
  */
-export async function resolveOutboundPolicy(params: {
+export function resolveOutboundPolicy(params: {
   chatId: string;
   basePath: string;
-}): Promise<ResolvedPolicy | null> {
+}): ResolvedPolicy | null {
   const { chatId, basePath } = params;
 
   try {
     const normalized = chatId.trim().toLowerCase();
     if (normalized.endsWith("@g.us")) {
-      return await resolveGroupPolicy({ chatId, senderId: "", basePath });
+      return resolveGroupPolicy({ chatId, senderId: "", basePath });
     } else {
-      return await resolveContactPolicy({ chatId, basePath });
+      return resolveContactPolicy({ chatId, basePath });
     }
   } catch (err) {
-    console.warn("[waha] rules outbound resolution failed:", err);
+    const errName = err instanceof Error ? err.constructor.name : "unknown";
+    console.warn(`[waha] rules resolution failed (${errName}):`, err);
     return null;
   }
 }

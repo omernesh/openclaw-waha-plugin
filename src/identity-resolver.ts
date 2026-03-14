@@ -31,6 +31,10 @@ import type { CoreConfig } from "./types.js";
 export function normalizeToStableId(jid: string): string {
   const normalized = jid.trim().toLowerCase();
 
+  if (normalized.startsWith("@c:") || normalized.startsWith("@g:") || normalized.startsWith("@lid:")) {
+    return normalized;
+  }
+
   if (normalized.endsWith("@g.us")) {
     return `@g:${normalized}`;
   }

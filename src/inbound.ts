@@ -537,10 +537,10 @@ export async function handleWahaInbound(params: {
   let resolvedPolicy: ResolvedPolicy | null = null;
   try {
     const rulesBasePath = getRulesBasePath(config);
-    resolvedPolicy = await resolveInboundPolicy({
+    resolvedPolicy = resolveInboundPolicy({
       isGroup,
       chatId,
-      senderId: message.from,
+      senderId,
       basePath: rulesBasePath,
     });
   } catch (err) {

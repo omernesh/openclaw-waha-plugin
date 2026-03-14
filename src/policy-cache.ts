@@ -11,7 +11,7 @@
  */
 
 import { LRUCache } from "lru-cache";
-import type { ResolvedPolicy } from "./rules-types";
+import type { ResolvedPolicy } from "./rules-types.js";
 
 export interface PolicyCacheOptions {
   /** Maximum number of entries (default: 500) */
