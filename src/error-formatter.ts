@@ -2,7 +2,7 @@
 // ║  ERROR FORMATTER — DO NOT CHANGE                                    ║
 // ║                                                                     ║
 // ║  Centralized action error to LLM message mapper. Converts raw       ║
-// ║  errors into actionable guidance for Sammie (the LLM).              ║
+// ║  errors into actionable guidance for the AI agent (the LLM).        ║
 // ║                                                                     ║
 // ║  Added in Phase 2, Plan 01 (2026-03-11).                           ║
 // ║  Every handleAction error flows through formatActionError().         ║

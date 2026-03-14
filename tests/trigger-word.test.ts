@@ -6,58 +6,58 @@ import type { WahaInboundMessage } from "../src/types.js";
 
 describe("detectTriggerWord", () => {
   it("detects trigger at start and strips prefix", () => {
-    const result = detectTriggerWord("!sammie hello", "!sammie");
+    const result = detectTriggerWord("!bot hello", "!bot");
     expect(result).toEqual({ triggered: true, strippedText: "hello" });
   });
 
   it("is case-insensitive for trigger word", () => {
-    const result = detectTriggerWord("!SAMMIE hello", "!sammie");
+    const result = detectTriggerWord("!BOT hello", "!bot");
     expect(result).toEqual({ triggered: true, strippedText: "hello" });
   });
 
   it("is case-insensitive for mixed-case trigger config", () => {
-    const result = detectTriggerWord("!Sammie Hello world", "!SAMMIE");
+    const result = detectTriggerWord("!Bot Hello world", "!BOT");
     expect(result).toEqual({ triggered: true, strippedText: "Hello world" });
   });
 
   it("returns empty strippedText when nothing follows trigger", () => {
-    const result = detectTriggerWord("!sammie", "!sammie");
+    const result = detectTriggerWord("!bot", "!bot");
     expect(result).toEqual({ triggered: true, strippedText: "" });
   });
 
   it("returns empty strippedText for trigger with only whitespace after", () => {
-    const result = detectTriggerWord("!sammie   ", "!sammie");
+    const result = detectTriggerWord("!bot   ", "!bot");
     expect(result).toEqual({ triggered: true, strippedText: "" });
   });
 
   it("does NOT trigger when trigger word is not at start", () => {
-    const result = detectTriggerWord("hello !sammie", "!sammie");
-    expect(result).toEqual({ triggered: false, strippedText: "hello !sammie" });
+    const result = detectTriggerWord("hello !bot", "!bot");
+    expect(result).toEqual({ triggered: false, strippedText: "hello !bot" });
   });
 
   it("does NOT trigger for unrelated message", () => {
-    const result = detectTriggerWord("hello world", "!sammie");
+    const result = detectTriggerWord("hello world", "!bot");
     expect(result).toEqual({ triggered: false, strippedText: "hello world" });
   });
 
   it("does NOT trigger when triggerWord is empty string", () => {
-    const result = detectTriggerWord("!sammie hello", "");
-    expect(result).toEqual({ triggered: false, strippedText: "!sammie hello" });
+    const result = detectTriggerWord("!bot hello", "");
+    expect(result).toEqual({ triggered: false, strippedText: "!bot hello" });
   });
 
   it("does NOT trigger when triggerWord is undefined", () => {
-    const result = detectTriggerWord("!sammie hello", undefined);
-    expect(result).toEqual({ triggered: false, strippedText: "!sammie hello" });
+    const result = detectTriggerWord("!bot hello", undefined);
+    expect(result).toEqual({ triggered: false, strippedText: "!bot hello" });
   });
 
   it("handles leading whitespace before trigger word", () => {
-    // trimStart is applied before matching — ' !sammie hello' still triggers
-    const result = detectTriggerWord("  !sammie hello", "!sammie");
+    // trimStart is applied before matching — ' !bot hello' still triggers
+    const result = detectTriggerWord("  !bot hello", "!bot");
     expect(result).toEqual({ triggered: true, strippedText: "hello" });
   });
 
   it("handles empty message with no trigger", () => {
-    const result = detectTriggerWord("", "!sammie");
+    const result = detectTriggerWord("", "!bot");
     expect(result).toEqual({ triggered: false, strippedText: "" });
   });
 
@@ -67,7 +67,7 @@ describe("detectTriggerWord", () => {
   });
 
   it("strips only the trigger prefix, leaving rest of prompt intact", () => {
-    const result = detectTriggerWord("!sammie what is the weather today?", "!sammie");
+    const result = detectTriggerWord("!bot what is the weather today?", "!bot");
     expect(result).toEqual({ triggered: true, strippedText: "what is the weather today?" });
   });
 });
@@ -81,7 +81,7 @@ describe("resolveTriggerTarget", () => {
     from: "120363421825201386@g.us",  // group JID
     fromMe: false,
     chatId: "120363421825201386@g.us",
-    body: "!sammie hello",
+    body: "!bot hello",
     hasMedia: false,
   };
 

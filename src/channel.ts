@@ -268,7 +268,7 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   // The name "search" makes the LLM naturally put queries in PARAMETERS (not
   // as a target), solving the rejection issue without any core gateway changes.
   //
-  // Verified: 2026-03-11 — "list all Hebrew groups" works via Sammie
+  // Verified: 2026-03-11 — "list all Hebrew groups" works via the bot
   // Added: 2026-03-11
   search: (p, cfg, aid) => resolveWahaTarget({
     cfg,
@@ -372,7 +372,7 @@ export function resolveChatId(params: Record<string, unknown>, toolContext?: { c
 // ║  Auto-resolves human-readable names to WhatsApp JIDs.              ║
 // ║  Called by standard action handlers (send, poll, etc.) when the    ║
 // ║  chatId doesn't look like a JID or phone number.                  ║
-// ║  This is what allows "send hello to sammie test group" to work.   ║
+// ║  This is what allows "send hello to test group" to work.          ║
 // ║                                                                    ║
 // ║  Added: 2026-03-10                                                 ║
 // ╚══════════════════════════════════════════════════════════════════════╝

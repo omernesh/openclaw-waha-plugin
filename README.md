@@ -1,838 +1,263 @@
-# OpenClaw WAHA Plugin -- Developer Reference
+# OpenClaw WAHA Plugin
 
-**Plugin ID:** `waha`
-**Platform:** WhatsApp (via WAHA HTTP API)
-**Last updated:** 2026-03-13
-**Version:** 1.11.0
+**The most comprehensive WhatsApp integration for OpenClaw.**
 
-## Changelog
+Full WhatsApp API access through [WAHA](https://waha.devlike.pro/) -- groups, channels, media, polls, reactions, stickers, voice messages, contact cards, labels, status/stories, presence, and more. 87%+ WAHA API coverage.
 
-### v1.11.0 — Multi-Session Support (2026-03-13)
-- **Phase 4**: Multi-session roles: `bot` / `human` with `full-access` / `listener` sub-roles
-- **Phase 4**: Trigger word activation: `triggerWord` config gates bot activation in group chats
-- **Phase 4**: Cross-session routing: bot uses its own session when a group member, falls back to human session
-- **Phase 4**: `readMessages` action: read recent messages from any monitored chat (limit 1-50)
-- **Phase 4**: Sessions tab in admin panel: live session health enriched with role and WAHA status
-- **Phase 3**: `muteChat` / `unmuteChat` actions for chat notification control
-- **Phase 3**: `sendMulti` action: send text to multiple chats in a single action (sequential, rate-limited)
-- **Phase 3**: Auto link preview: URLs in text messages automatically get rich link preview cards (`autoLinkPreview: true` by default)
-- **Phase 3**: Mention extraction: `@mentions` in inbound messages are extracted and surfaced to the agent
-- **Phase 2**: Session health monitoring: automatic health pings detect disconnects before they affect messages
-- **Phase 2**: Inbound message queue: prevents message loss under bursts; DM/group queues configurable
-- **Phase 1**: Request timeouts: all WAHA API calls time out after 30 seconds (configurable)
-- **Phase 1**: Rate limiter: token-bucket rate limiting protects WAHA from being overwhelmed
-- **Phase 1**: Automatic retry: 429 responses retried up to 3 times with exponential backoff (1s/2s/4s)
-- **Phase 1**: Webhook deduplication: composite key (eventType:messageId) prevents double-processing
+**Plugin ID:** `waha` | **Version:** 1.11.0 | **Last updated:** 2026-03-14
 
-### v1.9.4 — Contact Cards, Group Join & Channel Follow (2026-03-10)
-- **Added**: Contact card (vCard) sending via `send` action with `contacts` parameter
-- **Added**: `joinGroup` action — join groups via WhatsApp invite link code
-- **Added**: `followChannel` / `unfollowChannel` actions for newsletters
-- **Added**: `sendImage`, `sendVideo`, `sendFile` exposed as explicit actions
-- **Updated**: SKILL.md v3.1.0 with comprehensive action documentation and quick reference
-
-### v1.9.3 (2026-03-10) -- Outbound Media Fix
-- **Fixed**: Images/videos sent by Sammie now arrive as proper WhatsApp media (imageMessage/videoMessage) instead of file attachments (documentMessage)
-- **Fixed**: MIME detection for URLs with query parameters (e.g., `image.png?token=abc`)
-- **Fixed**: HTTP HEAD fallback for MIME detection on extensionless URLs
-- **Fixed**: Outbound adapter config crash (`readConfigFile is not a function`) — replaced with cached config
-- **Added**: Direct `sendImage`/`sendVideo`/`sendFile` actions (bypass MIME detection, route to correct WAHA endpoint)
-- **Added**: Extended MIME type map (+11 formats: SVG, BMP, TIFF, WebM, MOV, AVI, MKV, FLAC, AAC, WMA)
-- **Updated**: SKILL.md with media sending instructions for the agent
-
-### v1.9.2 (2026-03-10) -- Fix: Image Analysis via Native Pipeline
-- **Bug fix**: Images sent via WhatsApp were not being analyzed by Sammie. Root cause: `downloadWahaMedia()` saved temp files to `/tmp/waha-media-*` which is outside OpenClaw's allowed media path roots (`/tmp/openclaw/`). The native `applyMediaUnderstanding()` pipeline silently rejected these paths.
-- **Fix in media.ts**: Changed download path to `/tmp/openclaw/waha-media-*` with `mkdir` recursive to ensure the directory exists.
-- **Fix in inbound.ts**: For image messages, downloads the image from WAHA and passes it as `MediaPath`/`MediaPaths`/`MediaTypes` on the context payload, letting OpenClaw's native media-understanding pipeline analyze it (same pipeline Telegram uses). Previously, the plugin called LiteLLM vision API directly which failed with 401 (no API key in systemd env).
-- Audio transcription (local Whisper) unchanged and working correctly.
-
-### v1.9.1 (2026-03-10) -- Fix: Voice Transcription Disabled by Config
-- **Bug fix**: `mediaPreprocessing.enabled` was `false` in openclaw.json, silently disabling ALL media preprocessing (voice transcription, image analysis, video analysis, location resolution, vCard parsing, document analysis)
-- Voice messages were passed through as raw media URLs, causing the agent to reply "can't transcribe audio"
-- Added DO NOT CHANGE warnings to `media.ts` and `inbound.ts` around the preprocessing master switch and config passthrough
-- Root cause: `enabled: false` is a master kill switch that overrides all individual sub-toggles (`audioTranscription`, `imageAnalysis`, etc.)
-- **Config requirement**: `channels.waha.mediaPreprocessing.enabled` MUST be `true` for any media processing to occur
-
-### v1.9.0 (2026-03-10) -- BREAKING: Action Names Fix
-- **BREAKING**: `listActions()` now returns only gateway-standard names (send, poll, react, edit, unsend, pin, unpin, read, delete, reply) plus curated utility actions
-- Custom WAHA action names (sendPoll, editMessage, etc.) were rejected by gateway's MESSAGE_ACTION_TARGET_MODE
-- Added `messaging.targetResolver` to recognize WAHA JID formats (@c.us, @g.us, @lid, @s.whatsapp.net, @newsletter)
-- Added `messaging.normalizeTarget` to strip waha:/whatsapp:/chat: prefixes
-- Fixed poll chatId fallback chain: params.to -> params.chatId -> toolContext.currentChannelId
-- Fixed send.ts session guardrail (was hardcoded to logan-only, now blocks only omer)
-- Removed stale backup files from production
-- Added DO NOT CHANGE warnings throughout critical code sections
-- **Verified actions**: send DM, poll, react, edit, unsend, getGroups, sendLocation (sendEvent fails -- NOWEB limitation)
-
-### v1.8.0--v1.8.7 (2026-03-08--09)
-- v1.8.0: Added messaging.targetResolver for JID recognition
-- v1.8.2: Fixed poll chatId fallback, directory name resolution
-- v1.8.3--v1.8.5: Directory fixes (WAHA dict->array, LID dedup, newsletter names, rate limiter)
-- v1.8.6: Fixed duplicate webhook processing (message vs message.any)
-- v1.8.7: Fixed config save path, admin panel verified (all 4 tabs working)
-
-### v1.4.0 (2026-03-08)
-- **Typing indicator bug fix:** Inline flicker loop in `startHumanPresence` now guarantees `typing: false` on loop exit, eliminating lingering "typing..." state after message delivery. Added 100ms drain delay after `flickerPromise` to prevent race condition on final stop signal.
-- **Admin GUI -- Media Preprocessing toggles:** New "Media Preprocessing" section in Settings tab with master toggle and independent sub-toggles for audio transcription, image analysis, video analysis, location resolution, vCard parsing, and document analysis.
-- **Admin GUI -- Dynamic WAHA session picker:** Connection section now has a dropdown populated from `GET /api/admin/sessions` (proxies to WAHA `/api/sessions/`), replacing the read-only session text field.
-- **Admin GUI -- Directory Refresh button:** Directory tab now has "Refresh from WAHA" button that calls `POST /api/admin/directory/refresh`, bulk-importing all contacts and groups from WAHA API into the local SQLite directory.
-- **Poll Handling & Event Handling:** Displayed as "Automatic (built-in)" in the Features section -- no user configuration needed.
-- **New API endpoints:** `GET /api/admin/sessions`, `POST /api/admin/directory/refresh`.
-- **`bulkUpsertContacts()`:** New method on `DirectoryDb` for transactional batch upsert.
+[![npm](https://img.shields.io/npm/v/waha-openclaw-channel)](https://www.npmjs.com/package/waha-openclaw-channel)
 
 ---
 
-## 1. Overview
+## Why WAHA over wa-cli?
 
-This plugin bridges OpenClaw AI agents to WhatsApp through the WAHA (WhatsApp HTTP API) server. It enables the "Sammie" bot to receive WhatsApp messages via webhook, route them through OpenClaw's AI agent pipeline, and deliver replies back through WAHA -- including text responses and TTS-generated voice notes.
-
-The plugin operates as a channel adapter within the OpenClaw plugin-sdk framework. It:
-
-- Runs an HTTP webhook server to receive inbound WAHA events
-- Applies access control (DM policy, group allowlists with both `@c.us` and `@lid` JID formats)
-- Simulates human-like presence (read receipts, typing indicators with random pauses) before replying
-- Delivers AI-generated text and voice replies through WAHA's REST API
-- Enforces session role guardrails (listener sessions cannot send; bot sessions have full access)
-- Exposes only gateway-standard action names (v1.9.0+) for reliable LLM tool invocation
-
-### Feature Highlights by Phase
-
-| Phase | Feature | Config / Action |
-|-------|---------|----------------|
-| Phase 1 — Reliability | Request timeouts (30s default) | `timeoutMs` |
-| Phase 1 — Reliability | Token-bucket rate limiting | `rateLimitCapacity`, `rateLimitRefillRate` |
-| Phase 1 — Reliability | Automatic 429 retry (1s/2s/4s backoff) | automatic |
-| Phase 1 — Reliability | Webhook deduplication (no duplicate events) | automatic |
-| Phase 2 — Resilience | Session health monitoring (auto-detect disconnects) | `healthCheckIntervalMs` |
-| Phase 2 — Resilience | Inbound message queue (no message loss under bursts) | `dmQueueSize`, `groupQueueSize` |
-| Phase 3 — Features | Auto link preview in text messages | `autoLinkPreview` (default true) |
-| Phase 3 — Features | Chat mute / unmute | `muteChat`, `unmuteChat` actions |
-| Phase 3 — Features | Multi-recipient send | `sendMulti` action |
-| Phase 3 — Features | Mention extraction from inbound messages | automatic |
-| Phase 4 — Multi-Session | Bot / human session roles | `role`, `subRole` config |
-| Phase 4 — Multi-Session | Trigger word activation in group chats | `triggerWord`, `triggerResponseMode` |
-| Phase 4 — Multi-Session | Cross-session routing for group sends | automatic |
-| Phase 4 — Multi-Session | Read recent messages from any chat | `readMessages` action |
-| Phase 4 — Multi-Session | Sessions tab in admin panel | admin panel |
+- **Full WhatsApp API** -- groups, channels, newsletters, polls, reactions, stickers, voice bubbles, contact cards, labels, status/stories, presence management
+- **Multi-session support** -- run bot + human sessions with role-based access control (`bot`/`human`, `full-access`/`listener`)
+- **Built-in reliability** -- request timeouts, token-bucket rate limiting, automatic retry with exponential backoff, webhook deduplication
+- **Human mimicry** -- realistic typing indicators, read receipts, random pauses that make the bot feel human
+- **Inbound message queue** -- prevents message loss under load; separate DM and group queues
+- **Session health monitoring** -- automatic health pings detect disconnects before they affect messages
+- **Rules & policy system** -- file-based YAML rules for per-contact and per-group behavior control (v1.11)
+- **Admin panel** -- web UI with real-time monitoring, directory browser, config editor, session health
+- **Auto name resolution** -- send messages using human-readable names ("send hello to test group")
+- **Media pipeline** -- voice transcription (Whisper), image analysis, video description, vCard parsing, location geocoding
 
 ---
 
-## Critical Configuration
+## Quick Start
 
-This plugin requires specific OpenClaw configuration to function. See [SETUP_AND_TROUBLESHOOTING.md](docs/SETUP_AND_TROUBLESHOOTING.md) for the complete guide.
-
-**Minimum required in openclaw.json:**
-- `plugins.allow: ["waha"]` -- plugin ID must match `openclaw.plugin.json` id
-- `tools.alsoAllow: ["message"]` -- **CRITICAL** -- without this, the coding tools profile filters out the `message` tool, so the LLM cannot invoke any actions
-- `channels.waha.session` -- must be the outbound session (logan), not inbound (omer)
-- `channels.waha.apiKey` -- use `WHATSAPP_API_KEY` env var (not `WAHA_API_KEY`)
-
-**Action names (v1.9.0):**
-- `listActions()` returns only gateway-standard names: `send`, `poll`, `react`, `edit`, `unsend`, `pin`, `unpin`, `read`, `delete`, `reply`, plus curated utility actions
-- Custom WAHA names (sendPoll, editMessage, etc.) are rejected by the gateway's `MESSAGE_ACTION_TARGET_MODE` map and must NOT be used
-
----
-
-## Verified Actions (v1.9.0)
-
-Test results from manual verification on 2026-03-10:
-
-| Action | Status | Notes |
-|--------|--------|-------|
-| send (DM) | PASS | Text message to individual chat |
-| poll | PASS | Create poll in group or DM. chatId fallback: params.to -> params.chatId -> toolContext.currentChannelId |
-| react | PASS | Emoji reaction on message. Requires full messageId (`true_chatId_shortId`) |
-| edit | PASS | Edit previously sent message |
-| unsend | PASS | Delete/unsend a message |
-| getGroups | PASS | List groups via WAHA API |
-| sendLocation | PASS | Send GPS coordinates |
-| sendEvent | FAIL | WAHA NOWEB engine limitation -- endpoint not available in WAHA 2026.3.2 |
-| pinMessage | FAIL | Endpoint not available in WAHA 2026.3.2 NOWEB |
-| sendTextStatus | FAIL | Endpoint not available in WAHA 2026.3.2 NOWEB |
-
----
-
-## 2. File Listing
-
-| File | Lines | Description |
-|------|-------|-------------|
-| `channel.ts` | ~340 | Channel plugin registration and lifecycle. Exports the `ChannelPlugin` definition with metadata, capabilities (reactions, media, markdown), account resolution, and outbound delivery adapter. Wires up the webhook monitor, inbound handler, and send functions. |
-| `inbound.ts` | ~380 | Inbound message handler. Receives parsed `WahaInboundMessage` from the monitor, applies DM/group access control via `resolveDmGroupAccessWithCommandGate`, runs the DM keyword filter, starts the human presence simulation, dispatches the message to the AI agent, and delivers the reply. |
-| `dm-filter.ts` | ~145 | DM keyword filter. `DmFilter` class with regex caching, god mode bypass for super-users, and stats tracking (dropped/allowed/tokensEstimatedSaved). Fail-open: any error allows messages through. |
-| `send.ts` | ~1600 | All WAHA API HTTP calls (~1600 lines), name resolution, fuzzy matching, media handling, group/contact/channel management. |
-| `presence.ts` | ~170 | Human mimicry presence system. Implements the 4-phase presence simulation: seen, read delay, typing with random pauses (flicker), and reply-length padding. Exports `startHumanPresence()` which returns a `PresenceController` with `finishTyping()` and `cancelTyping()` methods. |
-| `types.ts` | ~130 | TypeScript type definitions. Defines `CoreConfig`, `WahaChannelConfig`, `WahaAccountConfig`, `PresenceConfig`, `DmFilterConfig`, `WahaWebhookEnvelope`, `WahaInboundMessage`, `WahaReactionEvent`, and `WahaWebhookConfig`. |
-| `config-schema.ts` | ~86 | Zod validation schema for the `channels.waha` config section. Validates all account-level and channel-level settings including secret inputs, policies, presence parameters, DM filter config, and markdown options. |
-| `accounts.ts` | ~140 | Multi-account resolution. Resolves which WAHA account (baseUrl, apiKey, session) to use for a given operation. Supports a default account plus named sub-accounts under `channels.waha.accounts`. Handles API key resolution from env vars, files, or direct strings. |
-| `normalize.ts` | ~30 | JID normalization utilities. `normalizeWahaMessagingTarget()` strips `waha:`, `whatsapp:`, `chat:` prefixes. `normalizeWahaAllowEntry()` lowercases for allowlist comparison. `resolveWahaAllowlistMatch()` checks if a sender JID is in the allowlist (supports `*` wildcard). |
-| `monitor.ts` | ~506 | Webhook HTTP server, health monitoring, and admin panel. Starts an HTTP server on the configured port (default 8050). Handles `/healthz`, `/admin` (HTML dashboard), `/api/admin/stats` (JSON stats), and the main webhook path. Validates HMAC signatures and dispatches inbound events. Only processes `message` events (not `message.any`) to prevent duplicate webhook processing. |
-| `runtime.ts` | ~15 | Runtime singleton access. `setWahaRuntime()` / `getWahaRuntime()` store and retrieve the OpenClaw `PluginRuntime` instance for use across modules. |
-| `signature.ts` | ~30 | HMAC webhook verification. `verifyWahaWebhookHmac()` validates the `X-Webhook-Hmac` header using SHA-512, accepting hex or base64 signature formats. Uses `crypto.timingSafeEqual()` for constant-time comparison. |
-| `secret-input.ts` | ~15 | Secret field schema. Re-exports OpenClaw SDK secret input utilities and provides `buildSecretInputSchema()` which accepts either a plain string or a `{ source, provider, id }` object for env/file/exec-based secret resolution. |
-| `media.ts` | ~470 | Media preprocessing pipeline. Downloads media from WAHA to `/tmp/openclaw/waha-media-*` (must be under `/tmp/openclaw/` for OpenClaw's allowed media path roots), transcribes audio via local faster-whisper, passes images through OpenClaw's native media-understanding pipeline, describes videos via Gemini, reverse-geocodes locations, parses vCards, extracts document metadata. **DO NOT disable `mediaPreprocessing.enabled`** -- it is the master kill switch for all processing. |
-
----
-
-## 3. DM Keyword Filter
-
-The DM keyword filter (`dm-filter.ts`) gates inbound DMs by keyword BEFORE they reach the AI agent. Only messages matching at least one pattern are processed; others are silently dropped. This prevents the AI from consuming tokens on irrelevant or unsolicited messages.
-
-### Config (under `channels.waha`)
-
-```json
-"dmFilter": {
-  "enabled": true,
-  "mentionPatterns": ["sammie", "help", "hello", "bot", "ai"],
-  "godModeBypass": true,
-  "godModeSuperUsers": [
-    { "identifier": "972544329000", "platform": "whatsapp", "passwordRequired": false }
-  ],
-  "tokenEstimate": 2500
-}
-```
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | `boolean` | `false` | Enable/disable the filter |
-| `mentionPatterns` | `string[]` | `[]` | Regex patterns (case-insensitive). Message must match at least one. Empty list means no restriction. |
-| `godModeBypass` | `boolean` | `true` | Super-users bypass the filter entirely |
-| `godModeSuperUsers` | `array` | `[]` | List of users who bypass the filter (phone in E.164 or JID format) |
-| `tokenEstimate` | `number` | `2500` | Estimated tokens saved per dropped message (used for stats display) |
-
-### Behavior
-
-- **Filter disabled**: All messages pass through (stats count as allowed)
-- **No patterns**: All messages pass through (no restriction configured)
-- **God mode**: Super-users bypass pattern matching entirely. Israeli phone normalization handles 05X/972X/+972X and JID suffixes (`@c.us`, `@lid`, `@s.whatsapp.net`)
-- **Pattern match**: Message is allowed if ANY pattern matches (case-insensitive regex)
-- **No match**: Message is silently dropped -- no reply, no error, no pairing message
-- **Fail-open**: Any error in the filter allows the message through (avoids outages from filter bugs)
-
-### Regex caching
-
-Patterns are compiled to `RegExp` objects once and cached. The cache key is the joined pattern array. If config updates (e.g. via `updateConfig()`), the cache is invalidated and rebuilt on next check.
-
-### Stats tracking
-
-The filter maintains runtime counters per account:
-- `dropped`: messages silently dropped
-- `allowed`: messages passed through
-- `tokensEstimatedSaved`: `dropped * tokenEstimate` -- rough estimate of AI tokens saved
-
-Recent events (last 50) are stored in memory with timestamp, pass/fail, reason, and text preview.
-
----
-
-## 4. Admin Panel
-
-A browser-based admin panel is served at `http://<host>:<webhookPort>/admin` (default port 8050).
-
-### Access
-
-```
-http://100.114.126.43:8050/admin
-```
-
-### Features
-
-- **DM Filter card**: Shows enabled status, keyword patterns, stats (dropped/allowed/tokens saved), and a live event log (last 20 events with timestamp, reason, and message preview)
-- **Presence System card**: Displays current presence config (wpm, read delays, typing durations, jitter)
-- **Access Control card**: Shows dmPolicy, groupPolicy, allowFrom, groupAllowFrom, and allowedGroups
-- **Session Info card**: Shows session name, baseUrl, webhookPort, and server time
-- **Settings tab**: Media preprocessing toggles, WAHA session picker, connection settings
-- **Directory tab**: Browse contacts (11), groups (123), newsletters (85). Refresh from WAHA button. Group participants lazy-load on click.
-- **Auto-refresh**: Reloads stats every 30 seconds. Manual refresh via button.
-
-### Stats API
-
-```bash
-curl http://100.114.126.43:8050/api/admin/stats
-```
-
-Returns JSON:
-```json
-{
-  "dmFilter": {
-    "enabled": true,
-    "patterns": ["sammie", "help"],
-    "stats": { "dropped": 5, "allowed": 12, "tokensEstimatedSaved": 12500 },
-    "recentEvents": [
-      { "ts": 1772902231754, "pass": false, "reason": "no_keyword_match", "preview": "hello world" }
-    ]
-  },
-  "presence": { "enabled": true, "wpm": 42, "..." : "..." },
-  "access": { "dmPolicy": "pairing", "allowFrom": ["..."], "..." : "..." },
-  "session": "3cf11776_logan",
-  "webhookPort": 8050,
-  "serverTime": "2026-03-07T18:50:00.000Z"
-}
-```
-
-### Implementation notes
-
-- Zero build tooling: the entire admin dashboard is an embedded HTML/CSS/JS template string in `monitor.ts`
-- Admin routes are added BEFORE the POST-only webhook guard in the HTTP server handler
-- No authentication on admin routes (only accessible from localhost by default since `webhookHost: 0.0.0.0` binds to all interfaces -- restrict via firewall if needed)
-- Config save path fixed in v1.8.7 to write to `~/.openclaw/openclaw.json` (was incorrectly writing to workspace path)
-
----
-
-## 5. Human Mimicry Presence System
-
-### Problem
-
-A bot that instantly shows "typing..." and replies in 200ms is obviously non-human. WhatsApp users notice deterministic timing patterns, which degrades the conversational experience.
-
-### Solution
-
-The presence system simulates a 4-phase human interaction pattern with randomized timing at every step:
-
-```
-Phase 1: SEEN         Phase 2: READ         Phase 3: TYPING         Phase 4: REPLY
-                                             (with pauses)
-  [msg arrives]  -->  [blue ticks]  -->  [typing... ...]  -->  [send message]
-       |                   |                    |
-       v                   v                    v
-   sendSeen()        sleep(readDelay)    typing ON/OFF flicker
-                                         (random pauses)
-                                         + padding if AI was fast
-```
-
-### Flow Detail
-
-1. **Seen** (`sendSeen`): If enabled, immediately marks the message as read (blue ticks).
-2. **Read Delay** (`readDelayMs`): Pauses to simulate the time a human takes to read the incoming message. Duration scales with message length (`msPerReadChar * charCount`), clamped to `readDelayMs` bounds, then jittered.
-3. **Typing with Flicker**: Sets typing indicator ON, then enters a loop where it randomly pauses typing (OFF for `pauseDurationMs`, then ON again) at `pauseIntervalMs` intervals with `pauseChance` probability. This continues while the AI generates its response.
-4. **Reply-Length Padding** (`finishTyping`): After the AI responds, calculates how long a human would take to type the reply at `wpm` words-per-minute. If the AI was faster than that, pads with additional typing flicker. If the AI was slower, no padding is needed.
-
-### Timing Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `enabled` | `boolean` | `true` | Master switch for the entire presence system |
-| `sendSeen` | `boolean` | `true` | Send read receipt (blue ticks) before typing |
-| `wpm` | `number` | `42` | Simulated typing speed in words-per-minute |
-| `readDelayMs` | `[min, max]` | `[500, 4000]` | Clamp range for read delay (ms) |
-| `msPerReadChar` | `number` | `30` | Base read time per character of incoming message |
-| `typingDurationMs` | `[min, max]` | `[1500, 15000]` | Clamp range for total typing duration (ms) |
-| `pauseChance` | `number` | `0.3` | Probability (0-1) of pausing typing each interval |
-| `pauseDurationMs` | `[min, max]` | `[500, 2000]` | Duration range for each typing pause (ms) |
-| `pauseIntervalMs` | `[min, max]` | `[2000, 5000]` | Interval range between pause-chance checks (ms) |
-| `jitter` | `[min, max]` | `[0.7, 1.3]` | Multiplier range applied to all computed durations |
-
-### Jitter Mechanics
-
-Every computed duration is multiplied by `rand(jitter[0], jitter[1])` before use. With the default `[0.7, 1.3]`, a base delay of 2000ms becomes anywhere from 1400ms to 2600ms. This prevents timing fingerprinting.
-
-### AI Fast vs Slow
-
-- **AI responds in 2s, human typing estimate is 8s**: Presence pads with 6s of additional typing flicker before sending.
-- **AI responds in 12s, human typing estimate is 8s**: No padding needed. Reply sends immediately after AI finishes (typing indicator was already running during generation).
-
----
-
-## 6. Configuration Reference
-
-All configuration lives in `~/.openclaw/openclaw.json` under `channels.waha`. The admin panel config save (v1.8.7+) writes to this file directly.
-
-### Full Config Structure
-
-```jsonc
-{
-  "channels": {
-    "waha": {
-      // --- Connection ---
-      "enabled": true,
-      "baseUrl": "http://127.0.0.1:3004",          // WAHA server URL
-      "apiKey": "XcTCX9cn84LE/...",                 // WHATSAPP_API_KEY (NOT WAHA_API_KEY)
-      "session": "3cf11776_logan",                  // WAHA session name
-
-      // --- Webhook Server ---
-      "webhookHost": "0.0.0.0",                     // Bind address (default: 0.0.0.0)
-      "webhookPort": 8050,                          // Webhook listener port (default: 8050)
-      "webhookPath": "/webhook/waha",               // Webhook URL path
-      "webhookHmacKey": "95b5f1b4ae57...",          // HMAC-SHA512 key for signature verification
-
-      // --- Access Control ---
-      "dmPolicy": "allowlist",                      // "pairing" | "open" | "closed" | "allowlist"
-      "groupPolicy": "allowlist",                   // "allowlist" | "open" | "closed"
-      "allowFrom": [                                // DM senders allowed (when dmPolicy=allowlist)
-        "972544329000@c.us",
-        "271862907039996@lid"
-      ],
-      "groupAllowFrom": [                           // Group message senders allowed
-        "972544329000@c.us",                        // @c.us JID
-        "271862907039996@lid"                       // @lid JID (NOWEB engine sends these!)
-      ],
-
-      // --- Presence (Human Mimicry) ---
-      "presence": {
-        "enabled": true,
-        "sendSeen": true,
-        "wpm": 42,
-        "readDelayMs": [500, 4000],
-        "msPerReadChar": 30,
-        "typingDurationMs": [1500, 15000],
-        "pauseChance": 0.3,
-        "pauseDurationMs": [500, 2000],
-        "pauseIntervalMs": [2000, 5000],
-        "jitter": [0.7, 1.3]
-      },
-
-      // --- Optional Features ---
-      "actions": {
-        "reactions": true                           // Enable emoji reactions
-      },
-      "markdown": {
-        "enabled": true,
-        "tables": "auto"                            // "auto" | "markdown" | "text"
-      },
-      "replyPrefix": {
-        "enabled": false
-      },
-      "blockStreaming": false,
-
-      // --- Media Preprocessing (DO NOT set enabled: false!) ---
-      "mediaPreprocessing": {
-        "enabled": true,           // MASTER SWITCH — false disables ALL processing
-        "audioTranscription": true, // Local Whisper transcription for voice messages
-        "imageAnalysis": true,      // Vision API image description
-        "videoAnalysis": true,      // Gemini video description
-        "locationResolution": true, // Nominatim reverse geocoding
-        "vcardParsing": true,       // Contact card parsing
-        "documentAnalysis": true    // Document metadata extraction
-      },
-
-      // --- Phase 1: Reliability (added v1.10.x) ---
-      "timeoutMs": 30000,                           // WAHA API request timeout (ms, default 30000)
-      "rateLimitCapacity": 20,                      // Token bucket max burst size (default 20)
-      "rateLimitRefillRate": 15,                    // Tokens refilled per second (default 15)
-
-      // --- Phase 2: Resilience (added v1.10.x) ---
-      "healthCheckIntervalMs": 60000,               // Session health ping interval (ms, default 60000)
-      "dmQueueSize": 50,                            // Max queued inbound DMs before drop (default 50)
-      "groupQueueSize": 50,                         // Max queued inbound group messages (default 50)
-
-      // --- Phase 3: Features (added v1.11.0) ---
-      "autoLinkPreview": true,                      // Auto-add link preview to text messages with URLs (default true)
-
-      // --- Phase 4: Multi-Session (added v1.11.0) ---
-      // Role for this session: "bot" (can send) or "human" (monitoring)
-      "role": "bot",
-      // Sub-role: "full-access" (can send) or "listener" (receive only)
-      "subRole": "full-access",
-      // Trigger word for group chat activation (optional, e.g. "!sammie")
-      "triggerWord": "!sammie",
-      // How bot responds when triggered: "dm" (reply in DM) or "group" (reply in-group)
-      "triggerResponseMode": "dm",
-
-      // --- Multi-Account (optional) ---
-      // Add additional WAHA sessions under "accounts" for multi-session routing
-      "accounts": {
-        "omer": {
-          "baseUrl": "http://127.0.0.1:3004",
-          "apiKey": "...",
-          "session": "3cf11776_omer",
-          "role": "human",
-          "subRole": "listener"
-        }
-      },
-      "defaultAccount": "default"
-    }
-  }
-}
-```
-
-### Config Field Reference (v1.11.0)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `true` | Enable the WAHA channel |
-| `baseUrl` | string | — | WAHA server URL (e.g. `http://127.0.0.1:3004`) |
-| `apiKey` | string | — | WAHA API key — use `WHATSAPP_API_KEY`, not `WAHA_API_KEY` |
-| `session` | string | — | WAHA session name (e.g. `3cf11776_logan`) |
-| `webhookPort` | number | `8050` | Port for incoming WAHA webhooks |
-| `webhookPath` | string | `/webhook/waha` | Path for webhook endpoint |
-| `webhookHmacKey` | string | — | HMAC-SHA512 key for webhook signature verification |
-| `dmPolicy` | string | `"pairing"` | DM access policy: `"pairing"` \| `"open"` \| `"closed"` \| `"allowlist"` |
-| `groupPolicy` | string | `"allowlist"` | Group message policy: `"allowlist"` \| `"open"` \| `"closed"` |
-| `allowFrom` | string[] | — | Allowed DM sender JIDs (when dmPolicy=allowlist) |
-| `groupAllowFrom` | string[] | — | Allowed group sender JIDs — include BOTH @c.us AND @lid formats |
-| `timeoutMs` | number | `30000` | WAHA API request timeout in milliseconds (Phase 1) |
-| `rateLimitCapacity` | number | `20` | Token bucket maximum burst tokens (Phase 1) |
-| `rateLimitRefillRate` | number | `15` | Token refill rate per second (Phase 1) |
-| `healthCheckIntervalMs` | number | `60000` | Session health check interval in milliseconds (Phase 2) |
-| `dmQueueSize` | number | `50` | Max inbound DM queue depth before drop (Phase 2) |
-| `groupQueueSize` | number | `50` | Max inbound group message queue depth before drop (Phase 2) |
-| `autoLinkPreview` | boolean | `true` | Auto-add link preview to text messages containing URLs (Phase 3) |
-| `role` | string | `"bot"` | Session role: `"bot"` or `"human"` (Phase 4) |
-| `subRole` | string | `"full-access"` | Sub-role: `"full-access"` (can send) or `"listener"` (receive only) (Phase 4) |
-| `triggerWord` | string | — | If set, bot only activates in groups when message starts with this word (Phase 4) |
-| `triggerResponseMode` | string | `"dm"` | Trigger response mode: `"dm"` (reply in DM) or `"group"` (reply in chat) (Phase 4) |
-
-### Access Control Notes
-
-- `dmPolicy: "allowlist"` + `allowFrom` restricts DMs to listed JIDs only
-- `groupPolicy: "allowlist"` + `groupAllowFrom` restricts group responses to messages from listed sender JIDs
-- `groupAllowFrom` filters by **sender JID** (participant), NOT by group JID
-- Use `"*"` to allow all senders (dangerous in production)
-- **CRITICAL**: WAHA NOWEB engine sends sender JIDs as `@lid`, not `@c.us`. You MUST include BOTH formats for each allowed user.
-
-### Finding a User's LID
-
-```bash
-docker exec -i postgres-waha psql -U admin -d waha_noweb_3cf11776_logan \
-  -c "SELECT id, pn FROM lid_map WHERE pn LIKE '%PHONE_NUMBER%'"
-```
-
----
-
-## 7. Installation and Deployment
-
-### npm Installation
+### 1. Install
 
 ```bash
 npm install waha-openclaw-channel
 ```
 
-Then enable the plugin in `~/.openclaw/openclaw.json`:
+### 2. Configure
+
+Add to your `openclaw.json`:
+
 ```json
 {
   "plugins": { "allow": ["waha"] },
   "tools": { "alsoAllow": ["message"] },
-  "channels": { "waha": { "enabled": true, "baseUrl": "...", "apiKey": "...", "session": "..." } }
+  "channels": {
+    "waha": {
+      "enabled": true,
+      "baseUrl": "YOUR_WAHA_URL",
+      "apiKey": "YOUR_API_KEY",
+      "session": "your_session_name",
+      "webhookPort": 8050,
+      "webhookPath": "/webhook/waha"
+    }
+  }
 }
 ```
 
-**CRITICAL:** `tools.alsoAllow: ["message"]` is mandatory. Without it, the `coding` tools profile filters out the `message` tool and the LLM cannot invoke any WhatsApp actions.
+> **CRITICAL:** `tools.alsoAllow: ["message"]` is mandatory. Without it, the `coding` tools profile filters out the `message` tool and the AI agent cannot invoke any WhatsApp actions.
 
-### File Locations — ALWAYS Deploy to BOTH
+### 3. Configure WAHA webhook
 
-> **WARNING:** The plugin source exists in TWO locations that must ALWAYS be kept in sync. Forgetting one causes a silent version mismatch where the gateway runs stale code.
+Point your WAHA session's webhook to `http://YOUR_HOST:8050/webhook/waha`.
 
-| Location | Purpose |
-|----------|---------|
-| `~/.openclaw/extensions/waha/` | **Runtime** — what OpenClaw actually loads at startup |
-| `~/.openclaw/workspace/skills/waha-openclaw-channel/` | **Dev/workspace** — source of truth for reinstalls |
-
-The main config file is at `/home/omer/.openclaw/openclaw.json` under `channels.waha`.
-
-### Deploying Changes (Local on hpg6)
-
-After editing source files locally on hpg6, deploy to BOTH locations and restart:
+### 4. Restart the gateway
 
 ```bash
-# 1. Copy files from workspace to runtime (both locations must match)
-cp ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts \
-   ~/.openclaw/extensions/waha/src/
-
-# 2. Verify both copies match
-md5sum ~/.openclaw/extensions/waha/src/*.ts
-md5sum ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts
-
-# 3. Restart gateway
 systemctl --user restart openclaw-gateway
-
-# 4. Check logs
-journalctl --user -u openclaw-gateway --since "1 minute ago" --no-pager
-
-# 5. Verify webhook is listening
-curl -s http://127.0.0.1:8050/healthz
 ```
-
-### Remote Deployment (from Windows dev machine via SSH/SCP)
-
-```bash
-# SCP to BOTH locations (always update both)
-scp src/file.ts omer@100.114.126.43:~/.openclaw/extensions/waha/src/file.ts
-scp src/file.ts omer@100.114.126.43:~/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts
-
-# Restart gateway
-ssh omer@100.114.126.43 'systemctl --user restart openclaw-gateway'
-
-# Check logs
-ssh omer@100.114.126.43 'journalctl --user -u openclaw-gateway --since "2 minutes ago" --no-pager'
-```
-
-**Shell escaping note:** TypeScript files containing `!==` or `!` characters cause bash history expansion in heredocs over SSH. Use `scp` (not SSH heredocs) to transfer TypeScript files, or use the base64 encode/decode pattern:
-
-```bash
-# Base64 transfer pattern (avoids ! escaping issues)
-B64=$(base64 -w 0 src/file.ts)
-ssh omer@100.114.126.43 "echo '$B64' | base64 -d > ~/.openclaw/extensions/waha/src/file.ts"
-ssh omer@100.114.126.43 "echo '$B64' | base64 -d > ~/.openclaw/workspace/skills/waha-openclaw-channel/src/file.ts"
-```
-
-### npm Publish Workflow
-
-1. Bump version in `package.json`
-2. Run `npm publish --access public`
-3. SCP built files to BOTH hpg6 locations (see above)
-4. Restart gateway: `ssh omer@100.114.126.43 'systemctl --user restart openclaw-gateway'`
-5. Test via WhatsApp (send test message to Sammie)
 
 ---
 
-## 8. Troubleshooting
+## Configuration Reference
 
-### Quick Diagnostic Checklist
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable the WAHA channel |
+| `baseUrl` | string | -- | WAHA server URL |
+| `apiKey` | string | -- | WAHA API key (use `WHATSAPP_API_KEY` env var) |
+| `session` | string | -- | WAHA session name |
+| `webhookPort` | number | `8050` | Port for incoming WAHA webhooks |
+| `webhookPath` | string | `/webhook/waha` | Path for webhook endpoint |
+| `webhookHmacKey` | string | -- | HMAC-SHA512 key for webhook signature verification |
+| `dmPolicy` | string | `"pairing"` | DM access: `"pairing"` / `"open"` / `"closed"` / `"allowlist"` |
+| `groupPolicy` | string | `"allowlist"` | Group access: `"allowlist"` / `"open"` / `"closed"` |
+| `allowFrom` | string[] | -- | Allowed DM sender JIDs (include both `@c.us` and `@lid` formats) |
+| `groupAllowFrom` | string[] | -- | Allowed group sender JIDs (include both `@c.us` and `@lid` formats) |
+| `timeoutMs` | number | `30000` | WAHA API request timeout (ms) |
+| `rateLimitCapacity` | number | `20` | Token bucket max burst size |
+| `rateLimitRefillRate` | number | `15` | Token refill rate per second |
+| `healthCheckIntervalMs` | number | `60000` | Session health check interval (ms) |
+| `dmQueueSize` | number | `50` | Max queued inbound DMs before drop |
+| `groupQueueSize` | number | `50` | Max queued inbound group messages before drop |
+| `autoLinkPreview` | boolean | `true` | Auto link preview for URLs in text messages |
+| `role` | string | `"bot"` | Session role: `"bot"` or `"human"` |
+| `subRole` | string | `"full-access"` | Sub-role: `"full-access"` or `"listener"` (receive only) |
+| `triggerWord` | string | -- | Bot only activates in groups when message starts with this word |
+| `triggerResponseMode` | string | `"dm"` | Trigger response: `"dm"` (reply via DM) or `"group"` (reply in chat) |
 
-1. **Gateway running?** `pgrep -af "openclaw-gateway"`
-2. **Webhook port bound?** `ss -tlnp | grep 8050`
-3. **Session healthy?** `curl -s http://127.0.0.1:8050/api/admin/sessions | python3 -m json.tool`
-4. **Recent errors?** `journalctl --user -u openclaw-gateway --since "5 minutes ago" --no-pager`
+### Presence (Human Mimicry)
 
----
+Configure under `channels.waha.presence`:
 
-### "Listener cannot send" / Session sub-role error
-
-**Symptom:** `"Session '...' has sub-role 'listener' and cannot send"`
-**Cause:** A session configured as `subRole: "listener"` (human monitoring session) tried to send.
-**Fix:** This is expected behavior — listener sessions are read-only by design. Configure a `bot` session with `subRole: "full-access"` for sending. If both sessions need sending ability, set `subRole: "full-access"` on both.
-
-### "Could not resolve target" / Target not found
-
-**Symptom:** `"Could not resolve '...' to a WhatsApp JID"` in gateway logs
-**Cause:** The name provided as a target does not match any contact or group in the directory.
-**Fix:** Use the `search` action first to find the correct name/JID:
-```
-Action: search
-Parameters: { "query": "group name", "scope": "group" }
-```
-Then retry the action with the exact JID from search results.
-
-### Session disconnected / "Session health: unhealthy"
-
-**Symptom:** Messages not being processed; health check logs show "unhealthy"
-**Cause:** WAHA session lost its WhatsApp connection (phone offline, QR re-scan needed, etc.)
-**Fix:**
-1. Open the admin panel Status tab: `http://YOUR_HOST:8050/admin`
-2. Check the WAHA dashboard for the disconnected session
-3. Re-scan the QR code if needed
-4. After reconnection, the health check will automatically detect recovery within `healthCheckIntervalMs` (default 60s)
-
-### Rate limited (429) errors
-
-**Symptom:** `"WAHA API rate limited (429)"` in logs; actions failing intermittently
-**Cause:** Too many WAHA API calls in a short period
-**Fix:** The plugin retries automatically up to 3 times with exponential backoff (1s/2s/4s). If errors persist:
-1. Reduce `rateLimitCapacity` or `rateLimitRefillRate` in config
-2. Wait 10-15 seconds between bulk operations
-3. Use `sendMulti` instead of looping `send` actions for multi-recipient sends
-
-### Inbound queue overflow / messages dropped
-
-**Symptom:** Log message `"inbound queue full, dropping message"`
-**Cause:** Messages arriving faster than the bot can process them; queue capacity exceeded
-**Fix:** Increase `dmQueueSize` or `groupQueueSize` in config (default 50 each). If the queue is regularly overflowing, the bot is receiving more traffic than it can handle.
-
-### Request timeout errors
-
-**Symptom:** `"timed out after 30000ms"` errors
-**Cause:** WAHA API not responding within the timeout window
-**Fix:**
-1. Check WAHA server health: `curl -s -H "X-Api-Key: YOUR_KEY" http://127.0.0.1:3004/api/sessions`
-2. If WAHA is busy (many media downloads, large group), increase `timeoutMs` in config
-3. For mutation operations (send, edit, delete) — the action MAY have succeeded even if the response timed out. Check the chat before retrying.
-
-### Trigger word not activating bot
-
-**Symptom:** Bot not responding to messages in groups that have `triggerWord` configured
-**Cause:** Message does not start with the trigger word (case-insensitive, leading whitespace stripped)
-**Fix:**
-1. Ensure messages start with the exact trigger word: e.g. `"!sammie what's up?"`
-2. Check the `triggerWord` config value matches exactly what users type
-3. In `triggerResponseMode: "dm"`, the reply goes to the user's DM — not visible in the group
-
-### Both deploy locations must match
-
-**Symptom:** Code changes deployed but old behavior persists; or inconsistent behavior after restart
-**Cause:** Only one of the two hpg6 locations was updated
-**Fix:** Always deploy to BOTH locations:
-- `~/.openclaw/extensions/waha/` (runtime)
-- `~/.openclaw/workspace/skills/waha-openclaw-channel/` (workspace)
-
-Verify they match: `md5sum ~/.openclaw/extensions/waha/src/*.ts && md5sum ~/.openclaw/workspace/skills/waha-openclaw-channel/src/*.ts`
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `true` | Master switch for presence simulation |
+| `sendSeen` | `true` | Send read receipts (blue ticks) |
+| `wpm` | `42` | Simulated typing speed (words per minute) |
+| `readDelayMs` | `[500, 4000]` | Read delay range (ms) |
+| `typingDurationMs` | `[1500, 15000]` | Typing duration range (ms) |
+| `pauseChance` | `0.3` | Probability of pausing typing |
+| `jitter` | `[0.7, 1.3]` | Randomization multiplier range |
 
 ---
 
-### CRITICAL: Gateway Uses Workspace Config, Not ~/.openclaw/openclaw.json
+## Actions Quick Reference
 
-The openclaw gateway service sets `OPENCLAW_CONFIG_PATH=/home/omer/.openclaw/workspace/openclaw.json` (visible in `/proc/<pid>/environ`). The gateway reads FROM and writes TO this file, NOT `~/.openclaw/openclaw.json`.
+### Standard Actions (support auto name-to-JID resolution)
 
-When WAHA is not starting (port 8050 not bound), verify the **workspace config** has the waha section:
+| Action | Purpose |
+|--------|---------|
+| `send` | Send text, contact cards |
+| `poll` | Create polls |
+| `react` | Emoji reactions |
+| `edit` | Edit sent messages |
+| `unsend` | Delete/unsend messages |
+| `pin` / `unpin` | Pin/unpin messages |
+| `read` | Mark chat as read |
+| `reply` | Reply to specific messages |
 
-```bash
-python3 -c "import json; cfg=json.load(open('/home/omer/.openclaw/workspace/openclaw.json')); print(list(cfg.get('channels',{}).keys()))"
-# Should show: ['telegram', 'waha']
-```
+### Utility Actions
 
-To sync WAHA config from `~/.openclaw/openclaw.json` to workspace:
-```bash
-python3 << 'PYEOF'
-import json, shutil
-full = json.load(open('/home/omer/.openclaw/openclaw.json'))
-ws = json.load(open('/home/omer/.openclaw/workspace/openclaw.json'))
-ws.setdefault('channels', {})['waha'] = full['channels']['waha']
-shutil.copy('/home/omer/.openclaw/workspace/openclaw.json', '/home/omer/.openclaw/workspace/openclaw.json.bak')
-json.dump(ws, open('/home/omer/.openclaw/workspace/openclaw.json', 'w'), indent=2)
-print('Done')
-PYEOF
-```
+| Action | Purpose |
+|--------|---------|
+| `search` | Find groups, contacts, channels by name |
+| `sendMulti` | Send text to multiple chats |
+| `sendImage` / `sendVideo` / `sendFile` | Send media |
+| `sendLocation` | Share GPS coordinates |
+| `sendEvent` | Create group events |
+| `sendLinkPreview` | URL preview cards |
+| `muteChat` / `unmuteChat` | Chat notification control |
+| `readMessages` | Read recent messages from any chat (1-50) |
+| `joinGroup` | Join group via invite link |
+| `followChannel` / `unfollowChannel` | Channel subscriptions |
 
-### WAHA API Key: Use WHATSAPP_API_KEY, Not WAHA_API_KEY
+### Management Actions
 
-WAHA defines two keys in its `.env`. Only `WHATSAPP_API_KEY` authenticates API calls (returns 200). Using `WAHA_API_KEY` returns 401 on every request. The `channels.waha.apiKey` config value must use the correct key.
+| Category | Actions |
+|----------|---------|
+| Groups | `createGroup`, `getGroups`, `getGroup`, `deleteGroup`, `leaveGroup`, `addParticipants`, `removeParticipants`, `promoteToAdmin`, `demoteFromAdmin` |
+| Contacts | `getContacts`, `getContact`, `checkContactExists`, `blockContact`, `unblockContact` |
+| Labels | `getLabels`, `createLabel`, `updateLabel`, `deleteLabel`, `setChatLabels`, `getChatsByLabel` |
+| Status/Stories | `sendTextStatus`, `sendImageStatus`, `sendVoiceStatus`, `sendVideoStatus`, `deleteStatus` |
+| Channels | `getChannels`, `createChannel`, `deleteChannel`, `searchChannelsByText` |
+| Profile | `getProfile`, `setProfileName`, `setProfileStatus`, `setProfilePicture` |
+| Presence | `setPresenceStatus`, `getPresence`, `subscribePresence` |
 
-**Test which key works:**
-```bash
-curl -s -o /dev/null -w "%{http_code}" \
-  -H "X-Api-Key: YOUR_KEY_HERE" \
-  http://127.0.0.1:3004/api/sessions
-# 200 = correct key, 401 = wrong key
-```
+---
 
-### groupAllowFrom Needs BOTH @c.us AND @lid JIDs
+## Rules & Policy System (v1.11)
 
-WAHA's NOWEB engine sends group message sender JIDs as `@lid` (linked device ID), not `@c.us`. If you only list `@c.us` JIDs in `groupAllowFrom`, all group messages will be silently dropped.
+File-based YAML rules allow per-contact and per-group behavior control without code changes.
 
-**Fix:** Add both formats for each allowed user:
+Rules are stored in a configurable directory (default: `rules/` relative to the plugin) and support:
+
+- **Per-contact policies** -- custom behavior for specific contacts
+- **Per-group policies** -- group-specific message handling rules
+- **Manager authorization** -- restrict policy edits to authorized users
+- **Outbound policy enforcement** -- apply rules before messages are sent
+- **Inbound hook integration** -- filter and route inbound messages by policy
+
+Configure via `rulesPath` in the channel config. See the rules directory for examples.
+
+---
+
+## Admin Panel
+
+Access at `http://YOUR_HOST:8050/admin`. No build tools required -- the UI is embedded in the plugin.
+
+**Tabs:**
+- **Directory** -- browse contacts, groups, newsletters; per-contact DM settings; group participant management
+- **Config** -- edit DM/group filter settings, keyword patterns, media preprocessing toggles
+- **Filter Stats** -- message processing statistics, duplicate webhook tracking
+- **Status** -- session health, connection info, gateway restart
+
+**API endpoints** (all under `/api/admin/`):
+- `GET /stats` -- filter statistics
+- `GET /config` / `POST /config` -- read/update plugin config
+- `GET /sessions` -- WAHA session status
+- `GET /directory` -- paginated contact/group listing
+- `POST /directory/refresh` -- refresh directory from WAHA API
+- `POST /restart` -- restart the gateway
+
+---
+
+## Multi-Session Setup
+
+Run a bot session alongside a human monitoring session:
+
 ```json
-"groupAllowFrom": ["972544329000@c.us", "271862907039996@lid"]
-```
-
-### Voice Files: Use /api/sendVoice, Not Base64 File Conversion
-
-The `send.ts` module includes `buildFilePayload()` which automatically handles local TTS file paths by reading them as base64. Audio files with recognized MIME types (`audio/*`) are routed to WAHA's `/api/sendVoice` endpoint with `convert: true` to produce proper WhatsApp voice bubbles (PTT format).
-
-If voice notes appear as document attachments instead of voice bubbles, check that:
-1. `resolveMime()` correctly detects the audio MIME type
-2. The WAHA endpoint is `/api/sendVoice` (not `/api/sendFile`)
-3. The payload includes `"convert": true`
-
-### TTS Local Paths: buildFilePayload() Handles Base64 Automatically
-
-OpenClaw TTS generates voice files at `/tmp/openclaw/tts-*/voice-*.mp3`. WAHA cannot access local filesystem paths. The `buildFilePayload()` function in `send.ts` detects paths starting with `/` or `file://`, reads the file with `readFileSync`, converts to base64, and builds the correct WAHA payload format with `{ data, mimetype, filename }`.
-
-### Plugin ID Mismatch Warning (Benign)
-
-```
-plugin id mismatch (config uses "waha-openclaw-channel", export uses "waha")
-```
-
-This warning appears because the config `plugins.entries` key is `waha-openclaw-channel` but the plugin exports `id: "waha"`. It is cosmetic only -- the plugin loads and operates normally.
-
-### Shell ! Escaping: Use Base64 Transfer for TypeScript Files Over SSH
-
-SSH heredocs with `!` characters (in `!==`, `!response.ok`, etc.) trigger bash history expansion, which inserts backslashes into the file content and causes TypeScript parse errors. Always use the base64 transfer pattern (see Section 7) when deploying TypeScript files remotely.
-
-### Gateway Not Responding After Restart
-
-1. Check if the process is running: `pgrep -af "openclaw-gateway"`
-2. Check if port 18789 is bound: `ss -tlnp | grep 18789`
-3. Check webhook port: `ss -tlnp | grep 8050`
-4. Check logs: `tail -100 /tmp/openclaw/openclaw-gateway.log`
-5. If an old process holds the port, force kill: `kill -9 $(pgrep -f "openclaw-gatewa")`
-6. Systemd auto-restarts the gateway -- wait ~5 seconds after kill
-
-### Actions Not Working (v1.9.0)
-
-If the LLM cannot invoke actions (send, poll, react, etc.):
-
-1. **Check `tools.alsoAllow`**: Must include `"message"`. The `coding` tools profile filters it out by default.
-2. **Check `listActions()` output**: Should return only gateway-standard names (send, poll, react, edit, unsend, pin, unpin, read, delete, reply). Custom WAHA names are rejected.
-3. **Check `messaging.targetResolver`**: Must be configured to recognize WAHA JID formats. Without it, JID targets cause "Unknown target" errors.
-
----
-
-## 9. Key Guardrails
-
-### Session Blocking (`assertAllowedSession`) -- Updated v1.9.0
-
-The `send.ts` module enforces a hard guardrail that prevents the bot from sending messages as Omer:
-
-```typescript
-// DO NOT CHANGE -- session guardrail
-if (normalized === "omer" || normalized.endsWith("_omer")) {
-    throw new Error(`WAHA session '${normalized}' is explicitly blocked by guardrail`);
+{
+  "channels": {
+    "waha": {
+      "session": "bot_session",
+      "role": "bot",
+      "subRole": "full-access",
+      "triggerWord": "!bot",
+      "triggerResponseMode": "dm",
+      "accounts": {
+        "human": {
+          "baseUrl": "YOUR_WAHA_URL",
+          "apiKey": "YOUR_API_KEY",
+          "session": "human_session",
+          "role": "human",
+          "subRole": "listener"
+        }
+      }
+    }
+  }
 }
 ```
 
-The guardrail blocks sessions matching `"omer"` or `"*_omer"`. All other sessions (including `"logan"` and `"*_logan"`) are allowed. This was fixed in v1.9.0 -- previous versions had a logan-only allowlist which was overly restrictive.
+| Role | Sub-Role | Can Send? | Purpose |
+|------|----------|-----------|---------|
+| `bot` | `full-access` | Yes | Primary bot session |
+| `human` | `listener` | No | Monitoring only |
+| `human` | `full-access` | Yes | Human with send access |
 
-### Action Name Filtering (v1.9.0) -- CRITICAL
-
-`listActions()` returns ONLY gateway-standard action names. This is the most impactful change in v1.9.0:
-
-- **Standard names**: `send`, `poll`, `react`, `edit`, `unsend`, `pin`, `unpin`, `read`, `delete`, `reply`
-- **Utility actions**: Curated subset of WAHA-specific utilities (getGroups, sendLocation, etc.)
-- **Rejected names**: Custom WAHA names like `sendPoll`, `editMessage`, `pinMessage` have `mode: "none"` in the gateway's `MESSAGE_ACTION_TARGET_MODE` map and cannot accept targets
-
-DO NOT revert `listActions()` to return all WAHA action names. This was the root cause of action failures prior to v1.9.0.
-
-### HMAC Webhook Verification
-
-All incoming webhooks are verified against the configured `webhookHmacKey` using SHA-512 HMAC. Requests without a valid `X-Webhook-Hmac` header receive HTTP 401. This prevents unauthorized parties from injecting fake messages into the bot pipeline.
-
-### Access Control Enforcement
-
-Messages are dropped silently (with logging) if:
-- The sender JID is not in `allowFrom` (for DMs when `dmPolicy: "allowlist"`)
-- The sender JID is not in `groupAllowFrom` (for group messages when `groupPolicy: "allowlist"`)
-- The session in the webhook payload does not match the configured session
-
-### Duplicate Webhook Prevention (v1.8.6)
-
-WAHA sends both `message` and `message.any` events for each message. The plugin now only processes `message` events, eliminating double-counting in filter stats and preventing duplicate AI invocations.
+**Cross-session routing** is automatic -- the bot uses its own session when it's a group member, falls back to the human session otherwise.
 
 ---
 
-## Appendix: Architecture Diagram
+## Troubleshooting
 
-```
-WAHA (hpg6:3004)
-    |
-    |--- webhook (X-Webhook-Hmac signed) --->  OpenClaw Webhook Server (hpg6:8050)
-    |                                               |
-    |                                          monitor.ts (verify HMAC, parse envelope)
-    |                                               |
-    |                                          inbound.ts (access control, DM filter, presence start)
-    |                                               |
-    |                                          OpenClaw AI Agent (generate reply)
-    |                                               |
-    |                                          channel.ts (listActions: gateway-standard names only)
-    |                                               |
-    |                                          presence.ts (pad typing to human speed)
-    |                                               |
-    |   <--- WAHA REST API (sendText/sendVoice) --- send.ts (assertAllowedSession: blocks omer)
-    |
-    v
-WhatsApp recipient sees: blue ticks -> typing... -> text reply -> voice note
-```
+### 1. "Listener cannot send" error
+The session is configured as `subRole: "listener"` (read-only). Use a `bot` session with `subRole: "full-access"` for sending.
+
+### 2. "Could not resolve target" error
+The target name doesn't match any contact or group. Use `search` action first to find the correct JID, then retry with the exact JID.
+
+### 3. Session disconnected / unhealthy
+Check the admin panel Status tab. Re-scan the QR code in the WAHA dashboard if needed. Health checks auto-detect recovery.
+
+### 4. Rate limited (429) errors
+The plugin retries up to 3 times with backoff (1s/2s/4s). If errors persist, reduce `rateLimitCapacity` or use `sendMulti` for bulk sends.
+
+### 5. Messages dropped / queue overflow
+Increase `dmQueueSize` or `groupQueueSize` in config (default 50 each).
+
+### Important notes
+- **API key**: Use `WHATSAPP_API_KEY`, not `WAHA_API_KEY` (wrong key returns 401)
+- **LID JIDs**: WAHA NOWEB engine sends sender JIDs as `@lid`. Include BOTH `@c.us` AND `@lid` formats in `allowFrom`/`groupAllowFrom`
+- **`tools.alsoAllow: ["message"]`**: Must be set or the AI agent cannot invoke actions
 
 ---
 
-## Appendix: Useful Commands
+## Changelog
 
-```bash
-# Check gateway status
-pgrep -af "openclaw gateway"
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 
-# Check webhook health
-curl -s http://127.0.0.1:8050/healthz
+---
 
-# Check WAHA sessions
-curl -s -H "X-Api-Key: $WHATSAPP_API_KEY" http://127.0.0.1:3004/api/sessions
+## License
 
-# View recent gateway logs
-tail -50 /tmp/openclaw/openclaw-gateway.log | grep waha
-
-# Restart gateway (systemd auto-restarts)
-kill -9 $(pgrep -f "openclaw-gatewa") 2>/dev/null
-
-# Verify port binding after restart
-ss -tlnp | grep 18789
-
-# Check admin panel
-curl -s http://127.0.0.1:8050/api/admin/stats | python3 -m json.tool
-```
+ISC

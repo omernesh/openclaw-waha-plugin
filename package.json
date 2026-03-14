@@ -10,7 +10,10 @@
     "docs/",
     "SKILL.md",
     "config-example.json",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "openclaw.plugin.json",
+    "rules/"
   ],
   "repository": {
     "type": "git",

@@ -62,7 +62,7 @@ export function getDmFilterForAdmin(cfg: CoreConfig, accountId: string): DmFilte
 const _groupFilterInstance = new Map<string, DmFilter>();
 
 // Default group filter patterns — keywords that trigger bot responses in groups
-const DEFAULT_GROUP_FILTER_PATTERNS = ["sammie", "סמי", "help", "hello", "bot", "ai"];
+const DEFAULT_GROUP_FILTER_PATTERNS = ["bot", "סמי", "help", "hello", "ai"];
 
 function getGroupFilter(cfg: CoreConfig, accountId: string): DmFilter {
   const wahaConfig = (cfg.channels?.waha ?? {}) as Record<string, unknown>;
@@ -315,7 +315,7 @@ export async function handleWahaInbound(params: {
 
   // Phase 4 Plan 02: Trigger word detection — check before group filters.
   // Trigger-word messages are explicit bot invocations and bypass group keyword filtering.
-  // triggerWord config is per-account (e.g., "!sammie"). Case-insensitive.
+  // triggerWord config is per-account (e.g., "!bot"). Case-insensitive.
   // DO NOT MOVE above rawBody calculation — detectTriggerWord needs the text body.
   // DO NOT MOVE below group filter — trigger must bypass it (see RESEARCH.md Open Question 1).
   // Added Phase 4, Plan 02. DO NOT REMOVE.

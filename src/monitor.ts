@@ -522,8 +522,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           </label>
         </div>
         <div class="field">
-          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). DMs must match at least one. One per line. Example: sammie, help, @bot">?</span></label>
-          <textarea id="s-mentionPatterns" name="mentionPatterns" rows="4" placeholder="sammie&#10;help&#10;hello"></textarea>
+          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). DMs must match at least one. One per line. Example: bot, help, @bot">?</span></label>
+          <textarea id="s-mentionPatterns" name="mentionPatterns" rows="4" placeholder="bot&#10;help&#10;hello"></textarea>
         </div>
         <div class="field">
           <label class="toggle-wrap">
@@ -553,7 +553,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
         </div>
         <div class="field">
           <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). Group messages must match at least one. One per line. This uses OpenClaw's built-in group interaction filtering with regex support.">?</span></label>
-          <textarea id="s-groupMentionPatterns" name="groupMentionPatterns" rows="4" placeholder="sammie&#10;@bot&#10;help"></textarea>
+          <textarea id="s-groupMentionPatterns" name="groupMentionPatterns" rows="4" placeholder="bot&#10;@bot&#10;help"></textarea>
         </div>
         <div class="field">
           <label class="toggle-wrap">
@@ -816,7 +816,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       <p><strong>God Mode Bypass:</strong> Super-users listed in <code>godModeSuperUsers</code> bypass the filter entirely — useful for the bot owner.</p>
       <p><strong>Patterns:</strong> Each pattern is a JavaScript regex. Examples:</p>
       <ul>
-        <li><code>sammie</code> — matches any message containing "sammie"</li>
+        <li><code>bot</code> — matches any message containing "bot"</li>
         <li><code>^help</code> — matches messages starting with "help"</li>
         <li><code>\\bbot\\b</code> — matches the word "bot" exactly</li>
       </ul>

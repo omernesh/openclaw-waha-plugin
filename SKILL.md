@@ -47,7 +47,7 @@ The plugin will find the group JID and send the message. If the name is ambiguou
 More examples:
 ```
 Action: poll
-Target: "sammie test group"
+Target: "test group"
 Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
 ```
 
@@ -425,7 +425,7 @@ The plugin supports multiple WhatsApp sessions with different roles, enabling a 
 
 | Role | Sub-Role | Can Send? | Receives Messages? | Purpose |
 |------|----------|-----------|-------------------|---------|
-| `bot` | `full-access` | Yes | Yes (all chats) | Primary bot session — Sammie's active session |
+| `bot` | `full-access` | Yes | Yes (all chats) | Primary bot session — the AI agent's active session |
 | `human` | `listener` | No | Yes (monitored chats) | Human operator's session — monitored but cannot send |
 | `human` | `full-access` | Yes | Yes | Human session with full access |
 
@@ -433,12 +433,12 @@ The plugin supports multiple WhatsApp sessions with different roles, enabling a 
 
 ## Trigger Word Activation
 
-When `triggerWord` is configured (e.g., `"!sammie"`), the bot only activates in group chats when a message starts with that trigger word.
+When `triggerWord` is configured (e.g., `"!bot"`), the bot only activates in group chats when a message starts with that trigger word.
 
-**Example:** If `triggerWord: "!sammie"`, only messages like `"!sammie what's the weather?"` will activate the bot. Other group messages are monitored but ignored.
+**Example:** If `triggerWord: "!bot"`, only messages like `"!bot what's the weather?"` will activate the bot. Other group messages are monitored but ignored.
 
 ```
-User in group: "!sammie what time is the meeting?"
+User in group: "!bot what time is the meeting?"
 Bot activates → processes and replies via DM (triggerResponseMode: "dm") or in-group
 ```
 

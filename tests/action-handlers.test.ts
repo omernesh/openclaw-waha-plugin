@@ -406,20 +406,20 @@ describe("search action handler", () => {
 
   it("happy path: calls resolveWahaTarget and returns results", async () => {
     const matches = [
-      { jid: "120363421825201386@g.us", name: "Sammie Test Group", confidence: 0.9 },
+      { jid: "120363421825201386@g.us", name: "Test Group", confidence: 0.9 },
     ];
-    mockResolveWahaTarget.mockResolvedValue({ matches, query: "sammie", searchedTypes: ["group"] });
+    mockResolveWahaTarget.mockResolvedValue({ matches, query: "test", searchedTypes: ["group"] });
 
     const result = await wahaPlugin.actions.handleAction({
       action: "search",
-      params: { query: "sammie" },
+      params: { query: "test" },
       cfg: makeCfg(),
       accountId: undefined,
     });
 
     expect(mockResolveWahaTarget).toHaveBeenCalledOnce();
     expect(mockResolveWahaTarget).toHaveBeenCalledWith(
-      expect.objectContaining({ query: "sammie" })
+      expect.objectContaining({ query: "test" })
     );
     const parsed = JSON.parse((result as ActionResult).content[0].text);
     expect(parsed.matches).toEqual(matches);
@@ -430,7 +430,7 @@ describe("search action handler", () => {
 
     const result = await wahaPlugin.actions.handleAction({
       action: "search",
-      params: { query: "sammie" },
+      params: { query: "test" },
       cfg: makeCfg(),
       accountId: undefined,
     });

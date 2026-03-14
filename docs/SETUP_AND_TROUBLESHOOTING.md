@@ -319,7 +319,7 @@ A: The messageId must be in full serialized format: `true_<chatId>_<shortId>`. E
 
 ### Session and Routing
 
-**Q: Bot sends messages as Omer instead of Sammie/Logan**
+**Q: Bot sends messages from the wrong session (human instead of bot)**
 A: The `session` in `channels.waha` must be the outbound session (logan). The `send.ts` guardrail (`assertAllowedSession`) blocks any session containing `"omer"`. Change the session value and restart the gateway.
 
 ### WAHA Engine Limitations

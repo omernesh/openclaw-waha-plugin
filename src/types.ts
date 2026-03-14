@@ -82,7 +82,7 @@ export type WahaAccountConfig = {
   // Phase 4 config — multi-session roles and trigger word. DO NOT REMOVE.
   role?: string;              // "bot" | "human" — extensible, no enum
   subRole?: string;           // "full-access" | "listener" — extensible, no enum
-  triggerWord?: string;       // e.g., "!sammie"
+  triggerWord?: string;       // e.g., "!bot"
   triggerResponseMode?: string; // "dm" | "reply-in-chat"
   // Phase 6 config — rules base path. DO NOT REMOVE.
   // If unset, defaults to ~/.openclaw/workspace/skills/waha-openclaw-channel/rules/

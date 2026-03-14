@@ -1,0 +1,70 @@
+# Changelog
+
+All notable changes to the OpenClaw WAHA Plugin are documented here.
+
+## [1.11.0] - 2026-03-14
+
+### Added
+- **Phase 6**: File-based YAML rules/policy system with hierarchical contact/group policies
+- **Phase 6**: Manager authorization for policy edits (owner-only appoint/revoke)
+- **Phase 6**: Compact resolved-policy injection into model context per event
+- **Phase 6**: Identity normalization for stable JID/LID mapping
+- **Phase 6**: Outbound policy enforcement (fail-open design)
+- **Phase 5**: Human mimicry presence system with realistic typing indicators, read receipts, and random pauses
+- **Phase 4**: Multi-session roles (`bot`/`human` with `full-access`/`listener` sub-roles)
+- **Phase 4**: Trigger word activation for group chats
+- **Phase 4**: Cross-session routing (bot session with human session fallback)
+- **Phase 4**: `readMessages` action for reading recent messages from any chat (1-50)
+- **Phase 4**: Sessions tab in admin panel
+- **Phase 3**: `muteChat`/`unmuteChat` actions
+- **Phase 3**: `sendMulti` action for sending text to multiple chats
+- **Phase 3**: Auto link preview for URLs in text messages
+- **Phase 3**: Mention extraction from inbound messages
+- **Phase 2**: Session health monitoring with automatic health pings
+- **Phase 2**: Inbound message queue with separate DM and group queues
+- **Phase 1**: Request timeouts on all WAHA API calls (configurable `timeoutMs`)
+- **Phase 1**: Token-bucket rate limiting (`rateLimitCapacity`/`rateLimitRefillRate`)
+- **Phase 1**: Automatic retry with exponential backoff (up to 3 retries)
+- **Phase 1**: Webhook deduplication by messageId
+
+## [1.9.4] - 2026-03-10
+
+### Added
+- Contact card (vCard) sending
+- `joinGroup` action
+- `followChannel`/`unfollowChannel` actions
+- `sendImage`, `sendVideo`, `sendFile` as explicit actions
+
+## [1.9.3] - 2026-03-10
+
+### Fixed
+- Media sent as proper WhatsApp media types (not document attachments)
+- MIME detection for URLs with query parameters
+
+## [1.9.0] - 2026-03-10
+
+### Changed
+- **BREAKING**: `listActions()` returns only gateway-standard action names
+
+### Added
+- Auto name-to-JID resolution via `autoResolveTarget`
+- Session role guardrails
+
+## [1.8.x] - 2026-03-08 to 2026-03-09
+
+### Fixed
+- Directory fixes
+- Duplicate webhook prevention
+- Config save path fix
+
+### Added
+- Admin panel
+
+## [1.4.0] - 2026-03-08
+
+### Fixed
+- Typing indicator flicker fix
+
+### Added
+- Admin panel media preprocessing toggles
+- Directory refresh

@@ -125,8 +125,8 @@ describe("WahaAccountSchemaBase — role/subRole/trigger fields", () => {
   });
 
   it("accepts triggerWord as optional string", () => {
-    const result = WahaAccountSchemaBase.parse({ triggerWord: "!sammie" });
-    expect(result.triggerWord).toBe("!sammie");
+    const result = WahaAccountSchemaBase.parse({ triggerWord: "!bot" });
+    expect(result.triggerWord).toBe("!bot");
   });
 
   it("defaults triggerResponseMode to 'dm'", () => {

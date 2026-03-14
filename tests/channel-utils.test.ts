@@ -285,10 +285,10 @@ describe("autoResolveTarget", () => {
 
   it("calls resolveWahaTarget and returns resolved JID for a human-readable name", async () => {
     mockResolveWahaTarget.mockResolvedValue({
-      matches: [{ jid: "resolved@g.us", name: "Sammie Group", confidence: 0.9 }],
+      matches: [{ jid: "resolved@g.us", name: "Alpha Group", confidence: 0.9 }],
     });
 
-    const result = await autoResolveTarget("sammie group", makeCfg());
+    const result = await autoResolveTarget("alpha group", makeCfg());
     expect(mockResolveWahaTarget).toHaveBeenCalledOnce();
     expect(result).toBe("resolved@g.us");
   });

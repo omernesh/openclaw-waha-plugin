@@ -54,23 +54,23 @@ import { fuzzyScore, toArr } from "../src/send.js";
 
 describe("fuzzyScore", () => {
   it("returns 1.0 for exact match (case-insensitive)", () => {
-    expect(fuzzyScore("sammie test group", "Sammie Test Group")).toBe(1.0);
+    expect(fuzzyScore("alpha test group", "Alpha Test Group")).toBe(1.0);
     expect(fuzzyScore("hello", "hello")).toBe(1.0);
   });
 
   it("returns 0.9 when name starts with query", () => {
-    expect(fuzzyScore("sammie", "sammie test group")).toBe(0.9);
+    expect(fuzzyScore("alpha", "alpha test group")).toBe(0.9);
     expect(fuzzyScore("work", "work channel")).toBe(0.9);
   });
 
   it("returns 0.85 when query starts with name (name is prefix of query)", () => {
-    expect(fuzzyScore("sammie test group and more", "sammie test group")).toBe(0.85);
+    expect(fuzzyScore("alpha test group and more", "alpha test group")).toBe(0.85);
   });
 
   it("returns 0.8 when all query words are found in the name (but not exact or prefix)", () => {
-    // "test group" is found in "sammie test group" but "sammie test group".startsWith("test group") = false
+    // "test group" is found in "alpha test group" but "alpha test group".startsWith("test group") = false
     // both "test" and "group" are present → 0.8
-    expect(fuzzyScore("test group", "sammie test group")).toBe(0.8);
+    expect(fuzzyScore("test group", "alpha test group")).toBe(0.8);
   });
 
   // NOTE: The 0.7 tier (n.includes(q)) is unreachable in practice. If the full query
