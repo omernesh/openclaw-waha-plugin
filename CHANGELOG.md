@@ -2,6 +2,13 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.11.1] - 2026-03-14
+
+### Fixed
+- Plugin name mismatch on deploy: `openclaw.plugin.json` now included in npm package
+- Excluded `.bak` files and internal design docs from npm package
+- Added `rules/` seed YAML files to npm package
+
 ## [1.11.0] - 2026-03-14
 
 ### Added
