@@ -70,6 +70,64 @@
 | Test files | 27 | ALL PASS |
 | Duration | 9.41s | |
 
+## Regression Tests — Batch 1 (WAHA API Direct)
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 1 | Send DM text | PASS | Delivered to 972544329000@c.us |
+| 2 | Send group text (group 1) | PASS | Delivered to 120363421825201386@g.us |
+| 3 | Find test group 2 JID | PASS | Found 120363408876966816@g.us |
+| 4 | Send group text (group 2) | PASS | Delivered to group 2 |
+| 5 | Create poll | PASS | "Favorite color?" poll with 3 options |
+| 6 | Send reaction | PASS | Thumbs up on poll message |
+| 7 | Send location | PASS | Tel Aviv coordinates (32.0853, 34.7818) |
+| 8 | Read messages (logan) | PASS | 5 messages retrieved including regression text |
+| 9 | Search groups (admin API) | PASS | Found 2 groups matching "test" |
+| 10 | Search contacts (admin API) | PASS | Found "Omer Nesher" |
+| 11 | Sessions API | PASS | logan: role=bot, wahaStatus=WORKING |
+| 12 | Gateway health | PASS | healthz=ok, DM filter active |
+| 13 | Edit message | PASS | Sent then edited; confirmed MESSAGE_EDIT |
+| 14 | Unsend/delete | PASS | Sent then deleted; confirmed REVOKE |
+| 15 | Mark as read | PASS | 100 message IDs marked seen |
+
+**Result: 15/15 PASS**
+
+## Regression Tests — Batch 2 (Advanced / Sammie Integration)
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 1 | Multi-group send | PASS | Delivered to both test groups |
+| 2 | Sammie search groups | PASS | Found 3 groups with "test" |
+| 3 | Sammie read messages (group 2) | PARTIAL | Sent OK; Sammie rate-limited on upstream API |
+| 4 | Link preview | PASS | GitHub repo preview rendered |
+| 5 | Directory pagination (groups p2) | PASS | 50 groups returned |
+| 6 | Directory pagination (groups p3) | PASS | 24 groups (50+50+24=124 total) |
+| 7 | Newsletter pagination | PASS | 50/86 newsletters returned |
+| 8 | Sammie responses check | PASS | Sammie responded to search with correct results |
+| 9 | Gateway error check | WARN | Upstream rate limits on gpt-5.4, auto-failover to MiniMax-M2.5 |
+| 10 | Final health check | PASS | Healthy, all filters active |
+
+**Result: 8/10 PASS, 1 PARTIAL, 1 WARN (upstream API, not plugin)**
+
+## Admin Panel Tests (Chrome DevTools / Playwright)
+
+| Tab | Test | Result | Notes |
+|-----|------|--------|-------|
+| Dashboard | Load and render all cards | PASS | DM Filter, Group Filter, Presence, Access Control, Session Info |
+| Dashboard | Session health display | PASS | Shows "healthy", 0 failures |
+| Settings | All config sections visible | PASS | Connection, Access Control, DM Filter, Presence, Media, etc. |
+| Directory | Contacts tab | PASS | 12 contacts loaded with DM allow/block buttons |
+| Directory | Groups tab | PASS | All 124 groups loaded via infinite scroll |
+| Directory | Newsletters tab | PASS | Tab accessible |
+| Directory | Search | PASS | "test" finds test groups, "omer" finds Omer contact |
+| Directory | Load More button | PASS | Visible and functional (was hidden before fix) |
+| Directory | Infinite scroll | PASS | Auto-loads pages as user scrolls to bottom |
+| Queue | Tab loads | PASS | No messages queued at test time |
+| Sessions | Session display | PASS | 3cf11776_logan: bot/full-access, WAHA: WORKING |
+| Docs | Tab accessible | PASS | Loads documentation |
+
+**Result: 12/12 PASS**
+
 ## Environment
 
 | Item | Value |
