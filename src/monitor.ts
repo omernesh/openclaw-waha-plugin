@@ -1434,12 +1434,31 @@ async function loadDirectory() {
     }
     d.contacts.forEach(function(c) { list.innerHTML += buildContactCard(c); });
     dirOffset += d.contacts.length;
-    document.getElementById('load-more-btn').style.display = d.contacts.length === 50 ? '' : 'none';
+    // Show Load More when there are more items to fetch. DO NOT use d.contacts.length === 50
+    // because server-side @lid/@s.whatsapp.net filtering can reduce count below 50.
+    var hasMore = dirOffset < d.total;
+    document.getElementById('load-more-btn').style.display = hasMore ? '' : 'none';
   } catch(e) {
     document.getElementById('contact-list').innerHTML = '<div style="color:#ef4444;padding:16px;">Error loading directory: ' + esc(e.message) + '</div>';
   }
 }
 async function loadMoreContacts() { await loadDirectory(); }
+// Infinite scroll: auto-load when user scrolls near the bottom of the directory list
+(function() {
+  var mainEl = document.querySelector('main');
+  if (!mainEl) return;
+  var loading = false;
+  mainEl.addEventListener('scroll', function() {
+    if (loading) return;
+    var btn = document.getElementById('load-more-btn');
+    if (!btn || btn.style.display === 'none') return;
+    // Trigger when within 200px of the bottom
+    if (mainEl.scrollTop + mainEl.clientHeight >= mainEl.scrollHeight - 200) {
+      loading = true;
+      loadMoreContacts().finally(function() { loading = false; });
+    }
+  });
+})();
 function buildContactCard(c) {
   var name = c.displayName || c.jid;
   var color = avatarColor(c.jid);
