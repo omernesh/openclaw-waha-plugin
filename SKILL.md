@@ -450,13 +450,16 @@ Bot activates → processes and replies via DM (triggerResponseMode: "dm") or in
 
 Use `readMessages` to retrieve recent messages from a monitored chat.
 
+> **IMPORTANT:** `readMessages` does NOT accept a target — pass the chat as a `chatId` parameter.
+> If you need the JID, use `search` first to find it.
+
 ```
 Action: readMessages
 Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
 ```
 
 **Parameters:**
-- `chatId`: The JID of the chat to read from
+- `chatId`: The JID of the chat to read from (required — use `search` to find JIDs by name)
 - `limit`: Number of recent messages to fetch (1-50, default 10)
 
 **Returns:** Array of recent messages with sender, text, timestamp, and message type.

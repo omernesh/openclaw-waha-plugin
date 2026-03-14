@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import {
   createLoggerBackedRuntime,
   isRequestBodyLimitError,
@@ -403,7 +404,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button onclick="switchTab('directory', this)" id="tab-directory">Directory</button>
     <button onclick="switchTab('queue', this)" id="tab-queue">Queue</button>
     <button onclick="switchTab('sessions', this)" id="tab-sessions">Sessions</button>
-    <button onclick="switchTab('docs', this)" id="tab-docs">Docs</button>
+    <button onclick="switchTab('logs', this)" id="tab-logs">Log</button>
   </nav>
   <span class="badge" id="status-badge">Loading...</span>
 </header>
@@ -788,154 +789,22 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 </main>
 </div>
 
-<!-- TAB: DOCS -->
-<div class="tab-content" id="content-docs">
+<!-- TAB: LOG -->
+<div class="tab-content" id="content-logs">
 <main class="tab-pane">
 <div class="card">
-  <h2>Documentation</h2>
-
-  <details class="docs-section" open>
-    <summary>Getting Started</summary>
-    <div class="docs-body">
-      <p>This admin panel is your browser-based control center for the <strong>OpenClaw WAHA plugin</strong>. All changes save directly to <code>openclaw.json</code>.</p>
-      <p>The plugin bridges WhatsApp (via WAHA) to your OpenClaw AI agents. Messages arrive via webhook, get filtered and routed, then responses are sent back through WAHA's REST API.</p>
-      <ul>
-        <li><strong>Dashboard</strong> — Live stats, filter events, session info</li>
-        <li><strong>Settings</strong> — Edit all plugin config without touching JSON files</li>
-        <li><strong>Directory</strong> — See who has messaged the bot, configure per-contact behavior</li>
-        <li><strong>Docs</strong> — This page</li>
-      </ul>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>DM Keyword Filter</summary>
-    <div class="docs-body">
-      <p>The DM filter lets you control which direct messages get forwarded to your AI agent. Without it, every DM (spam, irrelevant messages) consumes tokens.</p>
-      <p><strong>How it works:</strong> When enabled, a DM must match at least one <em>mention pattern</em> (regex, case-insensitive) to pass. Non-matching messages are silently dropped.</p>
-      <p><strong>God Mode Bypass:</strong> Super-users listed in <code>godModeSuperUsers</code> bypass the filter entirely — useful for the bot owner.</p>
-      <p><strong>Patterns:</strong> Each pattern is a JavaScript regex. Examples:</p>
-      <ul>
-        <li><code>bot</code> — matches any message containing "bot"</li>
-        <li><code>^help</code> — matches messages starting with "help"</li>
-        <li><code>\\bbot\\b</code> — matches the word "bot" exactly</li>
-      </ul>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Per-DM Settings</summary>
-    <div class="docs-body">
-      <p>In the Directory tab, each contact can have custom behavior settings:</p>
-      <ul>
-        <li><strong>Mode: Active</strong> — Normal behavior, bot responds as configured</li>
-        <li><strong>Mode: Listen Only</strong> — Bot tracks messages but never responds to this contact</li>
-        <li><strong>Mention Only</strong> — Even if the global filter is off, this contact must mention the bot</li>
-        <li><strong>Custom Keywords</strong> — Additional comma-separated keywords for this contact's filter</li>
-        <li><strong>Can Initiate</strong> — Whether the bot can proactively message this contact (future feature)</li>
-      </ul>
-      <p>Settings are stored in a local SQLite database at <code>~/.openclaw/data/waha-directory-{accountId}.db</code>.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Presence System (Human Mimicry)</summary>
-    <div class="docs-body">
-      <p>The presence system makes the bot feel more human by simulating natural messaging behavior:</p>
-      <ul>
-        <li><strong>Read delay</strong> — Waits before starting to type (as if reading the message)</li>
-        <li><strong>Typing indicator</strong> — Shows "typing..." in WhatsApp based on response length and WPM</li>
-        <li><strong>Pause breaks</strong> — Random mid-typing pauses (like a human pausing to think)</li>
-        <li><strong>Jitter</strong> — Random timing variation so patterns aren't perfectly predictable</li>
-      </ul>
-      <p>Tune WPM and timing ranges to match your desired persona. Higher WPM = faster typist. Lower pause chance = fewer interruptions.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Access Control</summary>
-    <div class="docs-body">
-      <p><strong>DM Policy options:</strong></p>
-      <ul>
-        <li><code>pairing</code> — Unknown senders get a pairing code. Approved users are stored in the pairing store.</li>
-        <li><code>open</code> — Everyone can DM the bot (not recommended for public-facing bots)</li>
-        <li><code>closed</code> — No DMs accepted</li>
-        <li><code>allowlist</code> — Only JIDs in the <em>Allow From</em> list can DM</li>
-      </ul>
-      <p><strong>JID formats:</strong> WAHA NOWEB engine may send senders as <code>@lid</code> (linked device ID) instead of <code>@c.us</code> (phone). Add BOTH formats for the same person to ensure access.</p>
-      <p><strong>Group policy</strong> works similarly but applies to group message senders.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Media Preprocessing (v1.4.0)</summary>
-    <div class="docs-body">
-      <p>The media preprocessing system transforms inbound media into AI-readable text before forwarding to OpenClaw:</p>
-      <ul>
-        <li><strong>Audio Transcription</strong> — Voice messages transcribed via faster-whisper (requires ffmpeg on host)</li>
-        <li><strong>Image Analysis</strong> — Image descriptions generated by vision-capable LLM</li>
-        <li><strong>Video Analysis</strong> — Key frame extraction + analysis</li>
-        <li><strong>Location Resolution</strong> — GPS coordinates resolved to addresses via OpenStreetMap Nominatim (no API key needed)</li>
-        <li><strong>vCard Parsing</strong> — Contact attachments extracted to structured text</li>
-        <li><strong>Document Analysis</strong> — PDF/document text extraction</li>
-        <li><strong>Poll Handling</strong> — Automatic (built-in, always on)</li>
-        <li><strong>Event Handling</strong> — Automatic (built-in, always on)</li>
-      </ul>
-      <p>Enable the master toggle, then enable individual sub-features as needed. Each sub-feature can be toggled independently.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Directory Refresh (v1.5.0)</summary>
-    <div class="docs-body">
-      <p>The <strong>Refresh from WAHA</strong> button in the Directory tab bulk-imports all contacts and groups from your WAHA session into the local SQLite directory.</p>
-      <p>As of v1.5.0, the refresh now calls three WAHA APIs: <code>/chats</code> (primary, always works on NOWEB), <code>/contacts</code> (fallback, may 400 on NOWEB without store), and <code>/groups</code>. Names are merged with contact names taking priority.</p>
-      <p>Participants are loaded lazily when you click a group card (not during bulk refresh). This avoids hammering the WAHA API.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Allow List (v1.5.0)</summary>
-    <div class="docs-body">
-      <p>The <strong>Allow List</strong> feature lets you manage who can interact with the bot directly from the Directory tab, without manually editing JSON config files.</p>
-      <p><strong>DM Contacts:</strong> Each contact card has an "Allow DM" button. Clicking it adds/removes the JID from <code>channels.waha.allowFrom</code> in <code>openclaw.json</code>.</p>
-      <p><strong>Groups:</strong> Click a group card to expand the participant list. Each participant has two toggles:</p>
-      <ul>
-        <li><strong>Allow in Group</strong> - adds the participant JID to <code>groupAllowFrom</code> (they can trigger the bot in that group)</li>
-        <li><strong>Allow DM</strong> - adds the participant JID to <code>allowFrom</code> (they can DM the bot directly)</li>
-      </ul>
-      <p>The <strong>Allow All</strong> button sets all participants in a group as allowed in <code>groupAllowFrom</code>.</p>
-      <p>All changes are persisted immediately to both the SQLite directory and <code>openclaw.json</code>.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Group Keyword Filter (v1.5.0)</summary>
-    <div class="docs-body">
-      <p>The Group Keyword Filter works identically to the DM Keyword Filter, but applies to group messages. This saves tokens by filtering out irrelevant group chatter before it reaches the AI.</p>
-      <p><strong>How it works:</strong> When enabled, group messages must match at least one mention pattern (regex, case-insensitive) to be forwarded to the AI. Non-matching messages are silently dropped.</p>
-      <p>Configure it in the Settings tab under "Group Keyword Filter". The patterns, god mode bypass, and token estimate work exactly the same as the DM version.</p>
-      <p>Stats are shown on the Dashboard tab in the "Group Keyword Filter" card.</p>
-    </div>
-  </details>
-
-  <details class="docs-section">
-    <summary>Troubleshooting</summary>
-    <div class="docs-body">
-      <p><strong>Bot not responding to messages?</strong></p>
-      <ul>
-        <li>Check the Dashboard → DM Filter recent events (red = dropped)</li>
-        <li>Verify the sender JID is in allowFrom (try both @c.us and @lid)</li>
-        <li>Check allowedGroups includes the group JID</li>
-        <li>For groups: groupAllowFrom must include the sender's JID</li>
-        <li>If using dmPolicy=pairing: sender must complete the pairing flow first</li>
-      </ul>
-      <p><strong>HMAC signature errors?</strong> The <code>webhookHmacKey</code> in this config must match the HMAC key configured in WAHA's webhook settings.</p>
-      <p><strong>Settings not taking effect?</strong> Connection settings (baseUrl, webhookPort) require a gateway restart: <code>kill -9 $(pgrep -f openclaw-gatewa)</code> — systemd auto-restarts it.</p>
-      <p><strong>Directory not updating?</strong> Contacts are tracked on first message receipt. Use the Refresh button to bulk-import from WAHA. The SQLite file is at <code>~/.openclaw/data/waha-directory-{accountId}.db</code>.</p>
-    </div>
-  </details>
-
+  <h2>Gateway Log</h2>
+  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+    <input type="text" id="log-search" placeholder="Filter logs..." oninput="loadLogs()" style="flex:1;min-width:180px;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">
+    <button onclick="setLogLevel('all')" id="log-level-all" class="log-level-btn active" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#3b82f6;color:#fff;">All</button>
+    <button onclick="setLogLevel('error')" id="log-level-error" class="log-level-btn" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#334155;color:#94a3b8;">Error</button>
+    <button onclick="setLogLevel('warn')" id="log-level-warn" class="log-level-btn" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#334155;color:#94a3b8;">Warn</button>
+    <button onclick="setLogLevel('info')" id="log-level-info" class="log-level-btn" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#334155;color:#94a3b8;">Info</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#94a3b8;cursor:pointer;"><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
+    <button onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#1e293b;color:#e2e8f0;">Refresh</button>
+  </div>
+  <div id="log-source" style="font-size:0.72rem;color:#64748b;margin-bottom:6px;"></div>
+  <pre id="log-output" style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;max-height:70vh;overflow-y:auto;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;line-height:1.4;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
 </div>
 </main>
 </div>
@@ -958,13 +827,14 @@ function switchTab(name, btn) {
   if (name === 'directory') loadDirectory();
   if (name === 'queue') loadQueue();
   if (name === 'sessions') loadSessions();
+  if (name === 'logs') { loadLogs(); startLogRefresh(); } else { stopLogRefresh(); }
   location.hash = name;
 }
 
 // Init from hash
 (function() {
   var hash = location.hash.replace('#','') || 'dashboard';
-  var valid = ['dashboard','settings','directory','docs','queue','sessions'];
+  var valid = ['dashboard','settings','directory','logs','queue','sessions'];
   if (!valid.includes(hash)) hash = 'dashboard';
   var btn = document.getElementById('tab-' + hash);
   switchTab(hash, btn);
@@ -1099,6 +969,60 @@ async function loadHealth() {
   var dot = document.getElementById('health-dot');
   if (dot) { dot.style.background = '#94a3b8'; dot.title = 'Health check error: ' + (e.message || e); }
 }
+}
+
+// ---- Log Tab ----
+var currentLogLevel = 'all';
+var logRefreshTimer = null;
+
+function setLogLevel(level) {
+  currentLogLevel = level;
+  document.querySelectorAll('.log-level-btn').forEach(function(b) {
+    b.style.background = '#334155';
+    b.style.color = '#94a3b8';
+    b.classList.remove('active');
+  });
+  var btn = document.getElementById('log-level-' + level);
+  if (btn) { btn.style.background = '#3b82f6'; btn.style.color = '#fff'; btn.classList.add('active'); }
+  loadLogs();
+}
+
+function startLogRefresh() {
+  stopLogRefresh();
+  logRefreshTimer = setInterval(loadLogs, 5000);
+}
+
+function stopLogRefresh() {
+  if (logRefreshTimer) { clearInterval(logRefreshTimer); logRefreshTimer = null; }
+}
+
+async function loadLogs() {
+  var search = (document.getElementById('log-search') || {}).value || '';
+  search = search.trim();
+  var url = '/api/admin/logs?lines=200&level=' + currentLogLevel + (search ? '&search=' + encodeURIComponent(search) : '');
+  try {
+    var r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var output = document.getElementById('log-output');
+    var sourceEl = document.getElementById('log-source');
+    if (sourceEl) sourceEl.textContent = 'Source: ' + (d.source || 'unknown') + ' | ' + d.total + ' lines';
+    var lines = d.lines || [];
+    if (lines.length > 500) lines = lines.slice(lines.length - 500);
+    var colored = lines.map(function(line) {
+      if (/error/i.test(line)) return '<span style="color:#ef4444">' + esc(line) + '</span>';
+      if (/warn/i.test(line)) return '<span style="color:#f59e0b">' + esc(line) + '</span>';
+      if (/\\[waha\\]/i.test(line)) return '<span style="color:#22d3ee">' + esc(line) + '</span>';
+      return esc(line);
+    }).join('\\n');
+    output.innerHTML = colored;
+    if (document.getElementById('log-autoscroll') && document.getElementById('log-autoscroll').checked) {
+      output.scrollTop = output.scrollHeight;
+    }
+  } catch(e) {
+    var out = document.getElementById('log-output');
+    if (out) out.textContent = 'Error loading logs: ' + (e.message || String(e));
+  }
 }
 
 // ---- Queue Stats (Phase 2, Plan 02) ----
@@ -1730,6 +1654,77 @@ export function createWahaWebhookServer(opts: {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true }));
       setTimeout(() => process.exit(0), 500); // systemd auto-restarts
+      return;
+    }
+
+    // GET /api/admin/logs — gateway log viewer (reads from journalctl or log file)
+    // DO NOT CHANGE — Log tab backend. Uses execFileSync (no shell injection) for journalctl,
+    // falls back to reading log file on non-systemd systems.
+    if (req.url?.startsWith("/api/admin/logs") && req.method === "GET") {
+      try {
+        const logUrl = new URL(req.url, "http://localhost");
+        const requestedLines = Math.min(Math.max(parseInt(logUrl.searchParams.get("lines") ?? "200", 10) || 200, 1), 500);
+        const search = logUrl.searchParams.get("search") ?? "";
+        const level = (logUrl.searchParams.get("level") ?? "all").toLowerCase();
+
+        let logLines: string[] = [];
+        let source = "unknown";
+
+        // Try journalctl first (most reliable on systemd systems)
+        try {
+          const raw = execFileSync("journalctl", [
+            "--user", "-u", "openclaw-gateway",
+            "--since", "10 minutes ago",
+            "--no-pager",
+            "-n", String(requestedLines),
+          ], { encoding: "utf-8", timeout: 5000 });
+          logLines = raw.split("\n").filter((l: string) => l.trim().length > 0);
+          source = "journalctl";
+        } catch {
+          // journalctl not available, try log file fallback
+          try {
+            const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            const logPath = `/tmp/openclaw/openclaw-${today}.log`;
+            if (existsSync(logPath)) {
+              const raw = readFileSync(logPath, "utf-8");
+              logLines = raw.split("\n").filter((l: string) => l.trim().length > 0);
+              if (logLines.length > requestedLines) {
+                logLines = logLines.slice(logLines.length - requestedLines);
+              }
+              source = "file";
+            } else {
+              logLines = ["No log file found at " + logPath + " and journalctl not available."];
+              source = "none";
+            }
+          } catch (fileErr) {
+            logLines = ["Failed to read log file: " + String(fileErr)];
+            source = "error";
+          }
+        }
+
+        // Apply level filter
+        if (level !== "all") {
+          const levelRegex = new RegExp(level, "i");
+          logLines = logLines.filter((l: string) => levelRegex.test(l));
+        }
+
+        // Apply search filter
+        if (search) {
+          const searchLower = search.toLowerCase();
+          logLines = logLines.filter((l: string) => l.toLowerCase().includes(searchLower));
+        }
+
+        // Trim to max 500 lines
+        const total = logLines.length;
+        if (logLines.length > 500) {
+          logLines = logLines.slice(logLines.length - 500);
+        }
+
+        writeJsonResponse(res, 200, { lines: logLines, source, total });
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/logs failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to fetch logs", lines: [], source: "error", total: 0 });
+      }
       return;
     }
 
