@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import {
   createLoggerBackedRuntime,
   isRequestBodyLimitError,
@@ -388,6 +388,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   footer { background: #1e293b; border-top: 1px solid #334155; padding: 12px 24px; text-align: center; font-size: 0.8rem; color: #64748b; margin-top: auto; }
   footer a { color: #38bdf8; text-decoration: none; }
   footer a:hover { text-decoration: underline; }
+  .log-level-btn { padding:4px 10px; border-radius:5px; border:1px solid #334155; cursor:pointer; font-size:0.75rem; background:#334155; color:#94a3b8; transition: background .1s; }
+  .log-level-btn.active { background:#3b82f6; color:#fff; }
   @media (max-width: 640px) {
     main.tab-pane { padding: 16px; }
     nav button { padding: 14px 12px; font-size: 0.8rem; }
@@ -754,7 +756,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="dir-stats" id="dir-stats"></div>
   </div>
   <div class="contact-list" id="contact-list"></div>
-  <button class="load-more-btn" id="load-more-btn" onclick="loadMoreContacts()" style="display:none">Load More</button>
+  <button class="load-more-btn" id="load-more-btn" onclick="loadDirectory()" style="display:none">Load More</button>
 </div>
 </main>
 </div>
@@ -795,11 +797,11 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <div class="card">
   <h2>Gateway Log</h2>
   <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-    <input type="text" id="log-search" placeholder="Filter logs..." oninput="loadLogs()" style="flex:1;min-width:180px;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">
-    <button onclick="setLogLevel('all')" id="log-level-all" class="log-level-btn active" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#3b82f6;color:#fff;">All</button>
-    <button onclick="setLogLevel('error')" id="log-level-error" class="log-level-btn" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#334155;color:#94a3b8;">Error</button>
-    <button onclick="setLogLevel('warn')" id="log-level-warn" class="log-level-btn" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#334155;color:#94a3b8;">Warn</button>
-    <button onclick="setLogLevel('info')" id="log-level-info" class="log-level-btn" style="padding:4px 10px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#334155;color:#94a3b8;">Info</button>
+    <input type="text" id="log-search" placeholder="Filter logs..." oninput="debouncedLogSearch()" style="flex:1;min-width:180px;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">
+    <button onclick="setLogLevel('all')" id="log-level-all" class="log-level-btn active">All</button>
+    <button onclick="setLogLevel('error')" id="log-level-error" class="log-level-btn">Error</button>
+    <button onclick="setLogLevel('warn')" id="log-level-warn" class="log-level-btn">Warn</button>
+    <button onclick="setLogLevel('info')" id="log-level-info" class="log-level-btn">Info</button>
     <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#94a3b8;cursor:pointer;"><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
     <button onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#1e293b;color:#e2e8f0;">Refresh</button>
   </div>
@@ -974,16 +976,19 @@ async function loadHealth() {
 // ---- Log Tab ----
 var currentLogLevel = 'all';
 var logRefreshTimer = null;
+var logSearchTimeout = null;
+function debouncedLogSearch() {
+  clearTimeout(logSearchTimeout);
+  logSearchTimeout = setTimeout(loadLogs, 300);
+}
 
 function setLogLevel(level) {
   currentLogLevel = level;
   document.querySelectorAll('.log-level-btn').forEach(function(b) {
-    b.style.background = '#334155';
-    b.style.color = '#94a3b8';
     b.classList.remove('active');
   });
   var btn = document.getElementById('log-level-' + level);
-  if (btn) { btn.style.background = '#3b82f6'; btn.style.color = '#fff'; btn.classList.add('active'); }
+  if (btn) { btn.classList.add('active'); }
   loadLogs();
 }
 
@@ -1002,13 +1007,18 @@ async function loadLogs() {
   var url = '/api/admin/logs?lines=200&level=' + currentLogLevel + (search ? '&search=' + encodeURIComponent(search) : '');
   try {
     var r = await fetch(url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) {
+      var errBody = await r.json().catch(function() { return {}; });
+      throw new Error(errBody.error || 'HTTP ' + r.status);
+    }
     var d = await r.json();
+    // Null-check output element — DO NOT REMOVE
     var output = document.getElementById('log-output');
+    if (!output) return;
     var sourceEl = document.getElementById('log-source');
     if (sourceEl) sourceEl.textContent = 'Source: ' + (d.source || 'unknown') + ' | ' + d.total + ' lines';
     var lines = d.lines || [];
-    if (lines.length > 500) lines = lines.slice(lines.length - 500);
+    // NOTE: No client-side trim needed — backend already limits to 500 lines
     var colored = lines.map(function(line) {
       if (/error/i.test(line)) return '<span style="color:#ef4444">' + esc(line) + '</span>';
       if (/warn/i.test(line)) return '<span style="color:#f59e0b">' + esc(line) + '</span>';
@@ -1016,7 +1026,8 @@ async function loadLogs() {
       return esc(line);
     }).join('\\n');
     output.innerHTML = colored;
-    if (document.getElementById('log-autoscroll') && document.getElementById('log-autoscroll').checked) {
+    var autoScroll = document.getElementById('log-autoscroll');
+    if (autoScroll && autoScroll.checked) {
       output.scrollTop = output.scrollHeight;
     }
   } catch(e) {
@@ -1366,7 +1377,6 @@ async function loadDirectory() {
     document.getElementById('contact-list').innerHTML = '<div style="color:#ef4444;padding:16px;">Error loading directory: ' + esc(e.message) + '</div>';
   }
 }
-async function loadMoreContacts() { await loadDirectory(); }
 // Infinite scroll: auto-load when user scrolls near the bottom of the directory list
 (function() {
   var mainEl = document.querySelector('main');
@@ -1379,7 +1389,7 @@ async function loadMoreContacts() { await loadDirectory(); }
     // Trigger when within 200px of the bottom
     if (mainEl.scrollTop + mainEl.clientHeight >= mainEl.scrollHeight - 200) {
       loading = true;
-      loadMoreContacts().finally(function() { loading = false; });
+      loadDirectory().finally(function() { loading = false; });
     }
   });
 })();
@@ -1657,9 +1667,9 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
-    // GET /api/admin/logs — gateway log viewer (reads from journalctl or log file)
-    // DO NOT CHANGE — Log tab backend. Uses execFileSync (no shell injection) for journalctl,
-    // falls back to reading log file on non-systemd systems.
+    // GET /api/admin/logs — gateway log viewer (reads from async execFile for journalctl,
+    // falls back to tail on log file for non-systemd systems).
+    // DO NOT CHANGE — Log tab backend. Uses execFile (no shell injection) for journalctl.
     if (req.url?.startsWith("/api/admin/logs") && req.method === "GET") {
       try {
         const logUrl = new URL(req.url, "http://localhost");
@@ -1670,27 +1680,34 @@ export function createWahaWebhookServer(opts: {
         let logLines: string[] = [];
         let source = "unknown";
 
-        // Try journalctl first (most reliable on systemd systems)
+        // Try journalctl first (most reliable on systemd systems) — async execFile, no thread blocking
         try {
-          const raw = execFileSync("journalctl", [
-            "--user", "-u", "openclaw-gateway",
-            "--since", "10 minutes ago",
-            "--no-pager",
-            "-n", String(requestedLines),
-          ], { encoding: "utf-8", timeout: 5000 });
+          const raw = await new Promise<string>((resolve, reject) => {
+            execFile("journalctl", [
+              "--user", "-u", "openclaw-gateway",
+              "--since", "10 minutes ago",
+              "--no-pager",
+              "-n", String(requestedLines),
+            ], { encoding: "utf-8", timeout: 5000, maxBuffer: 1024 * 1024 }, (err, stdout) => {
+              if (err) reject(err); else resolve(stdout);
+            });
+          });
           logLines = raw.split("\n").filter((l: string) => l.trim().length > 0);
           source = "journalctl";
-        } catch {
+        } catch (journalErr: unknown) {
           // journalctl not available, try log file fallback
+          const errMsg = journalErr instanceof Error ? journalErr.message : String(journalErr);
+          console.warn(`[waha] journalctl failed, falling back to log file: ${errMsg}`);
           try {
             const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
             const logPath = `/tmp/openclaw/openclaw-${today}.log`;
             if (existsSync(logPath)) {
-              const raw = readFileSync(logPath, "utf-8");
+              const raw = await new Promise<string>((resolve, reject) => {
+                execFile("tail", ["-n", String(requestedLines), logPath], { encoding: "utf-8", timeout: 3000 }, (err, stdout) => {
+                  if (err) reject(err); else resolve(stdout);
+                });
+              });
               logLines = raw.split("\n").filter((l: string) => l.trim().length > 0);
-              if (logLines.length > requestedLines) {
-                logLines = logLines.slice(logLines.length - requestedLines);
-              }
               source = "file";
             } else {
               logLines = ["No log file found at " + logPath + " and journalctl not available."];
@@ -1702,10 +1719,18 @@ export function createWahaWebhookServer(opts: {
           }
         }
 
-        // Apply level filter
-        if (level !== "all") {
-          const levelRegex = new RegExp(level, "i");
-          logLines = logLines.filter((l: string) => levelRegex.test(l));
+        // Apply level filter — pattern-based matching (no regex injection from user input)
+        // DO NOT CHANGE — fixes warn/info level filters that didn't work with naive regex
+        const LEVEL_PATTERNS: Record<string, RegExp> = {
+          error: /error|fail|crash|exception|isError[=:]true/i,
+          warn: /warn|drop |skip|reject|denied|mismatch/i,
+        };
+
+        if (level === "info") {
+          // Info = everything NOT matching error or warn patterns
+          logLines = logLines.filter((l: string) => !LEVEL_PATTERNS.error.test(l) && !LEVEL_PATTERNS.warn.test(l));
+        } else if (level !== "all" && LEVEL_PATTERNS[level]) {
+          logLines = logLines.filter((l: string) => LEVEL_PATTERNS[level].test(l));
         }
 
         // Apply search filter
