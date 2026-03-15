@@ -181,7 +181,19 @@ class MutationDedup {
    */
   private hashBody(body?: Record<string, unknown>): string {
     if (!body) return "empty";
-    const stable = JSON.stringify(body, Object.keys(body).sort());
+    // Recursive replacer: sorts keys at every level of nesting.
+    // A string-array replacer only filters top-level keys and strips nested
+    // objects entirely, causing different nested bodies to hash identically.
+    const sortedReplacer = (_key: string, value: unknown): unknown => {
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        const sorted = value as Record<string, unknown>;
+        return Object.fromEntries(
+          Object.keys(sorted).sort().map((k) => [k, sorted[k]])
+        );
+      }
+      return value;
+    };
+    const stable = JSON.stringify(body, sortedReplacer);
     let h = 5381;
     for (let i = 0; i < stable.length; i++) {
       h = ((h << 5) + h) ^ stable.charCodeAt(i);
@@ -267,7 +279,6 @@ export interface CallWahaApiParams {
  * 6. Error logging — structured console.warn with context
  * 7. Response parsing — JSON or text
  */
-// TODO: Change return to Promise<unknown> for type safety
 export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   const method = params.method ?? "POST";
   const timeout = params.timeoutMs ?? defaultTimeoutMs;
