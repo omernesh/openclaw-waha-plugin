@@ -46,6 +46,19 @@ export type GroupFilterOverride = {
   updatedAt: number;
 };
 
+/**
+ * Muted group record — tracks which groups are muted and DM backup for restore on unmute.
+ * DO NOT CHANGE — muted group schema is critical for /shutup and /unshutup commands.
+ */
+export type MutedGroup = {
+  groupJid: string;
+  mutedBy: string;
+  mutedAt: number;
+  expiresAt: number;
+  accountId: string;
+  dmBackup: Record<string, boolean> | null; // participantJid -> original canInitiate
+};
+
 export type ContactType = "contact" | "group" | "newsletter";
 
 const DEFAULT_DM_SETTINGS: ContactDmSettings = {
@@ -115,6 +128,15 @@ export class DirectoryDb {
         mention_patterns TEXT,
         god_mode_scope TEXT,
         updated_at INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS muted_groups (
+        group_jid TEXT PRIMARY KEY,
+        muted_by TEXT NOT NULL,
+        muted_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL DEFAULT 0,
+        account_id TEXT NOT NULL DEFAULT '',
+        dm_backup TEXT
       );
     `);
   }
@@ -467,6 +489,92 @@ export class DirectoryDb {
       merged.godModeScope ?? null,
       Date.now(),
     );
+  }
+
+  // ── Muted group methods ──
+  // DO NOT CHANGE — muted group methods are critical for /shutup and /unshutup commands.
+  // The mute system silently drops all inbound messages and blocks outbound sends to muted groups.
+  // DM settings for group participants are backed up on mute and restored on unmute.
+  // Added Phase 7 (2026-03-15).
+
+  /**
+   * Check if a group is muted. Also handles auto-expiry: if the mute has expired,
+   * auto-unmutes the group and returns false.
+   */
+  isGroupMuted(groupJid: string): boolean {
+    const row = this.db.prepare("SELECT expires_at FROM muted_groups WHERE group_jid = ?").get(groupJid) as
+      | { expires_at: number }
+      | undefined;
+    if (!row) return false;
+    if (row.expires_at > 0 && Date.now() > row.expires_at) {
+      // Expired — auto-unmute (just delete the record, DM restore is handled by caller if needed)
+      this.unmuteGroup(groupJid);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Get muted group details. Returns null if the group is not muted.
+   */
+  getMutedGroup(groupJid: string): MutedGroup | null {
+    const row = this.db.prepare("SELECT * FROM muted_groups WHERE group_jid = ?").get(groupJid) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) return null;
+    let dmBackup: Record<string, boolean> | null = null;
+    if (typeof row.dm_backup === "string") {
+      try { dmBackup = JSON.parse(row.dm_backup as string); } catch { /* corrupt JSON, ignore */ }
+    }
+    return {
+      groupJid: row.group_jid as string,
+      mutedBy: row.muted_by as string,
+      mutedAt: row.muted_at as number,
+      expiresAt: row.expires_at as number,
+      accountId: row.account_id as string,
+      dmBackup,
+    };
+  }
+
+  /**
+   * Get all muted groups. Cleans up expired mutes first.
+   */
+  getAllMutedGroups(): MutedGroup[] {
+    // First clean up expired mutes
+    this.db.prepare("DELETE FROM muted_groups WHERE expires_at > 0 AND expires_at < ?").run(Date.now());
+    const rows = this.db.prepare("SELECT * FROM muted_groups").all() as Array<Record<string, unknown>>;
+    return rows.map((row) => {
+      let dmBackup: Record<string, boolean> | null = null;
+      if (typeof row.dm_backup === "string") {
+        try { dmBackup = JSON.parse(row.dm_backup as string); } catch { /* corrupt JSON, ignore */ }
+      }
+      return {
+        groupJid: row.group_jid as string,
+        mutedBy: row.muted_by as string,
+        mutedAt: row.muted_at as number,
+        expiresAt: row.expires_at as number,
+        accountId: row.account_id as string,
+        dmBackup,
+      };
+    });
+  }
+
+  /**
+   * Mute a group. Records the mute with optional expiry and DM backup.
+   */
+  muteGroup(groupJid: string, mutedBy: string, accountId: string, expiresAt: number = 0, dmBackup: Record<string, boolean> | null = null): void {
+    this.db.prepare(
+      "INSERT OR REPLACE INTO muted_groups (group_jid, muted_by, muted_at, expires_at, account_id, dm_backup) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(groupJid, mutedBy, Date.now(), expiresAt, accountId, dmBackup ? JSON.stringify(dmBackup) : null);
+  }
+
+  /**
+   * Unmute a group. Returns the DM backup for restoration (or null if no backup).
+   */
+  unmuteGroup(groupJid: string): Record<string, boolean> | null {
+    const muted = this.getMutedGroup(groupJid);
+    this.db.prepare("DELETE FROM muted_groups WHERE group_jid = ?").run(groupJid);
+    return muted?.dmBackup ?? null;
   }
 
 

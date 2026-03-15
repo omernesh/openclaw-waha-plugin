@@ -34,6 +34,9 @@ import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
 import { resolveInboundPolicy } from "./rules-resolver.js";
 import { getRulesBasePath } from "./identity-resolver.js";
 import type { ResolvedPolicy } from "./rules-types.js";
+// Phase 7: /shutup and /unshutup slash commands — regex-based, NOT LLM-dependent.
+// Imported for command detection, pending selection check, and mute check in handleWahaInbound. DO NOT REMOVE.
+import { SHUTUP_RE, checkShutupAuthorization, handleShutupCommand, checkPendingSelection, clearPendingSelection, handleSelectionResponse } from "./shutup.js";
 // Phase 4 Plan 02: Trigger word detection — pure functions extracted to trigger-word.ts for testability.
 // Imported for local use and re-exported so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
 import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
@@ -364,6 +367,60 @@ export async function handleWahaInbound(params: {
   const isGroup = isWhatsAppGroupJid(message.chatId);
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
+
+  // === Slash command detection (regex-based, NOT LLM-dependent) ===
+  // Must run BEFORE mute check, dedup, trigger, and keyword filters.
+  // /shutup and /unshutup commands bypass all filters to work even when muted.
+  // DO NOT CHANGE — command detection must be the first check after message extraction.
+  const commandMatch = SHUTUP_RE.exec(rawBody.trim());
+  if (commandMatch) {
+    const [, command, allFlag, durationStr] = commandMatch;
+    const isAuthorized = await checkShutupAuthorization(senderId, chatId, isGroup, config, runtime);
+    if (isAuthorized) {
+      await handleShutupCommand({
+        command: command!.toLowerCase() as "shutup" | "unshutup" | "unmute",
+        allFlag: !!allFlag,
+        durationStr: durationStr ?? null,
+        chatId,
+        senderId,
+        isGroup,
+        account,
+        config,
+        runtime,
+      });
+      return; // Command handled
+    }
+  }
+
+  // === Pending /shutup selection response ===
+  // When a user sends /shutup in DM, the bot shows a numbered group list.
+  // This checks if the incoming DM is a reply with a number or "all".
+  // DO NOT CHANGE — DM interactive flow for /shutup command.
+  if (!isGroup && !commandMatch) {
+    const pending = checkPendingSelection(senderId);
+    if (pending) {
+      await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
+      clearPendingSelection(senderId);
+      return;
+    }
+  }
+
+  // === Group mute check ===
+  // If the group is muted, silently drop all messages.
+  // /shutup and /unshutup commands are handled above and bypass this check.
+  // DO NOT CHANGE — mute check prevents the bot from processing messages in muted groups.
+  if (isGroup) {
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      if (dirDb.isGroupMuted(chatId)) {
+        runtime.log?.(`[waha] group ${chatId} is muted, dropping message`);
+        return;
+      }
+    } catch (err) {
+      // DB errors are non-fatal — fall through to normal processing
+      runtime.log?.(`[waha] mute check failed for ${chatId}: ${String(err)}`);
+    }
+  }
 
   // Trigger word detection — check before group AND DM filters.
   // Trigger-word messages are explicit bot invocations and bypass BOTH group and DM keyword filtering.

@@ -4,7 +4,7 @@
 
 Full WhatsApp API access through [WAHA](https://waha.devlike.pro/) -- groups, channels, media, polls, reactions, stickers, voice messages, contact cards, labels, status/stories, presence, and more. 87%+ WAHA API coverage.
 
-**Plugin ID:** `waha` | **Version:** 1.13.0 | **Last updated:** 2026-03-15
+**Plugin ID:** `waha` | **Version:** 1.14.0 | **Last updated:** 2026-03-15
 
 [![npm](https://img.shields.io/npm/v/waha-openclaw-channel)](https://www.npmjs.com/package/waha-openclaw-channel)
 
@@ -259,6 +259,18 @@ Controls where superuser filter bypass applies:
 When the bot sends through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not the human.
 
 **Cross-session routing** is automatic -- the bot uses its own session when it's a group member, falls back to the human session otherwise.
+
+---
+
+## Shutup Command (v1.14)
+
+Mute the bot in any group directly from WhatsApp using `/shutup`. This is regex-based and does not consume LLM tokens.
+
+- **In a group**: `/shutup` (indefinite), `/shutup 5m` / `/shutup 2h` / `/shutup 1d` (timed)
+- **In a DM**: `/shutup` shows a numbered group list; reply with a number or `all`
+- **Unmute**: `/unshutup` or `/unmute` (same syntax as above)
+- Only superusers and allowed senders can use these commands
+- Mute state is persisted in SQLite and survives restarts
 
 ---
 

@@ -7,6 +7,7 @@ import { normalizeWahaMessagingTarget } from "./normalize.js";
 import { callWahaApi, warnOnError } from "./http-client.js";
 import { assertPolicyCanSend } from "./policy-enforcer.js";
 import type { CoreConfig } from "./types.js";
+import { getDirectoryDb } from "./directory.js";
 
 const HEAD_DETECT_TIMEOUT_MS = 5000;
 const RESOLVE_FETCH_DELAY_MS = 200;
@@ -206,6 +207,21 @@ export async function sendWahaText(params: {
   // Fail-open: if rules not configured or resolution fails, send proceeds normally.
   // Only blocks on explicit policy denial (can_initiate=false or silent_observer group).
   assertPolicyCanSend(chatId, params.cfg);
+
+  // Check if target group is muted — block outbound sends to muted groups.
+  // DO NOT CHANGE — muted groups must not receive any bot messages except /unshutup confirmations.
+  // Added Phase 7 (2026-03-15).
+  if (chatId.endsWith("@g.us")) {
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      if (dirDb.isGroupMuted(chatId)) {
+        throw new Error(`Group ${chatId} is muted. Use /unshutup to unmute.`);
+      }
+    } catch (err) {
+      if (String(err).includes("is muted")) throw err;
+      // DB errors are non-fatal for send
+    }
+  }
 
   // Bot prefix for human session replies — when the bot borrows a human session to send,
   // prepend a robot emoji so recipients know it's the bot, not the human.

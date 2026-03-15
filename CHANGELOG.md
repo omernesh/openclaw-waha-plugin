@@ -2,6 +2,18 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.14.0] - 2026-03-15
+
+### Added
+- **`/shutup` command**: Mute the bot in a group directly from WhatsApp. Regex-based (not LLM-dependent). Supports duration (`/shutup 5m`, `/shutup 2h`, `/shutup 1d`) and auto-unmute.
+- **`/unshutup` command**: Unmute the bot in a group. Also accepts `/unmute` as alias.
+- **DM interactive flow**: Send `/shutup` or `/unshutup` in a DM to see a numbered group list and select by number or "all".
+- **`/shutup all`**: Mute/unmute the bot in all groups at once.
+- **DM backup on mute**: When a group is muted, DM settings for all group participants are backed up and blocked. On unmute, settings are restored to pre-mute state.
+- **Outbound send block**: Messages to muted groups are blocked at the send level, not just inbound.
+- **Role-based authorization**: Only superusers and allowed senders can mute/unmute the bot.
+- **Persistence**: Mute state survives gateway restarts (SQLite-backed).
+
 ## [1.13.0] - 2026-03-15
 
 ### Added
