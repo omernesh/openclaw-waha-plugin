@@ -4,10 +4,28 @@
  * Fail-open: any error allows message through.
  */
 
+/**
+ * God mode scope controls which filter contexts god mode bypass applies to.
+ * - "all"  — god mode bypasses both DM and group filters (default, backward-compatible)
+ * - "dm"   — god mode only bypasses DM filter, NOT group filter (recommended for human sessions)
+ * - "off"  — god mode never bypasses any filter
+ * DO NOT CHANGE — this type is used by config-schema.ts and admin panel. Added for human session guardrails.
+ */
+export type GodModeScope = "all" | "dm" | "off";
+
+/**
+ * Filter type identifies whether this filter instance is used for DM or group filtering.
+ * Used in conjunction with godModeScope to determine if god mode bypass applies.
+ * DO NOT CHANGE — used by inbound.ts to pass context to check(). Added for human session guardrails.
+ */
+export type FilterType = "dm" | "group";
+
 export type DmFilterConfig = {
   enabled?: boolean;
   mentionPatterns?: string[];
   godModeBypass?: boolean;
+  /** Controls which filter types god mode bypass applies to. Default: "all" (backward-compatible). */
+  godModeScope?: GodModeScope;
   godModeSuperUsers?: Array<{
     identifier: string;
     platform?: string;
@@ -58,7 +76,7 @@ export class DmFilter {
     return [...this._recentEvents];
   }
 
-  check(params: { text: string; senderId: string; log?: (msg: string) => void }): DmFilterResult {
+  check(params: { text: string; senderId: string; filterType?: FilterType; log?: (msg: string) => void }): DmFilterResult {
     try {
       return this._check(params);
     } catch (err) {
@@ -67,8 +85,8 @@ export class DmFilter {
     }
   }
 
-  private _check(params: { text: string; senderId: string; log?: (msg: string) => void }): DmFilterResult {
-    const { text, senderId, log } = params;
+  private _check(params: { text: string; senderId: string; filterType?: FilterType; log?: (msg: string) => void }): DmFilterResult {
+    const { text, senderId, filterType, log } = params;
     const cfg = this._config;
 
     if (!cfg.enabled) {
@@ -76,18 +94,34 @@ export class DmFilter {
       return { pass: true, reason: "filter_disabled" };
     }
 
-    // God mode bypass: super-users skip the filter
+    // God mode bypass: super-users skip the filter IF scope allows it.
+    // DO NOT CHANGE — godModeScope guardrail for human sessions.
+    // When godModeScope is "all" (default), bypass applies to both DM and group filters (backward-compatible).
+    // When godModeScope is "dm", bypass ONLY applies when filterType is "dm" — group messages from
+    //   god mode users still go through keyword matching. This prevents the bot from responding in
+    //   groups on behalf of human sessions without explicit trigger word invocation.
+    // When godModeScope is "off", god mode bypass is completely disabled regardless of filterType.
+    // Added 2026-03-15 for human session guardrails. DO NOT REMOVE.
     if (cfg.godModeBypass !== false && cfg.godModeSuperUsers?.length) {
-      const normalized = normalizePhoneIdentifier(senderId);
-      const isGod = cfg.godModeSuperUsers.some((u) => {
-        if (u.passwordRequired) return false;
-        return normalizePhoneIdentifier(u.identifier) === normalized;
-      });
-      if (isGod) {
-        this._stats.allowed++;
-        this._record(true, "god_mode", text);
-        log?.(`dm-filter: allow ${senderId} (god mode)`);
-        return { pass: true, reason: "god_mode" };
+      const scope: GodModeScope = cfg.godModeScope ?? "all";
+      const scopeAllowsBypass =
+        scope === "all" ||
+        (scope === "dm" && filterType === "dm") ||
+        // When no filterType is provided (legacy callers), default to allowing bypass for backward compatibility
+        (scope === "dm" && filterType === undefined);
+
+      if (scopeAllowsBypass) {
+        const normalized = normalizePhoneIdentifier(senderId);
+        const isGod = cfg.godModeSuperUsers.some((u) => {
+          if (u.passwordRequired) return false;
+          return normalizePhoneIdentifier(u.identifier) === normalized;
+        });
+        if (isGod) {
+          this._stats.allowed++;
+          this._record(true, "god_mode", text);
+          log?.(`dm-filter: allow ${senderId} (god mode, scope=${scope}, filterType=${filterType ?? "unset"})`);
+          return { pass: true, reason: "god_mode" };
+        }
       }
     }
 

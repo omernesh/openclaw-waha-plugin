@@ -27,6 +27,10 @@ export type DmFilterConfig = {
   enabled?: boolean;
   mentionPatterns?: string[];
   godModeBypass?: boolean;
+  /** Controls which filter types god mode bypass applies to. Default: "all" (backward-compatible).
+   *  "all" = bypass both DM and group filters. "dm" = DM only. "off" = never bypass.
+   *  Added 2026-03-15 for human session guardrails. DO NOT REMOVE. */
+  godModeScope?: "all" | "dm" | "off";
   godModeSuperUsers?: Array<{
     identifier: string;
     platform?: string;

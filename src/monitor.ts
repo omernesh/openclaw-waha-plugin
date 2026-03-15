@@ -480,6 +480,23 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       </div>
     </details>
 
+    <details class="settings-section">
+      <summary>Trigger Operator</summary>
+      <div class="field-group">
+        <div class="field">
+          <label>Trigger Word <span class="tip" data-tip="Prefix that activates the bot (e.g. '!' or '!bot'). Messages must start with this to pass through filters. Used for human sessions where all messages are filtered by default. Leave empty to disable trigger-based filtering.">?</span></label>
+          <input type="text" id="s-triggerWord" name="triggerWord" placeholder="!" style="max-width:200px">
+        </div>
+        <div class="field">
+          <label>Trigger Response Mode <span class="tip" data-tip="Where the bot responds when triggered in a group. 'dm' = respond via DM to the sender. 'reply-in-chat' = respond in the same group. For DM triggers, the bot always responds in the same DM.">?</span></label>
+          <select id="s-triggerResponseMode" name="triggerResponseMode">
+            <option value="dm">dm</option>
+            <option value="reply-in-chat">reply-in-chat</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
     <details class="settings-section" open>
       <summary>Access Control</summary>
       <div class="field-group">
@@ -535,6 +552,14 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           </label>
         </div>
         <div class="field">
+          <label>God Mode Scope <span class="tip" data-tip="Controls which filters god mode bypass applies to. 'All' = bypass both DM and group filters (default for bot sessions). 'DM Only' = bypass DM filter only, NOT group filter (recommended for human sessions). 'Off' = never bypass.">?</span></label>
+          <select id="s-godModeScope" name="godModeScope">
+            <option value="all">All (DM + Groups)</option>
+            <option value="dm">DM Only</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+        <div class="field">
           <label>Token Estimate <span class="tip" data-tip="Estimated tokens saved per dropped DM. Used for stats display only. Default: 2500.">?</span></label>
           <input type="number" id="s-tokenEstimate" name="tokenEstimate" min="100" max="100000" step="100">
         </div>
@@ -563,6 +588,14 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
             <span>God Mode Bypass <span class="tip" data-tip="When on, super-users bypass the group keyword filter entirely.">?</span></span>
             <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-groupGodModeBypass" name="groupGodModeBypass"><span class="slider"></span></label>
           </label>
+        </div>
+        <div class="field">
+          <label>God Mode Scope <span class="tip" data-tip="Controls which filters god mode bypass applies to. 'All' = bypass both DM and group filters. 'DM Only' = bypass DM filter only, NOT group filter. 'Off' = never bypass. Typically set the same as the DM filter scope.">?</span></label>
+          <select id="s-groupGodModeScope" name="groupGodModeScope">
+            <option value="all">All (DM + Groups)</option>
+            <option value="dm">DM Only</option>
+            <option value="off">Off</option>
+          </select>
         </div>
         <div class="field">
           <label>Token Estimate <span class="tip" data-tip="Estimated tokens saved per dropped group message. Default: 2500.">?</span></label>
@@ -735,6 +768,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       <div id="save-note" style="font-size:0.78rem;color:#64748b;margin-top:6px;display:none;width:100%;">Some settings require a gateway restart to take effect.</div>
     </div>
   </form>
+<!-- Multi-Session Filtering Guide — collapsible reference for admin panel users -->  <details class="settings-section" style="margin-top:20px;border-top:1px solid #334155;padding-top:12px;">    <summary style="color:#38bdf8;">Multi-Session Filtering Guide</summary>    <div style="font-size:0.82rem;color:#cbd5e1;line-height:1.7;padding:8px 0 16px 0;">      <p style="color:#94a3b8;margin-bottom:12px;font-style:italic;">How messages flow through the guardrails:</p>      <ol style="padding-left:20px;margin-bottom:16px;display:grid;gap:4px;">        <li><strong style="color:#f8fafc;">Group allowlist</strong> — Is this group allowed? If not → dropped (zero tokens)</li>        <li><strong style="color:#f8fafc;">Sender allowlist</strong> — Is this sender allowed? If not → dropped</li>        <li><strong style="color:#f8fafc;">Cross-session dedup</strong> — Bot session claims first (200ms priority). If bot already claimed → human session drops the duplicate</li>        <li><strong style="color:#f8fafc;">Trigger prefix</strong> — Does the message start with the trigger operator (e.g., "!")? If required and missing → dropped</li>        <li><strong style="color:#f8fafc;">Keyword filter</strong> — Does the message match a keyword pattern? If not → dropped</li>        <li><strong style="color:#10b981;">Only then</strong> → Bot processes the message</li>      </ol>      <p style="color:#94a3b8;font-weight:600;margin-bottom:8px;text-transform:uppercase;font-size:0.78rem;letter-spacing:0.06em;">Scenarios</p>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot + Human session in same group</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message from anyone → Bot session handles it, human session drops the dupe</li>          <li>"sammie, what's the weather?" → Bot session handles (keyword match), human drops dupe</li>          <li>"!what's the weather?" → Bot session handles (trigger match), human drops dupe</li>          <li>Your message to a friend (no keyword) → Filtered on both sessions. God mode only bypasses DM filter, not group filter. Sammie stays quiet.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Only human session in group (bot not a member)</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message → Filtered (no keyword/trigger match). Sammie stays quiet.</li>          <li>"!what's the weather?" → Trigger activates on human session. Sammie responds with 🤖 prefix via your session.</li>          <li>Your message (superuser, no keyword) → Filtered. God mode scope is "dm" so groups still require keyword/trigger.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">DMs</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>You (superuser) DM Sammie → God mode bypasses DM filter. Sammie responds normally.</li>          <li>Someone else DMs → Must match keyword pattern or trigger prefix to reach Sammie.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot prefix</p>        <p>When Sammie responds through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not you.</p>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">God Mode Scope</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li><strong style="color:#f8fafc;">"all"</strong> — Superusers bypass ALL filters (DM + group). Use with caution.</li>          <li><strong style="color:#f8fafc;">"dm"</strong> <span style="color:#10b981;">(recommended)</span> — Superusers bypass DM filter only. Groups always require keyword/trigger.</li>          <li><strong style="color:#f8fafc;">"off"</strong> — Superusers never bypass filters. Must always use keyword/trigger.</li>        </ul>      </div>    </div>  </details>
 </div>
 </main>
 </div>
@@ -1159,6 +1193,8 @@ async function loadConfig() {
     })();
     setVal('s-webhookPort', w.webhookPort || 8050);
     setVal('s-webhookPath', w.webhookPath || '/webhook/waha');
+    setVal('s-triggerWord', w.triggerWord || '');
+    setVal('s-triggerResponseMode', w.triggerResponseMode || 'dm');
     setVal('s-dmPolicy', w.dmPolicy || 'pairing');
     setVal('s-groupPolicy', w.groupPolicy || 'allowlist');
     setVal('s-allowFrom', (w.allowFrom || []).join('\\n'));
@@ -1168,6 +1204,7 @@ async function loadConfig() {
     setChk('s-dmFilterEnabled', dm.enabled);
     setVal('s-mentionPatterns', (dm.mentionPatterns || []).join('\\n'));
     setChk('s-godModeBypass', dm.godModeBypass !== false);
+    setVal('s-godModeScope', dm.godModeScope || 'all');
     var dmGodUsers = (dm.godModeSuperUsers || []).map(function(u) { return typeof u === 'string' ? u : (u.identifier || ''); }).filter(Boolean);
     setVal('s-godModeSuperUsers', dmGodUsers.join(NL));
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
@@ -1175,6 +1212,7 @@ async function loadConfig() {
     setChk('s-groupFilterEnabled', gf.enabled);
     setVal('s-groupMentionPatterns', (gf.mentionPatterns || []).join('\\n'));
     setChk('s-groupGodModeBypass', gf.godModeBypass !== false);
+    setVal('s-groupGodModeScope', gf.godModeScope || 'all');
     var gfGodUsers = (gf.godModeSuperUsers || []).map(function(u) { return typeof u === 'string' ? u : (u.identifier || ''); }).filter(Boolean);
     setVal('s-groupGodModeSuperUsers', gfGodUsers.join(NL));
     setVal('s-groupTokenEstimate', gf.tokenEstimate || 2500);
@@ -1223,6 +1261,8 @@ async function saveSettings(e) {
       baseUrl: getVal('s-baseUrl') || undefined,
       webhookPort: parseNum(getVal('s-webhookPort'), 8050),
       webhookPath: getVal('s-webhookPath') || '/webhook/waha',
+      triggerWord: getVal('s-triggerWord') || undefined,
+      triggerResponseMode: getVal('s-triggerResponseMode') || 'dm',
       dmPolicy: getVal('s-dmPolicy') || 'pairing',
       groupPolicy: getVal('s-groupPolicy') || 'allowlist',
       allowFrom: splitLines(getVal('s-allowFrom')),
@@ -1232,6 +1272,7 @@ async function saveSettings(e) {
         enabled: getChk('s-dmFilterEnabled'),
         mentionPatterns: splitLines(getVal('s-mentionPatterns')),
         godModeBypass: getChk('s-godModeBypass'),
+        godModeScope: getVal('s-godModeScope') || 'all',
         godModeSuperUsers: splitLines(getVal('s-godModeSuperUsers')).map(function(id) { return { identifier: id }; }),
         tokenEstimate: parseNum(getVal('s-tokenEstimate'), 2500),
       },
@@ -1239,6 +1280,7 @@ async function saveSettings(e) {
         enabled: getChk('s-groupFilterEnabled'),
         mentionPatterns: splitLines(getVal('s-groupMentionPatterns')),
         godModeBypass: getChk('s-groupGodModeBypass'),
+        godModeScope: getVal('s-groupGodModeScope') || 'all',
         godModeSuperUsers: splitLines(getVal('s-groupGodModeSuperUsers')).map(function(id) { return { identifier: id }; }),
         tokenEstimate: parseNum(getVal('s-groupTokenEstimate'), 2500),
       },
@@ -1792,6 +1834,7 @@ export function createWahaWebhookServer(opts: {
           enabled: dmCfg.enabled ?? false,
           patterns: dmCfg.mentionPatterns ?? [],
           godModeBypass: dmCfg.godModeBypass ?? true,
+          godModeScope: dmCfg.godModeScope ?? 'all',
           godModeSuperUsers: dmCfg.godModeSuperUsers ?? [],
           tokenEstimate: dmCfg.tokenEstimate ?? 2500,
           stats: dmFilter.stats,
@@ -1801,6 +1844,7 @@ export function createWahaWebhookServer(opts: {
           enabled: Boolean(groupFilterCfg.enabled),
           patterns: Array.isArray(groupFilterCfg.mentionPatterns) ? groupFilterCfg.mentionPatterns : [],
           godModeBypass: groupFilterCfg.godModeBypass !== false,
+          godModeScope: typeof groupFilterCfg.godModeScope === 'string' ? groupFilterCfg.godModeScope : 'all',
           tokenEstimate: typeof groupFilterCfg.tokenEstimate === "number" ? groupFilterCfg.tokenEstimate : 2500,
           stats: groupFilter.stats,
           recentEvents: groupFilter.recentEvents,

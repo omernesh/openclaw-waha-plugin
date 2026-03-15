@@ -4,7 +4,7 @@
 
 Full WhatsApp API access through [WAHA](https://waha.devlike.pro/) -- groups, channels, media, polls, reactions, stickers, voice messages, contact cards, labels, status/stories, presence, and more. 87%+ WAHA API coverage.
 
-**Plugin ID:** `waha` | **Version:** 1.11.0 | **Last updated:** 2026-03-14
+**Plugin ID:** `waha` | **Version:** 1.12.0 | **Last updated:** 2026-03-15
 
 [![npm](https://img.shields.io/npm/v/waha-openclaw-channel)](https://www.npmjs.com/package/waha-openclaw-channel)
 
@@ -94,6 +94,7 @@ systemctl --user restart openclaw-gateway
 | `subRole` | string | `"full-access"` | Sub-role: `"full-access"` or `"listener"` (receive only) |
 | `triggerWord` | string | -- | Bot only activates in groups when message starts with this word |
 | `triggerResponseMode` | string | `"dm"` | Trigger response: `"dm"` (reply via DM) or `"group"` (reply in chat) |
+| `godModeScope` | string | `"all"` | God mode filter bypass scope: `"all"`, `"dm"` (recommended), or `"off"` |
 
 ### Presence (Human Mimicry)
 
@@ -177,7 +178,7 @@ Access at `http://YOUR_HOST:8050/admin`. No build tools required -- the UI is em
 
 **Tabs:**
 - **Directory** -- browse contacts, groups, newsletters; per-contact DM settings; group participant management
-- **Config** -- edit DM/group filter settings, keyword patterns, media preprocessing toggles
+- **Config** -- edit DM/group filter settings, keyword patterns, trigger operator, god mode scope, media preprocessing toggles, multi-session filtering guide
 - **Filter Stats** -- message processing statistics, duplicate webhook tracking
 - **Status** -- session health, connection info, gateway restart
 
@@ -193,26 +194,34 @@ Access at `http://YOUR_HOST:8050/admin`. No build tools required -- the UI is em
 
 ## Multi-Session Setup
 
-Run a bot session alongside a human monitoring session:
+Run a bot session alongside a human session with layered guardrails:
 
 ```json
 {
   "channels": {
     "waha": {
-      "session": "bot_session",
-      "role": "bot",
-      "subRole": "full-access",
-      "triggerWord": "!bot",
-      "triggerResponseMode": "dm",
       "accounts": {
+        "bot": {
+          "baseUrl": "YOUR_WAHA_URL",
+          "apiKey": "YOUR_API_KEY",
+          "session": "bot_session",
+          "role": "bot",
+          "subRole": "full-access"
+        },
         "human": {
           "baseUrl": "YOUR_WAHA_URL",
           "apiKey": "YOUR_API_KEY",
           "session": "human_session",
+          "webhookPort": 8051,
           "role": "human",
-          "subRole": "listener"
+          "subRole": "listener",
+          "triggerWord": "!",
+          "triggerResponseMode": "reply-in-chat",
+          "dmFilter": { "enabled": true, "mentionPatterns": [], "godModeScope": "dm" },
+          "groupFilter": { "enabled": true, "mentionPatterns": [], "godModeScope": "dm" }
         }
-      }
+      },
+      "defaultAccount": "bot"
     }
   }
 }
@@ -223,6 +232,31 @@ Run a bot session alongside a human monitoring session:
 | `bot` | `full-access` | Yes | Primary bot session |
 | `human` | `listener` | No | Monitoring only |
 | `human` | `full-access` | Yes | Human with send access |
+
+### Multi-Session Guardrails
+
+Messages pass through layered filtering before reaching the bot:
+
+1. **Group allowlist** -- Is this group allowed? If not, dropped (zero tokens)
+2. **Sender allowlist** -- Is this sender allowed? If not, dropped
+3. **Cross-session dedup** -- Bot session claims first (200ms priority). If bot claimed, human drops the duplicate
+4. **Trigger prefix** -- Does message start with trigger operator (e.g., `!`)? If required and missing, dropped
+5. **Keyword filter** -- Does message match a keyword pattern? If not, dropped
+6. **Processing** -- Only then does the bot see the message
+
+### God Mode Scope
+
+Controls where superuser filter bypass applies:
+
+| Scope | DM Filter | Group Filter | Recommended For |
+|-------|-----------|-------------|-----------------|
+| `"all"` | Bypassed | Bypassed | Bot-only setups |
+| `"dm"` | Bypassed | **Not bypassed** | Multi-session (prevents bot responding in groups uninvited) |
+| `"off"` | Not bypassed | Not bypassed | Maximum safety |
+
+### Bot Proxy Prefix
+
+When the bot sends through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not the human.
 
 **Cross-session routing** is automatic -- the bot uses its own session when it's a group member, falls back to the human session otherwise.
 

@@ -61,3 +61,95 @@ export function _resetDedupForTesting(): void {
 export function _getDedupSizeForTesting(): number {
   return _dedupEntries.size;
 }
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  CROSS-SESSION MESSAGE DEDUP — DO NOT CHANGE                       ║
+// ║                                                                    ║
+// ║  Prevents both bot and human sessions from processing the same     ║
+// ║  inbound message. Bot sessions claim immediately. Human sessions   ║
+// ║  defer 200ms, then check if a bot already claimed it.              ║
+// ║                                                                    ║
+// ║  This is SEPARATE from webhook dedup above (which deduplicates     ║
+// ║  duplicate webhook deliveries within a single session).            ║
+// ║  Cross-session dedup prevents double-processing and token waste    ║
+// ║  when multiple sessions receive the same group message.            ║
+// ║                                                                    ║
+// ║  Bounded to CROSS_SESSION_MAX entries with TTL-based pruning.      ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+interface ClaimedMessage {
+  accountId: string;
+  role: string;
+  timestamp: number;
+}
+
+const _crossSessionCache = new Map<string, ClaimedMessage>();
+const CROSS_SESSION_TTL_MS = 60_000; // 1 minute
+const CROSS_SESSION_MAX = 500;
+
+/**
+ * Claim a message for a specific session/account.
+ * Records that this accountId (with given role) is processing this messageId.
+ * Prunes expired entries when cache exceeds max size.
+ *
+ * DO NOT CHANGE — cross-session dedup prevents double-processing and token waste.
+ */
+export function claimMessage(messageId: string, accountId: string, role: string): void {
+  const now = Date.now();
+  // Prune old entries when approaching max (same pattern as webhook dedup)
+  if (_crossSessionCache.size > CROSS_SESSION_MAX) {
+    for (const [key, val] of _crossSessionCache) {
+      if (now - val.timestamp > CROSS_SESSION_TTL_MS) _crossSessionCache.delete(key);
+    }
+  }
+  _crossSessionCache.set(messageId, { accountId, role, timestamp: now });
+}
+
+/**
+ * Check if a message was already claimed by a DIFFERENT session.
+ * Returns true if another accountId claimed it (within TTL).
+ * Returns false if unclaimed, expired, or claimed by the same account.
+ *
+ * DO NOT CHANGE — cross-session dedup prevents double-processing and token waste.
+ */
+export function isClaimedByOtherSession(messageId: string, myAccountId: string): boolean {
+  const entry = _crossSessionCache.get(messageId);
+  if (!entry) return false;
+  if (Date.now() - entry.timestamp > CROSS_SESSION_TTL_MS) {
+    _crossSessionCache.delete(messageId);
+    return false;
+  }
+  return entry.accountId !== myAccountId;
+}
+
+/**
+ * Check if a message was claimed by a bot session specifically.
+ * Used by human sessions to defer to bot processing.
+ * Returns true if a bot-role session claimed it (within TTL).
+ *
+ * DO NOT CHANGE — cross-session dedup prevents double-processing and token waste.
+ */
+export function isClaimedByBotSession(messageId: string): boolean {
+  const entry = _crossSessionCache.get(messageId);
+  if (!entry) return false;
+  if (Date.now() - entry.timestamp > CROSS_SESSION_TTL_MS) {
+    _crossSessionCache.delete(messageId);
+    return false;
+  }
+  return entry.role === "bot";
+}
+
+/**
+ * Reset cross-session dedup state. For testing only.
+ * DO NOT call in production code.
+ */
+export function _resetCrossSessionDedupForTesting(): void {
+  _crossSessionCache.clear();
+}
+
+/**
+ * Get current cross-session cache size. For testing only.
+ */
+export function _getCrossSessionSizeForTesting(): number {
+  return _crossSessionCache.size;
+}

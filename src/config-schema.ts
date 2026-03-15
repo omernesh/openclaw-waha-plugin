@@ -16,11 +16,21 @@ const DmFilterSuperUserSchema = z.object({
   passwordRequired: z.boolean().optional(),
 });
 
+// God mode scope schema — controls which filter contexts god mode bypass applies to.
+// "all" = bypass both DM and group filters (default, backward-compatible for bot sessions).
+// "dm"  = bypass DM filter only, NOT group filter (recommended for human sessions).
+// "off" = never bypass any filter.
+// Added 2026-03-15 for human session guardrails. DO NOT REMOVE.
+const GodModeScopeSchema = z.enum(["all", "dm", "off"]).optional().default("all");
+
 const DmFilterSchema = z
   .object({
     enabled: z.boolean().optional().default(false),
     mentionPatterns: z.array(z.string()).optional(),
     godModeBypass: z.boolean().optional().default(true),
+    // Controls which filter types god mode bypass applies to. Default: "all" (backward-compatible).
+    // Added 2026-03-15 for human session guardrails. DO NOT REMOVE.
+    godModeScope: GodModeScopeSchema,
     godModeSuperUsers: z.array(DmFilterSuperUserSchema).optional(),
     tokenEstimate: z.number().int().positive().optional().default(2500),
   })

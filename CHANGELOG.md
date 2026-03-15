@@ -2,6 +2,20 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.12.0] - 2026-03-15
+
+### Added
+- **Cross-session message dedup**: Bot sessions claim messages first (200ms priority), human sessions drop duplicates. Prevents double-processing and token waste in multi-session setups.
+- **Trigger operator for DMs**: Trigger word detection now works for both DMs and group messages (previously groups only). DM filter respects trigger bypass.
+- **God mode scope**: New `godModeScope` config field ("all", "dm", "off") controls where superuser filter bypass applies. Prevents bot from accidentally responding in groups on behalf of human users.
+- **Bot proxy prefix**: When bot sends through a human session (cross-session routing), messages are prefixed with 🤖 to distinguish bot responses from human messages.
+- **Configurable trigger operator**: Admin panel now has Trigger Operator section with text input for trigger word and response mode dropdown.
+- **Multi-session filtering guide**: Admin panel Config tab includes collapsible documentation explaining message flow, scenarios, and guardrail layers.
+
+### Changed
+- Human sessions defer 200ms before processing to give bot sessions priority for claiming messages
+- God mode scope defaults to "all" (backward compatible) but recommended "dm" for group safety
+
 ## [1.11.1] - 2026-03-14
 
 ### Fixed

@@ -567,7 +567,13 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId) throw new Error("send action requires chatId (resolved from target)");
       if (!text) throw new Error("send action requires text");
 
-      const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: resolvedAid });
+      // Bot proxy detection for cross-session sends — when the bot routes through
+      // a human session, prefix the message so recipients know it's the bot.
+      // DO NOT CHANGE — prevents confusion about message source in group chats.
+      const resolvedAccount = resolveWahaAccount({ cfg: coreCfg, accountId: resolvedAid });
+      const isBotProxy = resolvedAccount.role !== "bot";
+
+      const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: resolvedAid, botProxy: isBotProxy });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
     }
 

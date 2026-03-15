@@ -17,8 +17,10 @@ import {
 } from "openclaw/plugin-sdk";
 import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { ResolvedWahaAccount } from "./accounts.js";
+import { resolveWahaAccount } from "./accounts.js";
 import { DmFilter } from "./dm-filter.js";
 import { getDirectoryDb } from "./directory.js";
+import { claimMessage, isClaimedByOtherSession, isClaimedByBotSession } from "./dedup.js";
 import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.js";
 import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
@@ -93,8 +95,9 @@ async function deliverWahaReply(params: {
   statusSink?: (patch: { lastOutboundAt?: number }) => void;
   cfg: CoreConfig;
   presenceCtrl?: PresenceController;
+  botProxy?: boolean;
 }) {
-  const { payload, chatId, accountId, statusSink, cfg, presenceCtrl } = params;
+  const { payload, chatId, accountId, statusSink, cfg, presenceCtrl, botProxy } = params;
   const mediaUrls = resolveOutboundMediaUrls(payload);
   const text = payload.text ?? "";
 
@@ -127,6 +130,7 @@ async function deliverWahaReply(params: {
     text,
     replyToId: payload.replyToId,
     accountId,
+    botProxy,
   });
   // Safety net: ensure typing stopped after delivery
   await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
@@ -142,6 +146,41 @@ export async function handleWahaInbound(params: {
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
 }) {
   const { message: rawMessage, rawPayload, account, config, runtime, statusSink } = params;
+
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  CROSS-SESSION MESSAGE DEDUP — DO NOT CHANGE                       ║
+  // ║                                                                    ║
+  // ║  Bot sessions claim and process immediately.                       ║
+  // ║  Human sessions defer 200ms to let bot sessions claim first.       ║
+  // ║  If bot claimed it, human silently drops. Saves tokens, prevents   ║
+  // ║  double-processing.                                                ║
+  // ║                                                                    ║
+  // ║  Behavior by scenario:                                             ║
+  // ║  - Both in group -> bot claims, human drops                        ║
+  // ║  - Only human in group -> no bot claim after 200ms, human proceeds ║
+  // ║  - Only bot in group -> bot claims and processes                   ║
+  // ║                                                                    ║
+  // ║  Must run BEFORE trigger detection, filters, and all processing.   ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  const HUMAN_DEFERRAL_MS = 200;
+
+  if (account.role !== "bot") {
+    // Human session: wait for bot to potentially claim this message
+    await new Promise(resolve => setTimeout(resolve, HUMAN_DEFERRAL_MS));
+    if (isClaimedByBotSession(rawMessage.messageId)) {
+      runtime.log?.(`[waha] [${account.accountId}] message ${rawMessage.messageId} already claimed by bot session, skipping`);
+      return;
+    }
+  }
+
+  // Claim this message for our session
+  claimMessage(rawMessage.messageId, account.accountId, account.role ?? "bot");
+
+  // Also check if another session of same type already claimed it
+  if (isClaimedByOtherSession(rawMessage.messageId, account.accountId)) {
+    runtime.log?.(`[waha] [${account.accountId}] message ${rawMessage.messageId} already claimed by another session, skipping`);
+    return;
+  }
 
   // Quick pre-check: skip media preprocessing for groups not in allowedGroups
   const _preCheckIsGroup = isWhatsAppGroupJid(rawMessage.chatId);
@@ -313,29 +352,35 @@ export async function handleWahaInbound(params: {
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
 
-  // Phase 4 Plan 02: Trigger word detection — check before group filters.
-  // Trigger-word messages are explicit bot invocations and bypass group keyword filtering.
-  // triggerWord config is per-account (e.g., "!bot"). Case-insensitive.
+  // Trigger word detection — check before group AND DM filters.
+  // Trigger-word messages are explicit bot invocations and bypass BOTH group and DM keyword filtering.
+  // Works for all message types (DMs + groups). For human sessions, this is the primary
+  // mechanism to let messages through — all non-trigger messages are filtered by default.
+  // triggerWord config is per-account (e.g., "!", "!bot"). Case-insensitive.
   // DO NOT MOVE above rawBody calculation — detectTriggerWord needs the text body.
-  // DO NOT MOVE below group filter — trigger must bypass it (see RESEARCH.md Open Question 1).
-  // Added Phase 4, Plan 02. DO NOT REMOVE.
+  // DO NOT MOVE below group/DM filter — trigger must bypass both filters.
+  // Originally Phase 4 Plan 02 (groups only), extended to DMs for human session support. DO NOT REMOVE.
+  // DO NOT CHANGE — trigger bypass for both DMs and groups is intentional.
   let effectiveBody = rawBody;
   let triggerActivated = false;
   let triggerResponseChatId = chatId; // default: respond in same chat
   const triggerWord = account.config.triggerWord;
-  if (isGroup && triggerWord) {
+  if (triggerWord) {
     const triggerResult = detectTriggerWord(rawBody, triggerWord);
     if (triggerResult.triggered) {
       triggerActivated = true;
       effectiveBody = triggerResult.strippedText || rawBody; // preserve original if stripped is empty
       const triggerResponseMode = account.config.triggerResponseMode ?? "dm";
-      if (triggerResponseMode === "dm") {
-        // Respond via DM to the sender (participant in group, or from in DM)
+      if (isGroup && triggerResponseMode === "dm") {
+        // Group trigger with DM response: respond via DM to the sender
         triggerResponseChatId = resolveTriggerTarget(message);
         runtime.log?.(`waha: trigger activated in group ${chatId}, responding via DM to ${triggerResponseChatId}`);
-      } else {
-        // "reply-in-chat": respond in the same group chat
+      } else if (isGroup) {
+        // Group trigger with in-chat response
         runtime.log?.(`waha: trigger activated in group ${chatId}, responding in-chat`);
+      } else {
+        // DM trigger: respond in the same DM chat (triggerResponseChatId already set to chatId)
+        runtime.log?.(`waha: trigger activated in DM from ${senderId}`);
       }
     }
   }
@@ -358,6 +403,7 @@ export async function handleWahaInbound(params: {
     const filterResult = groupFilter.check({
       text: rawBody,
       senderId,
+      filterType: "group",
       log: (msg) => runtime.log?.(msg),
     });
     if (!filterResult.pass) {
@@ -468,11 +514,14 @@ export async function handleWahaInbound(params: {
   }
 
   // DM keyword filter: silently drop DMs that don't match mentionPatterns
-  if (!isGroup) {
+  // SKIP for trigger-word messages — explicit invocation bypasses DM keyword filter.
+  // DO NOT CHANGE — triggerActivated bypass is intentional, same pattern as group filter above.
+  if (!isGroup && !triggerActivated) {
     const dmFilter = getDmFilter(config, account.accountId);
     const filterResult = dmFilter.check({
       text: rawBody,
       senderId,
+      filterType: "dm",
       log: (msg) => runtime.log?.(msg),
     });
     if (!filterResult.pass) {
@@ -552,6 +601,16 @@ export async function handleWahaInbound(params: {
   // In non-trigger context, triggerResponseChatId === chatId (unchanged). DO NOT REMOVE.
   const responseChatId = triggerResponseChatId;
   const responseChatIsGroup = isGroup && responseChatId === chatId; // DM-mode trigger routes to user, not group
+
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  Bot proxy detection — DO NOT CHANGE                                ║
+  // ║                                                                     ║
+  // ║  When the bot (LLM) generates a response and it goes out through   ║
+  // ║  a non-bot session, set botProxy=true so sendWahaText prepends a   ║
+  // ║  robot emoji prefix. This tells recipients the message came from    ║
+  // ║  the bot, not the human account owner.                              ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  const isBotProxy = account.role !== "bot";
 
   const route = core.channel.routing.resolveAgentRoute({
     cfg: config as OpenClawConfig,
@@ -649,6 +708,7 @@ export async function handleWahaInbound(params: {
       statusSink,
       cfg: config as CoreConfig,
       presenceCtrl,
+      botProxy: isBotProxy,
     });
   });
 

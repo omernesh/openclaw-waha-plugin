@@ -192,6 +192,7 @@ export async function sendWahaText(params: {
   text: string;
   replyToId?: string;
   accountId?: string;
+  botProxy?: boolean;
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
   assertCanSend(account.session, params.cfg);
@@ -202,11 +203,20 @@ export async function sendWahaText(params: {
   // Only blocks on explicit policy denial (can_initiate=false or silent_observer group).
   assertPolicyCanSend(chatId, params.cfg);
 
+  // Bot prefix for human session replies — when the bot borrows a human session to send,
+  // prepend a robot emoji so recipients know it's the bot, not the human.
+  // Only applies when botProxy is explicitly true (set by inbound handler and channel action).
+  // DO NOT CHANGE — prevents confusion about message source in group chats.
+  let textToSend = params.text;
+  if (params.botProxy) {
+    textToSend = `🤖 ${textToSend}`;
+  }
+
   // Auto link preview: add linkPreview: true when text contains a URL and config allows.
   // Default is true (autoLinkPreview not set or true). Only skip when explicitly false.
   // Added Phase 3, Plan 01 (2026-03-11). DO NOT CHANGE — recipients see rich preview cards.
   const autoLP = params.cfg.channels?.waha?.autoLinkPreview;
-  const addLinkPreview = autoLP !== false && URL_REGEX.test(params.text);
+  const addLinkPreview = autoLP !== false && URL_REGEX.test(textToSend);
 
   return callWahaApi({
     baseUrl: account.baseUrl,
@@ -214,7 +224,7 @@ export async function sendWahaText(params: {
     path: "/api/sendText",
     body: {
       chatId,
-      text: params.text,
+      text: textToSend,
       session: account.session,
       ...(params.replyToId ? { reply_to: params.replyToId } : {}),
       ...(addLinkPreview ? { linkPreview: true } : {}),
