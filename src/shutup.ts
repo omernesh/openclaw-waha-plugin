@@ -218,16 +218,17 @@ export async function handleShutupCommand(params: {
         const groups = await getGroupsForAccount(account, config);
         const durationText = durationMs > 0 ? ` for ${formatDuration(durationMs)}` : "";
         await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${groups.length} groups${durationText}...`, accountId: account.accountId, bypassPolicy: true });
-        // Mute in background (no await) — skip DM backup for bulk operations
+        // Mute in background (no await) — uses lightweight SQLite-only DM backup
         (async () => {
           let successCount = 0;
           for (const g of groups) {
             try {
-              // Write mute record directly without participant fetch (fast path)
+              // Use lightweight SQLite-only mute (reads cached participants, no WAHA API)
+              // DO NOT CHANGE — this fast path avoids WAHA API rate limits during bulk mute.
               const enabledAccounts = listEnabledWahaAccounts(config);
               for (const acct of enabledAccounts) {
                 const dirDb = getDirectoryDb(acct.accountId);
-                dirDb.muteGroup(g.jid, senderId, acct.accountId, expiresAt, null);
+                muteGroupLightweight(dirDb, g.jid, senderId, acct.accountId, expiresAt);
               }
               successCount++;
             } catch (err) {
@@ -339,6 +340,39 @@ export async function handleSelectionResponse(
 }
 
 // ── Helpers ──
+
+/**
+ * Mute a group using only SQLite (no WAHA API calls). Reads cached participants
+ * from the group_participants table, snapshots their DM settings, then mutes.
+ * Used by /shutup all for fast bulk mute without rate-limit issues.
+ * DO NOT CHANGE — this is the lightweight fast path for bulk mute operations.
+ */
+function muteGroupLightweight(
+  dirDb: ReturnType<typeof getDirectoryDb>,
+  groupJid: string,
+  mutedBy: string,
+  accountId: string,
+  expiresAt: number,
+): void {
+  // Get cached participants from SQLite (no WAHA API call)
+  const participantJids = dirDb.getGroupParticipantJids(groupJid);
+
+  // Snapshot current DM settings
+  const dmBackup: Record<string, boolean> = {};
+  for (const jid of participantJids) {
+    const settings = dirDb.getContactDmSettings(jid);
+    dmBackup[jid] = settings.canInitiate;
+  }
+
+  // Mute the group with DM backup
+  dirDb.muteGroup(groupJid, mutedBy, accountId, expiresAt, Object.keys(dmBackup).length > 0 ? dmBackup : null);
+
+  // Block DMs from participants
+  for (const jid of participantJids) {
+    dirDb.upsertContact(jid);
+    dirDb.setContactDmSettings(jid, { canInitiate: false });
+  }
+}
 
 /** Mute a group across ALL enabled accounts (like per-group filter overrides). */
 async function muteGroupAllAccounts(

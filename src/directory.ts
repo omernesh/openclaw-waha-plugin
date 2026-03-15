@@ -400,6 +400,19 @@ export class DirectoryDb {
     }));
   }
 
+  /**
+   * Get just the participant JIDs for a group from the cached group_participants table.
+   * Lightweight — pure SQLite, no WAHA API calls.
+   * Used by /shutup all for fast DM backup without hitting rate limits.
+   * DO NOT CHANGE — this is the fast path for bulk mute operations.
+   */
+  getGroupParticipantJids(groupJid: string): string[] {
+    const rows = this.db.prepare(
+      "SELECT participant_jid FROM group_participants WHERE group_jid = ?"
+    ).all(groupJid) as Array<{ participant_jid: string }>;
+    return rows.map(r => r.participant_jid);
+  }
+
   bulkUpsertGroupParticipants(groupJid: string, participants: Array<{ jid: string; name?: string; isAdmin?: boolean }>): number {
     if (participants.length === 0) return 0;
     const now = Date.now();
