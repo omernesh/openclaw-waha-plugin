@@ -171,12 +171,22 @@ export async function handleShutupCommand(params: {
       // Send confirmation BEFORE muting — sendWahaText blocks sends to muted groups.
       // DO NOT CHANGE this ordering.
       const durationText = durationMs > 0 ? ` for ${formatDuration(durationMs)}` : "";
-      await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up${durationText}.`, accountId: account.accountId });
-      await muteGroupAllAccounts(chatId, senderId, config, expiresAt, runtime);
+      await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up${durationText}.`, accountId: account.accountId, bypassPolicy: true });
+      try {
+        await muteGroupAllAccounts(chatId, senderId, config, expiresAt, runtime);
+      } catch (err) {
+        runtime.log?.(`[waha] shutup: mute failed after confirmation: ${String(err)}`);
+        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Mute failed. Please try again.", accountId: account.accountId, bypassPolicy: true }).catch(() => {});
+      }
     } else {
       // Unmute FIRST, then send confirmation (group was muted, can't send before unmute).
-      await unmuteGroupAllAccounts(chatId, config, runtime);
-      await sendWahaText({ cfg: config, to: chatId, text: "🔊 I'm back.", accountId: account.accountId });
+      try {
+        await unmuteGroupAllAccounts(chatId, config, runtime);
+        await sendWahaText({ cfg: config, to: chatId, text: "🔊 I'm back.", accountId: account.accountId, bypassPolicy: true });
+      } catch (err) {
+        runtime.log?.(`[waha] unshutup: unmute failed: ${String(err)}`);
+        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Unmute failed. Please try again.", accountId: account.accountId, bypassPolicy: true }).catch(() => {});
+      }
     }
   } else {
     // === DM CONTEXT ===
@@ -184,31 +194,43 @@ export async function handleShutupCommand(params: {
     // sendWahaText mute check only applies to @g.us targets, so DM sends are unaffected.
     if (isMute) {
       if (allFlag) {
-        // Mute all groups
+        // Mute all groups — per-iteration error handling to mute as many as possible
         const groups = await getGroupsForAccount(account, config);
+        let successCount = 0;
         for (const g of groups) {
-          await muteGroupAllAccounts(g.jid, senderId, config, expiresAt, runtime);
+          try {
+            await muteGroupAllAccounts(g.jid, senderId, config, expiresAt, runtime);
+            successCount++;
+          } catch (err) {
+            runtime.log?.(`[waha] shutup: failed to mute ${g.jid}: ${String(err)}`);
+          }
         }
         const durationText = durationMs > 0 ? ` for ${formatDuration(durationMs)}` : "";
-        await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in all ${groups.length} groups${durationText}.`, accountId: account.accountId });
+        await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${successCount}/${groups.length} groups${durationText}.`, accountId: account.accountId, bypassPolicy: true });
       } else {
         // Show group list for selection
         await showGroupListForMute(chatId, senderId, account, config, durationStr, runtime);
       }
     } else {
       if (allFlag) {
-        // Unmute all groups across all accounts
+        // Unmute all groups across all accounts — per-iteration error handling
         const enabledAccounts = listEnabledWahaAccounts(config);
         let totalUnmuted = 0;
+        let totalAttempted = 0;
         for (const acct of enabledAccounts) {
           const dirDb = getDirectoryDb(acct.accountId);
           const mutedGroups = dirDb.getAllMutedGroups();
           for (const mg of mutedGroups) {
-            await unmuteGroupWithDmRestore(dirDb, mg.groupJid, acct, config, runtime);
+            totalAttempted++;
+            try {
+              unmuteGroupWithDmRestore(dirDb, mg.groupJid, acct, config, runtime);
+              totalUnmuted++;
+            } catch (err) {
+              runtime.log?.(`[waha] unshutup: failed to unmute ${mg.groupJid}: ${String(err)}`);
+            }
           }
-          totalUnmuted += mutedGroups.length;
         }
-        await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${totalUnmuted} groups.`, accountId: account.accountId });
+        await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${totalUnmuted}/${totalAttempted} groups.`, accountId: account.accountId, bypassPolicy: true });
       } else {
         // Show muted groups list for selection
         await showMutedGroupsListForUnmute(chatId, senderId, account, config, runtime);
@@ -237,23 +259,35 @@ export async function handleSelectionResponse(
     if (pending.type === "mute") {
       const durationMs = parseDuration(pending.durationStr);
       const expiresAt = durationMs > 0 ? Date.now() + durationMs : 0;
+      let successCount = 0;
       for (const g of pending.groups) {
-        await muteGroupAllAccounts(g.jid, pending.senderId, config, expiresAt, runtime);
+        try {
+          await muteGroupAllAccounts(g.jid, pending.senderId, config, expiresAt, runtime);
+          successCount++;
+        } catch (err) {
+          runtime.log?.(`[waha] shutup: failed to mute ${g.jid}: ${String(err)}`);
+        }
       }
       const durationText = durationMs > 0 ? ` for ${formatDuration(durationMs)}` : "";
-      await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in all ${pending.groups.length} groups${durationText}.`, accountId: account.accountId });
+      await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${successCount}/${pending.groups.length} groups${durationText}.`, accountId: account.accountId, bypassPolicy: true });
     } else {
+      let successCount = 0;
       for (const g of pending.groups) {
-        await unmuteGroupAllAccounts(g.jid, config, runtime);
+        try {
+          await unmuteGroupAllAccounts(g.jid, config, runtime);
+          successCount++;
+        } catch (err) {
+          runtime.log?.(`[waha] unshutup: failed to unmute ${g.jid}: ${String(err)}`);
+        }
       }
-      await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${pending.groups.length} groups.`, accountId: account.accountId });
+      await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${successCount}/${pending.groups.length} groups.`, accountId: account.accountId, bypassPolicy: true });
     }
     return true;
   }
 
   const num = parseInt(trimmed, 10);
   if (isNaN(num) || num < 1 || num > pending.groups.length) {
-    await sendWahaText({ cfg: config, to: chatId, text: `Invalid selection. Reply with a number (1-${pending.groups.length}) or "all".`, accountId: account.accountId });
+    await sendWahaText({ cfg: config, to: chatId, text: `Invalid selection. Reply with a number (1-${pending.groups.length}) or "all".`, accountId: account.accountId, bypassPolicy: true });
     return false; // Don't clear pending — let user retry
   }
 
@@ -263,10 +297,10 @@ export async function handleSelectionResponse(
     const expiresAt = durationMs > 0 ? Date.now() + durationMs : 0;
     await muteGroupAllAccounts(selected.jid, pending.senderId, config, expiresAt, runtime);
     const durationText = durationMs > 0 ? ` for ${formatDuration(durationMs)}` : "";
-    await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${selected.name}${durationText}.`, accountId: account.accountId });
+    await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${selected.name}${durationText}.`, accountId: account.accountId, bypassPolicy: true });
   } else {
     await unmuteGroupAllAccounts(selected.jid, config, runtime);
-    await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${selected.name}.`, accountId: account.accountId });
+    await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${selected.name}.`, accountId: account.accountId, bypassPolicy: true });
   }
   return true;
 }
@@ -297,7 +331,7 @@ async function unmuteGroupAllAccounts(
   const enabledAccounts = listEnabledWahaAccounts(config);
   for (const acct of enabledAccounts) {
     const dirDb = getDirectoryDb(acct.accountId);
-    await unmuteGroupWithDmRestore(dirDb, groupJid, acct, config, runtime);
+    unmuteGroupWithDmRestore(dirDb, groupJid, acct, config, runtime);
   }
 }
 
@@ -322,7 +356,9 @@ async function muteGroupWithDmBackup(
       (p) => (p.id as string) || (p.jid as string) || ""
     ).filter(Boolean);
   } catch (err) {
-    runtime.log?.(`[waha] shutup: failed to get participants for ${groupJid}: ${String(err)}`);
+    // Group will still be muted but participant DMs will NOT be blocked (no participant list).
+    // DO NOT CHANGE — mute must proceed even if participant fetch fails.
+    runtime.log?.(`[waha] shutup: failed to get participants for ${groupJid}: ${String(err)}. Group will be muted but participant DMs will NOT be blocked.`);
   }
 
   // Snapshot current DM settings for all participants
@@ -381,7 +417,7 @@ async function showGroupListForMute(
 ): Promise<void> {
   const groups = await getGroupsForAccount(account, config);
   if (groups.length === 0) {
-    await sendWahaText({ cfg: config, to: chatId, text: "I'm not in any groups.", accountId: account.accountId });
+    await sendWahaText({ cfg: config, to: chatId, text: "I'm not in any groups.", accountId: account.accountId, bypassPolicy: true });
     return;
   }
   const list = groups.map((g, i) => `${i + 1}) ${g.name}`).join("\n");
@@ -390,6 +426,7 @@ async function showGroupListForMute(
     cfg: config, to: chatId,
     text: `Which group would you like me to shut up in?\n\n${list}\n\nReply with the number, or "all".`,
     accountId: account.accountId,
+    bypassPolicy: true,
   });
 }
 
@@ -417,7 +454,7 @@ async function showMutedGroupsListForUnmute(
   }
 
   if (groups.length === 0) {
-    await sendWahaText({ cfg: config, to: chatId, text: "I'm not muted in any groups.", accountId: account.accountId });
+    await sendWahaText({ cfg: config, to: chatId, text: "I'm not muted in any groups.", accountId: account.accountId, bypassPolicy: true });
     return;
   }
   const list = groups.map((g, i) => `${i + 1}) ${g.name}`).join("\n");
@@ -426,6 +463,7 @@ async function showMutedGroupsListForUnmute(
     cfg: config, to: chatId,
     text: `Which group would you like to unmute?\n\n${list}\n\nReply with the number, or "all".`,
     accountId: account.accountId,
+    bypassPolicy: true,
   });
 }
 

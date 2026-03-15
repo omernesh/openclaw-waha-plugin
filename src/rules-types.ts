@@ -125,7 +125,7 @@ export const SYSTEM_CONTACT_DEFAULTS: Required<Omit<ContactRule, "identity">> = 
   enabled: true,
   trust_level: "normal",
   privacy_level: "low",
-  can_initiate: false,
+  can_initiate: true,
   can_reply: true,
   can_use_memory: false,
   can_reference_calendar: false,

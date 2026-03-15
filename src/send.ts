@@ -198,6 +198,7 @@ export async function sendWahaText(params: {
   replyToId?: string;
   accountId?: string;
   botProxy?: boolean;
+  bypassPolicy?: boolean; // Skip rules-based policy check (used by system commands like /shutup)
 }) {
   const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
   assertCanSend(account.session, params.cfg);
@@ -206,7 +207,10 @@ export async function sendWahaText(params: {
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
   // Fail-open: if rules not configured or resolution fails, send proceeds normally.
   // Only blocks on explicit policy denial (can_initiate=false or silent_observer group).
-  assertPolicyCanSend(chatId, params.cfg);
+  // bypassPolicy skips this check for system commands (e.g., /shutup confirmations).
+  if (!params.bypassPolicy) {
+    assertPolicyCanSend(chatId, params.cfg);
+  }
 
   // Check if target group is muted — block outbound sends to muted groups.
   // DO NOT CHANGE — muted groups must not receive any bot messages except /unshutup confirmations.

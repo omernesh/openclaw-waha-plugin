@@ -126,7 +126,7 @@ describe("buildDmPayload", () => {
   it("uses system defaults for missing fields in ContactRule", () => {
     const sparse: ContactRule = { ...SYSTEM_CONTACT_DEFAULTS };
     const payload = buildDmPayload({ contactRule: sparse, targetId: "@c:test@c.us" });
-    expect(payload.can_initiate).toBe(false);
+    expect(payload.can_initiate).toBe(true);
     expect(payload.can_reply).toBe(true);
     expect(payload.privacy_level).toBe("low");
     expect(payload.tone).toBe("neutral");
