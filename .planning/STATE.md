@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 07-admin-panel-critical-fixes 07-02-PLAN.md
-last_updated: "2026-03-15T22:12:01.575Z"
+stopped_at: Completed 07-admin-panel-critical-fixes 07-01-PLAN.md
+last_updated: "2026-03-15T22:16:41.764Z"
 last_activity: "2026-03-15 - Completed quick task 260315-wo2: Break down BUGS.md into GSD phases"
 progress:
   total_phases: 11
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
   percent: 95
 ---
 
@@ -124,6 +124,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 06-whatsapp-rules-and-policy-system P03 | 7min | 2 tasks | 4 files |
 | Phase 06-whatsapp-rules-and-policy-system P04 | 9 | 2 tasks | 7 files |
 | Phase 07-admin-panel-critical-fixes P02 | 5 | 1 tasks | 2 files |
+| Phase 07-admin-panel-critical-fixes P01 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,9 @@ Recent decisions affecting current work:
 - [Phase 06-whatsapp-rules-and-policy-system]: executePolicyEdit extracted to policy-edit.ts for testability (follows trigger-word.ts pattern)
 - [Phase quick-1]: MutationDedup TTL=60s covers gateway retry window; only timeouts mark pending, not successes; body hash via djb2 over sorted JSON.stringify
 - [Phase 07-admin-panel-critical-fixes]: SQL NOT LIKE conditions added to both getContacts() and getContactCount() so LIMIT/OFFSET pagination is accurate and total count excludes @lid/@s.whatsapp.net ghost entries (AP-02 fix)
+- [Phase 07-admin-panel-critical-fixes]: DOM element creation (appendChild) instead of innerHTML for overlay — passes security hooks
+- [Phase 07-admin-panel-critical-fixes]: AbortController 10s timeout on saveGroupFilter to surface hung requests as clear error
+- [Phase 07-admin-panel-critical-fixes]: listEnabledWahaAccounts fallback to primary account prevents 502 from config resolution crashes
 
 ### Roadmap Evolution
 
@@ -196,6 +200,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-15T22:12:01.569Z
-Stopped at: Completed 07-admin-panel-critical-fixes 07-02-PLAN.md
+Last session: 2026-03-15T22:16:41.752Z
+Stopped at: Completed 07-admin-panel-critical-fixes 07-01-PLAN.md
 Resume file: None
