@@ -1334,7 +1334,7 @@ async function saveAndRestart() {
   await saveSettings(new Event('submit'));
   try {
     await fetch('/api/admin/restart', { method: 'POST' });
-  } catch(e) { /* expected - server is restarting */ }
+  } catch(e) { /* expected — Restarting: server drops connection before responding */ }
   // Show fullscreen overlay immediately — DO NOT revert to blind setTimeout reload
   var overlay = document.createElement('div');
   overlay.id = 'restart-overlay';
