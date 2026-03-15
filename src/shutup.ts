@@ -245,21 +245,22 @@ export async function handleShutupCommand(params: {
     } else {
       if (allFlag) {
         // Unmute all groups across all accounts — synchronous SQLite operations (fast).
+        // Deduplicate by group JID so the count reflects unique groups, not per-account entries.
         const enabledAccounts = listEnabledWahaAccounts(config);
-        let totalUnmuted = 0;
+        const unmutedJids = new Set<string>();
         for (const acct of enabledAccounts) {
           const dirDb = getDirectoryDb(acct.accountId);
           const mutedGroups = dirDb.getAllMutedGroups();
           for (const mg of mutedGroups) {
             try {
               unmuteGroupWithDmRestore(dirDb, mg.groupJid, acct, config, runtime);
-              totalUnmuted++;
+              unmutedJids.add(mg.groupJid);
             } catch (err) {
               runtime.log?.(`[waha] unshutup: failed to unmute ${mg.groupJid}: ${String(err)}`);
             }
           }
         }
-        await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${totalUnmuted} groups.`, accountId: account.accountId, bypassPolicy: true });
+        await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${unmutedJids.size} groups.`, accountId: account.accountId, bypassPolicy: true });
       } else {
         // Show muted groups list for selection
         await showMutedGroupsListForUnmute(chatId, senderId, account, config, runtime);
