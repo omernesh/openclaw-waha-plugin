@@ -2,6 +2,20 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.14.2] - 2026-03-15
+
+### Fixed
+- **Critical**: Keyword filters now check `textBody` (human-written text) instead of `rawBody`, preventing voice messages, images, locations, polls, and other media-only messages from bypassing DM and group keyword filters via synthetic `[media]` tags.
+- `mentionOnly` per-DM setting also checks `textBody` for consistency.
+- Global group filter and DM filter drops now log the reason (were previously silent).
+- `DmFilter` uses structured logging instead of `console.warn` for errors and invalid regex patterns.
+- Poll options fallback handles both string and object shapes from WAHA (was rendering `[object Object]`).
+
+### Improved
+- Replaced `as any` casts with typed `WahaPollCreationMessage` and `WahaEventMessage` interfaces.
+- Eliminated non-null assertions on `Map.get` with local variable pattern.
+- Consolidated duplicate `DmFilterConfig` type definition.
+
 ## [1.14.1] - 2026-03-15
 
 ### Fixed
