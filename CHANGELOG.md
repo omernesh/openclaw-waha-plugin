@@ -16,6 +16,14 @@ All notable changes to the OpenClaw WAHA Plugin are documented here.
 - Human sessions defer 200ms before processing to give bot sessions priority for claiming messages
 - God mode scope defaults to "all" (backward compatible) but recommended "dm" for group safety
 
+### Fixed
+- Race condition in cross-session dedup: `claimMessage` now uses claim-if-unclaimed semantics (prevents double-processing)
+- Empty messageId guard prevents all ID-less messages from being treated as duplicates
+- Added `groupFilter` to Zod strict schema (prevents potential startup crash)
+- Bot proxy prefix now applied to media captions (was only on text replies)
+- Invalid regex patterns in keyword filter are skipped individually instead of disabling all filtering
+- Unrecognized `godModeScope` values now log a warning instead of silently disabling bypass
+
 ## [1.11.1] - 2026-03-14
 
 ### Fixed
