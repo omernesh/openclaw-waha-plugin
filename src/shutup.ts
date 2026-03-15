@@ -12,6 +12,7 @@
 
 import { sendWahaText, getWahaGroupParticipants } from "./send.js";
 import { getDirectoryDb } from "./directory.js";
+import type { PendingSelectionRecord } from "./directory.js";
 import { callWahaApi } from "./http-client.js";
 import { resolveWahaAccount, listEnabledWahaAccounts } from "./accounts.js";
 import type { CoreConfig } from "./types.js";
@@ -55,35 +56,52 @@ function formatDuration(ms: number): string {
   return `${days}d`;
 }
 
-// ── Pending DM selections (interactive group list flow) ──
-
-interface PendingSelection {
-  type: "mute" | "unmute";
-  groups: { jid: string; name: string }[];
-  senderId: string;
-  durationStr: string | null;
-  timestamp: number;
-}
-const _pendingSelections = new Map<string, PendingSelection>(); // key: senderJid
-const SELECTION_TTL_MS = 60_000; // 1 minute to respond
+// ── Pending DM selections (SQLite-backed, survives restarts) ──
+// DO NOT CHANGE — pending selections are stored in SQLite across ALL account DBs.
+// Previously used an in-memory Map which was lost on gateway restart.
+// Fixed Phase 7 (2026-03-15).
 
 /**
  * Check if incoming DM is a pending selection response.
+ * Searches ALL account DBs since the pending selection may have been stored by a different account.
  * Returns the pending selection if found and not expired, null otherwise.
  * DO NOT CHANGE — pending selection check must run before normal message processing.
  */
-export function checkPendingSelection(senderId: string): PendingSelection | null {
-  const pending = _pendingSelections.get(senderId);
-  if (!pending) return null;
-  if (Date.now() - pending.timestamp > SELECTION_TTL_MS) {
-    _pendingSelections.delete(senderId);
+export function checkPendingSelection(senderId: string, config?: CoreConfig): PendingSelectionRecord | null {
+  if (config) {
+    // Search all account DBs — the pending may be stored by any account
+    const enabledAccounts = listEnabledWahaAccounts(config);
+    for (const acct of enabledAccounts) {
+      try {
+        const dirDb = getDirectoryDb(acct.accountId);
+        const pending = dirDb.getPendingSelection(senderId);
+        if (pending) return pending;
+      } catch {
+        // Non-fatal — try next account
+      }
+    }
     return null;
   }
-  return pending;
+  // Fallback: no config provided, can't search all accounts
+  return null;
 }
 
-export function clearPendingSelection(senderId: string): void {
-  _pendingSelections.delete(senderId);
+/**
+ * Clear a pending selection across ALL account DBs.
+ * DO NOT CHANGE — must clear from all DBs since we don't know which one stored it.
+ */
+export function clearPendingSelection(senderId: string, config?: CoreConfig): void {
+  if (config) {
+    const enabledAccounts = listEnabledWahaAccounts(config);
+    for (const acct of enabledAccounts) {
+      try {
+        const dirDb = getDirectoryDb(acct.accountId);
+        dirDb.clearPendingSelection(senderId);
+      } catch {
+        // Non-fatal
+      }
+    }
+  }
 }
 
 // ── Authorization ──
@@ -246,7 +264,7 @@ export async function handleShutupCommand(params: {
  * DO NOT CHANGE — handles the interactive group list flow for DM-based mute/unmute.
  */
 export async function handleSelectionResponse(
-  pending: PendingSelection,
+  pending: PendingSelectionRecord,
   text: string,
   chatId: string,
   account: ResolvedWahaAccount,
@@ -406,7 +424,7 @@ function unmuteGroupWithDmRestore(
   }
 }
 
-/** Show group list in DM for mute selection */
+/** Show group list in DM for mute selection — writes pending to ALL account DBs */
 async function showGroupListForMute(
   chatId: string,
   senderId: string,
@@ -421,7 +439,17 @@ async function showGroupListForMute(
     return;
   }
   const list = groups.map((g, i) => `${i + 1}) ${g.name}`).join("\n");
-  _pendingSelections.set(senderId, { type: "mute", groups, senderId, durationStr, timestamp: Date.now() });
+  // Store pending selection in ALL account DBs so any session can find it
+  // DO NOT CHANGE — cross-session pending selection requires all DBs to have the entry.
+  const enabledAccounts = listEnabledWahaAccounts(config);
+  for (const acct of enabledAccounts) {
+    try {
+      const dirDb = getDirectoryDb(acct.accountId);
+      dirDb.setPendingSelection(senderId, { type: "mute", groups, durationStr });
+    } catch (err) {
+      runtime.log?.(`[waha] failed to store pending selection in ${acct.accountId}: ${String(err)}`);
+    }
+  }
   await sendWahaText({
     cfg: config, to: chatId,
     text: `Which group would you like me to shut up in?\n\n${list}\n\nReply with the number, or "all".`,
@@ -430,7 +458,7 @@ async function showGroupListForMute(
   });
 }
 
-/** Show muted groups list in DM for unmute selection */
+/** Show muted groups list in DM for unmute selection — writes pending to ALL account DBs */
 async function showMutedGroupsListForUnmute(
   chatId: string,
   senderId: string,
@@ -458,7 +486,16 @@ async function showMutedGroupsListForUnmute(
     return;
   }
   const list = groups.map((g, i) => `${i + 1}) ${g.name}`).join("\n");
-  _pendingSelections.set(senderId, { type: "unmute", groups, senderId, durationStr: null, timestamp: Date.now() });
+  // Store pending selection in ALL account DBs so any session can find it
+  // DO NOT CHANGE — cross-session pending selection requires all DBs to have the entry.
+  for (const acct of enabledAccounts) {
+    try {
+      const dirDb = getDirectoryDb(acct.accountId);
+      dirDb.setPendingSelection(senderId, { type: "unmute", groups, durationStr: null });
+    } catch (err) {
+      runtime.log?.(`[waha] failed to store pending selection in ${acct.accountId}: ${String(err)}`);
+    }
+  }
   await sendWahaText({
     cfg: config, to: chatId,
     text: `Which group would you like to unmute?\n\n${list}\n\nReply with the number, or "all".`,

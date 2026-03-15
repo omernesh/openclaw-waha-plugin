@@ -59,6 +59,20 @@ export type MutedGroup = {
   dmBackup: Record<string, boolean> | null; // participantJid -> original canInitiate
 };
 
+/**
+ * Pending selection record — stores /shutup DM interactive flow state in SQLite.
+ * Survives gateway restarts (unlike in-memory Map).
+ * DO NOT CHANGE — pending selection persistence is critical for cross-session /shutup DM flow.
+ * Added Phase 7 fix (2026-03-15).
+ */
+export type PendingSelectionRecord = {
+  type: "mute" | "unmute";
+  groups: { jid: string; name: string }[];
+  senderId: string;
+  durationStr: string | null;
+  timestamp: number;
+};
+
 export type ContactType = "contact" | "group" | "newsletter";
 
 const DEFAULT_DM_SETTINGS: ContactDmSettings = {
@@ -67,6 +81,9 @@ const DEFAULT_DM_SETTINGS: ContactDmSettings = {
   customKeywords: "",
   canInitiate: true,
 };
+
+/** TTL for pending selections — 60 seconds to respond. DO NOT CHANGE. */
+const PENDING_SELECTION_TTL_MS = 60_000;
 
 export class DirectoryDb {
   private db: ReturnType<typeof require>;
@@ -137,6 +154,14 @@ export class DirectoryDb {
         expires_at INTEGER NOT NULL DEFAULT 0,
         account_id TEXT NOT NULL DEFAULT '',
         dm_backup TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS pending_selections (
+        sender_jid TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        groups_json TEXT NOT NULL,
+        duration_str TEXT,
+        timestamp INTEGER NOT NULL
       );
     `);
   }
@@ -582,6 +607,53 @@ export class DirectoryDb {
     const muted = this.getMutedGroup(groupJid);
     this.db.prepare("DELETE FROM muted_groups WHERE group_jid = ?").run(groupJid);
     return muted?.dmBackup ?? null;
+  }
+
+  // ── Pending selection methods (SQLite-backed /shutup DM flow) ──
+  // DO NOT CHANGE — pending selections must be stored in SQLite so they survive gateway restarts.
+  // The /shutup DM flow shows a numbered group list and waits for the user to reply with a number.
+  // Previously stored in an in-memory Map which was lost on restart.
+  // Added Phase 7 fix (2026-03-15).
+
+  /**
+   * Store a pending selection for a sender (DM interactive /shutup flow).
+   * Replaces any existing pending selection for the same sender.
+   */
+  setPendingSelection(senderJid: string, selection: { type: string; groups: { jid: string; name: string }[]; durationStr: string | null }): void {
+    this.db.prepare(
+      "INSERT OR REPLACE INTO pending_selections (sender_jid, type, groups_json, duration_str, timestamp) VALUES (?, ?, ?, ?, ?)"
+    ).run(senderJid, selection.type, JSON.stringify(selection.groups), selection.durationStr ?? null, Date.now());
+  }
+
+  /**
+   * Get a pending selection for a sender. Returns null if not found or expired (60s TTL).
+   * Automatically cleans up expired entries.
+   */
+  getPendingSelection(senderJid: string): PendingSelectionRecord | null {
+    const row = this.db.prepare("SELECT * FROM pending_selections WHERE sender_jid = ?").get(senderJid) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const timestamp = row.timestamp as number;
+    // Check TTL (60 seconds)
+    if (Date.now() - timestamp > PENDING_SELECTION_TTL_MS) {
+      this.db.prepare("DELETE FROM pending_selections WHERE sender_jid = ?").run(senderJid);
+      return null;
+    }
+    let groups: { jid: string; name: string }[] = [];
+    try { groups = JSON.parse(row.groups_json as string); } catch { /* corrupt JSON — treat as empty */ }
+    return {
+      type: row.type as "mute" | "unmute",
+      groups,
+      senderId: senderJid,
+      durationStr: (row.duration_str as string) ?? null,
+      timestamp,
+    };
+  }
+
+  /**
+   * Clear (delete) a pending selection for a sender.
+   */
+  clearPendingSelection(senderJid: string): void {
+    this.db.prepare("DELETE FROM pending_selections WHERE sender_jid = ?").run(senderJid);
   }
 
 

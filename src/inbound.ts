@@ -160,6 +160,34 @@ export async function handleWahaInbound(params: {
   const { message: rawMessage, rawPayload, account, config, runtime, statusSink } = params;
 
   // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  EARLY PENDING SELECTION CHECK — DO NOT CHANGE                      ║
+  // ║                                                                     ║
+  // ║  Must run BEFORE cross-session dedup because pending selections     ║
+  // ║  are stored in SQLite and any session can process the response.     ║
+  // ║  If we let dedup run first, the bot session may claim the "41"      ║
+  // ║  message and fail to find the pending (or vice versa), causing      ║
+  // ║  the selection response to leak to the LLM.                         ║
+  // ║                                                                     ║
+  // ║  Only checks DMs (not groups) with simple text (number or "all").   ║
+  // ║  Uses rawMessage fields directly — no media preprocessing needed.   ║
+  // ║  Added Phase 7 fix (2026-03-15).                                    ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  const _earlyIsGroup = isWhatsAppGroupJid(rawMessage.chatId);
+  const _earlySenderId = rawMessage.participant || rawMessage.from;
+  if (!_earlyIsGroup) {
+    const pending = checkPendingSelection(_earlySenderId, config);
+    if (pending) {
+      const earlyText = (rawMessage.body ?? "").trim();
+      // Only intercept if there is text and it's NOT a /shutup command itself
+      if (earlyText && !SHUTUP_RE.test(earlyText)) {
+        const handled = await handleSelectionResponse(pending, earlyText, rawMessage.chatId, account, config, runtime);
+        if (handled) clearPendingSelection(_earlySenderId, config);
+        return; // Selection handled — skip all further processing including dedup
+      }
+    }
+  }
+
+  // ╔══════════════════════════════════════════════════════════════════════╗
   // ║  CROSS-SESSION MESSAGE DEDUP — DO NOT CHANGE                       ║
   // ║                                                                    ║
   // ║  Bot sessions claim and process immediately.                       ║
@@ -392,15 +420,16 @@ export async function handleWahaInbound(params: {
     }
   }
 
-  // === Pending /shutup selection response ===
-  // When a user sends /shutup in DM, the bot shows a numbered group list.
-  // This checks if the incoming DM is a reply with a number or "all".
+  // === Pending /shutup selection response (post-dedup fallback) ===
+  // NOTE: The primary pending selection check runs BEFORE cross-session dedup (above).
+  // This secondary check handles edge cases where the early check missed (e.g., media messages
+  // where rawBody differs from rawMessage.body after preprocessing).
   // DO NOT CHANGE — DM interactive flow for /shutup command.
   if (!isGroup && !commandMatch) {
-    const pending = checkPendingSelection(senderId);
+    const pending = checkPendingSelection(senderId, config);
     if (pending) {
       const handled = await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
-      if (handled) clearPendingSelection(senderId);
+      if (handled) clearPendingSelection(senderId, config);
       return; // Either handled or invalid input (user can retry)
     }
   }
