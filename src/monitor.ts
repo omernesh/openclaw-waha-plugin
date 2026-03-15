@@ -1710,6 +1710,7 @@ async function loadGroupFilter(groupJid) {
     if (elFilterEnabled) elFilterEnabled.onchange = function() { saveGroupFilter(groupJid); };
   } catch(e) { console.warn('[waha] loadGroupFilter failed:', e); }
 }
+// DO NOT CHANGE — saveGroupFilter uses AbortController for 10s timeout to prevent 502 from hung requests (AP-03 fix).
 async function saveGroupFilter(groupJid) {
   var sfx = groupJid.replace(/[^a-zA-Z0-9]/g, '_');
   var elEnabled = document.getElementById('gfo-enabled-' + sfx);
@@ -1722,14 +1723,30 @@ async function saveGroupFilter(groupJid) {
   var patternsRaw = elPatterns ? elPatterns.value.trim() : '';
   var mentionPatterns = patternsRaw ? patternsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean) : null;
   var godModeScope = elGodMode ? elGodMode.value || null : null;
+  // Disable checkbox while saving to prevent double-clicks
+  elEnabled.disabled = true;
+  showToast('Saving...');
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
   try {
     var r = await fetch('/api/admin/directory/' + encodeURIComponent(groupJid) + '/filter', {
       method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope })
+      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     showToast('Group filter override saved');
-  } catch(e) { showToast('Error saving filter: ' + e.message, true); }
+  } catch(e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      showToast('Request timed out — filter may have been saved. Refresh to check.', true);
+    } else {
+      showToast('Error saving filter: ' + e.message, true);
+    }
+  } finally {
+    elEnabled.disabled = false;
+  }
 }
 </script>
 </body>
@@ -2077,6 +2094,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const jid = decodeURIComponent(m[1]);
+          console.log(`[waha] PUT group filter override for ${jid}`);
           const bodyStr = await readBody(req, maxBodyBytes);
           const body = JSON.parse(bodyStr) as {
             enabled?: boolean;
@@ -2105,7 +2123,15 @@ export function createWahaWebhookServer(opts: {
           // Write to ALL account DBs — per-group overrides are global settings,
           // but each session has its own SQLite DB file.
           // DO NOT CHANGE — ensures overrides work regardless of which session processes the message.
-          const accounts = listEnabledWahaAccounts(opts.config);
+          // Wrapped in try/catch with fallback to primary account if listEnabledWahaAccounts fails
+          // (e.g., config structure issue). AP-03 fix.
+          let accounts: { accountId: string }[];
+          try {
+            accounts = listEnabledWahaAccounts(opts.config);
+          } catch (accountErr) {
+            console.warn(`[waha] listEnabledWahaAccounts failed, fallback to primary account: ${String(accountErr)}`);
+            accounts = [{ accountId: opts.accountId }];
+          }
           let syncCount = 0;
           for (const acct of accounts) {
             try {
