@@ -32,6 +32,20 @@ export type GroupParticipant = {
   allowDm: boolean;
 };
 
+/**
+ * Per-group keyword filter override.
+ * Allows individual groups to override global group filter settings.
+ * DO NOT CHANGE — per-group overrides are critical for groups where Sammie should respond freely.
+ */
+export type GroupFilterOverride = {
+  groupJid: string;
+  enabled: boolean;          // is override active?
+  filterEnabled: boolean;    // keyword filter on/off
+  mentionPatterns: string[] | null;  // null = inherit global
+  godModeScope: string | null;      // null = inherit global
+  updatedAt: number;
+};
+
 export type ContactType = "contact" | "group" | "newsletter";
 
 const DEFAULT_DM_SETTINGS: ContactDmSettings = {
@@ -92,6 +106,15 @@ export class DirectoryDb {
         allow_dm INTEGER DEFAULT 0,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (group_jid, participant_jid)
+      );
+
+      CREATE TABLE IF NOT EXISTS group_filter_overrides (
+        group_jid TEXT PRIMARY KEY,
+        enabled INTEGER NOT NULL DEFAULT 0,
+        filter_enabled INTEGER NOT NULL DEFAULT 1,
+        mention_patterns TEXT,
+        god_mode_scope TEXT,
+        updated_at INTEGER NOT NULL DEFAULT 0
       );
     `);
   }
@@ -379,6 +402,76 @@ export class DirectoryDb {
   getAllowedGroupJids(groupJid: string): string[] {
     const rows = this.db.prepare("SELECT participant_jid FROM group_participants WHERE group_jid = ? AND allow_in_group = 1").all(groupJid) as Array<{ participant_jid: string }>;
     return rows.map((r) => r.participant_jid);
+  }
+
+  // ── Group filter override methods ──
+  // DO NOT CHANGE — per-group filter overrides allow individual groups to use custom keyword
+  // filter settings instead of the global group filter. Critical for groups where the bot
+  // should respond freely (filterEnabled=false) or with different keywords.
+
+  /**
+   * Get the filter override for a specific group.
+   * Returns null if no override exists for this group.
+   */
+  getGroupFilterOverride(groupJid: string): GroupFilterOverride | null {
+    const row = this.db.prepare(
+      "SELECT group_jid, enabled, filter_enabled, mention_patterns, god_mode_scope, updated_at FROM group_filter_overrides WHERE group_jid = ?"
+    ).get(groupJid) as Record<string, unknown> | undefined;
+
+    if (!row) return null;
+
+    let mentionPatterns: string[] | null = null;
+    if (row.mention_patterns && typeof row.mention_patterns === "string") {
+      try {
+        mentionPatterns = JSON.parse(row.mention_patterns as string);
+      } catch {
+        mentionPatterns = null;
+      }
+    }
+
+    return {
+      groupJid: row.group_jid as string,
+      enabled: row.enabled === 1,
+      filterEnabled: row.filter_enabled === 1,
+      mentionPatterns,
+      godModeScope: (row.god_mode_scope as string) || null,
+      updatedAt: row.updated_at as number,
+    };
+  }
+
+  /**
+   * Set or update the filter override for a specific group.
+   * Uses INSERT OR REPLACE — creates if not exists, updates if exists.
+   */
+  setGroupFilterOverride(groupJid: string, override: Partial<GroupFilterOverride>): void {
+    const existing = this.getGroupFilterOverride(groupJid);
+    const merged = {
+      enabled: override.enabled ?? existing?.enabled ?? false,
+      filterEnabled: override.filterEnabled ?? existing?.filterEnabled ?? true,
+      mentionPatterns: override.mentionPatterns !== undefined ? override.mentionPatterns : (existing?.mentionPatterns ?? null),
+      godModeScope: override.godModeScope !== undefined ? override.godModeScope : (existing?.godModeScope ?? null),
+    };
+
+    const mentionPatternsJson = merged.mentionPatterns ? JSON.stringify(merged.mentionPatterns) : null;
+
+    this.db.prepare(
+      `INSERT OR REPLACE INTO group_filter_overrides (group_jid, enabled, filter_enabled, mention_patterns, god_mode_scope, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      groupJid,
+      merged.enabled ? 1 : 0,
+      merged.filterEnabled ? 1 : 0,
+      mentionPatternsJson,
+      merged.godModeScope ?? null,
+      Date.now(),
+    );
+  }
+
+  /**
+   * Delete the filter override for a specific group, reverting to global filter settings.
+   */
+  deleteGroupFilterOverride(groupJid: string): void {
+    this.db.prepare("DELETE FROM group_filter_overrides WHERE group_jid = ?").run(groupJid);
   }
 
   /**

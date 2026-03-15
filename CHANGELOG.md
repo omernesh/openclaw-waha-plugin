@@ -2,6 +2,17 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.13.0] - 2026-03-15
+
+### Added
+- **Per-group filter overrides**: Individual groups can override the global keyword filter. Disable filtering entirely (Sammie responds freely), set custom keywords, or override god mode scope per group.
+- **Admin panel UI**: Groups in the Directory tab now show an inline "Group Filter Override" section when expanded, with toggles for override enable, keyword filter on/off, custom patterns, and god mode scope.
+- **API endpoints**: `GET/PUT /api/admin/directory/:jid/filter` for reading and saving per-group filter overrides.
+- **Cross-account sync**: Per-group overrides are written to all account DBs so they work regardless of which session processes the message.
+
+### Changed
+- Group filter override lookup happens before global filter — per-group settings take priority
+
 ## [1.12.1] - 2026-03-15
 
 ### Fixed

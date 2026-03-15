@@ -412,15 +412,69 @@ export async function handleWahaInbound(params: {
   // (enabled by default — getGroupFilter applies defaults internally)
   // SKIP for trigger-word messages — explicit invocation bypasses keyword filter.
   if (isGroup && !triggerActivated) {
-    const groupFilter = getGroupFilter(config, account.accountId);
-    const filterResult = groupFilter.check({
-      text: rawBody,
-      senderId,
-      filterType: "group",
-      log: (msg) => runtime.log?.(msg),
-    });
-    if (!filterResult.pass) {
-      return; // Silent drop
+    // ╔══════════════════════════════════════════════════════════════════════╗
+    // ║  Per-group filter override — DO NOT CHANGE                         ║
+    // ║                                                                    ║
+    // ║  Allows individual groups to override global group filter settings.║
+    // ║  If override exists and is enabled:                                ║
+    // ║    - filterEnabled=false → skip keyword filtering entirely         ║
+    // ║      (Sammie responds to everything in that group)                 ║
+    // ║    - mentionPatterns set → use custom patterns instead of global   ║
+    // ║    - mentionPatterns null/empty → fall through to global filter    ║
+    // ║  If no override or override.enabled=false → use global filter.    ║
+    // ║  Trigger-activated messages bypass this entirely (handled above).  ║
+    // ╚══════════════════════════════════════════════════════════════════════╝
+    let groupFilterHandled = false;
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      const override = dirDb.getGroupFilterOverride(chatId);
+      if (override && override.enabled) {
+        if (!override.filterEnabled) {
+          // Filter disabled for this group — Sammie responds to everything
+          runtime.log?.(`[waha] group filter override: filter disabled for ${chatId}, allowing`);
+          groupFilterHandled = true;
+        } else if (override.mentionPatterns && override.mentionPatterns.length > 0) {
+          // Custom patterns for this group — build a per-group DmFilter instance
+          const globalGroupFilterCfg = (config.channels?.waha as Record<string, unknown> | undefined)?.groupFilter as Record<string, unknown> | undefined;
+          const perGroupFilter = new DmFilter({
+            enabled: true,
+            mentionPatterns: override.mentionPatterns,
+            godModeBypass: globalGroupFilterCfg?.godModeBypass as boolean | undefined,
+            godModeScope: (override.godModeScope ?? globalGroupFilterCfg?.godModeScope ?? "all") as "all" | "dm" | "off",
+            godModeSuperUsers: globalGroupFilterCfg?.godModeSuperUsers as Array<{ identifier: string; platform?: string; passwordRequired?: boolean }> | undefined,
+          });
+          const filterResult = perGroupFilter.check({
+            text: rawBody,
+            senderId,
+            filterType: "group",
+            log: (msg) => runtime.log?.(msg),
+          });
+          if (!filterResult.pass) {
+            runtime.log?.(`[waha] group filter override: drop ${senderId} in ${chatId} (${filterResult.reason})`);
+            return;
+          }
+          // Custom patterns matched — skip global filter check
+          groupFilterHandled = true;
+        }
+        // If override enabled but mentionPatterns is null/empty, fall through to global filter
+      }
+    } catch (err) {
+      // Non-fatal: if SQLite fails, fall through to global filter
+      runtime.log?.(`[waha] group filter override lookup failed for ${chatId}: ${String(err)}`);
+    }
+
+    // Global group filter — only runs if per-group override did not handle the message
+    if (!groupFilterHandled) {
+      const groupFilter = getGroupFilter(config, account.accountId);
+      const filterResult = groupFilter.check({
+        text: rawBody,
+        senderId,
+        filterType: "group",
+        log: (msg) => runtime.log?.(msg),
+      });
+      if (!filterResult.pass) {
+        return; // Silent drop
+      }
     }
   }
 

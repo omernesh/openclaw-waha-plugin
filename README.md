@@ -4,7 +4,7 @@
 
 Full WhatsApp API access through [WAHA](https://waha.devlike.pro/) -- groups, channels, media, polls, reactions, stickers, voice messages, contact cards, labels, status/stories, presence, and more. 87%+ WAHA API coverage.
 
-**Plugin ID:** `waha` | **Version:** 1.12.1 | **Last updated:** 2026-03-15
+**Plugin ID:** `waha` | **Version:** 1.13.0 | **Last updated:** 2026-03-15
 
 [![npm](https://img.shields.io/npm/v/waha-openclaw-channel)](https://www.npmjs.com/package/waha-openclaw-channel)
 
@@ -177,7 +177,7 @@ Configure via `rulesPath` in the channel config. See the rules directory for exa
 Access at `http://YOUR_HOST:8050/admin`. No build tools required -- the UI is embedded in the plugin.
 
 **Tabs:**
-- **Directory** -- browse contacts, groups, newsletters; per-contact DM settings; group participant management
+- **Directory** -- browse contacts, groups, newsletters; per-contact DM settings; group participant management; per-group filter overrides (disable filtering, custom keywords, god mode scope)
 - **Config** -- edit DM/group filter settings, keyword patterns, trigger operator, god mode scope, media preprocessing toggles, multi-session filtering guide
 - **Filter Stats** -- message processing statistics, duplicate webhook tracking
 - **Status** -- session health, connection info, gateway restart

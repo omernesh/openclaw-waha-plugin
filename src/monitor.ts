@@ -768,7 +768,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       <div id="save-note" style="font-size:0.78rem;color:#64748b;margin-top:6px;display:none;width:100%;">Some settings require a gateway restart to take effect.</div>
     </div>
   </form>
-<!-- Multi-Session Filtering Guide — collapsible reference for admin panel users -->  <details class="settings-section" style="margin-top:20px;border-top:1px solid #334155;padding-top:12px;">    <summary style="color:#38bdf8;">Multi-Session Filtering Guide</summary>    <div style="font-size:0.82rem;color:#cbd5e1;line-height:1.7;padding:8px 0 16px 0;">      <p style="color:#94a3b8;margin-bottom:12px;font-style:italic;">How messages flow through the guardrails:</p>      <ol style="padding-left:20px;margin-bottom:16px;display:grid;gap:4px;">        <li><strong style="color:#f8fafc;">Group allowlist</strong> — Is this group allowed? If not → dropped (zero tokens)</li>        <li><strong style="color:#f8fafc;">Sender allowlist</strong> — Is this sender allowed? If not → dropped</li>        <li><strong style="color:#f8fafc;">Cross-session dedup</strong> — Bot session claims first (200ms priority). If bot already claimed → human session drops the duplicate</li>        <li><strong style="color:#f8fafc;">Trigger prefix</strong> — Does the message start with the trigger operator (e.g., "!")? If required and missing → dropped</li>        <li><strong style="color:#f8fafc;">Keyword filter</strong> — Does the message match a keyword pattern? If not → dropped</li>        <li><strong style="color:#10b981;">Only then</strong> → Bot processes the message</li>      </ol>      <p style="color:#94a3b8;font-weight:600;margin-bottom:8px;text-transform:uppercase;font-size:0.78rem;letter-spacing:0.06em;">Scenarios</p>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot + Human session in same group</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message from anyone → Bot session handles it, human session drops the dupe</li>          <li>"sammie, what's the weather?" → Bot session handles (keyword match), human drops dupe</li>          <li>"!what's the weather?" → Bot session handles (trigger match), human drops dupe</li>          <li>Your message to a friend (no keyword) → Filtered on both sessions. God mode only bypasses DM filter, not group filter. Sammie stays quiet.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Only human session in group (bot not a member)</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message → Filtered (no keyword/trigger match). Sammie stays quiet.</li>          <li>"!what's the weather?" → Trigger activates on human session. Sammie responds with 🤖 prefix via your session.</li>          <li>Your message (superuser, no keyword) → Filtered. God mode scope is "dm" so groups still require keyword/trigger.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">DMs</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>You (superuser) DM Sammie → God mode bypasses DM filter. Sammie responds normally.</li>          <li>Someone else DMs → Must match keyword pattern or trigger prefix to reach Sammie.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot prefix</p>        <p>When Sammie responds through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not you.</p>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">God Mode Scope</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li><strong style="color:#f8fafc;">"all"</strong> — Superusers bypass ALL filters (DM + group). Use with caution.</li>          <li><strong style="color:#f8fafc;">"dm"</strong> <span style="color:#10b981;">(recommended)</span> — Superusers bypass DM filter only. Groups always require keyword/trigger.</li>          <li><strong style="color:#f8fafc;">"off"</strong> — Superusers never bypass filters. Must always use keyword/trigger.</li>        </ul>      </div>    </div>  </details>
+<!-- Multi-Session Filtering Guide — collapsible reference for admin panel users -->  <details class="settings-section" style="margin-top:20px;border-top:1px solid #334155;padding-top:12px;">    <summary style="color:#38bdf8;">Multi-Session Filtering Guide</summary>    <div style="font-size:0.82rem;color:#cbd5e1;line-height:1.7;padding:8px 0 16px 0;">      <p style="color:#94a3b8;margin-bottom:12px;font-style:italic;">How messages flow through the guardrails:</p>      <ol style="padding-left:20px;margin-bottom:16px;display:grid;gap:4px;">        <li><strong style="color:#f8fafc;">Group allowlist</strong> — Is this group allowed? If not → dropped (zero tokens)</li>        <li><strong style="color:#f8fafc;">Sender allowlist</strong> — Is this sender allowed? If not → dropped</li>        <li><strong style="color:#f8fafc;">Cross-session dedup</strong> — Bot session claims first (200ms priority). If bot already claimed → human session drops the duplicate</li>        <li><strong style="color:#f8fafc;">Trigger prefix</strong> — Does the message start with the trigger operator (e.g., "!")? If required and missing → dropped</li>        <li><strong style="color:#f8fafc;">Keyword filter</strong> — Does the message match a keyword pattern? If not → dropped</li>        <li><strong style="color:#10b981;">Only then</strong> → Bot processes the message</li>      </ol>      <p style="color:#94a3b8;font-weight:600;margin-bottom:8px;text-transform:uppercase;font-size:0.78rem;letter-spacing:0.06em;">Scenarios</p>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot + Human session in same group</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message from anyone → Bot session handles it, human session drops the dupe</li>          <li>"sammie, what's the weather?" → Bot session handles (keyword match), human drops dupe</li>          <li>"!what's the weather?" → Bot session handles (trigger match), human drops dupe</li>          <li>Your message to a friend (no keyword) → Filtered on both sessions. God mode only bypasses DM filter, not group filter. Sammie stays quiet.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Only human session in group (bot not a member)</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message → Filtered (no keyword/trigger match). Sammie stays quiet.</li>          <li>"!what's the weather?" → Trigger activates on human session. Sammie responds with 🤖 prefix via your session.</li>          <li>Your message (superuser, no keyword) → Filtered. God mode scope is "dm" so groups still require keyword/trigger.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">DMs</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>You (superuser) DM Sammie → God mode bypasses DM filter. Sammie responds normally.</li>          <li>Someone else DMs → Must match keyword pattern or trigger prefix to reach Sammie.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot prefix</p>        <p>When Sammie responds through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not you.</p>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">God Mode Scope</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li><strong style="color:#f8fafc;">"all"</strong> — Superusers bypass ALL filters (DM + group). Use with caution.</li>          <li><strong style="color:#f8fafc;">"dm"</strong> <span style="color:#10b981;">(recommended)</span> — Superusers bypass DM filter only. Groups always require keyword/trigger.</li>          <li><strong style="color:#f8fafc;">"off"</strong> — Superusers never bypass filters. Must always use keyword/trigger.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Per-Group Filter Overrides</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Per-group overrides take <strong style="color:#f8fafc;">priority over the global filter</strong>. When a group has an override, global settings are ignored for that group.</li>          <li>Override with <strong style="color:#f8fafc;">filterEnabled=false</strong> → ALL messages in that group reach Sammie (no keyword/trigger required).</li>          <li>Override with <strong style="color:#f8fafc;">custom keywords</strong> → those keywords are used instead of the global keyword list.</li>          <li>Groups <strong style="color:#f8fafc;">without overrides</strong> continue using the global filter as usual.</li>          <li>Configure per-group overrides in the <strong style="color:#38bdf8;">Directory</strong> tab — click on a group to manage its settings.</li>        </ul>      </div>    </div>  </details>
 </div>
 </main>
 </div>
@@ -1572,7 +1572,26 @@ async function loadGroupParticipants(groupJid, forceOpen) {
       });
     }
     html += '</div>';
+    // ---- Group filter override section ----
+    // DO NOT CHANGE — per-group filter override UI allows admin to set custom keyword filter settings per group.
+    html += '<div class="group-filter-override" style="margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;">';
+    html += '<h4 style="margin:0 0 8px;color:#94a3b8;font-size:13px;text-transform:uppercase;">Group Filter Override</h4>';
+    html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+    html += '<input type="checkbox" id="gfo-enabled-' + esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_') + '" onchange="saveGroupFilter(\\\'' + esc(groupJid) + '\\\')">';
+    html += ' <span>Override global filter</span></label>';
+    html += '<div id="gfo-settings-' + esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_') + '" style="display:none;margin-left:24px;">';
+    html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+    html += '<input type="checkbox" id="gfo-filter-enabled-' + esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_') + '" checked onchange="saveGroupFilter(\\\'' + esc(groupJid) + '\\\')">';
+    html += ' <span>Keyword filter enabled</span></label>';
+    html += '<div style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">Keywords (comma-separated, empty = inherit global)</label>';
+    html += '<input type="text" id="gfo-patterns-' + esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_') + '" placeholder="sammie, help, bot" style="width:100%;padding:6px 8px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;"></div>';
+    html += '<div><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">God Mode Scope</label>';
+    html += '<select id="gfo-god-mode-' + esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_') + '" style="padding:6px 8px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;">';
+    html += '<option value="">Inherit global</option><option value="all">All (DM + Groups)</option><option value="dm">DM Only</option><option value="off">Off</option></select></div>';
+    html += '</div></div>';
     panel.innerHTML = html;
+    // Load existing filter override data for this group (async, non-blocking)
+    loadGroupFilter(groupJid);
   } catch(e) { panel.innerHTML = '<div style="color:#ef4444;padding:8px">' + esc(e.message) + '</div>'; }
 }
 
@@ -1598,6 +1617,61 @@ async function toggleGroupAllowAll(groupJid, currentlyAll) {
     showToast((!currentlyAll ? 'Allowed all' : 'Revoked all') + ' in group');
     loadGroupParticipants(groupJid, true);
   } catch(e) { showToast('Error: ' + e.message, true); }
+}
+// ---- Group filter override functions ----
+// DO NOT CHANGE — loadGroupFilter/saveGroupFilter manage per-group keyword filter overrides.
+var _gfoCurrentJid = null;
+async function loadGroupFilter(groupJid) {
+  _gfoCurrentJid = groupJid;
+  var sfx = groupJid.replace(/[^a-zA-Z0-9]/g, '_');
+  try {
+    var r = await fetch('/api/admin/directory/' + encodeURIComponent(groupJid) + '/filter');
+    if (!r.ok) return;
+    var d = await r.json();
+    var ov = d.override;
+    var elEnabled = document.getElementById('gfo-enabled-' + sfx);
+    var elSettings = document.getElementById('gfo-settings-' + sfx);
+    var elFilterEnabled = document.getElementById('gfo-filter-enabled-' + sfx);
+    var elPatterns = document.getElementById('gfo-patterns-' + sfx);
+    var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
+    if (!elEnabled) return;
+    if (ov && ov.enabled) {
+      elEnabled.checked = true;
+      if (elSettings) elSettings.style.display = '';
+      if (elFilterEnabled) elFilterEnabled.checked = ov.filterEnabled !== false;
+      if (elPatterns && ov.mentionPatterns) elPatterns.value = ov.mentionPatterns.join(', ');
+      if (elGodMode && ov.godModeScope) elGodMode.value = ov.godModeScope;
+    } else {
+      elEnabled.checked = false;
+      if (elSettings) elSettings.style.display = 'none';
+    }
+    // Wire toggle for settings visibility
+    elEnabled.onchange = function() {
+      if (elSettings) elSettings.style.display = elEnabled.checked ? '' : 'none';
+      saveGroupFilter(groupJid);
+    };
+  } catch(e) { /* non-fatal */ }
+}
+async function saveGroupFilter(groupJid) {
+  var sfx = groupJid.replace(/[^a-zA-Z0-9]/g, '_');
+  var elEnabled = document.getElementById('gfo-enabled-' + sfx);
+  var elFilterEnabled = document.getElementById('gfo-filter-enabled-' + sfx);
+  var elPatterns = document.getElementById('gfo-patterns-' + sfx);
+  var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
+  if (!elEnabled) return;
+  var enabled = elEnabled.checked;
+  var filterEnabled = elFilterEnabled ? elFilterEnabled.checked : true;
+  var patternsRaw = elPatterns ? elPatterns.value.trim() : '';
+  var mentionPatterns = patternsRaw ? patternsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean) : null;
+  var godModeScope = elGodMode ? elGodMode.value || null : null;
+  try {
+    var r = await fetch('/api/admin/directory/' + encodeURIComponent(groupJid) + '/filter', {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Group filter override saved');
+  } catch(e) { showToast('Error saving filter: ' + e.message, true); }
 }
 </script>
 </body>
@@ -1920,8 +1994,67 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
+    // GET /api/admin/directory/:jid/filter — per-group filter override
+    // DO NOT CHANGE — serves per-group keyword filter override data for admin panel.
+    {
+      const m = req.method === "GET" && req.url?.match(/^\/api\/admin\/directory\/([^/]+)\/filter$/);
+      if (m) {
+        try {
+          const jid = decodeURIComponent(m[1]);
+          const db = getDirectoryDb(opts.accountId);
+          const override = db.getGroupFilterOverride(jid);
+          writeJsonResponse(res, 200, { override: override ?? null });
+        } catch (err) {
+          console.error(`[waha] GET /api/admin/directory/:jid/filter failed: ${String(err)}`);
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // PUT /api/admin/directory/:jid/filter — update per-group filter override
+    // DO NOT CHANGE — saves per-group keyword filter override settings from admin panel.
+    {
+      const m = req.method === "PUT" && req.url?.match(/^\/api\/admin\/directory\/([^/]+)\/filter$/);
+      if (m) {
+        try {
+          const jid = decodeURIComponent(m[1]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const body = JSON.parse(bodyStr) as {
+            enabled?: boolean;
+            filterEnabled?: boolean;
+            mentionPatterns?: string[] | null;
+            godModeScope?: string | null;
+          };
+          // Write to ALL account DBs — per-group overrides are global settings,
+          // but each session has its own SQLite DB file.
+          // DO NOT CHANGE — ensures overrides work regardless of which session processes the message.
+          const overrideData = {
+            enabled: body.enabled ?? false,
+            filterEnabled: body.filterEnabled ?? true,
+            mentionPatterns: body.mentionPatterns ?? null,
+            godModeScope: body.godModeScope ?? null,
+          };
+          const accounts = listEnabledWahaAccounts(opts.config);
+          for (const acct of accounts) {
+            try {
+              const db = getDirectoryDb(acct.accountId);
+              db.setGroupFilterOverride(jid, overrideData);
+            } catch (dbErr) {
+              console.warn(`[waha] failed to write group filter override to ${acct.accountId} DB: ${String(dbErr)}`);
+            }
+          }
+          writeJsonResponse(res, 200, { ok: true });
+        } catch (err) {
+          console.error(`[waha] PUT /api/admin/directory/:jid/filter failed: ${String(err)}`);
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
     // GET /api/admin/directory
-    if (req.url?.startsWith("/api/admin/directory") && req.method === "GET" && !/\/group\/[^/]+\/participants/.test(req.url)) {
+    if (req.url?.startsWith("/api/admin/directory") && req.method === "GET" && !/\/group\/[^/]+\/participants/.test(req.url) && !/\/[^/]+\/filter$/.test(req.url)) {
       const url = new URL(req.url, "http://localhost");
       const pathParts = url.pathname.replace("/api/admin/directory", "").split("/").filter(Boolean);
 
