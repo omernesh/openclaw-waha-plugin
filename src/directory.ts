@@ -507,8 +507,15 @@ export class DirectoryDb {
       | undefined;
     if (!row) return false;
     if (row.expires_at > 0 && Date.now() > row.expires_at) {
-      // Expired — auto-unmute (just delete the record, DM restore is handled by caller if needed)
-      this.unmuteGroup(groupJid);
+      // Expired — auto-unmute and restore DM settings from backup.
+      // DO NOT CHANGE — auto-expiry must restore DM settings or participants stay permanently blocked.
+      const dmBackup = this.unmuteGroup(groupJid);
+      if (dmBackup) {
+        for (const [participantJid, canInitiate] of Object.entries(dmBackup)) {
+          this.upsertContact(participantJid);
+          this.setContactDmSettings(participantJid, { canInitiate });
+        }
+      }
       return false;
     }
     return true;
@@ -524,7 +531,7 @@ export class DirectoryDb {
     if (!row) return null;
     let dmBackup: Record<string, boolean> | null = null;
     if (typeof row.dm_backup === "string") {
-      try { dmBackup = JSON.parse(row.dm_backup as string); } catch { /* corrupt JSON, ignore */ }
+      try { dmBackup = JSON.parse(row.dm_backup as string); } catch (err) { console.warn(`[waha] corrupt dm_backup JSON for group ${row.group_jid}: ${String(err)}`); }
     }
     return {
       groupJid: row.group_jid as string,
@@ -546,7 +553,7 @@ export class DirectoryDb {
     return rows.map((row) => {
       let dmBackup: Record<string, boolean> | null = null;
       if (typeof row.dm_backup === "string") {
-        try { dmBackup = JSON.parse(row.dm_backup as string); } catch { /* corrupt JSON, ignore */ }
+        try { dmBackup = JSON.parse(row.dm_backup as string); } catch (err) { console.warn(`[waha] corrupt dm_backup JSON for group ${row.group_jid}: ${String(err)}`); }
       }
       return {
         groupJid: row.group_jid as string,

@@ -399,9 +399,9 @@ export async function handleWahaInbound(params: {
   if (!isGroup && !commandMatch) {
     const pending = checkPendingSelection(senderId);
     if (pending) {
-      await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
-      clearPendingSelection(senderId);
-      return;
+      const handled = await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
+      if (handled) clearPendingSelection(senderId);
+      return; // Either handled or invalid input (user can retry)
     }
   }
 

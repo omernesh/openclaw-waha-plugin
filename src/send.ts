@@ -215,11 +215,11 @@ export async function sendWahaText(params: {
     try {
       const dirDb = getDirectoryDb(account.accountId);
       if (dirDb.isGroupMuted(chatId)) {
-        throw new Error(`Group ${chatId} is muted. Use /unshutup to unmute.`);
+        throw new Error(`Outbound blocked: group ${chatId} is muted. Use /unshutup to unmute.`);
       }
     } catch (err) {
-      if (String(err).includes("is muted")) throw err;
-      // DB errors are non-fatal for send
+      if (err instanceof Error && err.message.startsWith("Outbound blocked:")) throw err;
+      console.warn(`[waha] mute check DB error for ${chatId}, proceeding with send: ${String(err)}`);
     }
   }
 
