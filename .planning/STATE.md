@@ -3,11 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
+stopped_at: Completed 07-admin-panel-critical-fixes 07-02-PLAN.md
+last_updated: "2026-03-15T22:12:01.575Z"
+last_activity: "2026-03-15 - Completed quick task 260315-wo2: Break down BUGS.md into GSD phases"
+progress:
+  total_phases: 11
+  completed_phases: 6
+  total_plans: 20
+  completed_plans: 19
+  percent: 95
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.10
+milestone_name: milestone
+status: in-progress
 stopped_at: Completed quick/260315-wo2-break-down-bugs-md-into-gsd-phases-and-a/260315-wo2-PLAN.md
 last_updated: "2026-03-15T21:49:54.199Z"
 last_activity: "2026-03-15 - Completed quick task 1: Fix duplicate messages and timeout issues"
 progress:
-  total_phases: 6
+  [██████████] 95%
   completed_phases: 6
   total_plans: 18
   completed_plans: 18
@@ -107,6 +123,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 06-whatsapp-rules-and-policy-system P02 | 3 | 2 tasks | 6 files |
 | Phase 06-whatsapp-rules-and-policy-system P03 | 7min | 2 tasks | 4 files |
 | Phase 06-whatsapp-rules-and-policy-system P04 | 9 | 2 tasks | 7 files |
+| Phase 07-admin-panel-critical-fixes P02 | 5 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -153,6 +170,7 @@ Recent decisions affecting current work:
 - [Phase 06-whatsapp-rules-and-policy-system]: Fail-open design for assertPolicyCanSend: rules errors never block sends, only explicit policy denials do
 - [Phase 06-whatsapp-rules-and-policy-system]: executePolicyEdit extracted to policy-edit.ts for testability (follows trigger-word.ts pattern)
 - [Phase quick-1]: MutationDedup TTL=60s covers gateway retry window; only timeouts mark pending, not successes; body hash via djb2 over sorted JSON.stringify
+- [Phase 07-admin-panel-critical-fixes]: SQL NOT LIKE conditions added to both getContacts() and getContactCount() so LIMIT/OFFSET pagination is accurate and total count excludes @lid/@s.whatsapp.net ghost entries (AP-02 fix)
 
 ### Roadmap Evolution
 
@@ -178,6 +196,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-15T21:49:54.182Z
-Stopped at: Completed quick/260315-wo2-break-down-bugs-md-into-gsd-phases-and-a/260315-wo2-PLAN.md
+Last session: 2026-03-15T22:12:01.569Z
+Stopped at: Completed 07-admin-panel-critical-fixes 07-02-PLAN.md
 Resume file: None
