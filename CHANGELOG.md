@@ -2,6 +2,18 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.14.3] - 2026-03-15
+
+### Added
+- **Mutation deduplication**: POST/PUT/DELETE calls to WAHA that timeout are now tracked. If the gateway retries the same mutation within 60 seconds, the retry is suppressed — preventing duplicate WhatsApp messages caused by timeout-then-retry cycles.
+
+### Fixed
+- Hash function for dedup keys now recursively sorts nested object keys (polls, events, locations hash correctly).
+- DELETE requests exclude body from dedup key (body is not sent in HTTP DELETE).
+- Timeout detection no longer matches non-timeout errors containing the word "abort".
+- `response.text()` fallback wrapped in try-catch with structured error context.
+- `hashBody` handles circular references gracefully (logs warning, skips dedup for that call).
+
 ## [1.14.2] - 2026-03-15
 
 ### Fixed
