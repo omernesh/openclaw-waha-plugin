@@ -17,14 +17,13 @@ import {
 } from "openclaw/plugin-sdk";
 import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { ResolvedWahaAccount } from "./accounts.js";
-import { resolveWahaAccount } from "./accounts.js";
 import { DmFilter } from "./dm-filter.js";
 import { getDirectoryDb } from "./directory.js";
-import { claimMessage, isClaimedByOtherSession, isClaimedByBotSession } from "./dedup.js";
+import { claimMessage, isClaimedByBotSession } from "./dedup.js";
 import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.js";
 import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
-import { sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
+import { BOT_PROXY_PREFIX, sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
 import { warnOnError } from "./http-client.js";
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
 import { extractMentionedJids } from "./mentions.js";
@@ -41,6 +40,10 @@ import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
 export { detectTriggerWord, resolveTriggerTarget };
 
 const CHANNEL_ID = "waha" as const;
+
+// Human session deferral delay (ms) — how long human sessions wait for bot to claim.
+// DO NOT CHANGE — cross-session dedup timing constant. Moved to module level for clarity.
+const HUMAN_DEFERRAL_MS = 200;
 
 // Module-level DM filter singleton (shared across invocations, reuses regex cache)
 const _dmFilterInstance = new Map<string, DmFilter>();
@@ -109,11 +112,17 @@ async function deliverWahaReply(params: {
   }
 
   if (mediaUrls.length > 0) {
+    // Bot proxy prefix on media caption — prepend robot emoji so recipients know
+    // the media was sent by the bot, not the human account owner. DO NOT CHANGE.
+    let caption = text;
+    if (botProxy && typeof caption === "string" && caption.trim()) {
+      caption = `${BOT_PROXY_PREFIX} ${caption}`;
+    }
     await sendWahaMediaBatch({
       cfg,
       to: chatId,
       mediaUrls,
-      caption: text,
+      caption,
       replyToId: payload.replyToId,
       accountId,
     });
@@ -161,25 +170,29 @@ export async function handleWahaInbound(params: {
   // ║  - Only bot in group -> bot claims and processes                   ║
   // ║                                                                    ║
   // ║  Must run BEFORE trigger detection, filters, and all processing.   ║
+  // ║  Empty messageId: skip dedup entirely (some WAHA events lack it).  ║
   // ╚══════════════════════════════════════════════════════════════════════╝
-  const HUMAN_DEFERRAL_MS = 200;
+  const hasMessageId = Boolean(rawMessage.messageId);
 
-  if (account.role !== "bot") {
-    // Human session: wait for bot to potentially claim this message
-    await new Promise(resolve => setTimeout(resolve, HUMAN_DEFERRAL_MS));
-    if (isClaimedByBotSession(rawMessage.messageId)) {
-      runtime.log?.(`[waha] [${account.accountId}] message ${rawMessage.messageId} already claimed by bot session, skipping`);
+  if (hasMessageId) {
+    if (account.role !== "bot") {
+      // Human session: wait for bot to potentially claim this message
+      await new Promise(resolve => setTimeout(resolve, HUMAN_DEFERRAL_MS));
+      if (isClaimedByBotSession(rawMessage.messageId)) {
+        runtime.log?.(`[waha] [${account.accountId}] message ${rawMessage.messageId} already claimed by bot session, skipping`);
+        return;
+      }
+    }
+
+    // Claim this message for our session — returns false if already claimed by another session
+    // DO NOT CHANGE — "claim if unclaimed" semantics prevent race condition double-processing.
+    const claimed = claimMessage(rawMessage.messageId, account.accountId, account.role);
+    if (!claimed) {
+      runtime.log?.(`[waha] [${account.accountId}] message ${rawMessage.messageId} already claimed by another session, skipping`);
       return;
     }
-  }
-
-  // Claim this message for our session
-  claimMessage(rawMessage.messageId, account.accountId, account.role ?? "bot");
-
-  // Also check if another session of same type already claimed it
-  if (isClaimedByOtherSession(rawMessage.messageId, account.accountId)) {
-    runtime.log?.(`[waha] [${account.accountId}] message ${rawMessage.messageId} already claimed by another session, skipping`);
-    return;
+  } else {
+    runtime.log?.(`[waha] [${account.accountId}] message has no messageId, skipping cross-session dedup`);
   }
 
   // Quick pre-check: skip media preprocessing for groups not in allowedGroups

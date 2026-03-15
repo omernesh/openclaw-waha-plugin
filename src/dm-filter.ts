@@ -56,9 +56,11 @@ export class DmFilter {
   private _regexCacheKey: string = "";
   private _recentEvents: Array<{ ts: number; pass: boolean; reason: string; preview: string }> = [];
   private readonly _maxEvents = 50;
+  private log?: (msg: string) => void;
 
-  constructor(config: DmFilterConfig) {
+  constructor(config: DmFilterConfig, log?: (msg: string) => void) {
     this._config = config;
+    this.log = log;
   }
 
   updateConfig(config: DmFilterConfig): void {
@@ -97,18 +99,21 @@ export class DmFilter {
     // God mode bypass: super-users skip the filter IF scope allows it.
     // DO NOT CHANGE — godModeScope guardrail for human sessions.
     // When godModeScope is "all" (default), bypass applies to both DM and group filters (backward-compatible).
-    // When godModeScope is "dm", bypass ONLY applies when filterType is "dm" — group messages from
+    // When godModeScope is "dm", bypass ONLY applies when filterType is NOT "group" — group messages from
     //   god mode users still go through keyword matching. This prevents the bot from responding in
     //   groups on behalf of human sessions without explicit trigger word invocation.
     // When godModeScope is "off", god mode bypass is completely disabled regardless of filterType.
     // Added 2026-03-15 for human session guardrails. DO NOT REMOVE.
     if (cfg.godModeBypass !== false && cfg.godModeSuperUsers?.length) {
       const scope: GodModeScope = cfg.godModeScope ?? "all";
+
+      // Validate scope value — warn on unrecognized values and treat as "off" for safety
+      if (scope !== "all" && scope !== "dm" && scope !== "off") {
+        this.log?.(`dm-filter: unrecognized godModeScope "${scope}", defaulting to "off"`);
+      }
+
       const scopeAllowsBypass =
-        scope === "all" ||
-        (scope === "dm" && filterType === "dm") ||
-        // When no filterType is provided (legacy callers), default to allowing bypass for backward compatibility
-        (scope === "dm" && filterType === undefined);
+        scope === "all" || (scope === "dm" && filterType !== "group");
 
       if (scopeAllowsBypass) {
         const normalized = normalizePhoneIdentifier(senderId);
@@ -131,10 +136,18 @@ export class DmFilter {
       return { pass: true, reason: "no_restriction" };
     }
 
-    // Build/reuse regex cache
+    // Build/reuse regex cache — skip invalid patterns instead of failing all.
+    // DO NOT CHANGE — invalid regex patterns are logged and skipped, not fatal.
     const cacheKey = patternsHash(patterns);
     if (cacheKey !== this._regexCacheKey) {
-      this._regexCache = patterns.map((p) => new RegExp(p, "i"));
+      this._regexCache = patterns.reduce<RegExp[]>((acc, p) => {
+        try {
+          acc.push(new RegExp(p, "i"));
+        } catch (err) {
+          console.warn(`[waha] DmFilter: invalid regex pattern "${p}": ${String(err)}, skipping`);
+        }
+        return acc;
+      }, []);
       this._regexCacheKey = cacheKey;
     }
 

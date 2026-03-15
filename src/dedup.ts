@@ -88,38 +88,51 @@ const CROSS_SESSION_TTL_MS = 60_000; // 1 minute
 const CROSS_SESSION_MAX = 500;
 
 /**
- * Claim a message for a specific session/account.
- * Records that this accountId (with given role) is processing this messageId.
+ * Get a valid (non-expired) claim for a messageId, or null if none exists.
+ * Cleans up expired entries on access.
+ *
+ * DO NOT CHANGE — shared helper for cross-session dedup claim checks.
+ */
+function getValidClaim(messageId: string): ClaimedMessage | null {
+  const entry = _crossSessionCache.get(messageId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CROSS_SESSION_TTL_MS) {
+    _crossSessionCache.delete(messageId);
+    return null;
+  }
+  return entry;
+}
+
+/**
+ * Claim a message for a specific session/account using "claim if unclaimed" semantics.
+ * Returns true if claim succeeded (this session now owns it).
+ * Returns false if already claimed by another session (within TTL).
  * Prunes expired entries when cache exceeds max size.
  *
- * DO NOT CHANGE — cross-session dedup prevents double-processing and token waste.
+ * DO NOT CHANGE — cross-session dedup prevents race condition double-processing and token waste.
  */
-export function claimMessage(messageId: string, accountId: string, role: string): void {
+export function claimMessage(messageId: string, accountId: string, role: string): boolean {
   const now = Date.now();
-  // Prune old entries when approaching max (same pattern as webhook dedup)
+  // Prune expired entries when approaching max (same pattern as webhook dedup)
   if (_crossSessionCache.size > CROSS_SESSION_MAX) {
     for (const [key, val] of _crossSessionCache) {
       if (now - val.timestamp > CROSS_SESSION_TTL_MS) _crossSessionCache.delete(key);
     }
+    // Hard cap: remove oldest entries if still over limit after TTL pruning — DO NOT CHANGE
+    if (_crossSessionCache.size > CROSS_SESSION_MAX) {
+      const sorted = [..._crossSessionCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+      while (_crossSessionCache.size > CROSS_SESSION_MAX && sorted.length) {
+        _crossSessionCache.delete(sorted.shift()![0]);
+      }
+    }
+  }
+  // Only claim if unclaimed or expired — DO NOT CHANGE: prevents race condition double-processing
+  const existing = _crossSessionCache.get(messageId);
+  if (existing && now - existing.timestamp <= CROSS_SESSION_TTL_MS) {
+    return false; // already claimed
   }
   _crossSessionCache.set(messageId, { accountId, role, timestamp: now });
-}
-
-/**
- * Check if a message was already claimed by a DIFFERENT session.
- * Returns true if another accountId claimed it (within TTL).
- * Returns false if unclaimed, expired, or claimed by the same account.
- *
- * DO NOT CHANGE — cross-session dedup prevents double-processing and token waste.
- */
-export function isClaimedByOtherSession(messageId: string, myAccountId: string): boolean {
-  const entry = _crossSessionCache.get(messageId);
-  if (!entry) return false;
-  if (Date.now() - entry.timestamp > CROSS_SESSION_TTL_MS) {
-    _crossSessionCache.delete(messageId);
-    return false;
-  }
-  return entry.accountId !== myAccountId;
+  return true;
 }
 
 /**
@@ -130,13 +143,8 @@ export function isClaimedByOtherSession(messageId: string, myAccountId: string):
  * DO NOT CHANGE — cross-session dedup prevents double-processing and token waste.
  */
 export function isClaimedByBotSession(messageId: string): boolean {
-  const entry = _crossSessionCache.get(messageId);
-  if (!entry) return false;
-  if (Date.now() - entry.timestamp > CROSS_SESSION_TTL_MS) {
-    _crossSessionCache.delete(messageId);
-    return false;
-  }
-  return entry.role === "bot";
+  const claim = getValidClaim(messageId);
+  return claim !== null && claim.role === "bot";
 }
 
 /**

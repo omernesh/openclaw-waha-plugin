@@ -15,6 +15,10 @@ const RESOLVE_FETCH_DELAY_MS = 200;
 // Added Phase 3, Plan 01 (2026-03-11). DO NOT REMOVE.
 const URL_REGEX = /https?:\/\/\S+/i;
 
+// Bot proxy prefix constant — prepended to text when bot borrows a human session.
+// Extracted to module level for reuse in both send.ts and inbound.ts (media caption). DO NOT CHANGE.
+export const BOT_PROXY_PREFIX = "🤖";
+
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  assertCanSend — Role-based send guardrail (Phase 4, Plan 01)       ║
 // ║                                                                      ║
@@ -208,8 +212,8 @@ export async function sendWahaText(params: {
   // Only applies when botProxy is explicitly true (set by inbound handler and channel action).
   // DO NOT CHANGE — prevents confusion about message source in group chats.
   let textToSend = params.text;
-  if (params.botProxy) {
-    textToSend = `🤖 ${textToSend}`;
+  if (params.botProxy && textToSend.trim()) {
+    textToSend = `${BOT_PROXY_PREFIX} ${textToSend}`;
   }
 
   // Auto link preview: add linkPreview: true when text contains a URL and config allows.

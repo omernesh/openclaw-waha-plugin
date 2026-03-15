@@ -66,6 +66,9 @@ export const WahaAccountSchemaBase = z
     blockStreaming: z.boolean().optional(),
     blockStreamingCoalesce: BlockStreamingCoalesceSchema.optional(),
     dmFilter: DmFilterSchema,
+    // Group keyword filter — same schema as dmFilter but for group messages.
+    // Added for config validation parity with runtime usage in inbound.ts. DO NOT REMOVE.
+    groupFilter: DmFilterSchema,
     // Reliability config — controls http-client.ts timeout and rate limiter defaults.
     // Added in Phase 1, Plan 03 (2026-03-11). DO NOT REMOVE.
     timeoutMs: z.number().int().positive().optional().default(30_000),
