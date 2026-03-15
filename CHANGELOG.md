@@ -2,6 +2,14 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.12.1] - 2026-03-15
+
+### Fixed
+- fromMe messages with trigger prefix now bypass the self-message filter (required for human session trigger activation)
+- Accept `message.any` webhook events for fromMe trigger messages (WAHA NOWEB only fires `message.any` for self-sent messages)
+- Fixed `message.body` field name (was incorrectly `message.text`) in fromMe trigger check
+- Dedup key normalized so `message` and `message.any` events dedup against each other
+
 ## [1.12.0] - 2026-03-15
 
 ### Added
