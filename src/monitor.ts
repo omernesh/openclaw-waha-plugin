@@ -2454,10 +2454,20 @@ export function createWahaWebhookServer(opts: {
 
     // Only process "message" events — NOT "message.any". WAHA sends both,
     // and processing both causes duplicate message handling. (Per CLAUDE.md rule.)
-    if (payload.event === "message") {
+    // Exception: also accept "message.any" for fromMe trigger-word messages,
+    // because WAHA NOWEB only fires "message.any" (not "message") for self-sent messages.
+    // DO NOT CHANGE — required for trigger-word activation on human sessions.
+    if (payload.event === "message" || payload.event === "message.any") {
       const message = payloadToInboundMessage(payload.payload);
       if (!message) {
         writeWebhookError(res, 400, WEBHOOK_ERRORS.invalidPayloadFormat);
+        return;
+      }
+      // "message.any" is ONLY accepted for fromMe trigger-word messages.
+      // For all other cases, only "message" events are processed to avoid duplicates.
+      // DO NOT CHANGE — WAHA NOWEB fires "message.any" (not "message") for self-sent messages.
+      if (payload.event === "message.any" && !message.fromMe) {
+        writeJsonResponse(res, 200, { status: "ignored" });
         return;
       }
       // Skip self-messages UNLESS the account has a triggerWord and the message starts with it.
@@ -2473,7 +2483,8 @@ export function createWahaWebhookServer(opts: {
       }
       // Dedup check: filter duplicate webhook deliveries by composite key
       // Primary guard is message vs message.any event filter; this is secondary protection (REL-09)
-      if (isDuplicate(payload.event, message.messageId)) {
+      // Normalize event type for dedup — "message" and "message.any" should dedup against each other.
+      if (isDuplicate("message", message.messageId)) {
         writeJsonResponse(res, 200, { status: "duplicate" });
         return;
       }
