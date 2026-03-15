@@ -120,11 +120,64 @@ Plans:
 - [ ] 06-03-PLAN.md -- Rules resolver (DM + group flows), resolved payload builder
 - [ ] 06-04-PLAN.md -- Outbound policy enforcer, inbound hook wiring, policy edit action handler
 
+### Phase 7: Admin Panel Critical Fixes
+**Goal:** Fix broken functionality that prevents normal admin panel use — Save & Restart crash, directory pagination, and group filter override 502
+**Depends on:** Phase 6
+**Requirements**: AP-01, AP-02, AP-03
+**Success Criteria** (what must be TRUE):
+  1. Save & Restart shows "Restarting..." overlay, polls until server responds (up to 60s), then auto-reloads — no 502 crash
+  2. Directory Load More loads new items with correct offset — no duplicates
+  3. Group Filter Override checkbox saves without HTTP 502 error
+**Plans**: TBD
+
+### Phase 8: Shared UI Components
+**Goal:** Build reusable UI components (name resolver, contact picker, tag input, contact list) used across Settings, Dashboard, and Directory sections
+**Depends on:** Phase 7
+**Requirements**: UI-01, UI-02, UI-03, UI-04
+**Success Criteria** (what must be TRUE):
+  1. All JID/LID/phone number displays show resolved human-readable contact names
+  2. Tag-style input works with comma/space/enter to create bubbles with 'x' to delete
+  3. Contact picker supports UTF-8 (Hebrew + English) fuzzy search with multi-select
+  4. God Mode Users shows names with remove buttons, adding/removing handles paired JIDs (@c.us + @lid)
+**Plans**: TBD
+
+### Phase 9: Settings UX Improvements
+**Goal:** Improve Settings tab usability with tooltips, fixed pairing mode, tab switching, and group filter UX
+**Depends on:** Phase 8
+**Requirements**: UX-01, UX-02, UX-03, UX-04
+**Success Criteria** (what must be TRUE):
+  1. DM Policy "pairing" mode is either working with tests or removed/disabled with explanation
+  2. All Contact Settings fields have tooltips explaining what they do
+  3. Group Filter Override has per-group trigger operator and tag-style keyword input
+  4. Tab switching clears search bar, search bar has 'x' clear button, "Newsletters" renamed to "Channels"
+**Plans**: TBD
+
+### Phase 10: Directory & Group Enhancements
+**Goal:** Paginated group browsing, fixed participants display, participant roles, and bulk edit
+**Depends on:** Phase 8
+**Requirements**: DIR-01, DIR-02, DIR-03, DIR-04
+**Success Criteria** (what must be TRUE):
+  1. Groups displayed in paginated table with page nav and "Display [X] groups" selector
+  2. All group participants load with contact names, global allowlist state reflected in buttons
+  3. Participant roles assignable via dropdown: Bot Admin, Manager, Participant
+  4. Bulk selection and edit works for contacts/groups/participants
+**Plans**: TBD
+
+### Phase 11: Dashboard, Sessions & Log
+**Goal:** Complete dashboard with all sessions, editable session roles, and structured log display
+**Depends on:** Phase 7
+**Requirements**: DASH-01, SESS-01, LOG-01
+**Success Criteria** (what must be TRUE):
+  1. Dashboard shows all connected sessions (both omer and logan) with ports and status
+  2. Session roles editable via dropdown in Sessions tab
+  3. Log entries have clearly formatted timestamps and visual separation between entries
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
-Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9/10 (parallel) -> 11
+Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Phase 11 depends only on Phase 7.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -134,3 +187,8 @@ Note: Phase 2 and Phase 3 can execute in parallel (both depend only on Phase 1).
 | 4. Multi-Session | 4/4 | Complete   | 2026-03-13 |
 | 5. Documentation and Testing | 2/2 | Complete   | 2026-03-13 |
 | 6. WhatsApp Rules and Policy System | 4/4 | Complete   | 2026-03-13 |
+| 7. Admin Panel Critical Fixes | 0/? | Planned | |
+| 8. Shared UI Components | 0/? | Planned | |
+| 9. Settings UX Improvements | 0/? | Planned | |
+| 10. Directory & Group Enhancements | 0/? | Planned | |
+| 11. Dashboard, Sessions & Log | 0/? | Planned | |
