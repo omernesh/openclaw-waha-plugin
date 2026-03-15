@@ -4,7 +4,7 @@
 
 Full WhatsApp API access through [WAHA](https://waha.devlike.pro/) -- groups, channels, media, polls, reactions, stickers, voice messages, contact cards, labels, status/stories, presence, and more. 87%+ WAHA API coverage.
 
-**Plugin ID:** `waha` | **Version:** 1.14.0 | **Last updated:** 2026-03-15
+**Plugin ID:** `waha` | **Version:** 1.14.1 | **Last updated:** 2026-03-15
 
 [![npm](https://img.shields.io/npm/v/waha-openclaw-channel)](https://www.npmjs.com/package/waha-openclaw-channel)
 

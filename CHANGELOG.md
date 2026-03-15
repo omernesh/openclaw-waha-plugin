@@ -2,6 +2,18 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.14.1] - 2026-03-15
+
+### Fixed
+- `/shutup all` now backs up DM settings from SQLite (lightweight, no WAHA API calls). Previously passed `null` backup, causing all contacts to revert to `canInitiate=true` on unmute.
+- `/shutup all` sends confirmation immediately, then mutes in background with completion DM.
+- `/unshutup all` deduplicates group count (was showing 244 instead of 122 with 2 accounts).
+- `bypassPolicy` now also skips mute check so system command messages can reach muted groups.
+- `getAllMutedGroups` restores DM settings before deleting expired mutes (was permanently losing backups).
+- Pending selections stored in SQLite (survives gateway restarts). Early check runs before cross-session dedup.
+- Default contact rule `can_initiate` changed to `true` (synced with `SYSTEM_CONTACT_DEFAULTS`).
+- Empty catch blocks replaced with logging throughout shutup module.
+
 ## [1.14.0] - 2026-03-15
 
 ### Added
