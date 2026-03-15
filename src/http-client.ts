@@ -122,6 +122,7 @@ export class TokenBucket {
 
 const DEDUP_TTL_MS = 60_000; // 1 minute — covers gateway retry window
 const DEDUP_MAX_ENTRIES = 500;
+const DJB2_SEED = 5381;
 
 class MutationDedup {
   private readonly pending = new Map<string, number>();
@@ -130,9 +131,10 @@ class MutationDedup {
    * Build a stable dedup key for a mutation request.
    * Returns null for GET requests (not mutations, never deduplicated).
    */
-  buildKey(method: string, path: string, body?: Record<string, unknown>): string | null {
+  buildKey(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: Record<string, unknown>): string | null {
     if (method === "GET") return null;
-    const bodyHash = this.hashBody(body);
+    const effectiveBody = method !== "DELETE" ? body : undefined;
+    const bodyHash = this.hashBody(effectiveBody);
     return `${method}:${path}:${bodyHash}`;
   }
 
@@ -168,11 +170,11 @@ class MutationDedup {
 
   private pruneExpired(): void {
     const now = Date.now();
+    const toDelete: string[] = [];
     for (const [key, ts] of this.pending) {
-      if (now - ts >= DEDUP_TTL_MS) {
-        this.pending.delete(key);
-      }
+      if (now - ts >= DEDUP_TTL_MS) toDelete.push(key);
     }
+    for (const key of toDelete) this.pending.delete(key);
   }
 
   /**
@@ -186,20 +188,26 @@ class MutationDedup {
     // objects entirely, causing different nested bodies to hash identically.
     const sortedReplacer = (_key: string, value: unknown): unknown => {
       if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-        const sorted = value as Record<string, unknown>;
+        const obj = value as Record<string, unknown>;
         return Object.fromEntries(
-          Object.keys(sorted).sort().map((k) => [k, sorted[k]])
+          Object.keys(obj).sort().map((k) => [k, obj[k]])
         );
       }
       return value;
     };
-    const stable = JSON.stringify(body, sortedReplacer);
-    let h = 5381;
+    let stable: string;
+    try {
+      stable = JSON.stringify(body, sortedReplacer);
+    } catch {
+      console.warn("[WAHA] MutationDedup: could not hash body (circular reference or non-serializable value) — dedup skipped for this call");
+      return "unstable";
+    }
+    let h = DJB2_SEED;
     for (let i = 0; i < stable.length; i++) {
       h = ((h << 5) + h) ^ stable.charCodeAt(i);
-      h = h & h; // coerce to 32-bit int
+      h = h & h; // h & h coerces to 32-bit signed int (equivalent to h | 0)
     }
-    return (h >>> 0).toString(16);
+    return `${(h >>> 0).toString(16)}_${stable.length}`;
   }
 }
 
@@ -211,8 +219,10 @@ const mutationDedup = new MutationDedup();
 // ---------------------------------------------------------------------------
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_BACKOFF_MS = 30_000; // Maximum retry backoff cap (separate from request timeout)
 const DEFAULT_BUCKET_CAPACITY = 20;
 const DEFAULT_BUCKET_REFILL_RATE = 15;
+const MAX_RETRIES = 3;
 
 /** Global token bucket for all WAHA API calls (20 burst, 15/sec sustained). */
 let globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
@@ -295,10 +305,15 @@ export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
 
   // 2b. Mutation dedup check — suppress retries of timed-out mutations
   // DO NOT REMOVE: prevents duplicate sends when gateway retries after timeout
-  const dedupKey = mutationDedup.buildKey(method, params.path, params.body);
+  let dedupKey: string | null = null;
+  try {
+    dedupKey = mutationDedup.buildKey(method, params.path, params.body);
+  } catch {
+    console.warn(`[WAHA] MutationDedup: buildKey failed for ${method} ${params.path} — dedup skipped`);
+  }
   if (dedupKey !== null && mutationDedup.isPending(dedupKey)) {
     const warnMsg = `[WAHA] Duplicate mutation suppressed (original timed out, may have already succeeded): ${method} ${params.path}`;
-    console.warn(warnMsg);
+    try { console.warn(warnMsg); } catch { /* logging must not prevent throw */ }
     throw new Error(warnMsg);
   }
 
@@ -306,11 +321,9 @@ export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   return fetchWithRetry(params, method, timeout, contextLabel, dedupKey, 0);
 }
 
-const MAX_RETRIES = 3;
-
 async function fetchWithRetry(
   params: CallWahaApiParams,
-  method: string,
+  method: "GET" | "POST" | "PUT" | "DELETE",
   timeout: number,
   contextLabel: string,
   dedupKey: string | null,
@@ -342,8 +355,7 @@ async function fetchWithRetry(
   } catch (err: unknown) {
     // 4. Timeout error handling
     const errName = err instanceof Error ? err.name : String(err);
-    const errMessage = err instanceof Error ? err.message : String(err);
-    if (errName === "TimeoutError" || errName === "AbortError" || errMessage.includes("abort")) {
+    if (errName === "TimeoutError" || errName === "AbortError") {
       if (isMutation) {
         // DO NOT REMOVE: mark mutation as pending so gateway retries are suppressed
         if (dedupKey !== null) {
@@ -374,7 +386,7 @@ async function fetchWithRetry(
     const baseDelay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
     const jitter = baseDelay * (0.75 + Math.random() * 0.5); // +/-25%
     const delay = Math.max(jitter, retryAfterSec * 1000);
-    const cappedDelay = Math.min(delay, 30_000);
+    const cappedDelay = Math.min(delay, MAX_BACKOFF_MS);
 
     // Set shared backoff state so other calls wait
     backoffUntil = Date.now() + cappedDelay;
@@ -407,7 +419,11 @@ async function fetchWithRetry(
       throw new Error(`[WAHA] Failed to parse JSON from ${method} ${params.path}: ${String(parseErr)}`);
     }
   }
-  return await response.text();
+  try {
+    return await response.text();
+  } catch (textErr) {
+    throw new Error(`[WAHA] Failed to read text response from ${method} ${params.path}: ${String(textErr)}`);
+  }
 }
 
 // ---------------------------------------------------------------------------

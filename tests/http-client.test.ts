@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { callWahaApi, warnOnError, _resetForTesting } from "../src/http-client.js";
 
+const DEDUP_TTL_MS = 60_000;
+
 function mockFetchOk(data: any) {
   const fn = vi.fn().mockResolvedValue({
     ok: true,
@@ -23,6 +25,46 @@ function mockFetchError(status: number, text = "error") {
   });
   vi.stubGlobal("fetch", fn);
   return fn;
+}
+
+// Shared helper: a fetch mock that never resolves but aborts when the AbortSignal fires.
+// Used by timeout tests and MutationDedup tests across all suites.
+function hangingFetch() {
+  return vi.fn().mockImplementation((_url: string, opts: any) => {
+    return new Promise((_resolve, reject) => {
+      const signal = opts?.signal as AbortSignal | undefined;
+      if (signal) {
+        if (signal.aborted) {
+          reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
+        signal.addEventListener("abort", () => {
+          reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+        });
+      }
+      // Otherwise never resolves
+    });
+  });
+}
+
+function make429(retryAfter?: string) {
+  return {
+    ok: false, status: 429,
+    headers: { get: (k: string) => {
+      if (k.toLowerCase() === "retry-after" && retryAfter) return retryAfter;
+      return null;
+    }},
+    text: vi.fn().mockResolvedValue("rate limited"),
+  };
+}
+
+function makeOk() {
+  return {
+    ok: true, status: 200,
+    headers: { get: (k: string) => k === "content-type" ? "application/json" : null },
+    json: vi.fn().mockResolvedValue({ ok: true }),
+    text: vi.fn().mockResolvedValue(""),
+  };
 }
 
 const baseParams = {
@@ -72,32 +114,14 @@ describe("callWahaApi", () => {
 
   it("throws with structured log on non-ok response (includes status, error text)", async () => {
     mockFetchError(500, "Internal Server Error");
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     await expect(
       callWahaApi({ ...baseParams, method: "GET" })
     ).rejects.toThrow(/500/);
-    consoleSpy.mockRestore();
   });
 
   // Timeout tests use real timers with a very short timeout (50ms).
   // The mock fetch must respect the AbortSignal to simulate real abort behavior.
-  function hangingFetch() {
-    return vi.fn().mockImplementation((_url: string, opts: any) => {
-      return new Promise((_resolve, reject) => {
-        const signal = opts?.signal as AbortSignal | undefined;
-        if (signal) {
-          if (signal.aborted) {
-            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
-            return;
-          }
-          signal.addEventListener("abort", () => {
-            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
-          });
-        }
-        // Otherwise never resolves
-      });
-    });
-  }
 
   it("aborts fetch after timeout with TimeoutError", async () => {
     vi.stubGlobal("fetch", hangingFetch());
@@ -156,8 +180,23 @@ describe("callWahaApi", () => {
       (msg) => msg.includes("sendText") && msg.includes("123@c.us")
     );
     expect(hasContext).toBe(true);
-    consoleSpy.mockRestore();
   });
+
+  it("TimeoutError name (DOMException) is detected and marks mutation pending", async () => {
+    // Use a fetch that rejects with DOMException("signal timed out", "TimeoutError")
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url: string, _opts: any) => {
+      return Promise.reject(new DOMException("signal timed out", "TimeoutError"));
+    }));
+
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", timeoutMs: 5000 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    // The same mutation should now be suppressed (was marked pending)
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", timeoutMs: 5000 })
+    ).rejects.toThrow(/duplicate mutation suppressed/i);
+  }, 10_000);
 });
 
 describe("callWahaApi 429 retry", () => {
@@ -170,26 +209,6 @@ describe("callWahaApi 429 retry", () => {
     vi.restoreAllMocks();
   });
 
-  function make429(retryAfter?: string) {
-    return {
-      ok: false, status: 429,
-      headers: { get: (k: string) => {
-        if (k.toLowerCase() === "retry-after" && retryAfter) return retryAfter;
-        return null;
-      }},
-      text: vi.fn().mockResolvedValue("rate limited"),
-    };
-  }
-
-  function makeOk() {
-    return {
-      ok: true, status: 200,
-      headers: { get: (k: string) => k === "content-type" ? "application/json" : null },
-      json: vi.fn().mockResolvedValue({ ok: true }),
-      text: vi.fn().mockResolvedValue(""),
-    };
-  }
-
   it("on 429 response, retries with exponential backoff up to 3 times", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(make429())
@@ -197,7 +216,7 @@ describe("callWahaApi 429 retry", () => {
       .mockResolvedValueOnce(make429())
       .mockResolvedValueOnce(makeOk());
     vi.stubGlobal("fetch", fetchMock);
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const promise = callWahaApi({ ...baseParams, method: "GET" });
 
@@ -209,7 +228,6 @@ describe("callWahaApi 429 retry", () => {
     const result = await promise;
     expect(result).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    consoleSpy.mockRestore();
   });
 
   it("on 429 with Retry-After header, uses that value as minimum delay", async () => {
@@ -217,7 +235,7 @@ describe("callWahaApi 429 retry", () => {
       .mockResolvedValueOnce(make429("5"))
       .mockResolvedValueOnce(makeOk());
     vi.stubGlobal("fetch", fetchMock);
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const promise = callWahaApi({ ...baseParams, method: "GET" });
 
@@ -227,7 +245,6 @@ describe("callWahaApi 429 retry", () => {
     const result = await promise;
     expect(result).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    consoleSpy.mockRestore();
   });
 
   it("after 3 failed 429 retries, throws rate limit error", async () => {
@@ -240,12 +257,14 @@ describe("callWahaApi 429 retry", () => {
 
     // With real timers and jitter, this resolves in ~7s. The backoff delays are real but short due to jitter.
     // Use a tighter retry: base delays are 1s/2s/4s but with 0.75-1.25 jitter.
-    await expect(
-      callWahaApi({ ...baseParams, method: "GET" })
-    ).rejects.toThrow(/rate.limit|429|too many/i);
-
-    consoleSpy.mockRestore();
-    vi.useFakeTimers(); // restore for afterEach
+    try {
+      await expect(
+        callWahaApi({ ...baseParams, method: "GET" })
+      ).rejects.toThrow(/rate.limit|429|too many/i);
+    } finally {
+      consoleSpy.mockRestore();
+      vi.useFakeTimers(); // restore for afterEach
+    }
   }, 30_000);
 });
 
@@ -260,28 +279,12 @@ describe("shared backoff state", () => {
   });
 
   it("second call waits for backoff from first call's 429", async () => {
-    function make429() {
-      return {
-        ok: false, status: 429,
-        headers: { get: () => null },
-        text: vi.fn().mockResolvedValue("rate limited"),
-      };
-    }
-    function makeOk() {
-      return {
-        ok: true, status: 200,
-        headers: { get: (k: string) => k === "content-type" ? "application/json" : null },
-        json: vi.fn().mockResolvedValue({ ok: true }),
-        text: vi.fn().mockResolvedValue(""),
-      };
-    }
-
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(make429())  // first call -> 429
       .mockResolvedValueOnce(makeOk())   // first call retry -> success
       .mockResolvedValueOnce(makeOk());  // second call -> success
     vi.stubGlobal("fetch", fetchMock);
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const p1 = callWahaApi({ ...baseParams, method: "GET" as const });
     const p2 = callWahaApi({ ...baseParams, method: "GET" as const, path: "/api/test2" });
@@ -292,7 +295,6 @@ describe("shared backoff state", () => {
 
     await Promise.all([p1, p2]);
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
-    consoleSpy.mockRestore();
   });
 });
 
@@ -337,7 +339,7 @@ describe("MutationDedup — duplicate mutation suppression", () => {
       });
     }));
 
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
     // First call: times out and marks mutation as pending
     await expect(
@@ -352,7 +354,6 @@ describe("MutationDedup — duplicate mutation suppression", () => {
 
     // fetch should NOT have been called for the second attempt
     expect(fetchCallCount).toBe(fetchCountBefore);
-    consoleSpy.mockRestore();
   }, 10_000);
 
   // Test 2: GET requests are never deduped
@@ -399,7 +400,7 @@ describe("MutationDedup — duplicate mutation suppression", () => {
       });
     }));
 
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const body = { chatId: "555@c.us", text: "test" };
 
     // First call times out
@@ -415,7 +416,6 @@ describe("MutationDedup — duplicate mutation suppression", () => {
     ).rejects.toThrow(/duplicate mutation suppressed/i);
 
     expect(fetchCallCount).toBe(countAfterFirst); // no new fetch call
-    consoleSpy.mockRestore();
   }, 10_000);
 
   // Test 5: After TTL expires, the mutation key is cleared — same mutation can proceed
@@ -437,7 +437,7 @@ describe("MutationDedup — duplicate mutation suppression", () => {
       });
     }));
 
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const body = { chatId: "777@c.us", text: "expire-test" };
 
     // First call times out
@@ -446,7 +446,7 @@ describe("MutationDedup — duplicate mutation suppression", () => {
     ).rejects.toThrow(/may have succeeded/i);
 
     // Advance time past TTL (60s)
-    await vi.advanceTimersByTimeAsync(61_000);
+    await vi.advanceTimersByTimeAsync(DEDUP_TTL_MS + 1_000);
 
     const countAfterExpiry = fetchCallCount;
 
@@ -457,7 +457,6 @@ describe("MutationDedup — duplicate mutation suppression", () => {
     ).rejects.toThrow(/may have succeeded/i);
 
     expect(fetchCallCount).toBeGreaterThan(countAfterExpiry);
-    consoleSpy.mockRestore();
   }, 10_000);
 
   // Test 6: Different chatId or different body produces different dedup keys
@@ -479,7 +478,7 @@ describe("MutationDedup — duplicate mutation suppression", () => {
       });
     }));
 
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
     // First call: chatId A times out
     await expect(
@@ -494,7 +493,6 @@ describe("MutationDedup — duplicate mutation suppression", () => {
     ).rejects.toThrow(/may have succeeded/i);
 
     expect(fetchCallCount).toBeGreaterThan(countAfterFirst);
-    consoleSpy.mockRestore();
   }, 10_000);
 
   // Test 7: _resetForTesting clears the dedup map
@@ -516,7 +514,7 @@ describe("MutationDedup — duplicate mutation suppression", () => {
       });
     }));
 
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     const body = { chatId: "reset-test@c.us", text: "reset" };
 
     // First call times out
@@ -535,6 +533,41 @@ describe("MutationDedup — duplicate mutation suppression", () => {
     ).rejects.toThrow(/may have succeeded/i);
 
     expect(fetchCallCount).toBeGreaterThan(countAfterReset);
-    consoleSpy.mockRestore();
+  }, 10_000);
+
+  // Test 8: Circular reference body does not throw a dedup serialization error —
+  // hashBody catches the error and returns "unstable" so dedup is skipped.
+  // The body still fails at fetch time (JSON.stringify in fetchWithRetry), so the
+  // test verifies: (a) the dedup-skip warning is logged before fetch is attempted,
+  // and (b) if fetch throws it's a real serialization error, not a dedup error.
+  it("circular reference body logs dedup-skip warning and does not suppress fetch", async () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Build a circular reference
+    const body: Record<string, unknown> = { chatId: "circular@c.us" };
+    body.self = body; // circular
+
+    // fetch will throw when trying to JSON.stringify the body — that's expected.
+    // What we're testing is that: (1) no dedup suppression error is thrown first,
+    // (2) the dedup-skip warning was logged by hashBody.
+    let thrownErr: unknown;
+    try {
+      await callWahaApi({ ...baseParams, method: "POST", body });
+    } catch (err) {
+      thrownErr = err;
+    }
+
+    // The error should be a JSON serialization error from fetch, not a dedup error
+    expect(thrownErr).toBeDefined();
+    const errMsg = thrownErr instanceof Error ? thrownErr.message : String(thrownErr);
+    expect(errMsg).not.toMatch(/duplicate mutation suppressed/i);
+    expect(errMsg).toMatch(/circular/i);
+
+    // A warning about dedup being skipped should have been logged by hashBody
+    const warnCalls = consoleSpy.mock.calls.map((c) => c.join(" "));
+    const hasSkipWarn = warnCalls.some((msg) =>
+      msg.includes("dedup skipped") || msg.includes("could not hash")
+    );
+    expect(hasSkipWarn).toBe(true);
   }, 10_000);
 });
