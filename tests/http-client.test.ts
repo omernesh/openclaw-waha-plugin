@@ -306,3 +306,235 @@ describe("warnOnError", () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe("MutationDedup — duplicate mutation suppression", () => {
+  beforeEach(() => {
+    _resetForTesting();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  // Test 1: Two identical POST calls within TTL — second is suppressed
+  it("second identical POST within TTL window throws duplicate suppression error", async () => {
+    // First POST: times out (triggers markPending)
+    let fetchCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url: string, opts: any) => {
+      fetchCallCount++;
+      return new Promise((_resolve, reject) => {
+        const signal = opts?.signal as AbortSignal | undefined;
+        if (signal) {
+          if (signal.aborted) {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }
+      });
+    }));
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // First call: times out and marks mutation as pending
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body: { chatId: "123@c.us", text: "hello" }, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    // Second call: same path+body — should be suppressed, NOT hit fetch
+    const fetchCountBefore = fetchCallCount;
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body: { chatId: "123@c.us", text: "hello" }, timeoutMs: 50 })
+    ).rejects.toThrow(/duplicate mutation suppressed/i);
+
+    // fetch should NOT have been called for the second attempt
+    expect(fetchCallCount).toBe(fetchCountBefore);
+    consoleSpy.mockRestore();
+  }, 10_000);
+
+  // Test 2: GET requests are never deduped
+  it("identical GET calls both proceed normally (GETs are not mutations)", async () => {
+    const fetchMock = mockFetchOk({ ok: true });
+
+    const r1 = await callWahaApi({ ...baseParams, method: "GET" });
+    const r2 = await callWahaApi({ ...baseParams, method: "GET" });
+
+    expect(r1).toEqual({ ok: true });
+    expect(r2).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // Test 3: POST that succeeds (200) does NOT mark as pending — retry proceeds normally
+  it("successful POST does NOT mark as pending — subsequent identical POST proceeds", async () => {
+    const fetchMock = mockFetchOk({ id: 1 });
+
+    const body = { chatId: "123@c.us", text: "hello" };
+
+    await callWahaApi({ ...baseParams, method: "POST", body });
+    // Second call with same body should also succeed (no suppression)
+    await callWahaApi({ ...baseParams, method: "POST", body });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // Test 4: POST that times out marks mutation as pending — retry within TTL is suppressed
+  it("POST timeout marks mutation pending — retry within TTL is suppressed", async () => {
+    let fetchCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url: string, opts: any) => {
+      fetchCallCount++;
+      return new Promise((_resolve, reject) => {
+        const signal = opts?.signal as AbortSignal | undefined;
+        if (signal) {
+          if (signal.aborted) {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }
+      });
+    }));
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const body = { chatId: "555@c.us", text: "test" };
+
+    // First call times out
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    const countAfterFirst = fetchCallCount;
+
+    // Retry within TTL should be suppressed
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body, timeoutMs: 50 })
+    ).rejects.toThrow(/duplicate mutation suppressed/i);
+
+    expect(fetchCallCount).toBe(countAfterFirst); // no new fetch call
+    consoleSpy.mockRestore();
+  }, 10_000);
+
+  // Test 5: After TTL expires, the mutation key is cleared — same mutation can proceed
+  it("after TTL expires, suppressed mutation key is cleared — mutation can proceed again", async () => {
+    let fetchCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url: string, opts: any) => {
+      fetchCallCount++;
+      return new Promise((_resolve, reject) => {
+        const signal = opts?.signal as AbortSignal | undefined;
+        if (signal) {
+          if (signal.aborted) {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }
+      });
+    }));
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const body = { chatId: "777@c.us", text: "expire-test" };
+
+    // First call times out
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    // Advance time past TTL (60s)
+    await vi.advanceTimersByTimeAsync(61_000);
+
+    const countAfterExpiry = fetchCallCount;
+
+    // After TTL, the same mutation should reach fetch again (not suppressed)
+    // It will time out again because fetch still hangs
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    expect(fetchCallCount).toBeGreaterThan(countAfterExpiry);
+    consoleSpy.mockRestore();
+  }, 10_000);
+
+  // Test 6: Different chatId or different body produces different dedup keys
+  it("different body produces different dedup key — not suppressed", async () => {
+    let fetchCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url: string, opts: any) => {
+      fetchCallCount++;
+      return new Promise((_resolve, reject) => {
+        const signal = opts?.signal as AbortSignal | undefined;
+        if (signal) {
+          if (signal.aborted) {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }
+      });
+    }));
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // First call: chatId A times out
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body: { chatId: "aaa@c.us", text: "hi" }, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    const countAfterFirst = fetchCallCount;
+
+    // Different chatId — should NOT be suppressed, should hit fetch
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body: { chatId: "bbb@c.us", text: "hi" }, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    expect(fetchCallCount).toBeGreaterThan(countAfterFirst);
+    consoleSpy.mockRestore();
+  }, 10_000);
+
+  // Test 7: _resetForTesting clears the dedup map
+  it("_resetForTesting clears the dedup map — previously suppressed mutation can proceed", async () => {
+    let fetchCallCount = 0;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url: string, opts: any) => {
+      fetchCallCount++;
+      return new Promise((_resolve, reject) => {
+        const signal = opts?.signal as AbortSignal | undefined;
+        if (signal) {
+          if (signal.aborted) {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(signal.reason ?? new DOMException("The operation was aborted.", "AbortError"));
+          });
+        }
+      });
+    }));
+
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const body = { chatId: "reset-test@c.us", text: "reset" };
+
+    // First call times out
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    // Reset clears the dedup state
+    _resetForTesting();
+
+    const countAfterReset = fetchCallCount;
+
+    // After reset, same mutation should reach fetch again
+    await expect(
+      callWahaApi({ ...baseParams, method: "POST", body, timeoutMs: 50 })
+    ).rejects.toThrow(/may have succeeded/i);
+
+    expect(fetchCallCount).toBeGreaterThan(countAfterReset);
+    consoleSpy.mockRestore();
+  }, 10_000);
+});

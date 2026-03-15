@@ -97,6 +97,104 @@ export class TokenBucket {
 }
 
 // ---------------------------------------------------------------------------
+// MutationDedup — duplicate mutation suppression
+// ---------------------------------------------------------------------------
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  MutationDedup — DO NOT CHANGE                                      ║
+// ║                                                                     ║
+// ║  Prevents duplicate WhatsApp sends when the gateway retries after   ║
+// ║  a WAHA API timeout. When a POST times out (after 30s), the         ║
+// ║  message likely DID send but WAHA couldn't confirm. The gateway     ║
+// ║  then retries the action, causing the plugin to re-send the same    ║
+// ║  message 2-3 times.                                                 ║
+// ║                                                                     ║
+// ║  Fix: after a timeout on a mutation (POST/PUT/DELETE), mark the     ║
+// ║  mutation key as pending. If the same mutation is attempted again   ║
+// ║  within the TTL window, throw immediately with a clear error.       ║
+// ║                                                                     ║
+// ║  Added: quick task 1, 2026-03-15                                    ║
+// ║                                                                     ║
+// ║  DO NOT remove this class.                                          ║
+// ║  DO NOT disable the dedup check in callWahaApi.                     ║
+// ║  DO NOT reduce the TTL below the gateway retry window.              ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+const DEDUP_TTL_MS = 60_000; // 1 minute — covers gateway retry window
+const DEDUP_MAX_ENTRIES = 500;
+
+class MutationDedup {
+  private readonly pending = new Map<string, number>();
+
+  /**
+   * Build a stable dedup key for a mutation request.
+   * Returns null for GET requests (not mutations, never deduplicated).
+   */
+  buildKey(method: string, path: string, body?: Record<string, unknown>): string | null {
+    if (method === "GET") return null;
+    const bodyHash = this.hashBody(body);
+    return `${method}:${path}:${bodyHash}`;
+  }
+
+  /**
+   * Returns true if the key is currently pending (timed-out mutation within TTL).
+   * Also opportunistically prunes expired entries.
+   */
+  isPending(key: string): boolean {
+    this.pruneExpired();
+    const ts = this.pending.get(key);
+    if (ts === undefined) return false;
+    return Date.now() - ts < DEDUP_TTL_MS;
+  }
+
+  /**
+   * Mark a mutation key as pending after a timeout.
+   * Enforces max-entry bound by pruning expired entries first, then oldest if still over limit.
+   */
+  markPending(key: string): void {
+    this.pruneExpired();
+    // If still at max after pruning expired, remove oldest entry
+    if (this.pending.size >= DEDUP_MAX_ENTRIES) {
+      const oldest = this.pending.keys().next().value;
+      if (oldest !== undefined) this.pending.delete(oldest);
+    }
+    this.pending.set(key, Date.now());
+  }
+
+  /** Clear all entries. Used by _resetForTesting(). */
+  clear(): void {
+    this.pending.clear();
+  }
+
+  private pruneExpired(): void {
+    const now = Date.now();
+    for (const [key, ts] of this.pending) {
+      if (now - ts >= DEDUP_TTL_MS) {
+        this.pending.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Stable hash of request body. Sorts keys for determinism.
+   * Simple djb2-like string hash — no crypto needed.
+   */
+  private hashBody(body?: Record<string, unknown>): string {
+    if (!body) return "empty";
+    const stable = JSON.stringify(body, Object.keys(body).sort());
+    let h = 5381;
+    for (let i = 0; i < stable.length; i++) {
+      h = ((h << 5) + h) ^ stable.charCodeAt(i);
+      h = h & h; // coerce to 32-bit int
+    }
+    return (h >>> 0).toString(16);
+  }
+}
+
+/** Module-level singleton. Cleared by _resetForTesting(). */
+const mutationDedup = new MutationDedup();
+
+// ---------------------------------------------------------------------------
 // Module-level shared state
 // ---------------------------------------------------------------------------
 
@@ -184,8 +282,17 @@ export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   // 2. Shared backoff check
   await waitForBackoffClear();
 
+  // 2b. Mutation dedup check — suppress retries of timed-out mutations
+  // DO NOT REMOVE: prevents duplicate sends when gateway retries after timeout
+  const dedupKey = mutationDedup.buildKey(method, params.path, params.body);
+  if (dedupKey !== null && mutationDedup.isPending(dedupKey)) {
+    const warnMsg = `[WAHA] Duplicate mutation suppressed (original timed out, may have already succeeded): ${method} ${params.path}`;
+    console.warn(warnMsg);
+    throw new Error(warnMsg);
+  }
+
   // 3-7: Fetch with retry logic
-  return fetchWithRetry(params, method, timeout, contextLabel, 0);
+  return fetchWithRetry(params, method, timeout, contextLabel, dedupKey, 0);
 }
 
 const MAX_RETRIES = 3;
@@ -195,6 +302,7 @@ async function fetchWithRetry(
   method: string,
   timeout: number,
   contextLabel: string,
+  dedupKey: string | null,
   attempt: number,
 ): Promise<any> {
   // Build URL
@@ -226,6 +334,10 @@ async function fetchWithRetry(
     const errMessage = err instanceof Error ? err.message : String(err);
     if (errName === "TimeoutError" || errName === "AbortError" || errMessage.includes("abort")) {
       if (isMutation) {
+        // DO NOT REMOVE: mark mutation as pending so gateway retries are suppressed
+        if (dedupKey !== null) {
+          mutationDedup.markPending(dedupKey);
+        }
         throw new Error(
           `[WAHA] ${contextLabel} timed out after ${timeout}ms — request may have succeeded (mutation: ${method} ${params.path})`
         );
@@ -261,7 +373,7 @@ async function fetchWithRetry(
     );
 
     await sleep(cappedDelay);
-    return fetchWithRetry(params, method, timeout, contextLabel, attempt + 1);
+    return fetchWithRetry(params, method, timeout, contextLabel, dedupKey, attempt + 1);
   }
 
   // 6. Error logging
@@ -325,4 +437,5 @@ export function _resetForTesting(): void {
   backoffUntil = 0;
   defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
   globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
+  mutationDedup.clear();
 }
