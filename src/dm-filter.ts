@@ -82,7 +82,7 @@ export class DmFilter {
     try {
       return this._check(params);
     } catch (err) {
-      console.warn(`[waha] DmFilter.check() threw: ${String(err)}`);
+      (params.log ?? console.warn)(`[waha] DmFilter.check() error (fail-open): ${String(err)}`);
       return { pass: true, reason: "error" };
     }
   }
@@ -144,7 +144,7 @@ export class DmFilter {
         try {
           acc.push(new RegExp(p, "i"));
         } catch (err) {
-          console.warn(`[waha] DmFilter: invalid regex pattern "${p}": ${String(err)}, skipping`);
+          (log ?? this.log ?? console.warn)(`[waha] DmFilter: invalid regex pattern "${p}": ${String(err)}, skipping`);
         }
         return acc;
       }, []);

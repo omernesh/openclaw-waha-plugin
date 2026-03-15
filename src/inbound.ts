@@ -17,7 +17,7 @@ import {
 } from "openclaw/plugin-sdk";
 import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { ResolvedWahaAccount } from "./accounts.js";
-import { DmFilter } from "./dm-filter.js";
+import { DmFilter, type DmFilterConfig } from "./dm-filter.js";
 import { getDirectoryDb } from "./directory.js";
 import { claimMessage, isClaimedByBotSession } from "./dedup.js";
 import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.js";
@@ -25,7 +25,7 @@ import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
 import { BOT_PROXY_PREFIX, sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
 import { warnOnError } from "./http-client.js";
-import type { CoreConfig, WahaInboundMessage } from "./types.js";
+import type { CoreConfig, WahaEventMessage, WahaInboundMessage, WahaPollCreationMessage } from "./types.js";
 import { extractMentionedJids } from "./mentions.js";
 // Re-export for external consumers (plan specifies extractMentionedJids in inbound.ts exports)
 export { extractMentionedJids } from "./mentions.js";
@@ -53,12 +53,14 @@ const _dmFilterInstance = new Map<string, DmFilter>();
 
 function getDmFilter(cfg: CoreConfig, accountId: string): DmFilter {
   const dmFilterCfg = cfg.channels?.waha?.dmFilter ?? {};
-  if (!_dmFilterInstance.has(accountId)) {
-    _dmFilterInstance.set(accountId, new DmFilter(dmFilterCfg));
+  let instance = _dmFilterInstance.get(accountId);
+  if (!instance) {
+    instance = new DmFilter(dmFilterCfg);
+    _dmFilterInstance.set(accountId, instance);
   } else {
-    _dmFilterInstance.get(accountId)!.updateConfig(dmFilterCfg);
+    instance.updateConfig(dmFilterCfg);
   }
-  return _dmFilterInstance.get(accountId)!;
+  return instance;
 }
 
 // Exported for admin panel stats access
@@ -80,13 +82,15 @@ function getGroupFilter(cfg: CoreConfig, accountId: string): DmFilter {
     enabled: true,
     mentionPatterns: DEFAULT_GROUP_FILTER_PATTERNS,
     ...rawGroupFilterCfg,
-  } as Parameters<typeof DmFilter.prototype.updateConfig>[0];
-  if (!_groupFilterInstance.has(accountId)) {
-    _groupFilterInstance.set(accountId, new DmFilter(groupFilterCfg));
+  } as DmFilterConfig;
+  let gInstance = _groupFilterInstance.get(accountId);
+  if (!gInstance) {
+    gInstance = new DmFilter(groupFilterCfg);
+    _groupFilterInstance.set(accountId, gInstance);
   } else {
-    _groupFilterInstance.get(accountId)!.updateConfig(groupFilterCfg);
+    gInstance.updateConfig(groupFilterCfg);
   }
-  return _groupFilterInstance.get(accountId)!;
+  return gInstance;
 }
 
 // Exported for admin panel stats access
@@ -357,11 +361,11 @@ export async function handleWahaInbound(params: {
   let pollSummary = "";
   const pollMsg = _rawMsg?.pollCreationMessage;
   if (pollMsg && typeof pollMsg === "object") {
-    const pollName = (pollMsg as any).name ?? textBody ?? "Untitled poll";
-    const options = Array.isArray((pollMsg as any).options)
-      ? (pollMsg as any).options.map((o: any, i: number) => `${i + 1}) ${o.name ?? o}`).join("  ")
+    const pollName = (pollMsg as WahaPollCreationMessage).name ?? textBody ?? "Untitled poll";
+    const options = Array.isArray((pollMsg as WahaPollCreationMessage).options)
+      ? (pollMsg as WahaPollCreationMessage).options!.map((o: { name?: string } | string, i: number) => `${i + 1}) ${typeof o === 'string' ? o : (o.name ?? 'Option')}`).join("  ")
       : "";
-    const multi = (pollMsg as any).multipleAnswers ? "yes" : "no";
+    const multi = (pollMsg as WahaPollCreationMessage).multipleAnswers ? "yes" : "no";
     pollSummary = `[poll] "${pollName}"\nOptions: ${options}\nMultiple answers: ${multi}`;
     if (rawMessage.messageId) pollSummary += `\nPoll message ID: ${rawMessage.messageId}`;
   }
@@ -370,13 +374,13 @@ export async function handleWahaInbound(params: {
   let eventSummary = "";
   const eventMsg = _rawMsg?.eventMessage ?? _rawMsg?.eventCreationMessage;
   if (eventMsg && typeof eventMsg === "object") {
-    const evName = (eventMsg as any).name ?? "Untitled event";
-    const startTs = (eventMsg as any).startTime;
-    const endTs = (eventMsg as any).endTime;
+    const evName = (eventMsg as WahaEventMessage).name ?? "Untitled event";
+    const startTs = (eventMsg as WahaEventMessage).startTime;
+    const endTs = (eventMsg as WahaEventMessage).endTime;
     const startStr = startTs ? new Date(startTs * 1000).toISOString() : "unknown";
     const endStr = endTs ? new Date(endTs * 1000).toISOString() : "";
-    const loc = (eventMsg as any).location?.name ?? "";
-    const desc = (eventMsg as any).description ?? "";
+    const loc = (eventMsg as WahaEventMessage).location?.name ?? "";
+    const desc = (eventMsg as WahaEventMessage).description ?? "";
     eventSummary = `[event] "${evName}"\nWhen: ${startStr}${endStr ? " to " + endStr : ""}`;
     if (loc) eventSummary += `\nWhere: ${loc}`;
     if (desc) eventSummary += `\nDescription: ${desc}`;
@@ -510,7 +514,10 @@ export async function handleWahaInbound(params: {
     // ║  If no override or override.enabled=false → use global filter.    ║
     // ║  Trigger-activated messages bypass this entirely (handled above).  ║
     // ╚══════════════════════════════════════════════════════════════════════╝
-    const groupFilterCheckArgs = { text: rawBody, senderId, filterType: "group" as const, log: (msg: string) => runtime.log?.(msg) };
+    // DO NOT CHANGE — keyword filters must use textBody (human-written text only), NOT rawBody.
+    // rawBody includes synthetic tags like "[media] mime=audio/ogg url=..." which can accidentally
+    // match keyword patterns and allow media-only messages through the filter.
+    const groupFilterCheckArgs = { text: textBody, senderId, filterType: "group" as const, log: (msg: string) => runtime.log?.(msg) };
     let groupFilterHandled = false;
     try {
       const dirDb = getDirectoryDb(account.accountId);
@@ -554,7 +561,8 @@ export async function handleWahaInbound(params: {
       const groupFilter = getGroupFilter(config, account.accountId);
       const filterResult = groupFilter.check(groupFilterCheckArgs);
       if (!filterResult.pass) {
-        return; // Silent drop
+        runtime.log?.(`[waha] group filter: drop ${senderId} in ${chatId} (${filterResult.reason})`);
+        return;
       }
     }
   }
@@ -666,14 +674,18 @@ export async function handleWahaInbound(params: {
   // DO NOT CHANGE — triggerActivated bypass is intentional, same pattern as group filter above.
   if (!isGroup && !triggerActivated) {
     const dmFilter = getDmFilter(config, account.accountId);
+    // DO NOT CHANGE — keyword filters must use textBody (human-written text only), NOT rawBody.
+    // rawBody includes synthetic tags like "[media] mime=audio/ogg url=..." which can accidentally
+    // match keyword patterns and allow media-only messages through the filter.
     const filterResult = dmFilter.check({
-      text: rawBody,
+      text: textBody,
       senderId,
       filterType: "dm",
       log: (msg) => runtime.log?.(msg),
     });
     if (!filterResult.pass) {
-      return; // Silent drop — no pairing message, no error
+      runtime.log?.(`[waha] dm filter: drop ${senderId} (${filterResult.reason})`);
+      return; // No pairing message, no error
     }
   }
 
@@ -709,9 +721,9 @@ export async function handleWahaInbound(params: {
           mentionPatterns.length === 0 ||
           mentionPatterns.some((p) => {
             try {
-              return new RegExp(p, "i").test(rawBody);
+              return new RegExp(p, "i").test(textBody);
             } catch (err) {
-              console.warn(`[waha] invalid mentionPattern regex "${p}": ${String(err)}`);
+              runtime.log?.(`[waha] invalid mentionPattern regex "${p}": ${String(err)}`);
               return false;
             }
           });
