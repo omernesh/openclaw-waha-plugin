@@ -212,34 +212,43 @@ export async function handleShutupCommand(params: {
     // sendWahaText mute check only applies to @g.us targets, so DM sends are unaffected.
     if (isMute) {
       if (allFlag) {
-        // Mute all groups — per-iteration error handling to mute as many as possible
+        // Mute all groups — send confirmation FIRST (muting 100+ groups takes minutes).
+        // Skip participant DM backup for "all" mode — too slow with WAHA rate limits.
+        // DO NOT CHANGE — confirmation must be immediate, muting runs in background.
         const groups = await getGroupsForAccount(account, config);
-        let successCount = 0;
-        for (const g of groups) {
-          try {
-            await muteGroupAllAccounts(g.jid, senderId, config, expiresAt, runtime);
-            successCount++;
-          } catch (err) {
-            runtime.log?.(`[waha] shutup: failed to mute ${g.jid}: ${String(err)}`);
-          }
-        }
         const durationText = durationMs > 0 ? ` for ${formatDuration(durationMs)}` : "";
-        await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${successCount}/${groups.length} groups${durationText}.`, accountId: account.accountId, bypassPolicy: true });
+        await sendWahaText({ cfg: config, to: chatId, text: `🔇 Shutting up in ${groups.length} groups${durationText}...`, accountId: account.accountId, bypassPolicy: true });
+        // Mute in background (no await) — skip DM backup for bulk operations
+        (async () => {
+          let successCount = 0;
+          for (const g of groups) {
+            try {
+              // Write mute record directly without participant fetch (fast path)
+              const enabledAccounts = listEnabledWahaAccounts(config);
+              for (const acct of enabledAccounts) {
+                const dirDb = getDirectoryDb(acct.accountId);
+                dirDb.muteGroup(g.jid, senderId, acct.accountId, expiresAt, null);
+              }
+              successCount++;
+            } catch (err) {
+              runtime.log?.(`[waha] shutup: failed to mute ${g.jid}: ${String(err)}`);
+            }
+          }
+          runtime.log?.(`[waha] shutup all: muted ${successCount}/${groups.length} groups`);
+        })().catch(err => runtime.log?.(`[waha] shutup all background error: ${String(err)}`));
       } else {
         // Show group list for selection
         await showGroupListForMute(chatId, senderId, account, config, durationStr, runtime);
       }
     } else {
       if (allFlag) {
-        // Unmute all groups across all accounts — per-iteration error handling
+        // Unmute all groups across all accounts — synchronous SQLite operations (fast).
         const enabledAccounts = listEnabledWahaAccounts(config);
         let totalUnmuted = 0;
-        let totalAttempted = 0;
         for (const acct of enabledAccounts) {
           const dirDb = getDirectoryDb(acct.accountId);
           const mutedGroups = dirDb.getAllMutedGroups();
           for (const mg of mutedGroups) {
-            totalAttempted++;
             try {
               unmuteGroupWithDmRestore(dirDb, mg.groupJid, acct, config, runtime);
               totalUnmuted++;
@@ -248,7 +257,7 @@ export async function handleShutupCommand(params: {
             }
           }
         }
-        await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${totalUnmuted}/${totalAttempted} groups.`, accountId: account.accountId, bypassPolicy: true });
+        await sendWahaText({ cfg: config, to: chatId, text: `🔊 Unmuted ${totalUnmuted} groups.`, accountId: account.accountId, bypassPolicy: true });
       } else {
         // Show muted groups list for selection
         await showMutedGroupsListForUnmute(chatId, senderId, account, config, runtime);
