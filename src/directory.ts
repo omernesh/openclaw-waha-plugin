@@ -214,6 +214,10 @@ export class DirectoryDb {
       conditions.push("c.jid LIKE '%@newsletter'");
     }
 
+    // Exclude internal/ghost JID types at SQL level so LIMIT/OFFSET are accurate.
+    // DO NOT REMOVE: filtering post-query causes offset drift and duplicates on Load More (AP-02 fix).
+    conditions.push("c.jid NOT LIKE '%@lid' AND c.jid NOT LIKE '%@s.whatsapp.net'");
+
     // Search filter
     if (search) {
       conditions.push("(c.jid LIKE ? OR c.display_name LIKE ?)");
@@ -296,6 +300,10 @@ export class DirectoryDb {
     } else if (type === "newsletter") {
       conditions.push("jid LIKE '%@newsletter'");
     }
+
+    // Exclude internal/ghost JID types at SQL level so total count matches displayable entries.
+    // DO NOT REMOVE: must stay in sync with getContacts() exclusion — mismatched counts break pagination (AP-02 fix).
+    conditions.push("jid NOT LIKE '%@lid' AND jid NOT LIKE '%@s.whatsapp.net'");
 
     if (search?.trim()) {
       const s = `%${search.trim()}%`;

@@ -1326,14 +1326,72 @@ async function saveSettings(e) {
 }
 
 // ---- Save & Restart ----
+// DO NOT CHANGE — Uses pollUntilReady overlay to avoid 502 crash page when gateway restarts.
+// The old code used a blind 5-second setTimeout which showed a Cloudflare 502 if restart took >5s.
+// Now: shows fullscreen overlay, polls /api/admin/stats every 3s for up to 60s, auto-reloads on success.
 async function saveAndRestart() {
   if (!confirm('Are you sure? This will save settings and restart the gateway. It will be back online in a few seconds.')) return;
   await saveSettings(new Event('submit'));
   try {
     await fetch('/api/admin/restart', { method: 'POST' });
   } catch(e) { /* expected - server is restarting */ }
-  showToast('Gateway restarting...');
-  setTimeout(function() { location.reload(); }, 5000);
+  // Show fullscreen overlay immediately — DO NOT revert to blind setTimeout reload
+  var overlay = document.createElement('div');
+  overlay.id = 'restart-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;';
+  var inner = document.createElement('div');
+  inner.style.cssText = 'text-align:center;';
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:1.5em;font-weight:bold;margin-bottom:16px;';
+  title.textContent = 'Restarting gateway...';
+  inner.appendChild(title);
+  var spinStyle = document.createElement('style');
+  spinStyle.textContent = '.spin{display:inline-block;width:36px;height:36px;border:4px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;}@keyframes spin{to{transform:rotate(360deg);}}';
+  inner.appendChild(spinStyle);
+  var spinWrap = document.createElement('div');
+  spinWrap.style.cssText = 'margin-bottom:24px;';
+  var spinEl = document.createElement('div');
+  spinEl.className = 'spin';
+  spinWrap.appendChild(spinEl);
+  inner.appendChild(spinWrap);
+  var statusEl = document.createElement('div');
+  statusEl.id = 'restart-status';
+  statusEl.style.cssText = 'font-size:0.95em;color:#aaa;';
+  statusEl.textContent = 'Waiting for server...';
+  inner.appendChild(statusEl);
+  var manualEl = document.createElement('div');
+  manualEl.id = 'restart-manual';
+  manualEl.style.cssText = 'display:none;margin-top:20px;';
+  var refreshBtn = document.createElement('button');
+  refreshBtn.style.cssText = 'padding:10px 24px;font-size:1em;cursor:pointer;background:#3b82f6;color:#fff;border:none;border-radius:6px;';
+  refreshBtn.textContent = 'Refresh Manually';
+  refreshBtn.onclick = function() { location.reload(); };
+  manualEl.appendChild(refreshBtn);
+  inner.appendChild(manualEl);
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+  pollUntilReady(0);
+}
+function pollUntilReady(elapsed) {
+  var statusEl = document.getElementById('restart-status');
+  var manualEl = document.getElementById('restart-manual');
+  if (elapsed >= 60) {
+    if (statusEl) statusEl.textContent = 'Gateway did not respond within 60s. Try refreshing manually.';
+    if (manualEl) manualEl.style.display = '';
+    return;
+  }
+  if (statusEl) statusEl.textContent = 'Waiting for server... ' + elapsed + 's elapsed';
+  setTimeout(function() {
+    fetch('/api/admin/stats').then(function(r) {
+      if (r.ok) {
+        location.reload();
+      } else {
+        pollUntilReady(elapsed + 3);
+      }
+    }).catch(function() {
+      pollUntilReady(elapsed + 3);
+    });
+  }, 3000);
 }
 
 // ---- Media sub-toggles visibility ----
@@ -2111,8 +2169,9 @@ export function createWahaWebhookServer(opts: {
         const newsletters = db.getNewsletterCount();
         // Enrich with allowedDm status from config
         const configAllowFrom: string[] = account.config.allowFrom ?? [];
-        // Filter out @lid entries at display level as a fallback
-        const enriched = contacts.filter((c) => !c.jid.endsWith("@lid") && !c.jid.endsWith("@s.whatsapp.net")).map((c) => ({
+        // @lid and @s.whatsapp.net entries are now filtered at SQL level in directory.ts
+        // to fix pagination offset/count mismatches. DO NOT re-add post-query filtering here.
+        const enriched = contacts.map((c) => ({
           ...c,
           allowedDm: configAllowFrom.includes(c.jid),
         }));
