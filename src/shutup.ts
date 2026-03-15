@@ -76,8 +76,8 @@ export function checkPendingSelection(senderId: string, config?: CoreConfig): Pe
         const dirDb = getDirectoryDb(acct.accountId);
         const pending = dirDb.getPendingSelection(senderId);
         if (pending) return pending;
-      } catch {
-        // Non-fatal — try next account
+      } catch (err) {
+        console.warn(`[waha] checkPendingSelection failed for account: ${String(err)}`);
       }
     }
     return null;
@@ -97,8 +97,8 @@ export function clearPendingSelection(senderId: string, config?: CoreConfig): vo
       try {
         const dirDb = getDirectoryDb(acct.accountId);
         dirDb.clearPendingSelection(senderId);
-      } catch {
-        // Non-fatal
+      } catch (err) {
+        console.warn(`[waha] clearPendingSelection failed for account: ${String(err)}`);
       }
     }
   }
@@ -194,7 +194,7 @@ export async function handleShutupCommand(params: {
         await muteGroupAllAccounts(chatId, senderId, config, expiresAt, runtime);
       } catch (err) {
         runtime.log?.(`[waha] shutup: mute failed after confirmation: ${String(err)}`);
-        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Mute failed. Please try again.", accountId: account.accountId, bypassPolicy: true }).catch(() => {});
+        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Mute failed. Please try again.", accountId: account.accountId, bypassPolicy: true }).catch(e => runtime.log?.(`[waha] shutup: error notification send failed: ${String(e)}`));
       }
     } else {
       // Unmute FIRST, then send confirmation (group was muted, can't send before unmute).
@@ -203,7 +203,7 @@ export async function handleShutupCommand(params: {
         await sendWahaText({ cfg: config, to: chatId, text: "🔊 I'm back.", accountId: account.accountId, bypassPolicy: true });
       } catch (err) {
         runtime.log?.(`[waha] unshutup: unmute failed: ${String(err)}`);
-        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Unmute failed. Please try again.", accountId: account.accountId, bypassPolicy: true }).catch(() => {});
+        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Unmute failed. Please try again.", accountId: account.accountId, bypassPolicy: true }).catch(e => runtime.log?.(`[waha] shutup: error notification send failed: ${String(e)}`));
       }
     }
   } else {
@@ -235,6 +235,7 @@ export async function handleShutupCommand(params: {
             }
           }
           runtime.log?.(`[waha] shutup all: muted ${successCount}/${groups.length} groups`);
+          await sendWahaText({ cfg: config, to: chatId, text: `✅ Done. Muted ${successCount}/${groups.length} groups.`, accountId: account.accountId, bypassPolicy: true }).catch(() => {});
         })().catch(err => runtime.log?.(`[waha] shutup all background error: ${String(err)}`));
       } else {
         // Show group list for selection
@@ -280,6 +281,11 @@ export async function handleSelectionResponse(
   config: CoreConfig,
   runtime: { log?: (msg: string) => void },
 ): Promise<boolean> {
+  if (!pending.groups || pending.groups.length === 0) {
+    await sendWahaText({ cfg: config, to: chatId, text: "Selection expired. Please run the command again.", accountId: account.accountId, bypassPolicy: true });
+    return true; // Clear the pending
+  }
+
   const trimmed = text.trim().toLowerCase();
 
   if (trimmed === "all") {

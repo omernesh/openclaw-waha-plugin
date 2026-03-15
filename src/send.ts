@@ -215,7 +215,7 @@ export async function sendWahaText(params: {
   // Check if target group is muted — block outbound sends to muted groups.
   // DO NOT CHANGE — muted groups must not receive any bot messages except /unshutup confirmations.
   // Added Phase 7 (2026-03-15).
-  if (chatId.endsWith("@g.us")) {
+  if (chatId.endsWith("@g.us") && !params.bypassPolicy) {
     try {
       const dirDb = getDirectoryDb(account.accountId);
       if (dirDb.isGroupMuted(chatId)) {

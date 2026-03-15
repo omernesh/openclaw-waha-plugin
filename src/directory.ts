@@ -572,8 +572,21 @@ export class DirectoryDb {
    * Get all muted groups. Cleans up expired mutes first.
    */
   getAllMutedGroups(): MutedGroup[] {
-    // First clean up expired mutes
-    this.db.prepare("DELETE FROM muted_groups WHERE expires_at > 0 AND expires_at < ?").run(Date.now());
+    // Clean up expired mutes WITH DM restore (same as isGroupMuted auto-expiry)
+    // DO NOT CHANGE — expired mutes must restore DM settings or participants stay permanently blocked.
+    const expired = this.db.prepare(
+      "SELECT * FROM muted_groups WHERE expires_at > 0 AND expires_at < ?"
+    ).all(Date.now()) as Array<Record<string, unknown>>;
+    for (const row of expired) {
+      const groupJid = row.group_jid as string;
+      const dmBackup = this.unmuteGroup(groupJid);
+      if (dmBackup) {
+        for (const [participantJid, canInitiate] of Object.entries(dmBackup)) {
+          this.upsertContact(participantJid);
+          this.setContactDmSettings(participantJid, { canInitiate });
+        }
+      }
+    }
     const rows = this.db.prepare("SELECT * FROM muted_groups").all() as Array<Record<string, unknown>>;
     return rows.map((row) => {
       let dmBackup: Record<string, boolean> | null = null;
@@ -639,7 +652,14 @@ export class DirectoryDb {
       return null;
     }
     let groups: { jid: string; name: string }[] = [];
-    try { groups = JSON.parse(row.groups_json as string); } catch { /* corrupt JSON — treat as empty */ }
+    try {
+      groups = JSON.parse(row.groups_json as string);
+      if (!Array.isArray(groups)) groups = [];
+    } catch (err) {
+      console.warn(`[waha] corrupt groups_json for pending selection ${senderJid}: ${String(err)}`);
+      this.db.prepare("DELETE FROM pending_selections WHERE sender_jid = ?").run(senderJid);
+      return null;
+    }
     return {
       type: row.type as "mute" | "unmute",
       groups,
