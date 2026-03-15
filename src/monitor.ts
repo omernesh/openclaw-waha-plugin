@@ -2523,6 +2523,10 @@ export function createWahaWebhookServer(opts: {
           const jid = decodeURIComponent(m[1]);
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          if (typeof allowed !== "boolean") {
+            writeJsonResponse(res, 400, { error: "allowed must be a boolean" });
+            return;
+          }
           const db = getDirectoryDb(opts.accountId);
           db.setContactAllowDm(jid, allowed);
           syncAllowList(getConfigPath(), "allowFrom", jid, allowed);
@@ -2584,6 +2588,10 @@ export function createWahaWebhookServer(opts: {
           const participantJid = decodeURIComponent(m[2]);
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          if (typeof allowed !== "boolean") {
+            writeJsonResponse(res, 400, { error: "allowed must be a boolean" });
+            return;
+          }
           const db = getDirectoryDb(opts.accountId);
           db.setParticipantAllowInGroup(groupJid, participantJid, allowed);
           syncAllowList(getConfigPath(), "groupAllowFrom", participantJid, allowed);
@@ -2606,6 +2614,10 @@ export function createWahaWebhookServer(opts: {
           const participantJid = decodeURIComponent(m[2]);
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          if (typeof allowed !== "boolean") {
+            writeJsonResponse(res, 400, { error: "allowed must be a boolean" });
+            return;
+          }
           const db = getDirectoryDb(opts.accountId);
           db.setParticipantAllowDm(groupJid, participantJid, allowed);
           syncAllowList(getConfigPath(), "allowFrom", participantJid, allowed);
@@ -2627,6 +2639,10 @@ export function createWahaWebhookServer(opts: {
           const groupJid = decodeURIComponent(m[1]);
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          if (typeof allowed !== "boolean") {
+            writeJsonResponse(res, 400, { error: "allowed must be a boolean" });
+            return;
+          }
           const db = getDirectoryDb(opts.accountId);
           db.setGroupAllowAll(groupJid, allowed);
           const participants = db.getGroupParticipants(groupJid);

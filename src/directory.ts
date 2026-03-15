@@ -555,12 +555,16 @@ export class DirectoryDb {
     if (row.expires_at > 0 && Date.now() > row.expires_at) {
       // Expired — auto-unmute and restore DM settings from backup.
       // DO NOT CHANGE — auto-expiry must restore DM settings or participants stay permanently blocked.
-      const dmBackup = this.unmuteGroup(groupJid);
-      if (dmBackup) {
-        for (const [participantJid, canInitiate] of Object.entries(dmBackup)) {
-          this.upsertContact(participantJid);
-          this.setContactDmSettings(participantJid, { canInitiate });
+      try {
+        const dmBackup = this.unmuteGroup(groupJid);
+        if (dmBackup) {
+          for (const [participantJid, canInitiate] of Object.entries(dmBackup)) {
+            this.upsertContact(participantJid);
+            this.setContactDmSettings(participantJid, { canInitiate });
+          }
         }
+      } catch (expireErr) {
+        console.warn(`[waha] isGroupMuted: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
       }
       return false;
     }
@@ -600,12 +604,16 @@ export class DirectoryDb {
     ).all(Date.now()) as Array<Record<string, unknown>>;
     for (const row of expired) {
       const groupJid = row.group_jid as string;
-      const dmBackup = this.unmuteGroup(groupJid);
-      if (dmBackup) {
-        for (const [participantJid, canInitiate] of Object.entries(dmBackup)) {
-          this.upsertContact(participantJid);
-          this.setContactDmSettings(participantJid, { canInitiate });
+      try {
+        const dmBackup = this.unmuteGroup(groupJid);
+        if (dmBackup) {
+          for (const [participantJid, canInitiate] of Object.entries(dmBackup)) {
+            this.upsertContact(participantJid);
+            this.setContactDmSettings(participantJid, { canInitiate });
+          }
         }
+      } catch (expireErr) {
+        console.warn(`[waha] getAllMutedGroups: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
       }
     }
     const rows = this.db.prepare("SELECT * FROM muted_groups").all() as Array<Record<string, unknown>>;
@@ -703,8 +711,8 @@ export class DirectoryDb {
    * Combines message counts and keeps the better name. Deletes the fromJid entry.
    */
   mergeContacts(fromJid: string, toJid: string): boolean {
-    const fromRow = this.db.prepare("SELECT message_count, display_name, first_seen_at, last_message_at FROM contacts WHERE jid = ?").get(fromJid) as
-      | { message_count: number; display_name: string | null; first_seen_at: number; last_message_at: number }
+    const fromRow = this.db.prepare("SELECT message_count, display_name, first_seen_at, last_message_at, is_group FROM contacts WHERE jid = ?").get(fromJid) as
+      | { message_count: number; display_name: string | null; first_seen_at: number; last_message_at: number; is_group: number }
       | undefined;
     if (!fromRow) return false;
 
@@ -717,8 +725,8 @@ export class DirectoryDb {
       // Can't rename PK easily, so insert new + delete old
       this.db.prepare(
         `INSERT INTO contacts (jid, display_name, first_seen_at, last_message_at, message_count, is_group)
-         VALUES (?, ?, ?, ?, ?, 0)`
-      ).run(toJid, fromRow.display_name, fromRow.first_seen_at, fromRow.last_message_at, fromRow.message_count);
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(toJid, fromRow.display_name, fromRow.first_seen_at, fromRow.last_message_at, fromRow.message_count, fromRow.is_group);
       this.deleteContact(fromJid);
       return true;
     }
@@ -744,6 +752,8 @@ export class DirectoryDb {
     this.db.prepare("DELETE FROM dm_settings WHERE jid = ?").run(jid);
     this.db.prepare("DELETE FROM allow_list WHERE jid = ?").run(jid);
     this.db.prepare("DELETE FROM group_participants WHERE participant_jid = ?").run(jid);
+    // Also clean up group_participants rows where this JID is the group itself (prevents orphaned rows)
+    this.db.prepare("DELETE FROM group_participants WHERE group_jid = ?").run(jid);
     this.db.prepare("DELETE FROM contacts WHERE jid = ?").run(jid);
   }
 
