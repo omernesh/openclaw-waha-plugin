@@ -35,7 +35,7 @@ export type GroupParticipant = {
 /**
  * Per-group keyword filter override.
  * Allows individual groups to override global group filter settings.
- * DO NOT CHANGE — per-group overrides are critical for groups where Sammie should respond freely.
+ * DO NOT CHANGE — per-group overrides are critical for groups where the bot should respond freely.
  */
 export type GroupFilterOverride = {
   groupJid: string;
@@ -423,8 +423,10 @@ export class DirectoryDb {
     let mentionPatterns: string[] | null = null;
     if (row.mention_patterns && typeof row.mention_patterns === "string") {
       try {
-        mentionPatterns = JSON.parse(row.mention_patterns as string);
-      } catch {
+        const parsed = JSON.parse(row.mention_patterns as string);
+        mentionPatterns = Array.isArray(parsed) ? parsed : null;
+      } catch (parseErr) {
+        console.warn(`[waha] corrupt mention_patterns JSON for group ${groupJid}: ${String(parseErr)}`);
         mentionPatterns = null;
       }
     }
@@ -467,12 +469,6 @@ export class DirectoryDb {
     );
   }
 
-  /**
-   * Delete the filter override for a specific group, reverting to global filter settings.
-   */
-  deleteGroupFilterOverride(groupJid: string): void {
-    this.db.prepare("DELETE FROM group_filter_overrides WHERE group_jid = ?").run(groupJid);
-  }
 
   /**
    * Merge one contact (fromJid) into another (toJid).
