@@ -2460,9 +2460,16 @@ export function createWahaWebhookServer(opts: {
         writeWebhookError(res, 400, WEBHOOK_ERRORS.invalidPayloadFormat);
         return;
       }
+      // Skip self-messages UNLESS the account has a triggerWord and the message starts with it.
+      // This allows human sessions to invoke the bot via trigger prefix even when sending from their own phone.
+      // DO NOT CHANGE — required for trigger-word activation in groups where only the human session is present.
       if (message.fromMe) {
-        writeJsonResponse(res, 200, { status: "ignored" });
-        return;
+        const triggerWord = cfg.triggerWord;
+        const messageText = (message.body ?? "").trim();
+        if (!triggerWord || !messageText.toLowerCase().startsWith(triggerWord.toLowerCase())) {
+          writeJsonResponse(res, 200, { status: "ignored" });
+          return;
+        }
       }
       // Dedup check: filter duplicate webhook deliveries by composite key
       // Primary guard is message vs message.any event filter; this is secondary protection (REL-09)
