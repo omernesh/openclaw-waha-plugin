@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 06-whatsapp-rules-and-policy-system 06-04-PLAN.md
-last_updated: "2026-03-13T23:27:21.812Z"
+stopped_at: Completed quick/1-fix-duplicate-messages-and-timeout-issue/1-PLAN.md
+last_updated: "2026-03-15T16:23:55.478Z"
 last_activity: 2026-03-11 -- Phase 03→04 transition
 progress:
   total_phases: 6
@@ -137,6 +137,7 @@ Recent decisions affecting current work:
 - [Phase 06-whatsapp-rules-and-policy-system]: Cache key for group resolver uses stableGroupId+stableSenderId compound to isolate per-sender results
 - [Phase 06-whatsapp-rules-and-policy-system]: Fail-open design for assertPolicyCanSend: rules errors never block sends, only explicit policy denials do
 - [Phase 06-whatsapp-rules-and-policy-system]: executePolicyEdit extracted to policy-edit.ts for testability (follows trigger-word.ts pattern)
+- [Phase quick-1]: MutationDedup TTL=60s covers gateway retry window; only timeouts mark pending, not successes; body hash via djb2 over sorted JSON.stringify
 
 ### Roadmap Evolution
 
@@ -154,6 +155,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T23:21:34.191Z
-Stopped at: Completed 06-whatsapp-rules-and-policy-system 06-04-PLAN.md
+Last session: 2026-03-15T16:23:50.644Z
+Stopped at: Completed quick/1-fix-duplicate-messages-and-timeout-issue/1-PLAN.md
 Resume file: None
