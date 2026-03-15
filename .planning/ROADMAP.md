@@ -128,7 +128,11 @@ Plans:
   1. Save & Restart shows "Restarting..." overlay, polls until server responds (up to 60s), then auto-reloads — no 502 crash
   2. Directory Load More loads new items with correct offset — no duplicates
   3. Group Filter Override checkbox saves without HTTP 502 error
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- Fix Save & Restart polling overlay + Group Filter Override 502 error handling
+- [ ] 07-02-PLAN.md -- Fix directory pagination by moving @lid/@s.whatsapp.net filtering to SQL level
 
 ### Phase 8: Shared UI Components
 **Goal:** Build reusable UI components (name resolver, contact picker, tag input, contact list) used across Settings, Dashboard, and Directory sections
@@ -187,7 +191,7 @@ Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Pha
 | 4. Multi-Session | 4/4 | Complete   | 2026-03-13 |
 | 5. Documentation and Testing | 2/2 | Complete   | 2026-03-13 |
 | 6. WhatsApp Rules and Policy System | 4/4 | Complete   | 2026-03-13 |
-| 7. Admin Panel Critical Fixes | 0/? | Planned | |
+| 7. Admin Panel Critical Fixes | 0/2 | Planned | |
 | 8. Shared UI Components | 0/? | Planned | |
 | 9. Settings UX Improvements | 0/? | Planned | |
 | 10. Directory & Group Enhancements | 0/? | Planned | |
