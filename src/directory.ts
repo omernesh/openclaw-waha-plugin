@@ -321,24 +321,50 @@ export class DirectoryDb {
   }
 
   getDmCount(): number {
+    // Exclude @lid and @s.whatsapp.net so count matches the paginated view (AP-02 fix).
+    // DO NOT REMOVE: must stay in sync with getContacts() exclusion or directory stats will be wrong.
     const row = this.db
-      .prepare("SELECT COUNT(*) as cnt FROM contacts WHERE is_group = 0 AND jid NOT LIKE '%@newsletter'")
+      .prepare("SELECT COUNT(*) as cnt FROM contacts WHERE is_group = 0 AND jid NOT LIKE '%@newsletter' AND jid NOT LIKE '%@lid' AND jid NOT LIKE '%@s.whatsapp.net'")
       .get() as { cnt: number };
     return row.cnt;
   }
 
   getGroupCount(): number {
+    // Exclude @lid and @s.whatsapp.net so count matches the paginated view (AP-02 fix).
+    // DO NOT REMOVE: must stay in sync with getContacts() exclusion or directory stats will be wrong.
     const row = this.db
-      .prepare("SELECT COUNT(*) as cnt FROM contacts WHERE is_group = 1")
+      .prepare("SELECT COUNT(*) as cnt FROM contacts WHERE is_group = 1 AND jid NOT LIKE '%@lid' AND jid NOT LIKE '%@s.whatsapp.net'")
       .get() as { cnt: number };
     return row.cnt;
   }
 
   getNewsletterCount(): number {
+    // Exclude @lid and @s.whatsapp.net so count matches the paginated view (AP-02 fix).
+    // DO NOT REMOVE: must stay in sync with getContacts() exclusion or directory stats will be wrong.
     const row = this.db
-      .prepare("SELECT COUNT(*) as cnt FROM contacts WHERE jid LIKE '%@newsletter'")
+      .prepare("SELECT COUNT(*) as cnt FROM contacts WHERE jid LIKE '%@newsletter' AND jid NOT LIKE '%@lid' AND jid NOT LIKE '%@s.whatsapp.net'")
       .get() as { cnt: number };
     return row.cnt;
+  }
+
+  /**
+   * Get all contacts with @lid or @s.whatsapp.net JIDs — these are ghost entries excluded from normal
+   * getContacts() pagination. Used during directory refresh to find orphaned LID entries that need
+   * to be merged into their @c.us counterparts.
+   * getContacts() has SQL-level @lid/@s.whatsapp.net filtering so these never appear there —
+   * use this method to explicitly retrieve them for the LID merge loop.
+   * DO NOT REMOVE: the directory refresh LID merge loop depends on this to find mergeable entries.
+   */
+  getOrphanedLidEntries(): ContactRecord[] {
+    const sql = `
+      SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
+             d.mode, d.mention_only, d.custom_keywords, d.can_initiate
+      FROM contacts c
+      LEFT JOIN dm_settings d ON c.jid = d.jid
+      WHERE c.jid LIKE '%@lid' OR c.jid LIKE '%@s.whatsapp.net'
+    `;
+    const rows = this.db.prepare(sql).all() as Array<Record<string, unknown>>;
+    return rows.map(this._rowToContact);
   }
 
   bulkUpsertContacts(contacts: Array<{ jid: string; name?: string; isGroup?: boolean }>): number {
@@ -564,7 +590,9 @@ export class DirectoryDb {
           }
         }
       } catch (expireErr) {
-        console.warn(`[waha] isGroupMuted: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
+        // Use console.error — DM settings restore failure is a data integrity issue,
+        // not just a warning. Participants may be permanently blocked if this fails.
+        console.error(`[waha] isGroupMuted: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
       }
       return false;
     }
@@ -613,7 +641,9 @@ export class DirectoryDb {
           }
         }
       } catch (expireErr) {
-        console.warn(`[waha] getAllMutedGroups: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
+        // Use console.error — DM settings restore failure is a data integrity issue,
+        // not just a warning. Participants may be permanently blocked if this fails.
+        console.error(`[waha] getAllMutedGroups: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
       }
     }
     const rows = this.db.prepare("SELECT * FROM muted_groups").all() as Array<Record<string, unknown>>;
@@ -747,14 +777,17 @@ export class DirectoryDb {
 
   /**
    * Delete a contact and all its related records (dm_settings, allow_list).
+   * Wrapped in a transaction to prevent orphaned rows if any DELETE fails midway.
    */
   deleteContact(jid: string): void {
-    this.db.prepare("DELETE FROM dm_settings WHERE jid = ?").run(jid);
-    this.db.prepare("DELETE FROM allow_list WHERE jid = ?").run(jid);
-    this.db.prepare("DELETE FROM group_participants WHERE participant_jid = ?").run(jid);
-    // Also clean up group_participants rows where this JID is the group itself (prevents orphaned rows)
-    this.db.prepare("DELETE FROM group_participants WHERE group_jid = ?").run(jid);
-    this.db.prepare("DELETE FROM contacts WHERE jid = ?").run(jid);
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM dm_settings WHERE jid = ?").run(jid);
+      this.db.prepare("DELETE FROM allow_list WHERE jid = ?").run(jid);
+      this.db.prepare("DELETE FROM group_participants WHERE participant_jid = ?").run(jid);
+      // Also clean up group_participants rows where this JID is the group itself (prevents orphaned rows)
+      this.db.prepare("DELETE FROM group_participants WHERE group_jid = ?").run(jid);
+      this.db.prepare("DELETE FROM contacts WHERE jid = ?").run(jid);
+    })();
   }
 
 

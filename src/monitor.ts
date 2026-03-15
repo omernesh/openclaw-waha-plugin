@@ -785,7 +785,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   </div>
   <div class="dir-header">
     <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()">
-    <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectoryTab()" title="Refresh current tab from WAHA API">Refresh</button>
+    <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Refresh current tab from WAHA API">Refresh</button>
     <button class="refresh-btn" style="background:#7c3aed;" id="dir-refresh-all-btn" onclick="refreshDirectory()" title="Import all contacts, groups and newsletters from WAHA API">Refresh All</button>
     <div class="dir-stats" id="dir-stats"></div>
   </div>
@@ -1002,9 +1002,10 @@ async function loadHealth() {
       kvRow('Last Check', d.lastCheckAt ? relTime(d.lastCheckAt) : 'never');
     hkv.innerHTML = healthHtml;
   } catch(e) {
-  var dot = document.getElementById('health-dot');
-  if (dot) { dot.style.background = '#94a3b8'; dot.title = 'Health check error: ' + (e.message || e); }
-}
+    var dot = document.getElementById('health-dot');
+    if (dot) { dot.style.background = '#ef4444'; dot.title = 'Health check error: ' + (e.message || e); }
+    console.warn('[waha] loadHealth failed:', e.message || e);
+  }
 }
 
 // ---- Log Tab ----
@@ -1251,7 +1252,7 @@ async function loadConfig() {
   }
 }
 async function saveSettings(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   var getVal = function(id) { return document.getElementById(id)?.value || ''; };
   var getChk = function(id) { return document.getElementById(id)?.checked || false; };
   var splitLines = function(s) { return s.split('\\n').map(function(l) { return l.trim(); }).filter(Boolean); };
@@ -1320,8 +1321,10 @@ async function saveSettings(e) {
     showToast('Settings saved' + (result.restartRequired ? ' (restart required)' : ''));
     if (result.restartRequired) document.getElementById('save-note').style.display = 'block';
     else document.getElementById('save-note').style.display = 'none';
+    return true;
   } catch(e) {
     showToast('Error: ' + e.message, true);
+    return false;
   }
 }
 
@@ -1331,7 +1334,11 @@ async function saveSettings(e) {
 // Now: shows fullscreen overlay, polls /api/admin/stats every 3s for up to 60s, auto-reloads on success.
 async function saveAndRestart() {
   if (!confirm('Are you sure? This will save settings and restart the gateway. It will be back online in a few seconds.')) return;
-  await saveSettings(new Event('submit'));
+  var saved = await saveSettings(null);
+  if (!saved) {
+    showToast('Save failed — restart cancelled. Fix the error above and try again.', true);
+    return;
+  }
   try {
     await fetch('/api/admin/restart', { method: 'POST' });
   } catch(e) { /* expected — Restarting: server drops connection before responding */ }
@@ -1370,12 +1377,13 @@ async function saveAndRestart() {
   inner.appendChild(manualEl);
   overlay.appendChild(inner);
   document.body.appendChild(overlay);
-  pollUntilReady(0);
+  pollUntilReady(Date.now());
 }
-function pollUntilReady(elapsed) {
+function pollUntilReady(startedAt) {
   var statusEl = document.getElementById('restart-status');
   var manualEl = document.getElementById('restart-manual');
-  if (elapsed >= 60) {
+  var elapsed = Math.floor((Date.now() - startedAt) / 1000);
+  if (Date.now() - startedAt >= 60000) {
     if (statusEl) statusEl.textContent = 'Gateway did not respond within 60s. Try refreshing manually.';
     if (manualEl) manualEl.style.display = '';
     return;
@@ -1386,10 +1394,10 @@ function pollUntilReady(elapsed) {
       if (r.ok) {
         location.reload();
       } else {
-        pollUntilReady(elapsed + 3);
+        pollUntilReady(startedAt);
       }
     }).catch(function() {
-      pollUntilReady(elapsed + 3);
+      pollUntilReady(startedAt);
     });
   }, 3000);
 }
@@ -1412,10 +1420,6 @@ function switchDirTab(tab, btn) {
   dirAutoImported = false;
   loadDirectory();
 }
-function refreshDirectoryTab() {
-  refreshDirectory();
-}
-
 // ---- Directory refresh ----
 async function refreshDirectory() {
   var btn = document.getElementById('dir-refresh-all-btn');
@@ -1560,7 +1564,7 @@ async function saveContactSettings(jid, id) {
   var mode = document.getElementById('mode-' + id)?.value || 'active';
   var mentionOnly = document.getElementById('mo-' + id)?.checked || false;
   var customKeywords = document.getElementById('kw-' + id)?.value || '';
-  var canInitiate = document.getElementById('ci-' + id)?.checked !== false;
+  var canInitiate = document.getElementById('ci-' + id)?.checked ?? true;
   try {
     var r = await fetch('/api/admin/directory/' + encodeURIComponent(jid) + '/settings', {
       method: 'PUT', headers: {'Content-Type':'application/json'},
@@ -1761,23 +1765,29 @@ export function readWahaWebhookBody(req: IncomingMessage, maxBodyBytes: number):
 }
 
 function syncAllowListBatch(configPath: string, field: "allowFrom" | "groupAllowFrom", jids: string[], add: boolean): void {
-  const raw = readFileSync(configPath, "utf-8");
-  const config = JSON.parse(raw) as Record<string, unknown>;
-  const channels = (config.channels as Record<string, unknown>) ?? {};
-  const waha = (channels.waha as Record<string, unknown>) ?? {};
-  const list: string[] = Array.isArray(waha[field]) ? (waha[field] as string[]) : [];
-  for (const jid of jids) {
-    if (add && !list.includes(jid)) {
-      list.push(jid);
+  // DB state is already committed before this call. Config sync failure should not crash the request.
+  // Log the error but don't rethrow — the DB state is correct, config will resync on next save.
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const channels = (config.channels as Record<string, unknown>) ?? {};
+    const waha = (channels.waha as Record<string, unknown>) ?? {};
+    const list: string[] = Array.isArray(waha[field]) ? (waha[field] as string[]) : [];
+    for (const jid of jids) {
+      if (add && !list.includes(jid)) {
+        list.push(jid);
+      }
+      if (!add) {
+        const idx = list.indexOf(jid);
+        if (idx >= 0) list.splice(idx, 1);
+      }
     }
-    if (!add) {
-      const idx = list.indexOf(jid);
-      if (idx >= 0) list.splice(idx, 1);
-    }
+    waha[field] = list;
+    config.channels = { ...channels, waha };
+    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+  } catch (err) {
+    console.error(`[waha] syncAllowListBatch: failed to sync ${field} config at ${configPath}: ${String(err)}`);
   }
-  waha[field] = list;
-  config.channels = { ...channels, waha };
-  writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
 }
 
 function syncAllowList(configPath: string, field: "allowFrom" | "groupAllowFrom", jid: string, add: boolean): void {
@@ -2417,11 +2427,15 @@ export function createWahaWebhookServer(opts: {
         const mappedGroups = filteredEntries.filter((e) => e.isGroup);
         const imported = db.bulkUpsertContacts(filteredEntries);
 
-        // Merge existing @lid and @s.whatsapp.net DB entries into their @c.us counterparts
+        // Merge existing @lid and @s.whatsapp.net DB entries into their @c.us counterparts.
+        // getContacts() filters these out at SQL level (AP-02 fix), so we use getOrphanedLidEntries()
+        // to explicitly fetch only the ghost JID entries that need merging.
+        // DO NOT CHANGE — getContacts() never returns @lid/@s.whatsapp.net entries so the old
+        // db.getContacts({ limit: 10000 }) call was dead code.
         let lidsMerged = 0;
         try {
-          const allDbContacts = db.getContacts({ limit: 10000 });
-          for (const c of allDbContacts) {
+          const orphanedEntries = db.getOrphanedLidEntries();
+          for (const c of orphanedEntries) {
             if (c.jid.endsWith("@lid")) {
               const cusJid = lidToCus.get(c.jid);
               if (cusJid) {
