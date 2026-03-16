@@ -26,7 +26,8 @@ function serializeGodModeUsers(
   var result: Array<{ identifier: string }> = [];
   for (var i = 0; i < selected.length; i++) {
     result.push({ identifier: selected[i].jid });
-    if (selected[i].lid) result.push({ identifier: selected[i].lid as string });
+    var lid = selected[i].lid;
+    if (lid) result.push({ identifier: lid });
   }
   return result;
 }
@@ -39,11 +40,12 @@ function deserializeGodModeUsers(
   for (var i = 0; i < configArr.length; i++) {
     var id = typeof configArr[i] === "string"
       ? (configArr[i] as string)
-      : ((configArr[i] as any).identifier || "");
+      : ((configArr[i] as { identifier: string }).identifier || "");
     if (!id) continue;
     if (id.endsWith("@lid")) {
+      // Find the last @c.us entry without a lid (immediately preceding this @lid)
       var found = false;
-      for (var j = 0; j < result.length; j++) {
+      for (var j = result.length - 1; j >= 0; j--) {
         if (!result[j].lid) { result[j].lid = id; found = true; break; }
       }
       if (!found) result.push({ jid: id, displayName: id, lid: null });

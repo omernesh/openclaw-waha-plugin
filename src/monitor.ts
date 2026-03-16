@@ -982,7 +982,8 @@ function createNameResolver(container, jid) {
     } else {
       throw new Error('not found');
     }
-  }).catch(function() {
+  }).catch(function(err) {
+    console.warn('[waha] name resolve failed for', jid, err);
     clearWrap();
     var jidEl = document.createElement('span');
     jidEl.className = 'nr-jid';
@@ -1199,6 +1200,7 @@ function createContactPicker(containerId, opts) {
     dropdown.classList.add('cp-open');
     // Prevent dropdown from overflowing viewport bottom
     var rect = wrapEl.getBoundingClientRect();
+    // 240px = estimated max dropdown height for viewport overflow check
     if (rect.bottom + 240 > window.innerHeight) {
       dropdown.style.bottom = '100%';
       dropdown.style.top = 'auto';
@@ -1219,6 +1221,7 @@ function createContactPicker(containerId, opts) {
   }
 
   function doSearch(query) {
+    // Minimum 2 characters before triggering search
     if (!query || query.length < 2) { closeDropdown(); return; }
     fetch('/api/admin/directory?search=' + encodeURIComponent(query) + '&limit=20&type=contact')
       .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
@@ -1227,12 +1230,12 @@ function createContactPicker(containerId, opts) {
         renderResults();
         openDropdown();
       })
-      .catch(function() { showToast('Search failed', true); });
+      .catch(function(err) { console.warn('[waha] contact search failed:', err); showToast('Search failed', true); });
   }
 
   searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(function() { doSearch(searchInput.value.trim()); }, 300);
+    searchTimeout = setTimeout(function() { doSearch(searchInput.value.trim()); }, 300); // 300ms debounce delay for search input
   });
 
   document.addEventListener('mousedown', function(e) {
@@ -1253,16 +1256,21 @@ function createContactPicker(containerId, opts) {
       selected = (jids || []).map(function(jid) { return { jid: jid, displayName: jid }; });
       renderChips();
       // Resolve display names asynchronously (best-effort)
-      selected.forEach(function(item, idx) {
+      selected.forEach(function(item) {
         fetch('/api/admin/directory/' + encodeURIComponent(item.jid))
           .then(function(r) { return r.ok ? r.json() : null; })
           .then(function(data) {
             if (data && data.displayName) {
-              selected[idx].displayName = data.displayName;
+              for (var k = 0; k < selected.length; k++) {
+                if (selected[k].jid === item.jid) {
+                  selected[k].displayName = data.displayName;
+                  break;
+                }
+              }
               renderChips();
             }
           })
-          .catch(function() {}); // best-effort name resolution
+          .catch(function(err) { console.warn('[waha] name resolve failed:', item.jid, err); });
       });
     },
     getSelected: function() { return selected.slice(); },
@@ -1273,17 +1281,22 @@ function createContactPicker(containerId, opts) {
       selected = (items || []).slice();
       renderChips();
       // Resolve display names for items that only have jid as displayName
-      selected.forEach(function(item, idx) {
+      selected.forEach(function(item) {
         if (item.displayName && item.displayName !== item.jid) return; // already has a name
         fetch('/api/admin/directory/' + encodeURIComponent(item.jid))
           .then(function(r) { return r.ok ? r.json() : null; })
           .then(function(data) {
             if (data && data.displayName) {
-              selected[idx].displayName = data.displayName;
+              for (var k = 0; k < selected.length; k++) {
+                if (selected[k].jid === item.jid) {
+                  selected[k].displayName = data.displayName;
+                  break;
+                }
+              }
               renderChips();
             }
           })
-          .catch(function() {});
+          .catch(function(err) { console.warn('[waha] name resolve failed:', item.jid, err); });
       });
     }
   };
@@ -1310,9 +1323,9 @@ function deserializeGodModeUsers(configArr) {
     var id = typeof configArr[i] === 'string' ? configArr[i] : (configArr[i].identifier || '');
     if (!id) continue;
     if (id.endsWith('@lid')) {
-      // Try to find matching @c.us entry without a lid yet
+      // Find the last @c.us entry without a lid (immediately preceding this @lid)
       var found = false;
-      for (var j = 0; j < result.length; j++) {
+      for (var j = result.length - 1; j >= 0; j--) {
         if (!result[j].lid) { result[j].lid = id; found = true; break; }
       }
       if (!found) result.push({ jid: id, displayName: id, lid: null });
@@ -1703,7 +1716,7 @@ async function loadConfig() {
     setVal('s-godModeScope', dm.godModeScope || 'all');
     // Phase 8, UI-04 -- God Mode Users Field (Contact Picker with paired JID support)
     if (!godModePickerDm) godModePickerDm = createGodModeUsersField('s-godModeSuperUsers-cp', { placeholder: 'Search god mode users...' });
-    godModePickerDm.setValue(dm.godModeSuperUsers || []);
+    if (godModePickerDm) godModePickerDm.setValue(dm.godModeSuperUsers || []);
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
     var gf = w.groupFilter || {};
     setChk('s-groupFilterEnabled', gf.enabled);
@@ -1712,7 +1725,7 @@ async function loadConfig() {
     setVal('s-groupGodModeScope', gf.godModeScope || 'all');
     // Phase 8, UI-04 -- God Mode Users Field (Contact Picker with paired JID support)
     if (!godModePickerGroup) godModePickerGroup = createGodModeUsersField('s-groupGodModeSuperUsers-cp', { placeholder: 'Search god mode users...' });
-    godModePickerGroup.setValue(gf.godModeSuperUsers || []);
+    if (godModePickerGroup) godModePickerGroup.setValue(gf.godModeSuperUsers || []);
     setVal('s-groupTokenEstimate', gf.tokenEstimate || 2500);
     var pr = w.presence || {};
     setChk('s-presenceEnabled', pr.enabled !== false);
