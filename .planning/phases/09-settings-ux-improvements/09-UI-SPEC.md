@@ -28,6 +28,12 @@ created: 2026-03-16
 
 ---
 
+## Focal Point Declaration
+
+The directory list (`.dir-list` region) is the primary visual region of the admin panel. The tab bar (`.dir-tabs`) is the primary focal navigation element. All Phase 9 changes are additive to this existing hierarchy — no changes to visual weight or focal ordering are introduced.
+
+---
+
 ## Spacing Scale
 
 All spacing is in multiples of 4px, matching existing admin panel conventions.
@@ -55,12 +61,11 @@ All sizes are expressed as rem, matching the existing CSS. Pixel equivalents ass
 
 | Role | Size | Weight | Line Height | Context |
 |------|------|--------|-------------|---------|
-| Body text | 0.88rem (14px) | 400 | 1.5 | General text, inputs, `.dir-search` |
-| Label | 0.82–0.85rem (13–14px) | 400 | 1.4 | `.field label`, `.settings-field label` |
+| Body text | 0.85rem (14px) | 400 | 1.5 | General text, inputs, `.dir-search`, `.field label`, `.settings-field label` |
 | Section heading | 0.85rem (14px) | 600 | 1.2 | `.card h2`, `.settings-section summary` — uppercase, letter-spacing 0.06em |
 | Tooltip content | 0.75rem (12px) | 400 | 1.4 | `.tip::after` — width 220px, white-space normal |
 
-Weights used: 400 (regular) and 600 (semibold) only. Do not introduce 500 or 700 in new elements.
+Body text and labels share the same 0.85rem size. Weight (400 vs 600) is the sole typographic distinction between them. Do not introduce a separate label size. Weights used: 400 (regular) and 600 (semibold) only. Do not introduce 500 or 700 in new elements.
 
 Tooltip text (UX-02 specific): All `data-tip` attribute values inherit 0.75rem / line-height 1.4 from the `.tip::after` rule. Write tooltip text as plain prose. No markdown, no newlines. Avoid apostrophes — rephrase or use the HTML entity `&#39;` if unavoidable.
 
@@ -153,7 +158,7 @@ Tab switch clears search:
 
 Search bar clear button:
 - Wrap the existing `dir-search` input in a position-relative container div with `flex:1` (the wrapper carries flex growth, remove it from the input)
-- Add a button `id="dir-search-clear"` positioned absolute, right `8px`, vertically centered via `top:50%; transform:translateY(-50%)`
+- Add a button `id="dir-search-clear"` with `aria-label="Clear search"` positioned absolute, right `8px`, vertically centered via `top:50%; transform:translateY(-50%)`
 - Button content: Unicode multiplication sign `&#x2715;` (renders as ×)
 - Button base style: `background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1rem; line-height:1; padding:0 4px`
 - Hover color: `#e2e8f0` (apply via `onmouseover`/`onmouseout` inline attributes, matching the project's vanilla JS pattern)
@@ -195,13 +200,13 @@ Search bar clear button:
 
 | Element | Copy |
 |---------|------|
-| Primary CTA | `Save` (unchanged — matches all existing save buttons) |
+| Primary CTA | Not introduced in this phase — existing Save buttons are unchanged carry-forwards from the pre-existing admin panel, not new Phase 9 UX decisions |
 | Tooltip badge label | `?` (single question mark) |
 | Trigger operator OR option | `OR – match any keyword` |
 | Trigger operator AND option | `AND – match all keywords` |
 | Trigger operator tooltip | `OR: message matches if it contains any keyword. AND: message must contain all keywords.` |
 | Channels tab label (renamed) | `Channels` |
-| Search clear button | `&#x2715;` (Unicode multiplication sign ×) |
+| Search clear button | `&#x2715;` (Unicode multiplication sign ×, with `aria-label="Clear search"`) |
 | Mode tooltip | `Active: bot responds to this contact. Listen Only: messages arrive but bot does not reply.` |
 | Mention Only tooltip | `When checked, bot only responds if it is explicitly @mentioned in the message.` |
 | Custom Keywords tooltip | `Comma-separated regex patterns. Bot responds only if the message matches one. Overrides global keyword filter for this contact.` |
