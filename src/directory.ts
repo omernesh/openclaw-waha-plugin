@@ -139,6 +139,7 @@ export class DirectoryDb {
         is_admin INTEGER DEFAULT 0,
         allow_in_group INTEGER DEFAULT 0,
         allow_dm INTEGER DEFAULT 0,
+        participant_role TEXT NOT NULL DEFAULT 'participant',
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (group_jid, participant_jid)
       );
@@ -455,7 +456,7 @@ export class DirectoryDb {
       isAdmin: r.is_admin === 1,
       allowInGroup: r.allow_in_group === 1,
       allowDm: r.allow_dm === 1,
-      participantRole: (r.participant_role as ParticipantRole) ?? "participant",
+      participantRole: (r.participant_role === "bot_admin" || r.participant_role === "manager" || r.participant_role === "participant") ? r.participant_role : "participant",
     }));
   }
 
@@ -845,8 +846,8 @@ export class DirectoryDb {
    */
   updateParticipantDisplayName(groupJid: string, participantJid: string, displayName: string): void {
     this.db.prepare(
-      "UPDATE group_participants SET display_name = ? WHERE group_jid = ? AND participant_jid = ?"
-    ).run(displayName, groupJid, participantJid);
+      "UPDATE group_participants SET display_name = ?, updated_at = ? WHERE group_jid = ? AND participant_jid = ?"
+    ).run(displayName, Date.now(), groupJid, participantJid);
   }
 
   close(): void {

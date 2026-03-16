@@ -12,7 +12,7 @@ import {
 } from "openclaw/plugin-sdk";
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
-import { getDirectoryDb } from "./directory.js";
+import { getDirectoryDb, type ParticipantRole } from "./directory.js";
 import { getWahaChats, getWahaContact, getWahaContacts, getWahaGroups, getWahaGroupParticipants, getWahaNewsletter, getWahaAllLids, toArr } from "./send.js";
 import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
@@ -2048,11 +2048,14 @@ async function bulkAction(action) {
     var d = await r.json();
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
     showToast('Updated ' + d.updated + ' item' + (d.updated !== 1 ? 's' : ''));
+    var savedGroupJid = bulkCurrentGroupJid;
     bulkSelectMode = false;
     bulkSelectedJids.clear();
     bulkCurrentGroupJid = null;
     updateBulkToolbar();
-    if (currentDirTab === 'groups') { loadGroupsTable(); } else { dirOffset = 0; loadDirectory(); }
+    if (savedGroupJid && (action === 'allow-group' || action === 'revoke-group')) {
+      loadGroupParticipants(savedGroupJid, true);
+    } else if (currentDirTab === 'groups') { loadGroupsTable(); } else { dirOffset = 0; loadDirectory(); }
   } catch(e) { showToast('Bulk action failed: ' + e.message, true); }
 }
 async function bulkRoleAction() {
@@ -2074,9 +2077,10 @@ async function bulkRoleAction() {
     showToast('Set role for ' + d.updated + ' participant' + (d.updated !== 1 ? 's' : ''));
     bulkSelectMode = false;
     bulkSelectedJids.clear();
-    updateBulkToolbar();
-    loadGroupParticipants(bulkCurrentGroupJid, true);
+    var savedGroupJid = bulkCurrentGroupJid;
     bulkCurrentGroupJid = null;
+    updateBulkToolbar();
+    loadGroupParticipants(savedGroupJid, true).catch(function(re) { showToast('Panel refresh failed: ' + (re instanceof Error ? re.message : String(re)), true); });
   } catch(e) { showToast('Bulk role failed: ' + e.message, true); }
 }
 
@@ -2088,13 +2092,13 @@ var dirGroupPage = 1;
 var dirGroupPageSize = 25;
 function debouncedDirSearch() {
   clearTimeout(dirSearchTimeout);
-  dirSearchTimeout = setTimeout(function() { dirOffset = 0; loadDirectory(); }, 300);
+  dirSearchTimeout = setTimeout(function() { dirOffset = 0; dirGroupPage = 1; loadDirectory(); }, 300);
 }
 async function loadDirectory() {
   // DIR-01: groups tab uses a separate paginated table renderer — do not use infinite-scroll path
   if (currentDirTab === 'groups') { return loadGroupsTable(); }
   var search = document.getElementById('dir-search').value.trim();
-  var typeParam = currentDirTab === 'contacts' ? '&type=contact' : currentDirTab === 'groups' ? '&type=group' : '&type=newsletter';
+  var typeParam = currentDirTab === 'contacts' ? '&type=contact' : '&type=newsletter';
   var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + typeParam + (search ? '&search=' + encodeURIComponent(search) : '');
   try {
     var r = await fetch(url);
@@ -2180,7 +2184,10 @@ async function loadGroupsTable() {
   var list = document.getElementById('contact-list');
   try {
     var r = await fetch(url);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!r.ok) {
+      var errBody; try { errBody = await r.json(); } catch(_) {}
+      throw new Error((errBody && errBody.error) || 'HTTP ' + r.status);
+    }
     var d = await r.json();
     var totalPages = Math.ceil((d.total || 0) / dirGroupPageSize) || 1;
     document.getElementById('dir-stats').innerHTML =
@@ -2283,11 +2290,11 @@ async function loadGroupsTable() {
     var lowerNav = document.createElement('div');
     lowerNav.innerHTML = buildPageNav(dirGroupPage, totalPages);
     list.appendChild(lowerNav);
-  } catch(errGt) {
+  } catch(err) {
     while (list.firstChild) { list.removeChild(list.firstChild); }
     var errEl = document.createElement('div');
     errEl.style.cssText = 'color:#ef4444;padding:16px;';
-    errEl.textContent = 'Error loading groups: ' + errGt.message;
+    errEl.textContent = 'Error loading groups: ' + (err instanceof Error ? err.message : String(err));
     list.appendChild(errEl);
   }
 }
@@ -2408,7 +2415,10 @@ async function loadGroupParticipants(groupJid, forceOpen) {
   if (!panel) return;
   if (!forceOpen) {
     panel.classList.toggle('open');
-    if (!panel.classList.contains('open')) return;
+    if (!panel.classList.contains('open')) {
+      if (bulkSelectMode && bulkCurrentGroupJid === groupJid) { bulkCurrentGroupJid = null; updateBulkToolbar(); }
+      return;
+    }
   } else {
     panel.classList.add('open');
   }
@@ -2518,7 +2528,9 @@ async function setParticipantRole(groupJid, participantJid, role) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: role })
     });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    if (!d.ok) throw new Error(d.error || 'Participant not found — refresh participants first');
     showToast('Role updated');
   } catch(e) {
     showToast('Failed to update role: ' + e.message, true);
@@ -3212,31 +3224,57 @@ export function createWahaWebhookServer(opts: {
           writeJsonResponse(res, 400, { error: "action must be one of: " + validActions.join(", ") });
           return;
         }
+        if (action === "set-role") {
+          if (!value || !["bot_admin", "manager", "participant"].includes(value)) {
+            writeJsonResponse(res, 400, { error: "value must be bot_admin, manager, or participant for set-role action" });
+            return;
+          }
+          if (!groupJid) {
+            writeJsonResponse(res, 400, { error: "groupJid is required for set-role action" });
+            return;
+          }
+        }
+        if ((action === "allow-group" || action === "revoke-group") && !groupJid) {
+          writeJsonResponse(res, 400, { error: "groupJid is required for " + action + " action" });
+          return;
+        }
         const db = getDirectoryDb(opts.accountId);
         const configPath = getConfigPath();
         let updated = 0;
+        const allowDmJids: string[] = [];
+        const revokeDmJids: string[] = [];
+        const allowGroupJids: string[] = [];
+        const revokeGroupJids: string[] = [];
         for (const jid of jids) {
           if (action === "allow-dm") {
-            syncAllowList(configPath, "allowFrom", jid, true);
+            db.setContactAllowDm(jid, true);
+            allowDmJids.push(jid);
             updated++;
           } else if (action === "revoke-dm") {
-            syncAllowList(configPath, "allowFrom", jid, false);
+            db.setContactAllowDm(jid, false);
+            revokeDmJids.push(jid);
             updated++;
           } else if (action === "allow-group" && groupJid) {
             if (db.setParticipantAllowInGroup(groupJid, jid, true)) {
-              syncAllowList(configPath, "groupAllowFrom", jid, true);
+              allowGroupJids.push(jid);
               updated++;
             }
           } else if (action === "revoke-group" && groupJid) {
             if (db.setParticipantAllowInGroup(groupJid, jid, false)) {
-              syncAllowList(configPath, "groupAllowFrom", jid, false);
+              revokeGroupJids.push(jid);
               updated++;
             }
           } else if (action === "set-role" && groupJid && value) {
-            if (!["bot_admin", "manager", "participant"].includes(value)) continue;
-            if (db.setParticipantRole(groupJid, jid, value as import("./directory.js").ParticipantRole)) updated++;
+            if (value === "bot_admin" || value === "manager" || value === "participant") {
+              if (db.setParticipantRole(groupJid, jid, value)) updated++;
+            }
           }
         }
+        // Batch config sync — single file read+write per action type instead of per-JID
+        if (allowDmJids.length) syncAllowListBatch(configPath, "allowFrom", allowDmJids, true);
+        if (revokeDmJids.length) syncAllowListBatch(configPath, "allowFrom", revokeDmJids, false);
+        if (allowGroupJids.length) syncAllowListBatch(configPath, "groupAllowFrom", allowGroupJids, true);
+        if (revokeGroupJids.length) syncAllowListBatch(configPath, "groupAllowFrom", revokeGroupJids, false);
         writeJsonResponse(res, 200, { ok: true, updated });
       } catch (err) {
         console.error(`[waha] POST /api/admin/directory/bulk failed: ${String(err)}`);
@@ -3612,8 +3650,12 @@ export function createWahaWebhookServer(opts: {
             return;
           }
           const db = getDirectoryDb(opts.accountId);
-          const ok = db.setParticipantRole(groupJid, participantJid, role as import("./directory.js").ParticipantRole);
-          writeJsonResponse(res, 200, { ok });
+          const ok = db.setParticipantRole(groupJid, participantJid, role as ParticipantRole);
+          if (!ok) {
+            writeJsonResponse(res, 404, { error: "Participant not found in group" });
+          } else {
+            writeJsonResponse(res, 200, { ok: true });
+          }
         } catch (err) {
           console.error(`[waha] PUT participant role failed: ${String(err)}`);
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
