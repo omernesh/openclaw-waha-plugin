@@ -23,6 +23,9 @@ export type ContactDmSettings = {
   canInitiate: boolean;
 };
 
+/** DIR-03: Plugin-level role for a group participant. No WhatsApp meaning — admin panel label only. */
+export type ParticipantRole = "bot_admin" | "manager" | "participant";
+
 export type GroupParticipant = {
   groupJid: string;
   participantJid: string;
@@ -30,6 +33,7 @@ export type GroupParticipant = {
   isAdmin: boolean;
   allowInGroup: boolean;
   allowDm: boolean;
+  participantRole: ParticipantRole;  // DIR-03: plugin-level role (bot_admin / manager / participant)
 };
 
 /**
@@ -171,6 +175,16 @@ export class DirectoryDb {
       this.db.prepare(`ALTER TABLE group_filter_overrides ADD COLUMN trigger_operator TEXT NOT NULL DEFAULT 'OR'`).run();
     } catch (migrationErr: unknown) {
       // Only ignore 'duplicate column' errors — re-throw anything else (disk full, corrupt DB, etc.)
+      const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
+      if (!msg.includes('duplicate column')) throw migrationErr;
+    }
+
+    // DIR-03: Add participant_role column to group_participants (migration-safe — ignores if column exists)
+    try {
+      this.db.prepare(
+        `ALTER TABLE group_participants ADD COLUMN participant_role TEXT NOT NULL DEFAULT 'participant'`
+      ).run();
+    } catch (migrationErr: unknown) {
       const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
       if (!msg.includes('duplicate column')) throw migrationErr;
     }
@@ -432,7 +446,7 @@ export class DirectoryDb {
 
   getGroupParticipants(groupJid: string): GroupParticipant[] {
     const rows = this.db.prepare(
-      "SELECT group_jid, participant_jid, display_name, is_admin, allow_in_group, allow_dm FROM group_participants WHERE group_jid = ? ORDER BY display_name ASC, participant_jid ASC"
+      "SELECT group_jid, participant_jid, display_name, is_admin, allow_in_group, allow_dm, participant_role FROM group_participants WHERE group_jid = ? ORDER BY display_name ASC, participant_jid ASC"
     ).all(groupJid) as Array<Record<string, unknown>>;
     return rows.map((r) => ({
       groupJid: r.group_jid as string,
@@ -441,6 +455,7 @@ export class DirectoryDb {
       isAdmin: r.is_admin === 1,
       allowInGroup: r.allow_in_group === 1,
       allowDm: r.allow_dm === 1,
+      participantRole: (r.participant_role as ParticipantRole) ?? "participant",
     }));
   }
 
@@ -461,14 +476,14 @@ export class DirectoryDb {
     if (participants.length === 0) return 0;
     const now = Date.now();
     const upsert = this.db.prepare(
-      `INSERT INTO group_participants (group_jid, participant_jid, display_name, is_admin, allow_in_group, allow_dm, updated_at)
-       VALUES (?, ?, ?, ?, COALESCE((SELECT allow_in_group FROM group_participants WHERE group_jid = ? AND participant_jid = ?), 0), COALESCE((SELECT allow_dm FROM group_participants WHERE group_jid = ? AND participant_jid = ?), 0), ?)
+      `INSERT INTO group_participants (group_jid, participant_jid, display_name, is_admin, allow_in_group, allow_dm, participant_role, updated_at)
+       VALUES (?, ?, ?, ?, COALESCE((SELECT allow_in_group FROM group_participants WHERE group_jid = ? AND participant_jid = ?), 0), COALESCE((SELECT allow_dm FROM group_participants WHERE group_jid = ? AND participant_jid = ?), 0), COALESCE((SELECT participant_role FROM group_participants WHERE group_jid = ? AND participant_jid = ?), 'participant'), ?)
        ON CONFLICT(group_jid, participant_jid) DO UPDATE SET display_name = excluded.display_name, is_admin = excluded.is_admin, updated_at = excluded.updated_at`
     );
     const tx = this.db.transaction((rows: Array<{ jid: string; name?: string; isAdmin?: boolean }>) => {
       let count = 0;
       for (const row of rows) {
-        upsert.run(groupJid, row.jid, row.name ?? null, row.isAdmin ? 1 : 0, groupJid, row.jid, groupJid, row.jid, now);
+        upsert.run(groupJid, row.jid, row.name ?? null, row.isAdmin ? 1 : 0, groupJid, row.jid, groupJid, row.jid, groupJid, row.jid, now);
         count++;
       }
       return count;
@@ -488,6 +503,22 @@ export class DirectoryDb {
       "UPDATE group_participants SET allow_dm = ?, updated_at = ? WHERE group_jid = ? AND participant_jid = ?"
     ).run(allowed ? 1 : 0, Date.now(), groupJid, participantJid);
     return result.changes > 0;
+  }
+
+  /** DIR-03: Set participant role — plugin-level label, no WAHA meaning. Returns true if row was updated. */
+  setParticipantRole(groupJid: string, participantJid: string, role: ParticipantRole): boolean {
+    const result = this.db.prepare(
+      "UPDATE group_participants SET participant_role = ?, updated_at = ? WHERE group_jid = ? AND participant_jid = ?"
+    ).run(role, Date.now(), groupJid, participantJid);
+    return result.changes > 0;
+  }
+
+  /** DIR-03: Get participant role — defaults to "participant" if row not found. */
+  getParticipantRole(groupJid: string, participantJid: string): ParticipantRole {
+    const row = this.db.prepare(
+      "SELECT participant_role FROM group_participants WHERE group_jid = ? AND participant_jid = ?"
+    ).get(groupJid, participantJid) as { participant_role: string } | undefined;
+    return (row?.participant_role as ParticipantRole) ?? "participant";
   }
 
   setGroupAllowAll(groupJid: string, allowAll: boolean): void {

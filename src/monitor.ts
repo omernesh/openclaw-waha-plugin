@@ -2307,6 +2307,13 @@ async function loadGroupParticipants(groupJid, forceOpen) {
         html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + '</div>';
         html += '<div style="font-size:0.72rem;color:#64748b;font-family:monospace;">' + esc(p.participantJid) + '</div>';
         html += '</div>';
+        // DIR-03: Role dropdown — role values are static strings (no user data), safe as HTML template
+        var pRole = p.participantRole || 'participant';
+        html += '<select style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:0.75rem;" onchange="setParticipantRole(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',this.value)">';
+        html += '<option value="bot_admin"' + (pRole === 'bot_admin' ? ' selected' : '') + '>Bot Admin</option>';
+        html += '<option value="manager"' + (pRole === 'manager' ? ' selected' : '') + '>Manager</option>';
+        html += '<option value="participant"' + (pRole === 'participant' ? ' selected' : '') + '>Participant</option>';
+        html += '</select>';
         html += '<button style="background:' + (groupAllowed ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-group\\',' + (p.allowInGroup ? 'true' : 'false') + ')">' + (groupAllowed ? 'Allowed' : 'Allow') + '</button>';
         html += '<button style="background:' + (p.allowDm ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-dm\\',' + (p.allowDm ? 'true' : 'false') + ')">' + (p.allowDm ? 'DM OK' : 'Allow DM') + '</button>';
         html += '</div>';
@@ -2360,6 +2367,21 @@ async function toggleParticipantAllow(groupJid, participantJid, type, currentlyA
     showToast('Updated ' + participantJid);
     loadGroupParticipants(groupJid, true);
   } catch(e) { showToast('Error: ' + e.message, true); }
+}
+
+// DIR-03: Set participant role — calls PUT /api/admin/directory/group/:groupJid/participants/:participantJid/role
+async function setParticipantRole(groupJid, participantJid, role) {
+  try {
+    var r = await fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/participants/' + encodeURIComponent(participantJid) + '/role', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: role })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Role updated');
+  } catch(e) {
+    showToast('Failed to update role: ' + e.message, true);
+  }
 }
 
 async function toggleGroupAllowAll(groupJid, currentlyAll) {
@@ -3370,6 +3392,30 @@ export function createWahaWebhookServer(opts: {
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
           console.error(`[waha] POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-dm failed: ${String(err)}`);
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // PUT /api/admin/directory/group/:groupJid/participants/:participantJid/role
+    {
+      const m = req.method === "PUT" && req.url?.match(/^\/api\/admin\/directory\/group\/([^/]+)\/participants\/([^/]+)\/role$/);
+      if (m) {
+        try {
+          const groupJid = decodeURIComponent(m[1]);
+          const participantJid = decodeURIComponent(m[2]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const { role } = JSON.parse(bodyStr) as { role: string };
+          if (!["bot_admin", "manager", "participant"].includes(role)) {
+            writeJsonResponse(res, 400, { error: "role must be bot_admin, manager, or participant" });
+            return;
+          }
+          const db = getDirectoryDb(opts.accountId);
+          const ok = db.setParticipantRole(groupJid, participantJid, role as import("./directory.js").ParticipantRole);
+          writeJsonResponse(res, 200, { ok });
+        } catch (err) {
+          console.error(`[waha] PUT participant role failed: ${String(err)}`);
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
