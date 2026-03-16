@@ -201,6 +201,6 @@ Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Pha
 | 6. WhatsApp Rules and Policy System | 4/4 | Complete   | 2026-03-13 |
 | 7. Admin Panel Critical Fixes | 2/2 | Complete   | 2026-03-15 |
 | 8. Shared UI Components | 2/2 | Complete   | 2026-03-16 |
-| 9. Settings UX Improvements | 0/2 | Planned | |
+| 9. Settings UX Improvements | 1/2 | In Progress|  |
 | 10. Directory & Group Enhancements | 0/? | Planned | |
 | 11. Dashboard, Sessions & Log | 0/? | Planned | |
