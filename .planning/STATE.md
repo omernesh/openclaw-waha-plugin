@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-03-16T16:41:26.837Z"
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-03-16T16:50:49.267Z"
 last_activity: "2026-03-15 - Completed quick task 260315-wo2: Break down BUGS.md into GSD phases"
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 26
-  completed_plans: 25
+  completed_plans: 26
   percent: 95
 ---
 
@@ -130,6 +130,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 09-settings-ux-improvements P09-01 | 3 | 1 tasks | 1 files |
 | Phase 09-settings-ux-improvements P02 | 4 | 1 tasks | 2 files |
 | Phase 10-directory-group-enhancements P10-01 | 15 | 1 tasks | 1 files |
+| Phase 10-directory-group-enhancements P02 | 7 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -191,6 +192,7 @@ Recent decisions affecting current work:
 - [Phase 10-directory-group-enhancements]: Groups tab uses separate loadGroupsTable() render path via early-return in loadDirectory() — contacts/newsletters infinite-scroll untouched
 - [Phase 10-directory-group-enhancements]: DOM methods required for all user-supplied text in loadGroupsTable — security hook blocks innerHTML+user-data; buildPageNav (static integers only) safe for innerHTML
 - [Phase 10-directory-group-enhancements]: Participant allow button green when allowInGroup OR globallyAllowed — reflects both DB state and config.groupAllowFrom
+- [Phase 10-directory-group-enhancements]: PUT role endpoint uses exact URL match before generic directory routes to prevent collision; JSON.stringify for safe JID embedding in checkbox onclick; bulkCurrentGroupJid context variable for toolbar action context
 
 ### Roadmap Evolution
 
@@ -216,6 +218,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-16T16:41:26.832Z
-Stopped at: Completed 10-01-PLAN.md
+Last session: 2026-03-16T16:50:49.259Z
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None
