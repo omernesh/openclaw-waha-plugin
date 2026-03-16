@@ -143,7 +143,11 @@ Plans:
   2. Tag-style input works with comma/space/enter to create bubbles with 'x' to delete
   3. Contact picker supports UTF-8 (Hebrew + English) fuzzy search with multi-select
   4. God Mode Users shows names with remove buttons, adding/removing handles paired JIDs (@c.us + @lid)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md -- Name Resolver + Tag Input factory functions, CSS, wire Tag Input into allowFrom/groupAllowFrom/allowedGroups, Name Resolver in dashboard
+- [ ] 08-02-PLAN.md -- Contact Picker + God Mode Users Field factory functions, CSS, wire into godModeSuperUsers textareas
 
 ### Phase 9: Settings UX Improvements
 **Goal:** Improve Settings tab usability with tooltips, fixed pairing mode, tab switching, and group filter UX
@@ -192,7 +196,7 @@ Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Pha
 | 5. Documentation and Testing | 2/2 | Complete   | 2026-03-13 |
 | 6. WhatsApp Rules and Policy System | 4/4 | Complete   | 2026-03-13 |
 | 7. Admin Panel Critical Fixes | 2/2 | Complete   | 2026-03-15 |
-| 8. Shared UI Components | 0/? | Planned | |
+| 8. Shared UI Components | 0/2 | Planned | |
 | 9. Settings UX Improvements | 0/? | Planned | |
 | 10. Directory & Group Enhancements | 0/? | Planned | |
 | 11. Dashboard, Sessions & Log | 0/? | Planned | |
