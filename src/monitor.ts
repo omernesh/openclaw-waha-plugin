@@ -342,7 +342,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   #toast.error { background: #ef4444; }
   /* DIRECTORY */
   .dir-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .dir-search { flex: 1; min-width: 200px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 0.88rem; }
+  .dir-search { min-width: 200px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 0.88rem; }
   .dir-search:focus { outline: none; border-color: #38bdf8; }
   .dir-stats { display: flex; gap: 16px; }
   .dir-stat { font-size: 0.8rem; color: #64748b; }
@@ -537,9 +537,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       <summary>Access Control</summary>
       <div class="field-group">
         <div class="field">
-          <label>DM Policy <span class="tip" data-tip="How to handle unknown DM senders. pairing=require approval code, open=allow all, closed=block all, allowlist=only allowFrom list.">?</span></label>
+          <label>DM Policy <span class="tip" data-tip="How to handle DMs from unknown senders. open: accept all. closed: block all. allowlist: only contacts in Allow From list. pairing: not supported in current SDK integration.">?</span></label>
           <select id="s-dmPolicy" name="dmPolicy">
-            <option value="pairing">pairing</option>
+            <!-- UX-01: pairing disabled - SDK integration not verified -->
+            <option value="pairing" disabled>pairing (not available)</option>
             <option value="open">open</option>
             <option value="closed">closed</option>
             <option value="allowlist">allowlist</option>
@@ -817,10 +818,13 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #334155;">
     <button class="dir-tab active" onclick="switchDirTab('contacts',this)" id="dtab-contacts">Contacts</button>
     <button class="dir-tab" onclick="switchDirTab('groups',this)" id="dtab-groups">Groups</button>
-    <button class="dir-tab" onclick="switchDirTab('newsletters',this)" id="dtab-newsletters">Newsletters</button>
+    <button class="dir-tab" onclick="switchDirTab('newsletters',this)" id="dtab-newsletters">Channels</button>
   </div>
   <div class="dir-header">
-    <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()">
+    <div style="position:relative;flex:1;">
+      <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()" style="width:100%;padding-right:28px;">
+      <button id="dir-search-clear" onclick="clearDirSearch()" aria-label="Clear search" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#94a3b8'">&#x2715;</button>
+    </div>
     <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Refresh current tab from WAHA API">Refresh</button>
     <button class="refresh-btn" style="background:#7c3aed;" id="dir-refresh-all-btn" onclick="refreshDirectory()" title="Import all contacts, groups and newsletters from WAHA API">Refresh All</button>
     <div class="dir-stats" id="dir-stats"></div>
@@ -1929,8 +1933,16 @@ function switchDirTab(tab, btn) {
   currentDirTab = tab;
   document.querySelectorAll('.dir-tab').forEach(function(el) { el.classList.remove('active'); });
   if (btn) btn.classList.add('active');
+  var searchEl = document.getElementById('dir-search');   // UX-04: clear on tab switch
+  if (searchEl) searchEl.value = '';                      // UX-04: clear on tab switch
   dirOffset = 0;
   dirAutoImported = false;
+  loadDirectory();
+}
+// UX-04: Clear search bar and reload directory
+function clearDirSearch() {
+  document.getElementById('dir-search').value = '';
+  dirOffset = 0;
   loadDirectory();
 }
 // ---- Directory refresh ----
@@ -2042,10 +2054,10 @@ function buildContactCard(c) {
   } else {
     panelContent = '<div class="contact-settings-panel" id="panel-' + id + '">' +
       '<div class="settings-fields">' +
-        '<div class="settings-field"><label>Mode</label><select id="mode-' + id + '"><option value="active"' + (dm.mode==='active'?' selected':'') + '>Active</option><option value="listen_only"' + (dm.mode==='listen_only'?' selected':'') + '>Listen Only</option></select></div>' +
-        '<div class="settings-field"><label><input type="checkbox" id="mo-' + id + '"' + (dm.mentionOnly?' checked':'') + '> Mention Only</label></div>' +
-        '<div class="settings-field"><label>Custom Keywords (comma-separated)</label><input type="text" id="kw-' + id + '" value="' + esc(dm.customKeywords) + '" placeholder="keyword1, keyword2"></div>' +
-        '<div class="settings-field"><label><input type="checkbox" id="ci-' + id + '"' + (dm.canInitiate?' checked':'') + '> Can Initiate</label></div>' +
+        '<div class="settings-field"><label>Mode <span class="tip" data-tip="Active: bot responds to this contact. Listen Only: messages arrive but bot does not reply.">?</span></label><select id="mode-' + id + '"><option value="active"' + (dm.mode==='active'?' selected':'') + '>Active</option><option value="listen_only"' + (dm.mode==='listen_only'?' selected':'') + '>Listen Only</option></select></div>' +
+        '<div class="settings-field"><label><input type="checkbox" id="mo-' + id + '"' + (dm.mentionOnly?' checked':'') + '> Mention Only <span class="tip" data-tip="When checked, bot only responds if it is explicitly @mentioned in the message.">?</span></label></div>' +
+        '<div class="settings-field"><label>Custom Keywords <span class="tip" data-tip="Comma-separated regex patterns. Bot responds only if the message matches one. Overrides global keyword filter for this contact.">?</span></label><input type="text" id="kw-' + id + '" value="' + esc(dm.customKeywords) + '" placeholder="keyword1, keyword2"></div>' +
+        '<div class="settings-field"><label><input type="checkbox" id="ci-' + id + '"' + (dm.canInitiate?' checked':'') + '> Can Initiate <span class="tip" data-tip="When checked, bot is allowed to send the first message to this contact. Uncheck to prevent unsolicited outbound messages.">?</span></label></div>' +
         '<button class="save-contact-btn" onclick="saveContactSettings(\\'' + esc(c.jid) + '\\', \\'' + id + '\\')">Save</button>' +
       '</div>' +
     '</div>';
