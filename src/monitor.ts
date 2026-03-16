@@ -457,6 +457,12 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- DIR-04: Bulk action toolbar — fixed at bottom, shown only when bulk items are selected -->
+<div id="bulk-toolbar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;border-top:2px solid #1d4ed8;padding:12px 24px;z-index:1000;align-items:center;gap:16px;">
+  <span id="bulk-count" style="color:#94a3b8;font-size:0.88rem;font-weight:600;"></span>
+  <div id="bulk-actions" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+</div>
+
 <!-- TAB: DASHBOARD -->
 <div class="tab-content active" id="content-dashboard">
 <main class="tab-pane">
@@ -834,6 +840,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     </div>
     <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Refresh current tab from WAHA API">Refresh</button>
     <button class="refresh-btn" style="background:#7c3aed;" id="dir-refresh-all-btn" onclick="refreshDirectory()" title="Import all contacts, groups and newsletters from WAHA API">Refresh All</button>
+    <button class="refresh-btn" id="bulk-select-btn" onclick="toggleBulkSelectMode()" title="Toggle bulk select mode">Select</button>
     <div class="dir-stats" id="dir-stats"></div>
   </div>
   <div class="contact-list" id="contact-list"></div>
@@ -1938,6 +1945,10 @@ function toggleMediaSubToggles() {
 // ---- Directory sub-tabs ----
 var currentDirTab = 'contacts';
 var dirAutoImported = false;
+// DIR-04: Bulk select mode state
+var bulkSelectMode = false;
+var bulkSelectedJids = new Set();
+var bulkCurrentGroupJid = null;  // set when bulk-selecting participants within a group panel
 function switchDirTab(tab, btn) {
   currentDirTab = tab;
   document.querySelectorAll('.dir-tab').forEach(function(el) { el.classList.remove('active'); });
@@ -1947,6 +1958,11 @@ function switchDirTab(tab, btn) {
   dirOffset = 0;
   dirGroupPage = 1;  // DIR-01: reset groups page on tab switch
   dirAutoImported = false;
+  // DIR-04: Clear bulk selection state on tab switch (Pitfall 4)
+  bulkSelectMode = false;
+  bulkSelectedJids.clear();
+  bulkCurrentGroupJid = null;
+  updateBulkToolbar();
   loadDirectory();
 }
 // UX-04: Clear search bar and reload directory
@@ -1972,6 +1988,96 @@ async function refreshDirectory() {
   } finally {
     if (btn) { btn.textContent = 'Refresh All'; btn.disabled = false; }
   }
+}
+
+// ---- DIR-04: Bulk select functions ----
+function toggleBulkSelectMode() {
+  bulkSelectMode = !bulkSelectMode;
+  bulkSelectedJids.clear();
+  bulkCurrentGroupJid = null;
+  updateBulkToolbar();
+  if (currentDirTab === 'groups') { loadGroupsTable(); } else { dirOffset = 0; loadDirectory(); }
+}
+function toggleBulkItem(jid, checkbox) {
+  if (checkbox.checked) { bulkSelectedJids.add(jid); } else { bulkSelectedJids.delete(jid); }
+  updateBulkToolbar();
+}
+function updateBulkToolbar() {
+  var toolbar = document.getElementById('bulk-toolbar');
+  var btn = document.getElementById('bulk-select-btn');
+  if (!toolbar) return;
+  // Update select button style
+  if (btn) {
+    btn.textContent = bulkSelectMode ? 'Cancel' : 'Select';
+    btn.style.background = bulkSelectMode ? '#ef4444' : '';
+  }
+  // Hide toolbar if not in bulk mode or no items selected
+  if (!bulkSelectMode || bulkSelectedJids.size === 0) {
+    toolbar.style.display = 'none';
+    return;
+  }
+  toolbar.style.display = 'flex';
+  var countEl = document.getElementById('bulk-count');
+  if (countEl) { countEl.textContent = bulkSelectedJids.size + ' selected'; }
+  // Rebuild action buttons based on context
+  var actionsEl = document.getElementById('bulk-actions');
+  if (!actionsEl) return;
+  actionsEl.innerHTML = '';
+  if (bulkCurrentGroupJid) {
+    // Participant context: Allow Group / Revoke Group / Set Role
+    actionsEl.innerHTML =
+      '<button onclick="bulkAction(\'allow-group\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow Group</button>' +
+      '<button onclick="bulkAction(\'revoke-group\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke Group</button>' +
+      '<button onclick="bulkRoleAction()" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Set Role</button>';
+  } else {
+    // Contacts context: Allow DM / Revoke DM
+    actionsEl.innerHTML =
+      '<button onclick="bulkAction(\'allow-dm\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow DM</button>' +
+      '<button onclick="bulkAction(\'revoke-dm\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke DM</button>';
+  }
+}
+async function bulkAction(action) {
+  var jids = Array.from(bulkSelectedJids);
+  if (jids.length === 0) return;
+  try {
+    var body = { jids: jids, action: action, groupJid: bulkCurrentGroupJid };
+    var r = await fetch('/api/admin/directory/bulk', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    showToast('Updated ' + d.updated + ' item' + (d.updated !== 1 ? 's' : ''));
+    bulkSelectMode = false;
+    bulkSelectedJids.clear();
+    bulkCurrentGroupJid = null;
+    updateBulkToolbar();
+    if (currentDirTab === 'groups') { loadGroupsTable(); } else { dirOffset = 0; loadDirectory(); }
+  } catch(e) { showToast('Bulk action failed: ' + e.message, true); }
+}
+async function bulkRoleAction() {
+  var jids = Array.from(bulkSelectedJids);
+  if (jids.length === 0 || !bulkCurrentGroupJid) return;
+  var role = prompt('Enter role: bot_admin, manager, or participant', 'participant');
+  if (!role) return;
+  if (!['bot_admin', 'manager', 'participant'].includes(role)) {
+    showToast('Invalid role. Must be bot_admin, manager, or participant', true);
+    return;
+  }
+  try {
+    var r = await fetch('/api/admin/directory/bulk', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ jids: jids, action: 'set-role', value: role, groupJid: bulkCurrentGroupJid })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    showToast('Set role for ' + d.updated + ' participant' + (d.updated !== 1 ? 's' : ''));
+    bulkSelectMode = false;
+    bulkSelectedJids.clear();
+    updateBulkToolbar();
+    loadGroupParticipants(bulkCurrentGroupJid, true);
+    bulkCurrentGroupJid = null;
+  } catch(e) { showToast('Bulk role failed: ' + e.message, true); }
 }
 
 // ---- Directory ----
@@ -2119,7 +2225,8 @@ async function loadGroupsTable() {
     var table = document.createElement('table');
     table.className = 'groups-table';
     var thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>Name</th><th>JID</th><th>Members</th><th>Last Active</th><th></th></tr>';
+    // DIR-04: Add checkbox column header in bulk select mode
+    thead.innerHTML = (bulkSelectMode ? '<tr><th style="width:30px;"></th><th>Name</th><th>JID</th><th>Members</th><th>Last Active</th><th></th></tr>' : '<tr><th>Name</th><th>JID</th><th>Members</th><th>Last Active</th><th></th></tr>');
     table.appendChild(thead);
     var tbody = document.createElement('tbody');
     d.contacts.forEach(function(c) {
@@ -2128,6 +2235,19 @@ async function loadGroupsTable() {
       var tr = document.createElement('tr');
       tr.id = 'row-' + safeId;
       tr.setAttribute('onclick', 'loadGroupParticipants(\'' + esc(c.jid) + '\')');
+      // DIR-04: Checkbox cell in bulk select mode — DOM methods required (JID is user data)
+      if (bulkSelectMode) {
+        var tdCb = document.createElement('td');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.style.cssText = 'width:16px;height:16px;accent-color:#1d4ed8;vertical-align:middle;cursor:pointer;';
+        cb.checked = bulkSelectedJids.has(c.jid);
+        (function(jid) {
+          cb.addEventListener('click', function(e) { e.stopPropagation(); toggleBulkItem(jid, cb); });
+        })(c.jid);
+        tdCb.appendChild(cb);
+        tr.appendChild(tdCb);
+      }
       var tdName = document.createElement('td');
       tdName.textContent = c.displayName || c.jid; // textContent safe — no HTML injection
       var tdJid = document.createElement('td');
@@ -2148,7 +2268,7 @@ async function loadGroupsTable() {
       // Panel expansion row (hosts participant panel div — reuses loadGroupParticipants panel pattern)
       var panelTr = document.createElement('tr');
       var panelTd = document.createElement('td');
-      panelTd.setAttribute('colspan', '5');
+      panelTd.setAttribute('colspan', bulkSelectMode ? '6' : '5');
       panelTd.style.padding = '0';
       var panelDiv = document.createElement('div');
       panelDiv.className = 'contact-settings-panel';
@@ -2213,8 +2333,22 @@ function buildContactCard(c) {
     '</div>';
   }
 
+  // DIR-04: Checkbox prepended in bulk select mode (DOM method used — JID is user data)
+  var bulkCheckbox = '';
+  if (bulkSelectMode) {
+    var cbEl = document.createElement('input');
+    cbEl.type = 'checkbox';
+    cbEl.style.cssText = 'margin-right:8px;width:18px;height:18px;accent-color:#1d4ed8;vertical-align:middle;flex-shrink:0;';
+    cbEl.checked = bulkSelectedJids.has(c.jid);
+    cbEl.setAttribute('onclick', 'event.stopPropagation();toggleBulkItem(' + JSON.stringify(c.jid) + ',this)');
+    var tempDiv = document.createElement('div');
+    tempDiv.appendChild(cbEl);
+    bulkCheckbox = tempDiv.innerHTML;
+  }
+
   return '<div class="contact-card" id="' + id + '" style="' + borderStyle + '">' +
-    '<div class="contact-header" onclick="' + clickAction + '">' +
+    '<div class="contact-header" onclick="' + clickAction + '" style="display:flex;align-items:center;">' +
+      bulkCheckbox +
       '<div class="avatar" style="background:' + avatarBg + ';color:#fff">' + avatarContent + '</div>' +
       '<div class="contact-info">' +
         '<div class="contact-name">' + esc(name) + '</div>' +
@@ -2285,6 +2419,8 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     var d = await r.json();
     var parts = d.participants || [];
     var allowAll = d.allowAll;
+    // DIR-04: When bulk mode is active, set bulkCurrentGroupJid so toolbar knows the context
+    if (bulkSelectMode) { bulkCurrentGroupJid = groupJid; updateBulkToolbar(); }
     var html = '<div style="padding:12px;">';
     html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
     html += '<span style="font-size:0.85rem;color:#94a3b8;font-weight:600;">' + parts.length + ' participants</span>';
@@ -2302,6 +2438,11 @@ async function loadGroupParticipants(groupJid, forceOpen) {
         // DIR-02: Green if allowed per-group OR globally allowed via config.groupAllowFrom
         var groupAllowed = p.allowInGroup || p.globallyAllowed;
         html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e293b;">';
+        // DIR-04: Checkbox in bulk select mode — use JSON.stringify to safely embed JID in onclick
+        if (bulkSelectMode) {
+          var pChecked = bulkSelectedJids.has(p.participantJid);
+          html += '<input type="checkbox"' + (pChecked ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:#1d4ed8;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();toggleBulkItem(' + JSON.stringify(p.participantJid) + ',this)">';
+        }
         html += '<div class="avatar" style="width:32px;height:32px;font-size:0.8rem;background:' + pColor + ';color:#fff">' + esc(pInits) + '</div>';
         html += '<div style="flex:1;min-width:0;">';
         html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + '</div>';
@@ -3039,6 +3180,59 @@ export function createWahaWebhookServer(opts: {
       } catch (err) {
         console.error(`[waha] GET /api/admin/sessions failed: ${String(err)}`);
         writeJsonResponse(res, 500, { error: "Failed to fetch sessions" });
+      }
+      return;
+    }
+
+    // POST /api/admin/directory/bulk — bulk operations on multiple JIDs (DIR-04)
+    // CRITICAL: exact URL match placed BEFORE generic /api/admin/directory/:jid routes to avoid collision (Pitfall 7)
+    if (req.url === "/api/admin/directory/bulk" && req.method === "POST") {
+      try {
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const { jids, action, value, groupJid } = JSON.parse(bodyStr) as {
+          jids: string[];
+          action: string;
+          value?: string;
+          groupJid?: string;
+        };
+        if (!Array.isArray(jids) || jids.length === 0) {
+          writeJsonResponse(res, 400, { error: "jids must be a non-empty array" });
+          return;
+        }
+        const validActions = ["allow-dm", "revoke-dm", "allow-group", "revoke-group", "set-role"];
+        if (!validActions.includes(action)) {
+          writeJsonResponse(res, 400, { error: "action must be one of: " + validActions.join(", ") });
+          return;
+        }
+        const db = getDirectoryDb(opts.accountId);
+        const configPath = getConfigPath();
+        let updated = 0;
+        for (const jid of jids) {
+          if (action === "allow-dm") {
+            syncAllowList(configPath, "allowFrom", jid, true);
+            updated++;
+          } else if (action === "revoke-dm") {
+            syncAllowList(configPath, "allowFrom", jid, false);
+            updated++;
+          } else if (action === "allow-group" && groupJid) {
+            if (db.setParticipantAllowInGroup(groupJid, jid, true)) {
+              syncAllowList(configPath, "groupAllowFrom", jid, true);
+              updated++;
+            }
+          } else if (action === "revoke-group" && groupJid) {
+            if (db.setParticipantAllowInGroup(groupJid, jid, false)) {
+              syncAllowList(configPath, "groupAllowFrom", jid, false);
+              updated++;
+            }
+          } else if (action === "set-role" && groupJid && value) {
+            if (!["bot_admin", "manager", "participant"].includes(value)) continue;
+            if (db.setParticipantRole(groupJid, jid, value as import("./directory.js").ParticipantRole)) updated++;
+          }
+        }
+        writeJsonResponse(res, 200, { ok: true, updated });
+      } catch (err) {
+        console.error(`[waha] POST /api/admin/directory/bulk failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
     }
