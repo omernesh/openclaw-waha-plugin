@@ -1540,7 +1540,7 @@ async function loadHealth() {
       kvRow('Last Check', d.lastCheckAt ? relTime(d.lastCheckAt) : 'never');
     hkv.innerHTML = healthHtml;
   } catch(e) {
-    var dot = document.getElementById('health-dot');
+    dot = document.getElementById('health-dot');
     if (dot) { dot.style.background = '#ef4444'; dot.title = 'Health check error: ' + (e.message || e); }
     console.warn('[waha] loadHealth failed:', e.message || e);
   }
@@ -1693,10 +1693,17 @@ function healthDotColor(healthy, healthStatus) {
 async function loadDashboardSessions() {
   try {
     var r = await fetch('/api/admin/sessions');
-    if (!r.ok) return;
-    var sessions = await r.json();
     var container = document.getElementById('dashboard-sessions');
     if (!container) return;
+    if (!r.ok) {
+      var errEl = document.createElement('div');
+      errEl.style.cssText = 'color:#ef4444;font-size:0.82rem;padding:4px 0;';
+      errEl.textContent = 'Could not load sessions (HTTP ' + r.status + ')';
+      while (container.firstChild) container.removeChild(container.firstChild);
+      container.appendChild(errEl);
+      return;
+    }
+    var sessions = await r.json();
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!Array.isArray(sessions) || sessions.length === 0) {
       var emptyEl = document.createElement('div');
@@ -3366,9 +3373,9 @@ export function createWahaWebhookServer(opts: {
           return;
         }
 
-        // Validate role if provided (must be non-empty string)
-        if (body.role !== undefined && (typeof body.role !== "string" || !body.role.trim())) {
-          writeJsonResponse(res, 400, { error: "Invalid role. Must be a non-empty string." });
+        // Validate role if provided (must be "bot" or "human")
+        if (body.role !== undefined && body.role !== "bot" && body.role !== "human") {
+          writeJsonResponse(res, 400, { error: "Invalid role. Must be 'bot' or 'human'." });
           return;
         }
 
