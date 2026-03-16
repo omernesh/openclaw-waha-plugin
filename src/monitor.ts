@@ -2244,7 +2244,7 @@ async function loadGroupFilter(groupJid) {
       if (elFilterEnabled) elFilterEnabled.checked = ov.filterEnabled !== false;
       // UX-03: Load keywords into tag input instance instead of plain text input
       if (gfoTagInputs[sfx] && ov.mentionPatterns) {
-        gfoTagInputs[sfx].setValue(ov.mentionPatterns.join(', '));
+        gfoTagInputs[sfx].setValue(ov.mentionPatterns);
       }
       // UX-03: Load trigger operator
       if (elOperator) elOperator.value = ov.triggerOperator || 'OR';
@@ -2259,6 +2259,8 @@ async function loadGroupFilter(groupJid) {
       saveGroupFilter(groupJid);
     };
     if (elFilterEnabled) elFilterEnabled.onchange = function() { saveGroupFilter(groupJid); };
+    // UX-03: Auto-save when trigger operator changes
+    if (elOperator) elOperator.onchange = function() { saveGroupFilter(groupJid); };
   } catch(e) { console.warn('[waha] loadGroupFilter failed:', e); }
 }
 // DO NOT CHANGE — saveGroupFilter uses AbortController for 10s timeout to prevent 502 from hung requests (AP-03 fix).
@@ -2267,15 +2269,15 @@ async function saveGroupFilter(groupJid) {
   var elEnabled = document.getElementById('gfo-enabled-' + sfx);
   var elFilterEnabled = document.getElementById('gfo-filter-enabled-' + sfx);
   var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
-  // UX-03: Read keywords from tag input instance instead of plain text input
-  var patternsRaw = gfoTagInputs[sfx] ? gfoTagInputs[sfx].getValue() : '';
+  // UX-03: Read keywords from tag input instance (returns array) instead of plain text input
+  var patternsArr = gfoTagInputs[sfx] ? gfoTagInputs[sfx].getValue() : [];
   // UX-03: Read trigger operator from select element
   var elOperator = document.getElementById('gfo-operator-' + sfx);
   var triggerOperator = elOperator ? elOperator.value : 'OR';
   if (!elEnabled) return;
   var enabled = elEnabled.checked;
   var filterEnabled = elFilterEnabled ? elFilterEnabled.checked : true;
-  var mentionPatterns = patternsRaw ? patternsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean) : null;
+  var mentionPatterns = patternsArr.length ? patternsArr : null;
   var godModeScope = elGodMode ? elGodMode.value || null : null;
   // Disable checkbox while saving to prevent double-clicks
   elEnabled.disabled = true;
@@ -2683,8 +2685,8 @@ export function createWahaWebhookServer(opts: {
             enabled: body.enabled === true,
             filterEnabled: body.filterEnabled !== false,
             mentionPatterns: body.mentionPatterns ?? null,
-            godModeScope: body.godModeScope ?? null,
-            triggerOperator: body.triggerOperator ?? "OR",  // UX-03: default to OR
+            godModeScope: (body.godModeScope as 'all' | 'dm' | 'off' | null) ?? null,
+            triggerOperator: (body.triggerOperator as 'OR' | 'AND') ?? "OR",  // UX-03: default to OR
           };
           // Write to ALL account DBs — per-group overrides are global settings,
           // but each session has its own SQLite DB file.

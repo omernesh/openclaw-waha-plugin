@@ -23,6 +23,8 @@ export type FilterType = "dm" | "group";
 export type DmFilterConfig = {
   enabled?: boolean;
   mentionPatterns?: string[];
+  /** 'OR' = any pattern matches (default), 'AND' = all patterns must match */
+  triggerOperator?: 'OR' | 'AND';
   godModeBypass?: boolean;
   /** Controls which filter types god mode bypass applies to. Default: "all" (backward-compatible). */
   godModeScope?: GodModeScope;
@@ -151,7 +153,10 @@ export class DmFilter {
       this._regexCacheKey = cacheKey;
     }
 
-    const matched = this._regexCache.some((re) => re.test(text));
+    // UX-03: Support AND/OR trigger operator — 'OR' (default) matches any pattern, 'AND' requires all patterns
+    const matched = cfg.triggerOperator === 'AND'
+      ? this._regexCache.every((re) => re.test(text))
+      : this._regexCache.some((re) => re.test(text));
     if (matched) {
       this._stats.allowed++;
       this._record(true, "keyword_match", text);

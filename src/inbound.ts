@@ -534,6 +534,7 @@ export async function handleWahaInbound(params: {
             const perGroupFilter = new DmFilter({
               enabled: true,
               mentionPatterns: override.mentionPatterns,
+              triggerOperator: override.triggerOperator ?? "OR",  // UX-03: per-group AND/OR operator
               godModeBypass: globalGroupFilterCfg?.godModeBypass as boolean | undefined,
               godModeScope: (override.godModeScope ?? globalGroupFilterCfg?.godModeScope ?? "dm") as "all" | "dm" | "off",
               godModeSuperUsers: globalGroupFilterCfg?.godModeSuperUsers as Array<{ identifier: string; platform?: string; passwordRequired?: boolean }> | undefined,
