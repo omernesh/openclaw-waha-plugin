@@ -395,6 +395,22 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     nav button { padding: 14px 12px; font-size: 0.8rem; }
     .range-pair { grid-template-columns: 1fr; }
   }
+  /* NAME RESOLVER (Phase 8, UI-01) -- DO NOT CHANGE: shimmer + avatar + JID display for resolved contacts */
+  @keyframes nr-shimmer { 0% { background-position: -200px 0; } 100% { background-position: calc(200px + 100%) 0; } }
+  .nr-wrap { display: inline-flex; align-items: center; gap: 8px; }
+  .nr-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; color: #fff; }
+  .nr-info { display: flex; flex-direction: column; gap: 2px; }
+  .nr-name { color: #e2e8f0; font-size: 0.88rem; }
+  .nr-jid { color: #64748b; font-family: monospace; font-size: 0.75rem; }
+  .nr-skeleton { display: inline-block; width: 80px; height: 14px; background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); background-size: 400px 100%; animation: nr-shimmer 1.2s ease-in-out infinite; border-radius: 4px; }
+  /* TAG INPUT (Phase 8, UI-02) -- DO NOT CHANGE: pill bubble input replacing JID-list textareas */
+  .ti-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px; min-height: 42px; cursor: text; }
+  .ti-wrap.ti-focused { border-color: #38bdf8; }
+  .ti-tag { background: #0ea5e9; color: #fff; font-size: 0.8rem; padding: 3px 10px; border-radius: 9999px; font-family: monospace; display: inline-flex; align-items: center; gap: 4px; }
+  .ti-tag .ti-remove { cursor: pointer; color: rgba(255,255,255,0.7); font-size: 0.9rem; line-height: 1; padding: 0 2px; }
+  .ti-tag .ti-remove:hover { color: #fff; }
+  .ti-input { background: none; border: none; color: #e2e8f0; font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; flex: 1; min-width: 120px; }
+  .ti-input::placeholder { color: #64748b; }
 </style>
 </head>
 <body>
@@ -518,16 +534,16 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           </select>
         </div>
         <div class="field">
-          <label>Allow From (DMs) <span class="tip" data-tip="JIDs allowed to send DMs. One per line. Supports @c.us and @lid formats. Example: 972544329000@c.us">?</span></label>
-          <textarea id="s-allowFrom" name="allowFrom" rows="3" placeholder="972544329000@c.us&#10;271862907039996@lid"></textarea>
+          <label>Allow From (DMs) <span class="tip" data-tip="JIDs allowed to send DMs. Press Enter or comma to add. Supports @c.us and @lid formats. Example: 972544329000@c.us">?</span></label>
+          <div id="s-allowFrom-ti"></div>
         </div>
         <div class="field">
-          <label>Group Allow From <span class="tip" data-tip="JIDs allowed to trigger the bot in groups. One per line. Include both @c.us and @lid for the same person (NOWEB sends @lid).">?</span></label>
-          <textarea id="s-groupAllowFrom" name="groupAllowFrom" rows="3"></textarea>
+          <label>Group Allow From <span class="tip" data-tip="JIDs allowed to trigger the bot in groups. Press Enter or comma to add. Include both @c.us and @lid for the same person (NOWEB sends @lid).">?</span></label>
+          <div id="s-groupAllowFrom-ti"></div>
         </div>
         <div class="field">
-          <label>Allowed Groups <span class="tip" data-tip="Group JIDs the bot will respond in. One per line. Leave empty to allow all groups (with open policy).">?</span></label>
-          <textarea id="s-allowedGroups" name="allowedGroups" rows="3" placeholder="120363421825201386@g.us"></textarea>
+          <label>Allowed Groups <span class="tip" data-tip="Group JIDs the bot will respond in. Press Enter or comma to add. Leave empty to allow all groups (with open policy).">?</span></label>
+          <div id="s-allowedGroups-ti"></div>
         </div>
       </div>
     </details>
@@ -910,6 +926,141 @@ function showToast(msg, isError) {
   t._timer = setTimeout(function() { t.className = ''; }, 3500);
 }
 
+// ---- Name Resolver (Phase 8, UI-01) -- DO NOT CHANGE: resolves JIDs to contact names with shimmer loading state ----
+function createNameResolver(container, jid) {
+  if (typeof container === 'string') container = document.getElementById(container);
+  if (!container) return null;
+  var wrap = document.createElement('span');
+  wrap.className = 'nr-wrap';
+  var skeleton = document.createElement('span');
+  skeleton.className = 'nr-skeleton';
+  wrap.appendChild(skeleton);
+  container.appendChild(wrap);
+  function clearWrap() { while (wrap.firstChild) wrap.removeChild(wrap.firstChild); }
+  fetch('/api/admin/directory/' + encodeURIComponent(jid)).then(function(r) {
+    if (r.ok) {
+      return r.json().then(function(data) {
+        var name = (data && data.displayName) ? data.displayName : jid;
+        var avatar = document.createElement('span');
+        avatar.className = 'nr-avatar';
+        avatar.style.background = avatarColor(jid);
+        avatar.textContent = initials(name, jid);
+        var info = document.createElement('span');
+        info.className = 'nr-info';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'nr-name';
+        nameEl.textContent = name;
+        var jidEl = document.createElement('span');
+        jidEl.className = 'nr-jid';
+        jidEl.textContent = jid;
+        info.appendChild(nameEl);
+        info.appendChild(jidEl);
+        clearWrap();
+        wrap.appendChild(avatar);
+        wrap.appendChild(info);
+      });
+    } else {
+      throw new Error('not found');
+    }
+  }).catch(function() {
+    clearWrap();
+    var jidEl = document.createElement('span');
+    jidEl.className = 'nr-jid';
+    jidEl.textContent = jid;
+    wrap.appendChild(jidEl);
+  });
+  return wrap;
+}
+
+// Pure logic: normalize raw input into trimmed non-empty tag array. DO NOT CHANGE: extracted for testability (Phase 8, UI-02)
+function normalizeTags(input) {
+  if (!input || typeof input !== 'string') return [];
+  return input.split(/[,\n]+/).map(function(t) { return t.trim(); }).filter(Boolean);
+}
+
+// ---- Tag Input (Phase 8, UI-02) -- DO NOT CHANGE: pill bubble input factory for JID list fields ----
+function createTagInput(containerId, opts) {
+  opts = opts || {};
+  var container = typeof containerId === 'string' ? document.getElementById(containerId) : containerId;
+  if (!container) return null;
+  var tags = [];
+  var wrap = document.createElement('div');
+  wrap.className = 'ti-wrap';
+  var input = document.createElement('input');
+  input.className = 'ti-input';
+  input.type = 'text';
+  input.placeholder = opts.placeholder || 'Type JID or phone, press Enter';
+  wrap.appendChild(input);
+  while (container.firstChild) container.removeChild(container.firstChild);
+  container.appendChild(wrap);
+
+  function renderTags() {
+    var existing = wrap.querySelectorAll('.ti-tag');
+    for (var i = 0; i < existing.length; i++) wrap.removeChild(existing[i]);
+    for (var j = 0; j < tags.length; j++) {
+      (function(idx, val) {
+        var pill = document.createElement('span');
+        pill.className = 'ti-tag';
+        pill.appendChild(document.createTextNode(val + ' '));
+        var rm = document.createElement('span');
+        rm.className = 'ti-remove';
+        rm.textContent = '\u00d7';
+        rm.setAttribute('aria-label', 'Remove ' + val);
+        rm.addEventListener('click', function(e) {
+          e.stopPropagation();
+          tags.splice(idx, 1);
+          renderTags();
+        });
+        pill.appendChild(rm);
+        wrap.insertBefore(pill, input);
+      })(j, tags[j]);
+    }
+  }
+
+  function addTag(val) {
+    val = val ? val.trim() : '';
+    if (!val) return;
+    if (tags.indexOf(val) !== -1) return;
+    tags.push(val);
+    input.value = '';
+    renderTags();
+  }
+
+  input.addEventListener('keydown', function(e) {
+    if ((e.key === 'Enter' || e.key === ',' || e.key === ' ' || e.key === 'Tab') && input.value.trim()) {
+      e.preventDefault();
+      var parts = normalizeTags(input.value);
+      for (var i = 0; i < parts.length; i++) addTag(parts[i]);
+    } else if (e.key === 'Backspace' && !input.value && tags.length) {
+      tags.pop();
+      renderTags();
+    }
+  });
+  input.addEventListener('paste', function() {
+    setTimeout(function() {
+      var parts = normalizeTags(input.value);
+      input.value = '';
+      for (var i = 0; i < parts.length; i++) addTag(parts[i]);
+    }, 0);
+  });
+  wrap.addEventListener('click', function() { input.focus(); });
+  input.addEventListener('focus', function() { wrap.classList.add('ti-focused'); });
+  input.addEventListener('blur', function() {
+    wrap.classList.remove('ti-focused');
+    if (input.value.trim()) addTag(input.value);
+  });
+
+  return {
+    getValue: function() { return tags.slice(); },
+    setValue: function(arr) { tags = (arr || []).slice(); renderTags(); }
+  };
+}
+
+// ---- Tag Input instance variables (Phase 8, UI-02) -- initialized lazily in loadConfig() ----
+var tagInputAllowFrom = null;
+var tagInputGroupAllowFrom = null;
+var tagInputAllowedGroups = null;
+
 // ---- Dashboard ----
 async function loadStats() {
   try {
@@ -966,12 +1117,39 @@ async function loadStats() {
       kvRow('wpm', pr.wpm) + kvRow('readDelayMs', JSON.stringify(pr.readDelayMs)) +
       kvRow('typingDurationMs', JSON.stringify(pr.typingDurationMs)) +
       kvRow('pauseChance', pr.pauseChance) + kvRow('jitter', JSON.stringify(pr.jitter));
+    // Phase 8, UI-01 -- access-kv uses Name Resolver for JID display. DO NOT REVERT to innerHTML tags().
     var ac = d.access;
-    document.getElementById('access-kv').innerHTML =
-      kvRow('dmPolicy', ac.dmPolicy) + kvRow('groupPolicy', ac.groupPolicy) +
-      '<div class="k" style="margin-top:8px">allowFrom</div><div class="tag-list" style="padding:4px 0">' + tags(ac.allowFrom) + '</div>' +
-      '<div class="k" style="margin-top:8px">groupAllowFrom</div><div class="tag-list" style="padding:4px 0">' + tags(ac.groupAllowFrom) + '</div>' +
-      '<div class="k" style="margin-top:8px">allowedGroups</div><div class="tag-list" style="padding:4px 0">' + tags(ac.allowedGroups) + '</div>';
+    var accessKv = document.getElementById('access-kv');
+    accessKv.innerHTML = kvRow('dmPolicy', ac.dmPolicy) + kvRow('groupPolicy', ac.groupPolicy);
+    var jidGroups = [
+      { key: 'allowFrom', arr: ac.allowFrom || [] },
+      { key: 'groupAllowFrom', arr: ac.groupAllowFrom || [] },
+      { key: 'allowedGroups', arr: ac.allowedGroups || [] }
+    ];
+    for (var gi = 0; gi < jidGroups.length; gi++) {
+      (function(grp) {
+        var keyEl = document.createElement('div');
+        keyEl.className = 'k';
+        keyEl.style.marginTop = '8px';
+        keyEl.textContent = grp.key;
+        var valEl = document.createElement('div');
+        valEl.className = 'tag-list';
+        valEl.style.padding = '4px 0';
+        valEl.id = 'nr-' + grp.key;
+        accessKv.appendChild(keyEl);
+        accessKv.appendChild(valEl);
+        if (!grp.arr.length) {
+          var noneEl = document.createElement('span');
+          noneEl.style.color = '#64748b';
+          noneEl.textContent = 'none';
+          valEl.appendChild(noneEl);
+        } else {
+          for (var ji = 0; ji < grp.arr.length; ji++) {
+            createNameResolver(valEl, grp.arr[ji]);
+          }
+        }
+      })(jidGroups[gi]);
+    }
     document.getElementById('session-kv').innerHTML =
       kvRow('session', d.session) + kvRow('baseUrl', d.baseUrl) +
       kvRow('webhookPort', d.webhookPort) + kvRow('serverTime', d.serverTime);
@@ -1198,9 +1376,13 @@ async function loadConfig() {
     setVal('s-triggerResponseMode', w.triggerResponseMode || 'dm');
     setVal('s-dmPolicy', w.dmPolicy || 'pairing');
     setVal('s-groupPolicy', w.groupPolicy || 'allowlist');
-    setVal('s-allowFrom', (w.allowFrom || []).join('\\n'));
-    setVal('s-groupAllowFrom', (w.groupAllowFrom || []).join('\\n'));
-    setVal('s-allowedGroups', (w.allowedGroups || []).join('\\n'));
+    // Phase 8, UI-02 -- Tag Input components replace textareas for JID lists. DO NOT REVERT to setVal.
+    if (!tagInputAllowFrom) tagInputAllowFrom = createTagInput('s-allowFrom-ti', { placeholder: '972544329000@c.us' });
+    if (!tagInputGroupAllowFrom) tagInputGroupAllowFrom = createTagInput('s-groupAllowFrom-ti', { placeholder: 'Phone or JID, press Enter' });
+    if (!tagInputAllowedGroups) tagInputAllowedGroups = createTagInput('s-allowedGroups-ti', { placeholder: '120363421825201386@g.us' });
+    if (tagInputAllowFrom) tagInputAllowFrom.setValue(w.allowFrom || []);
+    if (tagInputGroupAllowFrom) tagInputGroupAllowFrom.setValue(w.groupAllowFrom || []);
+    if (tagInputAllowedGroups) tagInputAllowedGroups.setValue(w.allowedGroups || []);
     var dm = w.dmFilter || {};
     setChk('s-dmFilterEnabled', dm.enabled);
     setVal('s-mentionPatterns', (dm.mentionPatterns || []).join('\\n'));
@@ -1266,9 +1448,10 @@ async function saveSettings(e) {
       triggerResponseMode: getVal('s-triggerResponseMode') || 'dm',
       dmPolicy: getVal('s-dmPolicy') || 'pairing',
       groupPolicy: getVal('s-groupPolicy') || 'allowlist',
-      allowFrom: splitLines(getVal('s-allowFrom')),
-      groupAllowFrom: splitLines(getVal('s-groupAllowFrom')),
-      allowedGroups: splitLines(getVal('s-allowedGroups')),
+      // Phase 8, UI-02 -- read from Tag Input components. DO NOT REVERT to splitLines(getVal(...)).
+      allowFrom: tagInputAllowFrom ? tagInputAllowFrom.getValue() : [],
+      groupAllowFrom: tagInputGroupAllowFrom ? tagInputGroupAllowFrom.getValue() : [],
+      allowedGroups: tagInputAllowedGroups ? tagInputAllowedGroups.getValue() : [],
       dmFilter: {
         enabled: getChk('s-dmFilterEnabled'),
         mentionPatterns: splitLines(getVal('s-mentionPatterns')),
