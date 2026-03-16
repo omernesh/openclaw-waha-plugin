@@ -43,6 +43,7 @@ export type GroupFilterOverride = {
   filterEnabled: boolean;    // keyword filter on/off
   mentionPatterns: string[] | null;  // null = inherit global
   godModeScope: string | null;      // null = inherit global
+  triggerOperator: string;   // 'OR' (any keyword) or 'AND' (all keywords) — UX-03
   updatedAt: number;
 };
 
@@ -164,6 +165,13 @@ export class DirectoryDb {
         timestamp INTEGER NOT NULL
       );
     `);
+
+    // UX-03: Add trigger_operator column to group_filter_overrides (migration-safe — ignores if column exists)
+    try {
+      this.db.prepare(`ALTER TABLE group_filter_overrides ADD COLUMN trigger_operator TEXT NOT NULL DEFAULT 'OR'`).run();
+    } catch (_) {
+      // Column already exists — expected on subsequent runs
+    }
   }
 
   upsertContact(jid: string, displayName?: string, isGroup?: boolean): void {
@@ -509,7 +517,7 @@ export class DirectoryDb {
    */
   getGroupFilterOverride(groupJid: string): GroupFilterOverride | null {
     const row = this.db.prepare(
-      "SELECT group_jid, enabled, filter_enabled, mention_patterns, god_mode_scope, updated_at FROM group_filter_overrides WHERE group_jid = ?"
+      "SELECT group_jid, enabled, filter_enabled, mention_patterns, god_mode_scope, trigger_operator, updated_at FROM group_filter_overrides WHERE group_jid = ?"
     ).get(groupJid) as Record<string, unknown> | undefined;
 
     if (!row) return null;
@@ -531,6 +539,7 @@ export class DirectoryDb {
       filterEnabled: row.filter_enabled === 1,
       mentionPatterns,
       godModeScope: (row.god_mode_scope as string) || null,
+      triggerOperator: (row.trigger_operator as string) || "OR",
       updatedAt: row.updated_at as number,
     };
   }
@@ -546,19 +555,21 @@ export class DirectoryDb {
       filterEnabled: override.filterEnabled ?? existing?.filterEnabled ?? true,
       mentionPatterns: override.mentionPatterns !== undefined ? override.mentionPatterns : (existing?.mentionPatterns ?? null),
       godModeScope: override.godModeScope !== undefined ? override.godModeScope : (existing?.godModeScope ?? null),
+      triggerOperator: override.triggerOperator !== undefined ? override.triggerOperator : (existing?.triggerOperator ?? "OR"),
     };
 
     const mentionPatternsJson = merged.mentionPatterns ? JSON.stringify(merged.mentionPatterns) : null;
 
     this.db.prepare(
-      `INSERT OR REPLACE INTO group_filter_overrides (group_jid, enabled, filter_enabled, mention_patterns, god_mode_scope, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO group_filter_overrides (group_jid, enabled, filter_enabled, mention_patterns, god_mode_scope, trigger_operator, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(
       groupJid,
       merged.enabled ? 1 : 0,
       merged.filterEnabled ? 1 : 0,
       mentionPatternsJson,
       merged.godModeScope ?? null,
+      merged.triggerOperator ?? "OR",
       Date.now(),
     );
   }

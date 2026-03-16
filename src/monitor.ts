@@ -1387,6 +1387,8 @@ function createGodModeUsersField(containerId, opts) {
 var tagInputAllowFrom = null;
 var tagInputGroupAllowFrom = null;
 var tagInputAllowedGroups = null;
+// ---- Group Filter Override tag input instances (Phase 9, UX-03) -- keyed by sanitized JID suffix ----
+var gfoTagInputs = {};
 // ---- God Mode Users Field instance variables (Phase 8, UI-04) -- initialized lazily in loadConfig() ----
 var godModePickerDm = null;
 var godModePickerGroup = null;
@@ -2171,13 +2173,26 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
     html += '<input type="checkbox" id="gfo-filter-enabled-' + sfx + '" checked>';
     html += ' <span>Keyword filter enabled</span></label>';
-    html += '<div style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">Keywords (comma-separated, empty = inherit global)</label>';
-    html += '<input type="text" id="gfo-patterns-' + sfx + '" placeholder="hello, help, bot" style="width:100%;padding:6px 8px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;"></div>';
+    // UX-03: Trigger operator select — directly below keyword filter enabled checkbox, above keywords tag input
+    html += '<div class="settings-field" style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">Trigger Operator <span class="tip" data-tip="OR: message matches if it contains any keyword. AND: message must contain all keywords.">?</span></label>';
+    html += '<select id="gfo-operator-' + sfx + '" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:5px;padding:6px 10px;font-size:0.85rem;width:100%;">';
+    html += '<option value="OR">OR &ndash; match any keyword</option>';
+    html += '<option value="AND">AND &ndash; match all keywords</option></select></div>';
+    // UX-03: Tag input container replaces plain text input for keywords
+    html += '<div style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">Keywords (empty = inherit global)</label>';
+    html += '<div id="gfo-patterns-cp-' + sfx + '"></div></div>';
     html += '<div><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">God Mode Scope</label>';
     html += '<select id="gfo-god-mode-' + sfx + '" style="padding:6px 8px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;">';
     html += '<option value="">Inherit global</option><option value="all">All (DM + Groups)</option><option value="dm">DM Only</option><option value="off">Off</option></select></div>';
     html += '</div></div>';
     panel.innerHTML = html;
+    // UX-03: Initialize tag input for group filter keywords (must be after DOM assignment)
+    // DO NOT CHANGE — createTagInput requires container div to exist in DOM before calling.
+    if (!gfoTagInputs[sfx]) {
+      gfoTagInputs[sfx] = createTagInput('gfo-patterns-cp-' + sfx, {
+        placeholder: 'hello, help, bot'
+      });
+    }
     // Load existing filter override data for this group (async, non-blocking)
     loadGroupFilter(groupJid);
   } catch(e) { panel.innerHTML = '<div style="color:#ef4444;padding:8px">' + esc(e.message) + '</div>'; }
@@ -2218,14 +2233,20 @@ async function loadGroupFilter(groupJid) {
     var elEnabled = document.getElementById('gfo-enabled-' + sfx);
     var elSettings = document.getElementById('gfo-settings-' + sfx);
     var elFilterEnabled = document.getElementById('gfo-filter-enabled-' + sfx);
-    var elPatterns = document.getElementById('gfo-patterns-' + sfx);
     var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
+    // UX-03: Trigger operator select element
+    var elOperator = document.getElementById('gfo-operator-' + sfx);
     if (!elEnabled) return;
     if (ov && ov.enabled) {
       elEnabled.checked = true;
       if (elSettings) elSettings.style.display = '';
       if (elFilterEnabled) elFilterEnabled.checked = ov.filterEnabled !== false;
-      if (elPatterns && ov.mentionPatterns) elPatterns.value = ov.mentionPatterns.join(', ');
+      // UX-03: Load keywords into tag input instance instead of plain text input
+      if (gfoTagInputs[sfx] && ov.mentionPatterns) {
+        gfoTagInputs[sfx].setValue(ov.mentionPatterns.join(', '));
+      }
+      // UX-03: Load trigger operator
+      if (elOperator) elOperator.value = ov.triggerOperator || 'OR';
       if (elGodMode && ov.godModeScope) elGodMode.value = ov.godModeScope;
     } else {
       elEnabled.checked = false;
@@ -2244,12 +2265,15 @@ async function saveGroupFilter(groupJid) {
   var sfx = groupJid.replace(/[^a-zA-Z0-9]/g, '_');
   var elEnabled = document.getElementById('gfo-enabled-' + sfx);
   var elFilterEnabled = document.getElementById('gfo-filter-enabled-' + sfx);
-  var elPatterns = document.getElementById('gfo-patterns-' + sfx);
   var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
+  // UX-03: Read keywords from tag input instance instead of plain text input
+  var patternsRaw = gfoTagInputs[sfx] ? gfoTagInputs[sfx].getValue() : '';
+  // UX-03: Read trigger operator from select element
+  var elOperator = document.getElementById('gfo-operator-' + sfx);
+  var triggerOperator = elOperator ? elOperator.value : 'OR';
   if (!elEnabled) return;
   var enabled = elEnabled.checked;
   var filterEnabled = elFilterEnabled ? elFilterEnabled.checked : true;
-  var patternsRaw = elPatterns ? elPatterns.value.trim() : '';
   var mentionPatterns = patternsRaw ? patternsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean) : null;
   var godModeScope = elGodMode ? elGodMode.value || null : null;
   // Disable checkbox while saving to prevent double-clicks
@@ -2260,7 +2284,7 @@ async function saveGroupFilter(groupJid) {
   try {
     var r = await fetch('/api/admin/directory/' + encodeURIComponent(groupJid) + '/filter', {
       method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope }),
+      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope, triggerOperator: triggerOperator }),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -2635,6 +2659,7 @@ export function createWahaWebhookServer(opts: {
             filterEnabled?: boolean;
             mentionPatterns?: string[] | null;
             godModeScope?: string | null;
+            triggerOperator?: string;  // UX-03: 'OR' or 'AND'
           };
           // Validate input types before storing
           if (body.mentionPatterns != null) {
@@ -2647,12 +2672,18 @@ export function createWahaWebhookServer(opts: {
             writeJsonResponse(res, 400, { error: "godModeScope must be 'all', 'dm', 'off', or null" });
             return;
           }
+          // UX-03: Validate triggerOperator if provided
+          if (body.triggerOperator != null && !["OR", "AND"].includes(body.triggerOperator)) {
+            writeJsonResponse(res, 400, { error: "triggerOperator must be 'OR' or 'AND'" });
+            return;
+          }
           // Coerce enabled/filterEnabled to boolean
           const overrideData = {
             enabled: body.enabled === true,
             filterEnabled: body.filterEnabled !== false,
             mentionPatterns: body.mentionPatterns ?? null,
             godModeScope: body.godModeScope ?? null,
+            triggerOperator: body.triggerOperator ?? "OR",  // UX-03: default to OR
           };
           // Write to ALL account DBs — per-group overrides are global settings,
           // but each session has its own SQLite DB file.
