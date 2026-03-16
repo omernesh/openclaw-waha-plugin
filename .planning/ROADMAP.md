@@ -173,7 +173,11 @@ Plans:
   2. All group participants load with contact names, global allowlist state reflected in buttons
   3. Participant roles assignable via dropdown: Bot Admin, Manager, Participant
   4. Bulk selection and edit works for contacts/groups/participants
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md -- Groups paginated table + participant name resolution and global allowlist display
+- [ ] 10-02-PLAN.md -- Participant role dropdown + bulk select mode with action toolbar
 
 ### Phase 11: Dashboard, Sessions & Log
 **Goal:** Complete dashboard with all sessions, editable session roles, and structured log display
@@ -202,5 +206,5 @@ Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Pha
 | 7. Admin Panel Critical Fixes | 2/2 | Complete   | 2026-03-15 |
 | 8. Shared UI Components | 2/2 | Complete   | 2026-03-16 |
 | 9. Settings UX Improvements | 2/2 | Complete   | 2026-03-16 |
-| 10. Directory & Group Enhancements | 0/? | Planned | |
+| 10. Directory & Group Enhancements | 0/2 | Planned | |
 | 11. Dashboard, Sessions & Log | 0/? | Planned | |
