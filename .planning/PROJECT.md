@@ -2,11 +2,11 @@
 
 ## What This Is
 
-A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents (primarily Sammie) to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, and more. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API).
+A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with an embedded admin panel for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies.
 
 ## Core Value
 
-Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures.
+Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
 
 ## Requirements
 
@@ -25,7 +25,6 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Presence management (online/offline, subscribe) — v1.8.x
 - ✓ Profile management (name, status, picture) — v1.8.x
 - ✓ LID resolution (phone-to-LID, LID-to-phone) — v1.8.x
-- ✓ Admin panel with directory, config, filter stats, status tabs — v1.8.7
 - ✓ SQLite-backed directory with DM settings, allow-lists, participant tracking — v1.8.7
 - ✓ Webhook handler with duplicate event filtering (message vs message.any) — v1.8.x
 - ✓ vCard interception in deliverWahaReply — v1.9.5
@@ -41,12 +40,19 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ F3: Mentions detection (@mentions extracted from inbound NOWEB messages, normalized to @c.us) — Phase 3
 - ✓ F4: Multi-recipient send (sendMulti, sequential, 10-cap, per-recipient results, text-only v1) — Phase 3
 - ✓ F6: URL preview send (auto linkPreview in sendWahaText + existing sendLinkPreview action) — Phase 3
+- ✓ M1: Multi-session support (session registry, roles, trigger word activation, configurable routing) — v1.10
+- ✓ M2: Participant roles (owner/admin/member tracking, per-participant allow/block in admin panel) — v1.10
+- ✓ M3: Bulk participant edit (bulk select UI, bulk allow/block toolbar in admin panel) — v1.10
+- ✓ D1: SKILL.md refresh, unit tests (313 passing), integration tests, README — v1.10
+- ✓ Rules system: YAML-based policy definitions with merge engine and inbound/outbound enforcement — v1.10
+- ✓ Admin panel: directory, config, filter stats, status tabs — v1.8.7, expanded v1.10
+- ✓ Admin panel: logs tab with live tail and level filtering — v1.10
+- ✓ Admin panel: shared UI component library (Button, Badge, Modal, Toast, Table, Form) — v1.10
+- ✓ Admin panel: security hardening (textContent only, no innerHTML, input sanitization) — v1.10
 
 ### Active
 
 - [ ] F2: Inbound group events (join/leave/promote/demote)
-- [ ] M1: Multi-session support (session registry, roles, trigger word activation)
-- [ ] D1: SKILL.md refresh, unit tests, integration tests, README
 
 ### Out of Scope
 
@@ -57,16 +63,18 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Call initiation — WAHA limitation
 - Disappearing messages — low priority
 - Hot-reload — gateway requires restart, not worth engineering around
+- Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
 ## Context
 
 - **Runtime**: TypeScript on Node.js, deployed to hpg6 Linux server
+- **Codebase**: 13,026 LOC TypeScript (33 source files), 5,619 LOC tests (29 files), 313 passing tests
 - **WAHA Engine**: NOWEB (has known limitations — poll.vote <5% capture, contacts API needs store.enabled)
 - **Gateway**: OpenClaw at `/usr/lib/node_modules/openclaw/dist/` — READ-ONLY, not ours
-- **Sessions**: `3cf11776_logan` (Sammie/bot), `3cf11776_omer` (Omer/human)
-- **Primary user**: Sammie (AI assistant, he/him) on WhatsApp, model gpt-5.3-codex
+- **Sessions**: `3cf11776_logan` (bot), `3cf11776_omer` (Omer/human)
+- **Primary user**: OpenClaw agent on WhatsApp, model gpt-5.3-codex
 - **Code is brittle**: Many hard-won fixes have DO NOT CHANGE markers — always read comments before modifying
-- **~87% WAHA API coverage** as of v1.10.4
+- **~95% WAHA API coverage** as of v1.10
 
 ## Constraints
 
@@ -82,20 +90,24 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 |----------|-----------|---------|
 | Standard action names only in listActions() | Gateway rejects custom names with targets | ✓ Good |
 | looksLikeId returns true for ALL non-empty strings | Enables name-based targeting (auto-resolve handles the rest) | ✓ Good |
-| vCard interception in deliverWahaReply, not sendWahaText | Sammie's replies go through media path, bypassing sendWahaText | ✓ Good |
+| vCard interception in deliverWahaReply, not sendWahaText | Bot replies go through media path, bypassing sendWahaText | ✓ Good |
 | SQLite for directory (not in-memory) | Persistence across restarts, proper querying | ✓ Good |
 | Embedded admin panel (not separate app) | Single deployment unit, no CORS, shares webhook server | ✓ Good |
 | DO NOT CHANGE markers on critical code | Prevents regression on hard-won fixes | ✓ Good |
-| Proactive rate limiter + 429 backoff | Prevent overload rather than just react to it | — Pending |
-| Multi-session with role-based access | Support bot + human sessions with configurable permissions | — Pending |
-| setTimeout chain for health pings (not setInterval) | Prevents timer pile-up when pings take longer than interval | — Pending |
-| Two separate bounded queues (DM + group) | Simpler than priority queue, DM priority via drain order | — Pending |
-| Always return HTTP 200 on webhook even on queue overflow | Prevents WAHA retry storms | — Pending |
+| Proactive rate limiter + 429 backoff | Prevent overload rather than just react to it | ✓ Good |
+| Multi-session with role-based access | Support bot + human sessions with configurable permissions | ✓ Good |
+| setTimeout chain for health pings (not setInterval) | Prevents timer pile-up when pings take longer than interval | ✓ Good |
+| Two separate bounded queues (DM + group) | Simpler than priority queue, DM priority via drain order | ✓ Good |
+| Always return HTTP 200 on webhook even on queue overflow | Prevents WAHA retry storms | ✓ Good |
 | Auto link preview defaults to true | Most users want rich previews; opt-out via autoLinkPreview: false | ✓ Good |
 | Sequential sends for sendMulti (not parallel) | Respects token-bucket rate limiter from Phase 1 | ✓ Good |
 | Pure-function extraction for testability (mentions.ts) | inbound.ts has heavy openclaw deps that break vitest | ✓ Good |
 | Text-only sendMulti v1 | Media multi-send deferred; keeps implementation simple | ✓ Good |
 | 10-recipient cap on sendMulti | Prevents abuse, respects rate limits | ✓ Good |
+| YAML rules engine with merge strategies | Declarative policies composable across sessions and scopes | ✓ Good |
+| Shared UI component library in admin panel | Eliminates duplication, consistent styling, single place to harden | ✓ Good |
+| textContent only (no innerHTML) in admin panel | Eliminates XSS attack surface on all dynamic content | ✓ Good |
+| Rules enforcement at inbound/outbound layer (not action handler) | Policies apply uniformly regardless of action type | ✓ Good |
 
 ---
-*Last updated: 2026-03-11 after Phase 3*
+*Last updated: 2026-03-16 after v1.10 milestone*
