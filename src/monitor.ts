@@ -411,6 +411,26 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .ti-tag .ti-remove:hover { color: #fff; }
   .ti-input { background: none; border: none; color: #e2e8f0; font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; flex: 1; min-width: 120px; }
   .ti-input::placeholder { color: #64748b; }
+  /* CONTACT PICKER (Phase 8, UI-03) -- DO NOT CHANGE: searchable contact selector with multi-select */
+  .cp-wrap { position: relative; }
+  .cp-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .cp-chip { background: #1e3a5f; color: #7dd3fc; font-size: 0.75rem; padding: 4px 12px; border-radius: 4px; font-family: monospace; display: inline-flex; align-items: center; gap: 6px; }
+  .cp-chip .cp-chip-remove { cursor: pointer; color: #7dd3fc; font-size: 0.85rem; line-height: 1; padding: 0 2px; }
+  .cp-chip .cp-chip-remove:hover { color: #ef4444; }
+  .cp-search { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; color: #e2e8f0; font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; box-sizing: border-box; }
+  .cp-search:focus { border-color: #38bdf8; }
+  .cp-search::placeholder { color: #64748b; }
+  .cp-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-height: 240px; overflow-y: auto; z-index: 300; display: none; }
+  .cp-dropdown.cp-open { display: block; }
+  .cp-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; transition: background .1s; }
+  .cp-row:hover { background: #0f172a; }
+  .cp-row .cp-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; color: #fff; }
+  .cp-row .cp-row-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .cp-row .cp-row-name { color: #e2e8f0; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cp-row .cp-row-jid { color: #64748b; font-family: monospace; font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cp-row .cp-check { color: #10b981; font-size: 0.85rem; flex-shrink: 0; width: 20px; text-align: center; }
+  .cp-empty { color: #64748b; text-align: center; padding: 16px; font-size: 0.85rem; }
+  .cp-loading { padding: 10px 12px; }
 </style>
 </head>
 <body>
@@ -580,8 +600,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           <input type="number" id="s-tokenEstimate" name="tokenEstimate" min="100" max="100000" step="100">
         </div>
         <div class="field">
-          <label>God Mode Users <span class="tip" data-tip="JIDs that bypass the DM keyword filter entirely. One per line. Supports @c.us, @lid, phone numbers. Include both formats for NOWEB compatibility.">?</span></label>
-          <textarea id="s-godModeSuperUsers" name="godModeSuperUsers" rows="3" placeholder="972544329000@c.us&#10;271862907039996@lid"></textarea>
+          <label>God Mode Users <span class="tip" data-tip="JIDs that bypass the DM keyword filter entirely. Search and select contacts. Include both @c.us and @lid formats for NOWEB compatibility.">?</span></label>
+          <div id="s-godModeSuperUsers-cp"></div>
         </div>
       </div>
     </details>
@@ -618,8 +638,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           <input type="number" id="s-groupTokenEstimate" name="groupTokenEstimate" min="100" max="100000" step="100">
         </div>
         <div class="field">
-          <label>God Mode Users <span class="tip" data-tip="JIDs that bypass the group keyword filter entirely. One per line. Supports @c.us, @lid, phone numbers.">?</span></label>
-          <textarea id="s-groupGodModeSuperUsers" name="groupGodModeSuperUsers" rows="3" placeholder="972544329000@c.us&#10;271862907039996@lid"></textarea>
+          <label>God Mode Users <span class="tip" data-tip="JIDs that bypass the group keyword filter entirely. Search and select contacts. Supports @c.us and @lid formats.">?</span></label>
+          <div id="s-groupGodModeSuperUsers-cp"></div>
         </div>
       </div>
     </details>
@@ -1056,10 +1076,303 @@ function createTagInput(containerId, opts) {
   };
 }
 
+// ---- Contact Picker (Phase 8, UI-03) -- DO NOT CHANGE: searchable multi-select contact picker ----
+
+// Pure logic: toggle an item in a selection array by jid. Returns new array.
+// If item.jid exists in arr, removes it. Otherwise appends it.
+// DO NOT CHANGE: extracted for testability (Phase 8, UI-03)
+function toggleSelection(arr, item) {
+  var idx = -1;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].jid === item.jid) { idx = i; break; }
+  }
+  var next = arr.slice();
+  if (idx >= 0) {
+    next.splice(idx, 1);
+  } else {
+    next.push({ jid: item.jid, displayName: item.displayName || item.jid });
+  }
+  return next;
+}
+
+function createContactPicker(containerId, opts) {
+  opts = opts || {};
+  var container = typeof containerId === 'string' ? document.getElementById(containerId) : containerId;
+  if (!container) return null;
+  var selected = [];
+  var results = [];
+  var searchTimeout = null;
+  var isOpen = false;
+
+  var wrapEl = document.createElement('div');
+  wrapEl.className = 'cp-wrap';
+  var chipsEl = document.createElement('div');
+  chipsEl.className = 'cp-selected';
+  var searchInput = document.createElement('input');
+  searchInput.className = 'cp-search';
+  searchInput.type = 'text';
+  searchInput.placeholder = opts.placeholder || 'Search contacts...';
+  var dropdown = document.createElement('div');
+  dropdown.className = 'cp-dropdown';
+  wrapEl.appendChild(chipsEl);
+  wrapEl.appendChild(searchInput);
+  wrapEl.appendChild(dropdown);
+  while (container.firstChild) container.removeChild(container.firstChild);
+  container.appendChild(wrapEl);
+
+  function renderChips() {
+    while (chipsEl.firstChild) chipsEl.removeChild(chipsEl.firstChild);
+    for (var i = 0; i < selected.length; i++) {
+      (function(idx, item) {
+        var chip = document.createElement('span');
+        chip.className = 'cp-chip';
+        chip.appendChild(document.createTextNode(item.displayName || item.jid));
+        var rm = document.createElement('span');
+        rm.className = 'cp-chip-remove';
+        rm.textContent = '\u00d7';
+        rm.setAttribute('aria-label', 'Remove ' + (item.displayName || item.jid));
+        rm.addEventListener('click', function(e) {
+          e.stopPropagation();
+          selected.splice(idx, 1);
+          renderChips();
+          if (opts.onRemove) opts.onRemove(item);
+        });
+        chip.appendChild(rm);
+        chipsEl.appendChild(chip);
+      })(i, selected[i]);
+    }
+  }
+
+  function renderResults() {
+    while (dropdown.firstChild) dropdown.removeChild(dropdown.firstChild);
+    if (results.length === 0 && searchInput.value.trim()) {
+      var emptyEl = document.createElement('div');
+      emptyEl.className = 'cp-empty';
+      emptyEl.appendChild(document.createTextNode('No contacts found'));
+      var emptyLine2 = document.createElement('div');
+      emptyLine2.textContent = 'Try a different name or phone number';
+      emptyEl.appendChild(emptyLine2);
+      dropdown.appendChild(emptyEl);
+      return;
+    }
+    for (var i = 0; i < results.length; i++) {
+      (function(result) {
+        var row = document.createElement('div');
+        row.className = 'cp-row';
+        var av = document.createElement('span');
+        av.className = 'cp-av';
+        av.style.background = avatarColor(result.jid);
+        av.textContent = initials(result.displayName, result.jid);
+        var info = document.createElement('div');
+        info.className = 'cp-row-info';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'cp-row-name';
+        nameEl.textContent = result.displayName || result.jid;
+        var jidEl = document.createElement('span');
+        jidEl.className = 'cp-row-jid';
+        jidEl.textContent = result.jid;
+        info.appendChild(nameEl);
+        info.appendChild(jidEl);
+        var check = document.createElement('span');
+        check.className = 'cp-check';
+        var isSelected = false;
+        for (var j = 0; j < selected.length; j++) {
+          if (selected[j].jid === result.jid) { isSelected = true; break; }
+        }
+        check.textContent = isSelected ? '\u2713' : '';
+        row.appendChild(av);
+        row.appendChild(info);
+        row.appendChild(check);
+        row.addEventListener('click', function() {
+          selected = toggleSelection(selected, { jid: result.jid, displayName: result.displayName || result.jid });
+          renderChips();
+          renderResults();
+          if (opts.onSelect) opts.onSelect(selected);
+        });
+        dropdown.appendChild(row);
+      })(results[i]);
+    }
+  }
+
+  function openDropdown() {
+    isOpen = true;
+    dropdown.classList.add('cp-open');
+    // Prevent dropdown from overflowing viewport bottom
+    var rect = wrapEl.getBoundingClientRect();
+    if (rect.bottom + 240 > window.innerHeight) {
+      dropdown.style.bottom = '100%';
+      dropdown.style.top = 'auto';
+      dropdown.style.marginTop = '0';
+      dropdown.style.marginBottom = '4px';
+    } else {
+      dropdown.style.top = '100%';
+      dropdown.style.bottom = 'auto';
+      dropdown.style.marginTop = '4px';
+      dropdown.style.marginBottom = '0';
+    }
+  }
+
+  function closeDropdown() {
+    isOpen = false;
+    dropdown.classList.remove('cp-open');
+    results = [];
+  }
+
+  function doSearch(query) {
+    if (!query || query.length < 2) { closeDropdown(); return; }
+    fetch('/api/admin/directory?search=' + encodeURIComponent(query) + '&limit=20&type=contact')
+      .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+      .then(function(data) {
+        results = data.contacts || [];
+        renderResults();
+        openDropdown();
+      })
+      .catch(function() { showToast('Search failed', true); });
+  }
+
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(function() { doSearch(searchInput.value.trim()); }, 300);
+  });
+
+  document.addEventListener('mousedown', function(e) {
+    if (isOpen && !wrapEl.contains(e.target)) closeDropdown();
+  });
+
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && isOpen) { e.stopPropagation(); closeDropdown(); }
+  });
+
+  return {
+    getValue: function() { return selected.map(function(s) { return s.jid; }); },
+    setValue: function(jids) {
+      // NOTE: This fetch-in-component is an approved exception to the UI-SPEC
+      // "no fetch inside components" guideline. The same pattern exists in
+      // createNameResolver (Plan 01). Justified because name resolution is
+      // best-effort cosmetic enrichment, not data-fetching logic.
+      selected = (jids || []).map(function(jid) { return { jid: jid, displayName: jid }; });
+      renderChips();
+      // Resolve display names asynchronously (best-effort)
+      selected.forEach(function(item, idx) {
+        fetch('/api/admin/directory/' + encodeURIComponent(item.jid))
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(data) {
+            if (data && data.displayName) {
+              selected[idx].displayName = data.displayName;
+              renderChips();
+            }
+          })
+          .catch(function() {}); // best-effort name resolution
+      });
+    },
+    getSelected: function() { return selected.slice(); },
+    // Allow callers to directly set selected with full objects (jid + displayName + any extra fields)
+    // This preserves all properties on the objects, unlike setValue which only takes JID strings.
+    // Used by createGodModeUsersField to store lid pairings inside the picker's closure.
+    setSelectedObjects: function(items) {
+      selected = (items || []).slice();
+      renderChips();
+      // Resolve display names for items that only have jid as displayName
+      selected.forEach(function(item, idx) {
+        if (item.displayName && item.displayName !== item.jid) return; // already has a name
+        fetch('/api/admin/directory/' + encodeURIComponent(item.jid))
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(data) {
+            if (data && data.displayName) {
+              selected[idx].displayName = data.displayName;
+              renderChips();
+            }
+          })
+          .catch(function() {});
+      });
+    }
+  };
+}
+
+// Pure logic: serialize God Mode selected contacts to config format
+// Each contact produces [{identifier: jid}] or [{identifier: jid}, {identifier: lid}] if paired
+// DO NOT CHANGE: extracted for testability (Phase 8, UI-04)
+function serializeGodModeUsers(selected) {
+  var result = [];
+  for (var i = 0; i < selected.length; i++) {
+    result.push({ identifier: selected[i].jid });
+    if (selected[i].lid) result.push({ identifier: selected[i].lid });
+  }
+  return result;
+}
+
+// Pure logic: deserialize God Mode config [{identifier: x}] to picker-friendly array
+// Groups @c.us + @lid pairs into single entries
+function deserializeGodModeUsers(configArr) {
+  if (!configArr || !configArr.length) return [];
+  var result = [];
+  for (var i = 0; i < configArr.length; i++) {
+    var id = typeof configArr[i] === 'string' ? configArr[i] : (configArr[i].identifier || '');
+    if (!id) continue;
+    if (id.endsWith('@lid')) {
+      // Try to find matching @c.us entry without a lid yet
+      var found = false;
+      for (var j = 0; j < result.length; j++) {
+        if (!result[j].lid) { result[j].lid = id; found = true; break; }
+      }
+      if (!found) result.push({ jid: id, displayName: id, lid: null });
+    } else {
+      result.push({ jid: id, displayName: id, lid: null });
+    }
+  }
+  return result;
+}
+
+// ---- God Mode Users Field (Phase 8, UI-04) -- DO NOT CHANGE: wraps Contact Picker with paired JID (@c.us + @lid) handling ----
+function createGodModeUsersField(containerId, opts) {
+  opts = opts || {};
+  var picker = createContactPicker(containerId, {
+    placeholder: opts.placeholder || 'Search contacts...',
+    mode: 'multi'
+  });
+  if (!picker) return null;
+
+  // Maintain a parallel lid map keyed by JID string.
+  // This is independent of the picker's internal selected array,
+  // so lid pairings survive getSelected() copy semantics.
+  // DO NOT CHANGE: fixes lid-loss bug (Phase 8 revision, checker issue #1)
+  var lidMap = {};
+
+  return {
+    getValue: function() {
+      // Return flat array of JID strings, consulting lidMap for pairings
+      var sel = picker.getSelected();
+      var ids = [];
+      for (var i = 0; i < sel.length; i++) {
+        ids.push(sel[i].jid);
+        if (lidMap[sel[i].jid]) ids.push(lidMap[sel[i].jid]);
+      }
+      return ids;
+    },
+    setValue: function(configArr) {
+      // configArr is [{identifier: "jid"}, ...] or ["jid", ...]
+      var items = deserializeGodModeUsers(configArr);
+      // Populate lidMap from deserialized pairs
+      lidMap = {};
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].lid) lidMap[items[i].jid] = items[i].lid;
+      }
+      // Use setSelectedObjects to pass full objects (with displayName) into picker
+      // This avoids the closure-copy problem entirely
+      picker.setSelectedObjects(items.map(function(it) {
+        return { jid: it.jid, displayName: it.displayName || it.jid };
+      }));
+    }
+  };
+}
+
 // ---- Tag Input instance variables (Phase 8, UI-02) -- initialized lazily in loadConfig() ----
 var tagInputAllowFrom = null;
 var tagInputGroupAllowFrom = null;
 var tagInputAllowedGroups = null;
+// ---- God Mode Users Field instance variables (Phase 8, UI-04) -- initialized lazily in loadConfig() ----
+var godModePickerDm = null;
+var godModePickerGroup = null;
 
 // ---- Dashboard ----
 async function loadStats() {
@@ -1388,16 +1701,18 @@ async function loadConfig() {
     setVal('s-mentionPatterns', (dm.mentionPatterns || []).join('\\n'));
     setChk('s-godModeBypass', dm.godModeBypass !== false);
     setVal('s-godModeScope', dm.godModeScope || 'all');
-    var dmGodUsers = (dm.godModeSuperUsers || []).map(function(u) { return typeof u === 'string' ? u : (u.identifier || ''); }).filter(Boolean);
-    setVal('s-godModeSuperUsers', dmGodUsers.join(NL));
+    // Phase 8, UI-04 -- God Mode Users Field (Contact Picker with paired JID support)
+    if (!godModePickerDm) godModePickerDm = createGodModeUsersField('s-godModeSuperUsers-cp', { placeholder: 'Search god mode users...' });
+    godModePickerDm.setValue(dm.godModeSuperUsers || []);
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
     var gf = w.groupFilter || {};
     setChk('s-groupFilterEnabled', gf.enabled);
     setVal('s-groupMentionPatterns', (gf.mentionPatterns || []).join('\\n'));
     setChk('s-groupGodModeBypass', gf.godModeBypass !== false);
     setVal('s-groupGodModeScope', gf.godModeScope || 'all');
-    var gfGodUsers = (gf.godModeSuperUsers || []).map(function(u) { return typeof u === 'string' ? u : (u.identifier || ''); }).filter(Boolean);
-    setVal('s-groupGodModeSuperUsers', gfGodUsers.join(NL));
+    // Phase 8, UI-04 -- God Mode Users Field (Contact Picker with paired JID support)
+    if (!godModePickerGroup) godModePickerGroup = createGodModeUsersField('s-groupGodModeSuperUsers-cp', { placeholder: 'Search god mode users...' });
+    godModePickerGroup.setValue(gf.godModeSuperUsers || []);
     setVal('s-groupTokenEstimate', gf.tokenEstimate || 2500);
     var pr = w.presence || {};
     setChk('s-presenceEnabled', pr.enabled !== false);
@@ -1457,7 +1772,8 @@ async function saveSettings(e) {
         mentionPatterns: splitLines(getVal('s-mentionPatterns')),
         godModeBypass: getChk('s-godModeBypass'),
         godModeScope: getVal('s-godModeScope') || 'all',
-        godModeSuperUsers: splitLines(getVal('s-godModeSuperUsers')).map(function(id) { return { identifier: id }; }),
+        // Phase 8, UI-04 -- read from God Mode Users Field. DO NOT REVERT to splitLines(getVal(...)).
+        godModeSuperUsers: godModePickerDm ? godModePickerDm.getValue().map(function(id) { return { identifier: id }; }) : [],
         tokenEstimate: parseNum(getVal('s-tokenEstimate'), 2500),
       },
       groupFilter: {
@@ -1465,7 +1781,8 @@ async function saveSettings(e) {
         mentionPatterns: splitLines(getVal('s-groupMentionPatterns')),
         godModeBypass: getChk('s-groupGodModeBypass'),
         godModeScope: getVal('s-groupGodModeScope') || 'all',
-        godModeSuperUsers: splitLines(getVal('s-groupGodModeSuperUsers')).map(function(id) { return { identifier: id }; }),
+        // Phase 8, UI-04 -- read from God Mode Users Field. DO NOT REVERT to splitLines(getVal(...)).
+        godModeSuperUsers: godModePickerGroup ? godModePickerGroup.getValue().map(function(id) { return { identifier: id }; }) : [],
         tokenEstimate: parseNum(getVal('s-groupTokenEstimate'), 2500),
       },
       presence: {
