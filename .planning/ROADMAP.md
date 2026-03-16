@@ -158,7 +158,11 @@ Plans:
   2. All Contact Settings fields have tooltips explaining what they do
   3. Group Filter Override has per-group trigger operator and tag-style keyword input
   4. Tab switching clears search bar, search bar has 'x' clear button, "Newsletters" renamed to "Channels"
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md -- Disable pairing mode with explanation tooltip, add Contact Settings tooltips, tab switch clears search, search bar clear button, rename Newsletters to Channels
+- [ ] 09-02-PLAN.md -- Replace group filter keywords with tag-style input, add per-group trigger operator AND/OR select
 
 ### Phase 10: Directory & Group Enhancements
 **Goal:** Paginated group browsing, fixed participants display, participant roles, and bulk edit
@@ -197,6 +201,6 @@ Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Pha
 | 6. WhatsApp Rules and Policy System | 4/4 | Complete   | 2026-03-13 |
 | 7. Admin Panel Critical Fixes | 2/2 | Complete   | 2026-03-15 |
 | 8. Shared UI Components | 2/2 | Complete   | 2026-03-16 |
-| 9. Settings UX Improvements | 0/? | Planned | |
+| 9. Settings UX Improvements | 0/2 | Planned | |
 | 10. Directory & Group Enhancements | 0/? | Planned | |
 | 11. Dashboard, Sessions & Log | 0/? | Planned | |
