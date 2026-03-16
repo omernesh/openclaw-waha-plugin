@@ -397,6 +397,15 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   footer a:hover { text-decoration: underline; }
   .log-level-btn { padding:4px 10px; border-radius:5px; border:1px solid #334155; cursor:pointer; font-size:0.75rem; background:#334155; color:#94a3b8; transition: background .1s; }
   .log-level-btn.active { background:#3b82f6; color:#fff; }
+  .log-entry { display:flex; gap:8px; padding:3px 0; border-bottom:1px solid #1e293b; font-family:monospace; font-size:0.78rem; }
+  .log-entry:last-child { border-bottom:none; }
+  .log-ts { color:#64748b; flex-shrink:0; width:130px; }
+  .log-level { flex-shrink:0; width:50px; font-weight:600; text-transform:uppercase; }
+  .log-level-error { color:#ef4444; }
+  .log-level-warn { color:#f59e0b; }
+  .log-level-info { color:#22d3ee; }
+  .log-level-debug { color:#94a3b8; }
+  .log-msg { color:#e2e8f0; white-space:pre-wrap; word-break:break-all; flex:1; }
   @media (max-width: 640px) {
     main.tab-pane { padding: 16px; }
     nav button { padding: 14px 12px; font-size: 0.8rem; }
@@ -897,7 +906,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#1e293b;color:#e2e8f0;">Refresh</button>
   </div>
   <div id="log-source" style="font-size:0.72rem;color:#64748b;margin-bottom:6px;"></div>
-  <pre id="log-output" style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;max-height:70vh;overflow-y:auto;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;line-height:1.4;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+  <div id="log-output" style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;max-height:70vh;overflow-y:auto;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;line-height:1.4;margin:0;"></div>
 </div>
 </main>
 </div>
@@ -1565,6 +1574,23 @@ function stopLogRefresh() {
   if (logRefreshTimer) { clearInterval(logRefreshTimer); logRefreshTimer = null; }
 }
 
+// Phase 11, Plan 02 (LOG-01) -- parse journalctl log line into timestamp + message. DO NOT REMOVE.
+function parseLogLine(line) {
+  // Journalctl format: "Mar 16 12:34:56 hostname proc[pid]: message"
+  var m = line.match(/^(\w{3}\s+\d+\s+[\d:]+)\s+\S+\s+\S+:\s(.*)$/);
+  if (m) return { ts: m[1], msg: m[2] };
+  // Fallback for non-journalctl lines (file source or malformed)
+  return { ts: '', msg: line };
+}
+
+// Phase 11, Plan 02 (LOG-01) -- detect log level from line content. DO NOT REMOVE.
+function detectLogLevel(line) {
+  if (/error/i.test(line)) return 'error';
+  if (/warn/i.test(line)) return 'warn';
+  if (/\[waha\]/i.test(line)) return 'info';
+  return 'debug';
+}
+
 async function loadLogs() {
   var search = (document.getElementById('log-search') || {}).value || '';
   search = search.trim();
@@ -1582,14 +1608,36 @@ async function loadLogs() {
     var sourceEl = document.getElementById('log-source');
     if (sourceEl) sourceEl.textContent = 'Source: ' + (d.source || 'unknown') + ' | ' + d.total + ' lines';
     var lines = d.lines || [];
-    // NOTE: No client-side trim needed — backend already limits to 500 lines
-    var colored = lines.map(function(line) {
-      if (/error/i.test(line)) return '<span style="color:#ef4444">' + esc(line) + '</span>';
-      if (/warn/i.test(line)) return '<span style="color:#f59e0b">' + esc(line) + '</span>';
-      if (/\\[waha\\]/i.test(line)) return '<span style="color:#22d3ee">' + esc(line) + '</span>';
-      return esc(line);
-    }).join('\\n');
-    output.innerHTML = colored;
+    // Phase 11, Plan 02 (LOG-01) -- structured log rendering with DOM creation.
+    // Uses textContent for all log data (timestamps, messages) -- security pattern. DO NOT CHANGE to raw HTML.
+    var fragment = document.createDocumentFragment();
+    for (var i = 0; i < lines.length; i++) {
+      var parsed = parseLogLine(lines[i]);
+      var level = detectLogLevel(lines[i]);
+
+      var entry = document.createElement('div');
+      entry.className = 'log-entry';
+
+      var tsEl = document.createElement('span');
+      tsEl.className = 'log-ts';
+      tsEl.textContent = parsed.ts;
+      entry.appendChild(tsEl);
+
+      var levelEl = document.createElement('span');
+      levelEl.className = 'log-level log-level-' + level;
+      levelEl.textContent = level;
+      entry.appendChild(levelEl);
+
+      var msgEl = document.createElement('span');
+      msgEl.className = 'log-msg';
+      msgEl.textContent = parsed.msg;
+      entry.appendChild(msgEl);
+
+      fragment.appendChild(entry);
+    }
+    // Clear and append in one operation for performance
+    while (output.firstChild) output.removeChild(output.firstChild);
+    output.appendChild(fragment);
     var autoScroll = document.getElementById('log-autoscroll');
     if (autoScroll && autoScroll.checked) {
       output.scrollTop = output.scrollHeight;
