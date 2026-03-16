@@ -751,7 +751,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
             <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-mediaEnabled" name="mediaEnabled" onchange="toggleMediaSubToggles()"><span class="slider"></span></label>
           </label>
         </div>
-        <div id="media-sub-toggles" style="display:none;padding-left:16px;border-left:2px solid #334155;display:grid;gap:10px;">
+        <div id="media-sub-toggles" style="display:none;padding-left:16px;border-left:2px solid #334155;gap:10px;">
           <div class="field">
             <label class="toggle-wrap">
               <span>Audio Transcription <span class="tip" data-tip="Transcribe voice messages to text using Whisper before sending to AI.">?</span></span>
@@ -2276,8 +2276,7 @@ function syncAllowListBatch(configPath: string, field: "allowFrom" | "groupAllow
     for (const jid of jids) {
       if (add && !list.includes(jid)) {
         list.push(jid);
-      }
-      if (!add) {
+      } else if (!add) {
         const idx = list.indexOf(jid);
         if (idx >= 0) list.splice(idx, 1);
       }
