@@ -3199,6 +3199,14 @@ export function createWahaWebhookServer(opts: {
           writeJsonResponse(res, 400, { error: "jids must be a non-empty array" });
           return;
         }
+        if (jids.length > 500) {
+          writeJsonResponse(res, 400, { error: "jids array exceeds maximum of 500 items" });
+          return;
+        }
+        if (!jids.every((j) => typeof j === "string")) {
+          writeJsonResponse(res, 400, { error: "all jids must be strings" });
+          return;
+        }
         const validActions = ["allow-dm", "revoke-dm", "allow-group", "revoke-group", "set-role"];
         if (!validActions.includes(action)) {
           writeJsonResponse(res, 400, { error: "action must be one of: " + validActions.join(", ") });
@@ -3508,9 +3516,7 @@ export function createWahaWebhookServer(opts: {
                   const altJid = p.participantJid.replace("@lid", "@c.us");
                   const contact = db.getContact(altJid);
                   if (contact?.displayName) {
-                    db.db.prepare(
-                      "UPDATE group_participants SET display_name = ? WHERE group_jid = ? AND participant_jid = ?"
-                    ).run(contact.displayName, groupJid, p.participantJid);
+                    db.updateParticipantDisplayName(groupJid, p.participantJid, contact.displayName);
                   }
                 }
                 // Re-read after name resolution so enriched names are returned in response
@@ -3523,7 +3529,7 @@ export function createWahaWebhookServer(opts: {
 
           // DIR-02: Enrich participants with global allowlist state from config.groupAllowFrom
           // This shows green buttons for participants already in the global allowlist (not just per-group DB)
-          const groupAllowFrom: string[] = ((opts.config as Record<string, unknown>).groupAllowFrom as string[]) ?? [];
+          const groupAllowFrom: string[] = account.config.groupAllowFrom ?? [];
           const enrichedParticipants = participants.map((p) => ({
             ...p,
             globallyAllowed: groupAllowFrom.includes(p.participantJid),

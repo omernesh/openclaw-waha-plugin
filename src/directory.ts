@@ -518,7 +518,10 @@ export class DirectoryDb {
     const row = this.db.prepare(
       "SELECT participant_role FROM group_participants WHERE group_jid = ? AND participant_jid = ?"
     ).get(groupJid, participantJid) as { participant_role: string } | undefined;
-    return (row?.participant_role as ParticipantRole) ?? "participant";
+    const val = row?.participant_role;
+    // Validate against allowed values — corrupt DB value defaults to "participant"
+    if (val === "bot_admin" || val === "manager" || val === "participant") return val;
+    return "participant";
   }
 
   setGroupAllowAll(groupJid: string, allowAll: boolean): void {
@@ -834,6 +837,17 @@ export class DirectoryDb {
     })();
   }
 
+
+  /**
+   * Update the display_name for a group participant.
+   * Public method to avoid external callers accessing the private db field directly.
+   * Used during lazy participant load to enrich @lid JIDs with names from directory contacts.
+   */
+  updateParticipantDisplayName(groupJid: string, participantJid: string, displayName: string): void {
+    this.db.prepare(
+      "UPDATE group_participants SET display_name = ? WHERE group_jid = ? AND participant_jid = ?"
+    ).run(displayName, groupJid, participantJid);
+  }
 
   close(): void {
     this.db.close();
