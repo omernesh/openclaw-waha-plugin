@@ -374,6 +374,13 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .dir-tab { background: none; border: none; color: #94a3b8; padding: 10px 16px; cursor: pointer; font-size: 0.85rem; border-bottom: 2px solid transparent; transition: color .15s; }
   .dir-tab:hover { color: #e2e8f0; }
   .dir-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+  /* DIR-01: Groups paginated table */
+  .groups-table { width:100%; border-collapse:collapse; }
+  .groups-table th, .groups-table td { padding:8px 12px; text-align:left; border-bottom:1px solid #1e293b; }
+  .groups-table th { color:#94a3b8; font-size:0.75rem; text-transform:uppercase; }
+  .groups-table tr:hover { background:#1e293b; cursor:pointer; }
+  .page-nav { display:flex; align-items:center; justify-content:center; gap:4px; padding:8px 0; }
+  .page-size-select { background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:4px; padding:4px 8px; font-size:0.8rem; }
   /* DOCS */
   .docs-section { margin-bottom: 4px; }
   .docs-section summary { cursor: pointer; font-size: 1rem; font-weight: 600; color: #e2e8f0; padding: 12px 0; list-style: none; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #334155; }
@@ -1938,6 +1945,7 @@ function switchDirTab(tab, btn) {
   var searchEl = document.getElementById('dir-search');   // UX-04: clear on tab switch
   if (searchEl) searchEl.value = '';                      // UX-04: clear on tab switch
   dirOffset = 0;
+  dirGroupPage = 1;  // DIR-01: reset groups page on tab switch
   dirAutoImported = false;
   loadDirectory();
 }
@@ -1969,11 +1977,16 @@ async function refreshDirectory() {
 // ---- Directory ----
 var dirOffset = 0;
 var dirSearchTimeout = null;
+// DIR-01: Groups tab pagination state
+var dirGroupPage = 1;
+var dirGroupPageSize = 25;
 function debouncedDirSearch() {
   clearTimeout(dirSearchTimeout);
   dirSearchTimeout = setTimeout(function() { dirOffset = 0; loadDirectory(); }, 300);
 }
 async function loadDirectory() {
+  // DIR-01: groups tab uses a separate paginated table renderer — do not use infinite-scroll path
+  if (currentDirTab === 'groups') { return loadGroupsTable(); }
   var search = document.getElementById('dir-search').value.trim();
   var typeParam = currentDirTab === 'contacts' ? '&type=contact' : currentDirTab === 'groups' ? '&type=group' : '&type=newsletter';
   var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + typeParam + (search ? '&search=' + encodeURIComponent(search) : '');
@@ -2025,6 +2038,140 @@ async function loadDirectory() {
     }
   });
 })();
+// DIR-01: Navigate to a specific groups page — called from buildPageNav onclick handlers
+function goGroupPage(page) { dirGroupPage = page; loadGroupsTable(); }
+
+// DIR-01: Build page navigation HTML — pure function, returns '' for single-page results.
+// All button labels and onclick args are static integers — no user data, no XSS risk.
+function buildPageNav(currentPage, totalPages) {
+  if (totalPages <= 1) return '';
+  var start = Math.max(1, currentPage - 2);
+  var end = Math.min(totalPages, start + 4);
+  start = Math.max(1, end - 4); // re-anchor if end hit the wall
+  var sBase = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;cursor:pointer;font-size:0.8rem;';
+  var sDis  = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.8rem;opacity:0.5;pointer-events:none;';
+  var sCur  = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1d4ed8;color:#fff;cursor:pointer;font-size:0.8rem;font-weight:bold;';
+  var nav = '<div class="page-nav">';
+  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="goGroupPage(1)">First</button>';
+  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="goGroupPage(' + (currentPage - 1) + ')">Prev</button>';
+  for (var pg = start; pg <= end; pg++) {
+    nav += '<button style="' + (pg === currentPage ? sCur : sBase) + '" onclick="goGroupPage(' + pg + ')">' + pg + '</button>';
+  }
+  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="goGroupPage(' + (currentPage + 1) + ')">Next</button>';
+  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="goGroupPage(' + totalPages + ')">Last</button>';
+  nav += '</div>';
+  return nav;
+}
+
+// DIR-01: Render groups tab as a paginated table.
+// Uses DOM methods (textContent / createElement / appendChild) for all user-supplied text (JIDs, names).
+// buildPageNav output is static-integer-only HTML — safe to assign via innerHTML.
+// DO NOT replace DOM methods with innerHTML concatenation — security hook requires DOM methods for user text.
+async function loadGroupsTable() {
+  var search = document.getElementById('dir-search').value.trim();
+  var offset = (dirGroupPage - 1) * dirGroupPageSize;
+  var url = '/api/admin/directory?type=group&limit=' + dirGroupPageSize + '&offset=' + offset + (search ? '&search=' + encodeURIComponent(search) : '');
+  var list = document.getElementById('contact-list');
+  try {
+    var r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var totalPages = Math.ceil((d.total || 0) / dirGroupPageSize) || 1;
+    document.getElementById('dir-stats').innerHTML =
+      '<div class="dir-stat">Contacts <span>' + d.dms + '</span></div>' +
+      '<div class="dir-stat">Groups <span>' + d.groups + '</span></div>' +
+      '<div class="dir-stat">Newsletters <span>' + (d.newsletters || 0) + '</span></div>' +
+      '<div class="dir-stat">Showing <span>' + d.total + '</span></div>';
+    document.getElementById('load-more-btn').style.display = 'none';
+    // Clear list — safe DOM loop avoids direct innerHTML assignment on user container
+    while (list.firstChild) { list.removeChild(list.firstChild); }
+    if (!d.contacts || d.contacts.length === 0) {
+      var emptyEl = document.createElement('div');
+      emptyEl.style.cssText = 'color:#64748b;text-align:center;padding:32px;';
+      emptyEl.textContent = 'No groups found.';
+      list.appendChild(emptyEl);
+      return;
+    }
+    // Page-size selector — option values/labels are static integers, safe
+    var sizeRow = document.createElement('div');
+    sizeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
+    var sizeLabel = document.createElement('label');
+    sizeLabel.style.cssText = 'font-size:0.8rem;color:#94a3b8;';
+    sizeLabel.textContent = 'Groups per page:';
+    var sizeSelect = document.createElement('select');
+    sizeSelect.className = 'page-size-select';
+    sizeSelect.setAttribute('onchange', 'dirGroupPageSize=parseInt(this.value);dirGroupPage=1;loadGroupsTable();');
+    [10, 25, 50, 100].forEach(function(sz) {
+      var opt = document.createElement('option');
+      opt.value = String(sz);
+      opt.textContent = String(sz);
+      if (sz === dirGroupPageSize) { opt.selected = true; }
+      sizeSelect.appendChild(opt);
+    });
+    sizeRow.appendChild(sizeLabel);
+    sizeRow.appendChild(sizeSelect);
+    list.appendChild(sizeRow);
+    // Upper nav — buildPageNav output is static-integer HTML, no user data
+    var upperNav = document.createElement('div');
+    upperNav.innerHTML = buildPageNav(dirGroupPage, totalPages);
+    list.appendChild(upperNav);
+    // Groups table — all user text (names, JIDs) set via textContent
+    var table = document.createElement('table');
+    table.className = 'groups-table';
+    var thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>Name</th><th>JID</th><th>Members</th><th>Last Active</th><th></th></tr>';
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    d.contacts.forEach(function(c) {
+      var safeId = c.jid.replace(/[^a-zA-Z0-9]/g, '_');
+      // Group row — click expands participant panel
+      var tr = document.createElement('tr');
+      tr.id = 'row-' + safeId;
+      tr.setAttribute('onclick', 'loadGroupParticipants(\'' + esc(c.jid) + '\')');
+      var tdName = document.createElement('td');
+      tdName.textContent = c.displayName || c.jid; // textContent safe — no HTML injection
+      var tdJid = document.createElement('td');
+      tdJid.style.cssText = 'font-family:monospace;font-size:0.78rem;color:#64748b;';
+      tdJid.textContent = c.jid; // textContent safe
+      var tdMem = document.createElement('td');
+      tdMem.textContent = c.messageCount > 0 ? String(c.messageCount) : '-';
+      var tdTime = document.createElement('td');
+      tdTime.textContent = relTime(c.lastMessageAt);
+      var tdAct = document.createElement('td');
+      var expandBtn = document.createElement('button');
+      expandBtn.style.cssText = 'background:#1e293b;color:#e2e8f0;border:1px solid #334155;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;';
+      expandBtn.textContent = 'Participants';
+      expandBtn.setAttribute('onclick', 'event.stopPropagation();loadGroupParticipants(\'' + esc(c.jid) + '\')');
+      tdAct.appendChild(expandBtn);
+      tr.appendChild(tdName); tr.appendChild(tdJid); tr.appendChild(tdMem); tr.appendChild(tdTime); tr.appendChild(tdAct);
+      tbody.appendChild(tr);
+      // Panel expansion row (hosts participant panel div — reuses loadGroupParticipants panel pattern)
+      var panelTr = document.createElement('tr');
+      var panelTd = document.createElement('td');
+      panelTd.setAttribute('colspan', '5');
+      panelTd.style.padding = '0';
+      var panelDiv = document.createElement('div');
+      panelDiv.className = 'contact-settings-panel';
+      panelDiv.id = 'panel-card-' + safeId; // matches loadGroupParticipants expected id: panel-{card-jid}
+      panelTd.appendChild(panelDiv);
+      panelTr.appendChild(panelTd);
+      tbody.appendChild(panelTr);
+    });
+    table.appendChild(tbody);
+    list.appendChild(table);
+    // Lower nav — same static-integer HTML
+    var lowerNav = document.createElement('div');
+    lowerNav.innerHTML = buildPageNav(dirGroupPage, totalPages);
+    list.appendChild(lowerNav);
+  } catch(errGt) {
+    while (list.firstChild) { list.removeChild(list.firstChild); }
+    var errEl = document.createElement('div');
+    errEl.style.cssText = 'color:#ef4444;padding:16px;';
+    errEl.textContent = 'Error loading groups: ' + errGt.message;
+    list.appendChild(errEl);
+  }
+}
+
 function buildContactCard(c) {
   var name = c.displayName || c.jid;
   var color = avatarColor(c.jid);
@@ -2147,16 +2294,20 @@ async function loadGroupParticipants(groupJid, forceOpen) {
       html += '<div style="color:#64748b;font-size:0.85rem;">No participants found. Try refreshing from WAHA first.</div>';
     } else {
       parts.forEach(function(p) {
-        var pName = p.displayName || p.participantJid;
+        // DIR-02: For @lid JIDs with no display name, strip domain for a cleaner fallback than the full raw JID
+        var pNameFallback = p.participantJid.indexOf('@lid') !== -1 ? p.participantJid.replace(/@.*$/, '') : p.participantJid;
+        var pName = p.displayName || pNameFallback;
         var pColor = avatarColor(p.participantJid);
         var pInits = initials(p.displayName || '', p.participantJid);
+        // DIR-02: Green if allowed per-group OR globally allowed via config.groupAllowFrom
+        var groupAllowed = p.allowInGroup || p.globallyAllowed;
         html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e293b;">';
         html += '<div class="avatar" style="width:32px;height:32px;font-size:0.8rem;background:' + pColor + ';color:#fff">' + esc(pInits) + '</div>';
         html += '<div style="flex:1;min-width:0;">';
         html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + '</div>';
         html += '<div style="font-size:0.72rem;color:#64748b;font-family:monospace;">' + esc(p.participantJid) + '</div>';
         html += '</div>';
-        html += '<button style="background:' + (p.allowInGroup ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-group\\',' + (p.allowInGroup ? 'true' : 'false') + ')">' + (p.allowInGroup ? 'In Group' : 'Allow Group') + '</button>';
+        html += '<button style="background:' + (groupAllowed ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-group\\',' + (p.allowInGroup ? 'true' : 'false') + ')">' + (groupAllowed ? 'Allowed' : 'Allow') + '</button>';
         html += '<button style="background:' + (p.allowDm ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-dm\\',' + (p.allowDm ? 'true' : 'false') + ')">' + (p.allowDm ? 'DM OK' : 'Allow DM') + '</button>';
         html += '</div>';
       });
@@ -3134,15 +3285,37 @@ export function createWahaWebhookServer(opts: {
               if (mapped.length > 0) {
                 db.bulkUpsertGroupParticipants(groupJid, mapped);
                 participants = db.getGroupParticipants(groupJid);
+                // DIR-02: Name resolution pass — for @lid JIDs with no display name, attempt
+                // to find the matching @c.us contact in the directory (NOWEB sends @lid JIDs).
+                const noName = participants.filter((p) => !p.displayName);
+                for (const p of noName) {
+                  const altJid = p.participantJid.replace("@lid", "@c.us");
+                  const contact = db.getContact(altJid);
+                  if (contact?.displayName) {
+                    db.db.prepare(
+                      "UPDATE group_participants SET display_name = ? WHERE group_jid = ? AND participant_jid = ?"
+                    ).run(contact.displayName, groupJid, p.participantJid);
+                  }
+                }
+                // Re-read after name resolution so enriched names are returned in response
+                participants = db.getGroupParticipants(groupJid);
               }
             } catch (fetchErr) {
               console.warn(`[waha] Failed to lazy-fetch participants for ${groupJid}: ${String(fetchErr)}`);
             }
           }
 
+          // DIR-02: Enrich participants with global allowlist state from config.groupAllowFrom
+          // This shows green buttons for participants already in the global allowlist (not just per-group DB)
+          const groupAllowFrom: string[] = ((opts.config as Record<string, unknown>).groupAllowFrom as string[]) ?? [];
+          const enrichedParticipants = participants.map((p) => ({
+            ...p,
+            globallyAllowed: groupAllowFrom.includes(p.participantJid),
+          }));
+
           const allowAll = db.getGroupAllowAllStatus(groupJid);
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ participants, allowAll }));
+          res.end(JSON.stringify({ participants: enrichedParticipants, allowAll }));
         } catch (err) {
           console.error(`[waha] GET /api/admin/directory/group/:groupJid/participants failed: ${String(err)}`);
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
