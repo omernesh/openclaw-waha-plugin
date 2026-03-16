@@ -76,6 +76,33 @@ Requirements for this milestone cycle. Each maps to roadmap phases.
 - [x] **RULES-13**: Unit tests for merge engine, identity normalizer, payload builder, auth matrix
 - [x] **RULES-14**: Integration tests for DM resolution, group resolution, unknown participant, outbound enforcement
 
+### Shared UI Components
+
+- [x] **UI-01**: Name Resolver component — JID/LID displays resolve to human-readable contact names with shimmer skeleton and avatar
+- [x] **UI-02**: Tag Input component — JID list fields replaced with pill-bubble inputs supporting comma/enter/space delimiters and backspace delete
+- [x] **UI-03**: Contact Picker component — searchable contact dropdown with UTF-8 fuzzy search, multi-select chips, 300ms debounce, outside-click dismiss
+- [x] **UI-04**: God Mode Users field — wraps Contact Picker with paired @c.us + @lid JID handling, serialize/deserialize pure functions
+
+### Settings UX Improvements
+
+- [x] **UX-01**: DM Policy pairing mode disabled — pairing mode UI hidden/disabled when DM policy is not in pairing configuration
+- [x] **UX-02**: Contact Settings tooltips — hover tooltips on all Contact Settings fields explaining purpose and valid values
+- [x] **UX-03**: Group Filter tag input + trigger operator — Group Filter allow-from fields use Tag Input; trigger operator (any/all) selector added
+- [x] **UX-04**: Tab switch clears search / Channels rename — switching directory tabs resets search input; Newsletters tab renamed to Channels
+
+### Directory & Group Enhancements
+
+- [x] **DIR-01**: Groups tab paginated table — Groups directory rendered as sortable paginated table with Load More
+- [x] **DIR-02**: Participant name resolution + allowlist state — group participant list shows resolved names and current allow/block state
+- [x] **DIR-03**: Participant role dropdown + SQLite persistence — participant role (member/admin/superadmin) stored in group_participants table and editable via dropdown
+- [x] **DIR-04**: Bulk select mode + action toolbar — checkbox multi-select mode in participant list with bulk allow/block/role-change toolbar
+
+### Dashboard, Sessions & Log
+
+- [x] **DASH-01**: Dashboard multi-session display — Dashboard tab shows per-session status cards with connection health, message counts, and role badges
+- [x] **SESS-01**: Sessions tab role editing + PUT endpoint — Sessions tab supports inline role/sub-role editing; PUT /api/admin/sessions/:id endpoint persists changes
+- [x] **LOG-01**: Structured log display with level badges — Log tab shows structured log entries with color-coded level badges (info/warn/error/debug)
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -150,27 +177,42 @@ Deferred to future release. Tracked but not in current roadmap.
 | DOC-02 | Phase 5 | Complete |
 | DOC-03 | Phase 5 | Complete |
 | DOC-04 | Phase 5 | Complete |
-| RULES-01 | Phase 6 | Planned |
-| RULES-02 | Phase 6 | Planned |
-| RULES-03 | Phase 6 | Planned |
-| RULES-04 | Phase 6 | Planned |
-| RULES-05 | Phase 6 | Planned |
-| RULES-06 | Phase 6 | Planned |
-| RULES-07 | Phase 6 | Planned |
-| RULES-08 | Phase 6 | Planned |
-| RULES-09 | Phase 6 | Planned |
-| RULES-10 | Phase 6 | Planned |
-| RULES-11 | Phase 6 | Planned |
-| RULES-12 | Phase 6 | Planned |
-| RULES-13 | Phase 6 | Planned |
-| RULES-14 | Phase 6 | Planned |
+| RULES-01 | Phase 6 | Complete |
+| RULES-02 | Phase 6 | Complete |
+| RULES-03 | Phase 6 | Complete |
+| RULES-04 | Phase 6 | Complete |
+| RULES-05 | Phase 6 | Complete |
+| RULES-06 | Phase 6 | Complete |
+| RULES-07 | Phase 6 | Complete |
+| RULES-08 | Phase 6 | Complete |
+| RULES-09 | Phase 6 | Complete |
+| RULES-10 | Phase 6 | Complete |
+| RULES-11 | Phase 6 | Complete |
+| RULES-12 | Phase 6 | Complete |
+| RULES-13 | Phase 6 | Complete |
+| RULES-14 | Phase 6 | Complete |
+| UI-01 | Phase 8 | Complete |
+| UI-02 | Phase 8 | Complete |
+| UI-03 | Phase 8 | Complete |
+| UI-04 | Phase 8 | Complete |
+| UX-01 | Phase 9 | Complete |
+| UX-02 | Phase 9 | Complete |
+| UX-03 | Phase 9 | Complete |
+| UX-04 | Phase 9 | Complete |
+| DIR-01 | Phase 10 | Complete |
+| DIR-02 | Phase 10 | Complete |
+| DIR-03 | Phase 10 | Complete |
+| DIR-04 | Phase 10 | Complete |
+| DASH-01 | Phase 11 | Complete |
+| SESS-01 | Phase 11 | Complete |
+| LOG-01 | Phase 11 | Complete |
 
 **Coverage:**
-- v1 requirements: 36 total (complete)
-- Phase 6 requirements: 14 total (planned)
-- Mapped to phases: 50
+- v1 requirements: 50 total (complete)
+- Phase 8–11 requirements: 15 total (complete)
+- Mapped to phases: 65
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-11*
-*Last updated: 2026-03-14 after Phase 6 planning*
+*Last updated: 2026-03-16 after Phase 11 — added UI/UX/DIR/DASH/SESS/LOG entries, marked RULES-01–14 Complete*
