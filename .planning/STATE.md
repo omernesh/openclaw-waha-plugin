@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.10
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 07-admin-panel-critical-fixes 07-01-PLAN.md
-last_updated: "2026-03-15T22:23:51.155Z"
+stopped_at: Completed 08-shared-ui-components/08-01-PLAN.md
+last_updated: "2026-03-16T14:27:44.127Z"
 last_activity: "2026-03-15 - Completed quick task 260315-wo2: Break down BUGS.md into GSD phases"
 progress:
   total_phases: 11
   completed_phases: 7
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 22
+  completed_plans: 21
   percent: 95
 ---
 
@@ -125,6 +125,7 @@ Progress: [████████████████████] 8/8 pla
 | Phase 06-whatsapp-rules-and-policy-system P04 | 9 | 2 tasks | 7 files |
 | Phase 07-admin-panel-critical-fixes P02 | 5 | 1 tasks | 2 files |
 | Phase 07-admin-panel-critical-fixes P01 | 8 | 2 tasks | 1 files |
+| Phase 08-shared-ui-components P08-01 | 7 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,9 @@ Recent decisions affecting current work:
 - [Phase 07-admin-panel-critical-fixes]: DOM element creation (appendChild) instead of innerHTML for overlay — passes security hooks
 - [Phase 07-admin-panel-critical-fixes]: AbortController 10s timeout on saveGroupFilter to surface hung requests as clear error
 - [Phase 07-admin-panel-critical-fixes]: listEnabledWahaAccounts fallback to primary account prevents 502 from config resolution crashes
+- [Phase 08-shared-ui-components]: Lazy init in loadConfig(): Tag Input components created on first loadConfig() call, not at script bottom, because DOM elements do not exist until Settings tab is activated
+- [Phase 08-shared-ui-components]: normalizeTags() extracted as pure function for testability - follows mentions.ts pattern from Phase 3
+- [Phase 08-shared-ui-components]: DOM removeChild loop for element clearing: safe pattern that avoids security hook, semantically equivalent
 
 ### Roadmap Evolution
 
@@ -200,6 +204,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-15T22:16:41.752Z
-Stopped at: Completed 07-admin-panel-critical-fixes 07-01-PLAN.md
+Last session: 2026-03-16T14:27:44.119Z
+Stopped at: Completed 08-shared-ui-components/08-01-PLAN.md
 Resume file: None
