@@ -8,6 +8,23 @@ A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents t
 
 Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
 
+## Current Milestone: v1.11 Polish, Sync & Features
+
+**Goal:** Fix all bugs and CRs from v1.10 human verification, implement background directory sync, and add pairing mode, TTL access, auto-reply, and modules system.
+
+**Target features:**
+- Name resolution across all UI (dashboard, settings, directory, participants)
+- Background WAHA→SQLite directory sync with local search
+- Dashboard polish (per-session stats, collapsible cards, human-readable labels)
+- Sessions tab UX (role change, labels, restart handling)
+- Consistent tag-style inputs throughout settings
+- Directory UX (search fix, tooltips, bulk edit, channels, pagination)
+- Refresh button feedback across all tabs
+- Pairing mode (passcode-gated temporary access with wa.me deep links)
+- TTL-based access for contacts and groups
+- Auto-reply canned message to unauthorized DMs
+- Modules system with admin panel tab
+
 ## Requirements
 
 ### Validated
@@ -52,7 +69,19 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 
 ### Active
 
-- [ ] F2: Inbound group events (join/leave/promote/demote)
+<!-- v1.11 — bugs, CRs, and features from human verification -->
+
+- [ ] Fix name resolution for @lid JIDs across dashboard, settings, directory, participants
+- [ ] Background directory sync (WAHA→SQLite) with local search
+- [ ] Dashboard per-session stats, collapsible cards, human-readable labels, flicker fix
+- [ ] Sessions tab role change UX, labels, 502 restart handling
+- [ ] Consistent tag-style inputs (custom keywords, mention patterns, group override keywords)
+- [ ] Directory search fix, tooltip clipping, drawer persistence, pagination, bulk edit
+- [ ] Refresh button visual feedback across all tabs
+- [ ] Pairing mode — passcode-gated temporary access with wa.me deep links
+- [ ] TTL-based auto-expiring access for contacts and groups
+- [ ] Auto-reply canned message to unauthorized DMs
+- [ ] Modules system with admin panel tab and module framework
 
 ### Out of Scope
 
@@ -110,4 +139,4 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | Rules enforcement at inbound/outbound layer (not action handler) | Policies apply uniformly regardless of action type | ✓ Good |
 
 ---
-*Last updated: 2026-03-16 after v1.10 milestone*
+*Last updated: 2026-03-17 after v1.11 milestone start*
