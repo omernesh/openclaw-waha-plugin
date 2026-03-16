@@ -438,6 +438,9 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .cp-row .cp-check { color: #10b981; font-size: 0.85rem; flex-shrink: 0; width: 20px; text-align: center; }
   .cp-empty { color: #64748b; text-align: center; padding: 16px; font-size: 0.85rem; }
   .cp-loading { padding: 10px 12px; }
+  /* SESSION ROW (Phase 11, Plan 01 - DASH-01) -- DO NOT CHANGE: compact multi-session row in Dashboard card */
+  .session-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #1e293b; font-size:0.82rem; }
+  .session-row:last-child { border-bottom:none; }
 </style>
 </head>
 <body>
@@ -487,7 +490,9 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="kv" id="access-kv"></div>
   </div>
   <div class="card" id="session-card">
-    <h2>Session Info <span id="health-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:8px;vertical-align:middle;background:#94a3b8;" title="Loading..."></span></h2>
+    <h2>Sessions <span id="health-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:8px;vertical-align:middle;background:#94a3b8;" title="Loading..."></span></h2>
+    <!-- Phase 11, Plan 01 (DASH-01): multi-session rows rendered by loadDashboardSessions(). DO NOT REMOVE. -->
+    <div id="dashboard-sessions" style="margin-bottom:12px;"></div>
     <div class="kv" id="session-kv"></div>
     <div class="kv" id="health-kv" style="margin-top:8px;border-top:1px solid #334155;padding-top:8px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
@@ -869,9 +874,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <div class="card">
     <h2>Registered Sessions</h2>
     <div id="sessions-list" style="display:grid;gap:12px;margin-top:4px;"></div>
-    <p style="margin-top:16px;font-size:0.78rem;color:#64748b;border-top:1px solid #334155;padding-top:12px;">
-      Roles are configured via the Config tab or config API. This view is read-only.
-    </p>
+    <p style="margin-top:16px;font-size:0.78rem;color:#64748b;border-top:1px solid #334155;padding-top:12px;">Changes take effect after gateway restart.</p>
     <div style="margin-top:8px;display:flex;justify-content:flex-end;">
       <button class="refresh-btn" onclick="loadSessions()">Refresh</button>
     </div>
@@ -1497,11 +1500,13 @@ async function loadStats() {
       })(jidGroups[gi]);
     }
     document.getElementById('session-kv').innerHTML =
-      kvRow('session', d.session) + kvRow('baseUrl', d.baseUrl) +
+      kvRow('baseUrl', d.baseUrl) +
       kvRow('webhookPort', d.webhookPort) + kvRow('serverTime', d.serverTime);
     document.getElementById('last-refresh').textContent = 'Last refreshed: ' + new Date().toLocaleTimeString();
     // Load health status for session card (Phase 2, Plan 02)
     loadHealth();
+    // Load multi-session dashboard rows (Phase 11, Plan 01 - DASH-01)
+    loadDashboardSessions();
   } catch(e) {
     document.getElementById('status-badge').textContent = 'Error';
     document.getElementById('status-badge').style.background = '#ef4444';
@@ -1616,44 +1621,136 @@ async function loadQueue() {
 }
 setInterval(function() { if (document.getElementById('content-dashboard').classList.contains('active')) loadStats(); }, 30000);
 
+// ---- Sessions Tab helpers (Phase 11, Plan 01 - DASH-01+SESS-01) ----
+// Moved out of loadSessions() so loadDashboardSessions() can share them. DO NOT MOVE BACK inside loadSessions().
+function roleBadgeColor(role) {
+  if (role === 'bot') return '#1d4ed8';
+  if (role === 'human') return '#059669';
+  return '#64748b';
+}
+function subRoleBadgeColor(subRole) {
+  if (subRole === 'full-access') return '#059669';
+  if (subRole === 'listener') return '#d97706';
+  return '#64748b';
+}
+function healthDotColor(healthy, healthStatus) {
+  if (healthy === null) return '#94a3b8'; // unknown
+  if (healthStatus === 'healthy') return '#10b981';
+  if (healthStatus === 'degraded') return '#f59e0b';
+  return '#ef4444'; // unhealthy
+}
+
+// ---- Dashboard multi-session rows (Phase 11, Plan 01 - DASH-01) ----
+// DO NOT REMOVE: renders all config sessions in the Dashboard session card.
+async function loadDashboardSessions() {
+  try {
+    var r = await fetch('/api/admin/sessions');
+    if (!r.ok) return;
+    var sessions = await r.json();
+    var container = document.getElementById('dashboard-sessions');
+    if (!container) return;
+    while (container.firstChild) container.removeChild(container.firstChild);
+    if (!Array.isArray(sessions) || sessions.length === 0) {
+      var emptyEl = document.createElement('div');
+      emptyEl.style.cssText = 'color:#64748b;font-size:0.82rem;padding:4px 0;';
+      emptyEl.textContent = 'No sessions configured.';
+      container.appendChild(emptyEl);
+      return;
+    }
+    for (var i = 0; i < sessions.length; i++) {
+      (function(s) {
+        var row = document.createElement('div');
+        row.className = 'session-row';
+        var nameEl = document.createElement('span');
+        nameEl.style.cssText = 'flex:1;font-weight:500;color:#e2e8f0;';
+        nameEl.textContent = s.name || s.sessionId;
+        var roleEl = document.createElement('span');
+        roleEl.style.cssText = 'background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;';
+        roleEl.textContent = s.role || 'unknown';
+        var subRoleEl = document.createElement('span');
+        subRoleEl.style.cssText = 'background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;';
+        subRoleEl.textContent = s.subRole || 'unknown';
+        var dotEl = document.createElement('span');
+        dotEl.style.cssText = 'width:8px;height:8px;border-radius:50%;display:inline-block;background:' + healthDotColor(s.healthy, s.healthStatus) + ';flex-shrink:0;';
+        dotEl.setAttribute('title', 'Health: ' + (s.healthStatus || 'unknown'));
+        var wahaEl = document.createElement('span');
+        wahaEl.style.cssText = 'font-family:monospace;font-size:0.75rem;color:#94a3b8;';
+        wahaEl.textContent = s.wahaStatus || 'UNKNOWN';
+        row.appendChild(nameEl);
+        row.appendChild(roleEl);
+        row.appendChild(subRoleEl);
+        row.appendChild(dotEl);
+        row.appendChild(wahaEl);
+        container.appendChild(row);
+      })(sessions[i]);
+    }
+  } catch(e) {
+    console.warn('[waha] loadDashboardSessions failed:', e.message || e);
+  }
+}
+
 // ---- Sessions Tab (Phase 4, Plan 04) ----
+// Phase 11, Plan 01 (SESS-01): saveSessionRole -- save role/subRole via PUT endpoint. DO NOT REMOVE.
+async function saveSessionRole(sessionId, role, subRole) {
+  try {
+    var body = {};
+    if (role !== null) body.role = role;
+    if (subRole !== null) body.subRole = subRole;
+    var r = await fetch('/api/admin/sessions/' + encodeURIComponent(sessionId) + '/role', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      showToast('Role saved. Restart gateway to apply changes.');
+      loadSessions();
+    } else {
+      var errData = await r.json().catch(function() { return {}; });
+      showToast(errData.error || 'Failed to save role', true);
+    }
+  } catch(e) {
+    showToast('Error saving role: ' + (e.message || String(e)), true);
+  }
+}
+
 async function loadSessions() {
   var container = document.getElementById('sessions-list');
   if (!container) return;
-  container.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Loading...</div>';
+  while (container.firstChild) container.removeChild(container.firstChild);
+  var loadingEl = document.createElement('div');
+  loadingEl.style.cssText = 'color:#64748b;font-size:0.85rem;';
+  loadingEl.textContent = 'Loading...';
+  container.appendChild(loadingEl);
   try {
     var r = await fetch('/api/admin/sessions');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var sessions = await r.json();
+    while (container.firstChild) container.removeChild(container.firstChild);
     if (!Array.isArray(sessions) || sessions.length === 0) {
-      container.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">No sessions configured.</div>';
+      var noneEl = document.createElement('div');
+      noneEl.style.cssText = 'color:#64748b;font-size:0.85rem;';
+      noneEl.textContent = 'No sessions configured.';
+      container.appendChild(noneEl);
       return;
     }
-    var roleBadgeColor = function(role) {
-      if (role === 'bot') return '#1d4ed8';
-      if (role === 'human') return '#059669';
-      return '#64748b';
-    };
-    var subRoleBadgeColor = function(subRole) {
-      if (subRole === 'full-access') return '#059669';
-      if (subRole === 'listener') return '#d97706';
-      return '#64748b';
-    };
-    var healthDotColor = function(healthy, healthStatus) {
-      if (healthy === null) return '#94a3b8'; // unknown
-      if (healthStatus === 'healthy') return '#10b981';
-      if (healthStatus === 'degraded') return '#f59e0b';
-      return '#ef4444'; // unhealthy
-    };
     var html = sessions.map(function(s) {
       var displayName = esc(s.name || s.sessionId);
       var sessionId = esc(s.sessionId || '');
-      var role = esc(s.role || 'unknown');
-      var subRole = esc(s.subRole || 'unknown');
       var dotColor = healthDotColor(s.healthy, s.healthStatus);
       var dotTitle = 'Health: ' + esc(s.healthStatus || 'unknown');
       var lastCheckStr = s.lastCheck ? relTime(s.lastCheck) : 'never';
       var wahaStatus = esc(s.wahaStatus || 'UNKNOWN');
+      // Phase 11, Plan 01 (SESS-01): role/subRole are dropdowns. DO NOT revert to static spans.
+      var roleSelect =
+        '<select onchange="saveSessionRole(\'' + esc(s.sessionId) + '\', this.value, null)" style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;">' +
+          '<option value="bot"' + (s.role === 'bot' ? ' selected' : '') + '>bot</option>' +
+          '<option value="human"' + (s.role === 'human' ? ' selected' : '') + '>human</option>' +
+        '</select>';
+      var subRoleSelect =
+        '<select onchange="saveSessionRole(\'' + esc(s.sessionId) + '\', null, this.value)" style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;margin-left:4px;">' +
+          '<option value="full-access"' + (s.subRole === 'full-access' ? ' selected' : '') + '>full-access</option>' +
+          '<option value="listener"' + (s.subRole === 'listener' ? ' selected' : '') + '>listener</option>' +
+        '</select>';
       return '<div class="contact-card" style="background:#0f172a;">' +
         '<div class="contact-header" style="cursor:default;">' +
           '<div class="avatar" style="background:' + roleBadgeColor(s.role) + ';font-size:0.85rem;">' + esc((s.name || s.sessionId || '?').substring(0, 2).toUpperCase()) + '</div>' +
@@ -1662,8 +1759,8 @@ async function loadSessions() {
             '<div class="contact-jid">' + sessionId + '</div>' +
           '</div>' +
           '<div class="contact-meta">' +
-            '<span style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">' + role + '</span>' +
-            '<span style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;margin-left:4px;">' + subRole + '</span>' +
+            roleSelect +
+            subRoleSelect +
             '<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:0.78rem;color:#94a3b8;" title="' + dotTitle + '">' +
               '<span style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;display:inline-block;"></span>' +
               esc(s.healthStatus || 'unknown') +
@@ -1679,7 +1776,11 @@ async function loadSessions() {
     }).join('');
     container.innerHTML = html;
   } catch(e) {
-    container.innerHTML = '<div style="color:#ef4444;font-size:0.85rem;">Failed to load sessions: ' + esc(e.message || String(e)) + '</div>';
+    while (container.firstChild) container.removeChild(container.firstChild);
+    var errEl = document.createElement('div');
+    errEl.style.cssText = 'color:#ef4444;font-size:0.85rem;';
+    errEl.textContent = 'Failed to load sessions: ' + (e.message || String(e));
+    container.appendChild(errEl);
   }
 }
 
@@ -3192,6 +3293,71 @@ export function createWahaWebhookServer(opts: {
       } catch (err) {
         console.error(`[waha] GET /api/admin/sessions failed: ${String(err)}`);
         writeJsonResponse(res, 500, { error: "Failed to fetch sessions" });
+      }
+      return;
+    }
+
+    // PUT /api/admin/sessions/:sessionId/role -- update role/subRole for a session
+    // Phase 11, Plan 01 (SESS-01). Pattern mirrors PUT /api/admin/directory/:jid/filter from Phase 9. DO NOT REMOVE.
+    if (req.method === "PUT" && req.url?.startsWith("/api/admin/sessions/") && req.url?.endsWith("/role")) {
+      try {
+        const urlParts = (req.url || "").split("/");
+        // URL shape: /api/admin/sessions/{sessionId}/role -> parts: ['', 'api', 'admin', 'sessions', '{sessionId}', 'role']
+        const sessionId = decodeURIComponent(urlParts[4] || "");
+        if (!sessionId) {
+          writeJsonResponse(res, 400, { error: "Missing sessionId" });
+          return;
+        }
+
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const body = JSON.parse(bodyStr) as { role?: string; subRole?: string };
+
+        // Validate subRole if provided
+        if (body.subRole !== undefined && body.subRole !== "full-access" && body.subRole !== "listener") {
+          writeJsonResponse(res, 400, { error: "Invalid subRole. Must be 'full-access' or 'listener'." });
+          return;
+        }
+
+        // Validate role if provided (must be non-empty string)
+        if (body.role !== undefined && (typeof body.role !== "string" || !body.role.trim())) {
+          writeJsonResponse(res, 400, { error: "Invalid role. Must be a non-empty string." });
+          return;
+        }
+
+        // Find which config account matches this sessionId
+        const configAccounts = listEnabledWahaAccounts(opts.config);
+        const matchedAcc = configAccounts.find((a) => a.session === sessionId);
+        if (!matchedAcc) {
+          writeJsonResponse(res, 404, { error: "Session not found: " + sessionId });
+          return;
+        }
+
+        // Read-modify-write config file
+        const configPath = getConfigPath();
+        const currentConfigStr = readFileSync(configPath, "utf-8");
+        const currentConfig = JSON.parse(currentConfigStr) as Record<string, unknown>;
+        const channels = (currentConfig.channels as Record<string, unknown>) ?? {};
+        const wahaSection = (channels.waha as Record<string, unknown>) ?? {};
+
+        const accounts = wahaSection.accounts as Record<string, Record<string, unknown>> | undefined;
+        if (matchedAcc.accountId === "__default__" || !accounts || !accounts[matchedAcc.accountId]) {
+          // Default account -- write role/subRole to channels.waha directly
+          if (body.role !== undefined) wahaSection.role = body.role;
+          if (body.subRole !== undefined) wahaSection.subRole = body.subRole;
+        } else {
+          // Named account -- write to channels.waha.accounts[accountId]
+          if (body.role !== undefined) accounts[matchedAcc.accountId].role = body.role;
+          if (body.subRole !== undefined) accounts[matchedAcc.accountId].subRole = body.subRole;
+        }
+
+        const updatedConfig = { ...currentConfig, channels: { ...channels, waha: wahaSection } };
+        writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
+
+        writeJsonResponse(res, 200, { ok: true });
+        console.log(`[waha] Session role updated: ${sessionId} -> role=${body.role ?? "(unchanged)"} subRole=${body.subRole ?? "(unchanged)"}`);
+      } catch (err) {
+        console.error(`[waha] PUT /api/admin/sessions role failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to save role" });
       }
       return;
     }
