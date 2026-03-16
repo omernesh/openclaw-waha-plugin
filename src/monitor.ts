@@ -1026,7 +1026,7 @@ function createNameResolver(container, jid) {
 // Pure logic: normalize raw input into trimmed non-empty tag array. DO NOT CHANGE: extracted for testability (Phase 8, UI-02)
 function normalizeTags(input) {
   if (!input || typeof input !== 'string') return [];
-  return input.split(/[,\n]+/).map(function(t) { return t.trim(); }).filter(Boolean);
+  return input.split(/[,\\n]+/).map(function(t) { return t.trim(); }).filter(Boolean);
 }
 
 // ---- Tag Input (Phase 8, UI-02) -- DO NOT CHANGE: pill bubble input factory for JID list fields ----
@@ -1577,7 +1577,7 @@ function stopLogRefresh() {
 // Phase 11, Plan 02 (LOG-01) -- parse journalctl log line into timestamp + message. DO NOT REMOVE.
 function parseLogLine(line) {
   // Journalctl format: "Mar 16 12:34:56 hostname proc[pid]: message"
-  var m = line.match(/^(\w{3}\s+\d+\s+[\d:]+)\s+\S+\s+\S+:\s(.*)$/);
+  var m = line.match(/^(\\w{3}\\s+\\d+\\s+[\\d:]+)\\s+\\S+\\s+\\S+:\\s(.*)$/);
   if (m) return { ts: m[1], msg: m[2] };
   // Fallback for non-journalctl lines (file source or malformed)
   return { ts: '', msg: line };
@@ -1587,7 +1587,7 @@ function parseLogLine(line) {
 function detectLogLevel(line) {
   if (/error/i.test(line)) return 'error';
   if (/warn/i.test(line)) return 'warn';
-  if (/\[waha\]/i.test(line)) return 'info';
+  if (/\\[waha\\]/i.test(line)) return 'info';
   return 'debug';
 }
 
@@ -1797,12 +1797,12 @@ async function loadSessions() {
       var wahaStatus = esc(s.wahaStatus || 'UNKNOWN');
       // Phase 11, Plan 01 (SESS-01): role/subRole are dropdowns. DO NOT revert to static spans.
       var roleSelect =
-        '<select onchange="saveSessionRole(\'' + esc(s.sessionId) + '\', this.value, null)" style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;">' +
+        '<select onchange="saveSessionRole(' + "'" + esc(s.sessionId) + "'" + ', this.value, null)" style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;">' +
           '<option value="bot"' + (s.role === 'bot' ? ' selected' : '') + '>bot</option>' +
           '<option value="human"' + (s.role === 'human' ? ' selected' : '') + '>human</option>' +
         '</select>';
       var subRoleSelect =
-        '<select onchange="saveSessionRole(\'' + esc(s.sessionId) + '\', null, this.value)" style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;margin-left:4px;">' +
+        '<select onchange="saveSessionRole(' + "'" + esc(s.sessionId) + "'" + ', null, this.value)" style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;margin-left:4px;">' +
           '<option value="full-access"' + (s.subRole === 'full-access' ? ' selected' : '') + '>full-access</option>' +
           '<option value="listener"' + (s.subRole === 'listener' ? ' selected' : '') + '>listener</option>' +
         '</select>';
@@ -2182,14 +2182,14 @@ function updateBulkToolbar() {
   if (bulkCurrentGroupJid) {
     // Participant context: Allow Group / Revoke Group / Set Role
     actionsEl.innerHTML =
-      '<button onclick="bulkAction(\'allow-group\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow Group</button>' +
-      '<button onclick="bulkAction(\'revoke-group\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke Group</button>' +
+      '<button onclick="bulkAction(\\'allow-group\\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow Group</button>' +
+      '<button onclick="bulkAction(\\'revoke-group\\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke Group</button>' +
       '<button onclick="bulkRoleAction()" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Set Role</button>';
   } else {
     // Contacts context: Allow DM / Revoke DM
     actionsEl.innerHTML =
-      '<button onclick="bulkAction(\'allow-dm\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow DM</button>' +
-      '<button onclick="bulkAction(\'revoke-dm\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke DM</button>';
+      '<button onclick="bulkAction(\\'allow-dm\\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow DM</button>' +
+      '<button onclick="bulkAction(\\'revoke-dm\\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke DM</button>';
   }
 }
 async function bulkAction(action) {
@@ -2397,7 +2397,7 @@ async function loadGroupsTable() {
       // Group row — click expands participant panel
       var tr = document.createElement('tr');
       tr.id = 'row-' + safeId;
-      tr.setAttribute('onclick', 'loadGroupParticipants(\'' + esc(c.jid) + '\')');
+      tr.setAttribute('onclick', 'loadGroupParticipants(\\'' + esc(c.jid) + '\\')');
       // DIR-04: Checkbox cell in bulk select mode — DOM methods required (JID is user data)
       if (bulkSelectMode) {
         var tdCb = document.createElement('td');
@@ -2424,7 +2424,7 @@ async function loadGroupsTable() {
       var expandBtn = document.createElement('button');
       expandBtn.style.cssText = 'background:#1e293b;color:#e2e8f0;border:1px solid #334155;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;';
       expandBtn.textContent = 'Participants';
-      expandBtn.setAttribute('onclick', 'event.stopPropagation();loadGroupParticipants(\'' + esc(c.jid) + '\')');
+      expandBtn.setAttribute('onclick', 'event.stopPropagation();loadGroupParticipants(\\'' + esc(c.jid) + '\\')');
       tdAct.appendChild(expandBtn);
       tr.appendChild(tdName); tr.appendChild(tdJid); tr.appendChild(tdMem); tr.appendChild(tdTime); tr.appendChild(tdAct);
       tbody.appendChild(tr);
