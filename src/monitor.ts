@@ -1943,7 +1943,8 @@ function switchDirTab(tab, btn) {
 }
 // UX-04: Clear search bar and reload directory
 function clearDirSearch() {
-  document.getElementById('dir-search').value = '';
+  var el = document.getElementById('dir-search');
+  if (el) el.value = '';
   dirOffset = 0;
   loadDirectory();
 }
@@ -2188,11 +2189,11 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     panel.innerHTML = html;
     // UX-03: Initialize tag input for group filter keywords (must be after DOM assignment)
     // DO NOT CHANGE — createTagInput requires container div to exist in DOM before calling.
-    if (!gfoTagInputs[sfx]) {
-      gfoTagInputs[sfx] = createTagInput('gfo-patterns-cp-' + sfx, {
-        placeholder: 'hello, help, bot'
-      });
-    }
+    // Always re-create: panel.innerHTML rebuild destroys old DOM, stale reference would be non-functional.
+    delete gfoTagInputs[sfx];
+    gfoTagInputs[sfx] = createTagInput('gfo-patterns-cp-' + sfx, {
+      placeholder: 'hello, help, bot'
+    });
     // Load existing filter override data for this group (async, non-blocking)
     loadGroupFilter(groupJid);
   } catch(e) { panel.innerHTML = '<div style="color:#ef4444;padding:8px">' + esc(e.message) + '</div>'; }

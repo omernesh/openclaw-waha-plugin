@@ -169,8 +169,10 @@ export class DirectoryDb {
     // UX-03: Add trigger_operator column to group_filter_overrides (migration-safe — ignores if column exists)
     try {
       this.db.prepare(`ALTER TABLE group_filter_overrides ADD COLUMN trigger_operator TEXT NOT NULL DEFAULT 'OR'`).run();
-    } catch (_) {
-      // Column already exists — expected on subsequent runs
+    } catch (migrationErr: unknown) {
+      // Only ignore 'duplicate column' errors — re-throw anything else (disk full, corrupt DB, etc.)
+      const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
+      if (!msg.includes('duplicate column')) throw migrationErr;
     }
   }
 
