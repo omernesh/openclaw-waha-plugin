@@ -187,7 +187,11 @@ Plans:
   1. Dashboard shows all connected sessions (both omer and logan) with ports and status
   2. Session roles editable via dropdown in Sessions tab
   3. Log entries have clearly formatted timestamps and visual separation between entries
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Dashboard multi-session card + Sessions tab role dropdowns + PUT endpoint
+- [ ] 11-02-PLAN.md -- Structured log display with timestamp parsing and level badges
 
 ## Progress
 
@@ -207,4 +211,4 @@ Note: Phase 9 and Phase 10 can execute in parallel (both depend on Phase 8). Pha
 | 8. Shared UI Components | 2/2 | Complete   | 2026-03-16 |
 | 9. Settings UX Improvements | 2/2 | Complete   | 2026-03-16 |
 | 10. Directory & Group Enhancements | 2/2 | Complete    | 2026-03-16 |
-| 11. Dashboard, Sessions & Log | 0/? | Planned | |
+| 11. Dashboard, Sessions & Log | 0/2 | Planned | |
