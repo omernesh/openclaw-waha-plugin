@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 12-05-PLAN.md
-last_updated: "2026-03-17T02:03:24.030Z"
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-03-17T02:44:58.492Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 40
 ---
 
@@ -66,6 +66,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 12-ui-bug-sprint]: Lazy tag input init in toggleContactSettings via customKeywordTagInputs registry; data-init-kw attribute seeds value from buildContactCard without extra API call (12-04, 2026-03-17)
 - [Phase 12-ui-bug-sprint]: Bot JID lookup via WAHA /me with 5-min cache (12-05, 2026-03-17): fetchBotJids() caches session->JID mapping to avoid per-request API calls while keeping data fresh for admin panel
 - [Phase 12-ui-bug-sprint]: Role auto-grant/revoke pattern (12-05, 2026-03-17): promote to bot_admin/manager auto-enables Allow+Allow DM; demote to participant auto-revokes Allow DM only (group Allow preserved)
+- [Phase 13]: FTS5 MATCH replaces LIKE for directory search — O(log n) vs O(n), trigger-based index maintenance
+- [Phase 13]: Background sync engine (sync.ts) uses setTimeout chain + per-account Map state, stores opts at startDirectorySync call time for triggerImmediateSync re-use
 
 ### Pending Todos
 
@@ -79,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T01:52:15.304Z
-Stopped at: Completed 12-05-PLAN.md
+Last session: 2026-03-17T02:44:58.488Z
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
