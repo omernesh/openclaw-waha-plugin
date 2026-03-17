@@ -363,6 +363,8 @@ export class DirectoryDb {
    */
   resolveJids(jids: string[]): Map<string, string> {
     if (jids.length === 0) return new Map();
+    // Cap input to prevent oversized SQL IN clauses — caller should paginate if needed.
+    jids = jids.slice(0, 500);
 
     // Batch lookup: collect all JIDs to query (originals + @c.us fallbacks for @lid JIDs)
     const lidToCs = new Map<string, string>(); // @lid -> @c.us equivalent
@@ -472,7 +474,6 @@ export class DirectoryDb {
     }
 
     const conditions: string[] = [];
-    const params: unknown[] = [];
 
     if (type === "contact") {
       conditions.push("is_group = 0 AND jid NOT LIKE '%@newsletter'");
@@ -491,7 +492,7 @@ export class DirectoryDb {
       sql += " WHERE " + conditions.join(" AND ");
     }
 
-    const row = this.db.prepare(sql).get(...params) as { cnt: number };
+    const row = this.db.prepare(sql).get() as { cnt: number };
     return row.cnt;
   }
 

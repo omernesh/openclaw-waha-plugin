@@ -21,7 +21,7 @@ import { isDuplicate } from "./dedup.js";
 import { startHealthCheck, getHealthState, type HealthState } from "./health.js";
 import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
 import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.js";
-import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
+import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
@@ -3905,7 +3905,7 @@ export function createWahaWebhookServer(opts: {
       if (pathParts.length === 1 && pathParts[0] === "resolve") {
         try {
           const jidsParam = url.searchParams.get("jids") ?? "";
-          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean);
+          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean).slice(0, 500); // cap at 500 to prevent oversized SQL queries
           const db = getDirectoryDb(opts.accountId);
           const resolvedMap = db.resolveJids(jidArray);
           const resolved: Record<string, string> = {};
@@ -4671,7 +4671,7 @@ export function createWahaWebhookServer(opts: {
 
 function resolveWebhookHmacSecret(account: ReturnType<typeof resolveWahaAccount>): string {
   const env = process.env.WAHA_WEBHOOK_HMAC_KEY?.trim();
-  if (env && account.accountId === "default") {
+  if (env && account.accountId === DEFAULT_ACCOUNT_ID) {
     return env;
   }
   if (account.config.webhookHmacKeyFile) {
