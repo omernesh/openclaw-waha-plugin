@@ -40,66 +40,7 @@ const WEBHOOK_ERRORS = {
   internalServerError: "Internal server error",
 } as const;
 
-/**
- * Simple rate limiter for WAHA API calls.
- * Limits concurrent requests and enforces minimum delay between requests.
- */
-class RateLimiter {
-  private queue: Array<() => void> = [];
-  private activeCount = 0;
-  private lastRequestTime = 0;
-
-  constructor(
-    private maxConcurrent: number,
-    private delayMs: number,
-  ) {}
-
-  async acquire(): Promise<void> {
-    if (this.activeCount < this.maxConcurrent) {
-      this.activeCount++;
-      const now = Date.now();
-      const elapsed = now - this.lastRequestTime;
-      if (elapsed < this.delayMs) {
-        await new Promise((resolve) => setTimeout(resolve, this.delayMs - elapsed));
-      }
-      this.lastRequestTime = Date.now();
-      return;
-    }
-    return new Promise<void>((resolve) => {
-      this.queue.push(() => {
-        this.activeCount++;
-        const now = Date.now();
-        const elapsed = now - this.lastRequestTime;
-        if (elapsed < this.delayMs) {
-          setTimeout(() => {
-            this.lastRequestTime = Date.now();
-            resolve();
-          }, this.delayMs - elapsed);
-        } else {
-          this.lastRequestTime = Date.now();
-          resolve();
-        }
-      });
-    });
-  }
-
-  release(): void {
-    this.activeCount--;
-    if (this.queue.length > 0) {
-      const next = this.queue.shift()!;
-      next();
-    }
-  }
-
-  async run<T>(fn: () => Promise<T>): Promise<T> {
-    await this.acquire();
-    try {
-      return await fn();
-    } finally {
-      this.release();
-    }
-  }
-}
+// RateLimiter extracted to src/rate-limiter.ts (Phase review, 2026-03-17). DO NOT DUPLICATE.
 
 
 function writeJsonResponse(res: ServerResponse, status: number, body?: object) {
@@ -2410,7 +2351,7 @@ async function loadConfig() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ waha: { dmPolicy: 'allowlist' } })
-      }).catch(function() { /* silent — migration best-effort */ });
+      }).catch(function(e) { console.error('Migration failed:', e); showToast('Migration failed — please set DM Policy manually in Access Control', true); });
     }
     setVal('s-dmPolicy', w.dmPolicy || 'allowlist');
     setVal('s-groupPolicy', w.groupPolicy || 'allowlist');

@@ -651,20 +651,8 @@ export class DirectoryDb {
   // ── Allow-list methods ──
 
   setContactAllowDm(jid: string, allowed: boolean, expiresAt?: number | null): void {
-    const now = Date.now();
-    // Ensure contact exists
-    const existing = this.db.prepare("SELECT jid FROM contacts WHERE jid = ?").get(jid);
-    if (!existing) {
-      this.upsertContact(jid, undefined, false);
-    }
-    if (allowed) {
-      // TTL-02: Store expires_at as Unix timestamp (seconds). NULL = permanent. DO NOT REMOVE.
-      this.db.prepare(
-        "INSERT OR REPLACE INTO allow_list (jid, allow_dm, added_at, expires_at) VALUES (?, 1, ?, ?)"
-      ).run(jid, now, expiresAt ?? null);
-    } else {
-      this.db.prepare("DELETE FROM allow_list WHERE jid = ?").run(jid);
-    }
+    // Delegate to setContactAllowDmWithSource with no source/grantedAt. DO NOT DUPLICATE logic here.
+    this.setContactAllowDmWithSource(jid, allowed, expiresAt);
   }
 
   isContactAllowedDm(jid: string): boolean {
@@ -1369,7 +1357,8 @@ export class DirectoryDb {
     if (!row) return {};
     try {
       return JSON.parse(row.config_json) as Record<string, unknown>;
-    } catch {
+    } catch (err) {
+      console.warn('[waha] [modules] corrupt config JSON for module ' + moduleId + ':', err);
       return {};
     }
   }

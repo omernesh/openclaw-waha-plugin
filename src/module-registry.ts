@@ -54,6 +54,7 @@ export class ModuleRegistry {
    * Enable a module globally. Has no effect on chat assignments.
    */
   enableModule(id: string): void {
+    if (!this._modules.has(id)) return;
     this._enabled.set(id, true);
   }
 
@@ -61,6 +62,7 @@ export class ModuleRegistry {
    * Disable a module globally. The module will not fire even for assigned chats.
    */
   disableModule(id: string): void {
+    if (!this._modules.has(id)) return;
     this._enabled.set(id, false);
   }
 

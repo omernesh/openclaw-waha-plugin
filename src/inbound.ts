@@ -598,6 +598,16 @@ export async function handleWahaInbound(params: {
       if (pairingConfig.enabled && pairingConfig.hmacSecret) {
         const engine = getPairingEngine(account.accountId, pairingConfig.hmacSecret);
 
+        // Local helper — deduplicates 5 try/catch + sendWahaText blocks below. DO NOT CHANGE.
+        async function sendPairingReply(text: string, label: string) {
+          try {
+            await sendWahaText({ cfg: config, to: chatId, text, accountId: account.accountId });
+            statusSink?.({ lastOutboundAt: Date.now() });
+          } catch (err) {
+            runtime.error?.('[waha] [pairing] ' + label + ' failed: ' + String(err));
+          }
+        }
+
         // Check for deep link token: PAIR-{12 hex chars}
         // verifyDeepLinkToken extracts the token internally and recomputes expected HMAC.
         // DO NOT CHANGE -- pass full messageText, not just the token (function extracts its own regex).
@@ -607,18 +617,7 @@ export async function handleWahaInbound(params: {
             const grantTtlMinutes = pairingConfig.grantTtlMinutes ?? 1440;
             engine.grantAccess(senderId, grantTtlMinutes);
             runtime.log?.(`[waha] [pairing] deep link verified for ${senderId}, granted access (TTL ${grantTtlMinutes}min)`);
-            // Send welcome confirmation
-            try {
-              await sendWahaText({
-                cfg: config as any,
-                to: chatId,
-                text: "Access granted! You can now chat with me.",
-                accountId: account.accountId,
-              });
-              statusSink?.({ lastOutboundAt: Date.now() });
-            } catch (err) {
-              runtime.error?.(`[waha] [pairing] welcome message failed for ${senderId}: ${String(err)}`);
-            }
+            await sendPairingReply("Access granted! You can now chat with me.", "welcome message");
             return; // Message handled -- do not pass to LLM
           } else {
             runtime.log?.(`[waha] [pairing] invalid deep link token from ${senderId}`);
@@ -634,45 +633,15 @@ export async function handleWahaInbound(params: {
             const grantTtlMinutes = pairingConfig.grantTtlMinutes ?? 1440;
             engine.grantAccess(senderId, grantTtlMinutes);
             runtime.log?.(`[waha] [pairing] passcode verified for ${senderId}, granted access (TTL ${grantTtlMinutes}min)`);
-            try {
-              await sendWahaText({
-                cfg: config as any,
-                to: chatId,
-                text: "Access granted! You can now chat with me.",
-                accountId: account.accountId,
-              });
-              statusSink?.({ lastOutboundAt: Date.now() });
-            } catch (err) {
-              runtime.error?.(`[waha] [pairing] welcome message failed for ${senderId}: ${String(err)}`);
-            }
+            await sendPairingReply("Access granted! You can now chat with me.", "welcome message");
             return; // Message handled
           } else if (result.reason === "locked") {
             runtime.log?.(`[waha] [pairing] ${senderId} locked out (too many attempts)`);
-            try {
-              await sendWahaText({
-                cfg: config as any,
-                to: chatId,
-                text: "Too many incorrect attempts. Please try again later.",
-                accountId: account.accountId,
-              });
-              statusSink?.({ lastOutboundAt: Date.now() });
-            } catch (err) {
-              runtime.error?.(`[waha] [pairing] lockout message failed: ${String(err)}`);
-            }
+            await sendPairingReply("Too many incorrect attempts. Please try again later.", "lockout message");
             return; // Do not pass to LLM
           } else if (result.reason === "wrong") {
             runtime.log?.(`[waha] [pairing] wrong passcode from ${senderId}`);
-            try {
-              await sendWahaText({
-                cfg: config as any,
-                to: chatId,
-                text: "Incorrect passcode. Please try again.",
-                accountId: account.accountId,
-              });
-              statusSink?.({ lastOutboundAt: Date.now() });
-            } catch (err) {
-              runtime.error?.(`[waha] [pairing] wrong passcode message failed: ${String(err)}`);
-            }
+            await sendPairingReply("Incorrect passcode. Please try again.", "wrong passcode message");
             return;
           }
           // If reason is "not_found" or "expired", fall through to send challenge
@@ -684,17 +653,7 @@ export async function handleWahaInbound(params: {
         }
         const challengeMsg = pairingConfig.challengeMessage
           ?? "Welcome! Please enter the 6-digit passcode to get started.";
-        try {
-          await sendWahaText({
-            cfg: config as any,
-            to: chatId,
-            text: challengeMsg,
-            accountId: account.accountId,
-          });
-          statusSink?.({ lastOutboundAt: Date.now() });
-        } catch (err) {
-          runtime.error?.(`[waha] [pairing] challenge message failed for ${senderId}: ${String(err)}`);
-        }
+        await sendPairingReply(challengeMsg, "challenge message");
         runtime.log?.(`[waha] [pairing] challenge sent to ${senderId}`);
         return; // Do not pass to LLM -- zero tokens consumed
 
@@ -704,14 +663,8 @@ export async function handleWahaInbound(params: {
         const intervalSeconds = (autoReplyConfig.intervalMinutes ?? 1440) * 60;
 
         if (autoReplyEngine.shouldReply(senderId, intervalSeconds)) {
-          // Resolve {admin_name} from directory (best-effort, non-fatal)
+          // TODO: resolve actual admin name from Bot Admin role contacts
           let adminName = "the administrator";
-          try {
-            const adminContact = dirDb.getContact?.(senderId);
-            void adminContact; // field not used here — just keeping the try as extensible
-          } catch {
-            // Non-fatal -- use default admin name
-          }
 
           const messageTemplate = autoReplyConfig.message
             ?? "Hey! Thanks for reaching out. Unfortunately, I'm not permitted to chat with you right now. Please ask {admin_name} to add you to my allow list.";
@@ -722,7 +675,7 @@ export async function handleWahaInbound(params: {
               chatId,
               messageTemplate,
               adminName,
-              cfg: config as any,
+              cfg: config,
               accountId: account.accountId,
             });
             statusSink?.({ lastOutboundAt: Date.now() });
