@@ -15,7 +15,7 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 - [x] **UI-04**: Sessions tab handles 502 during restart gracefully with polling overlay instead of raw error (BUG-05)
 - [x] **UI-05**: Directory search bar 'x' button clears search text and resets results (BUG-07)
 - [x] **UI-06**: Tooltips render above container overflow boundaries and are fully readable (BUG-08)
-- [ ] **UI-07**: Contact settings drawer stays open after saving, shows success toast (BUG-09)
+- [x] **UI-07**: Contact settings drawer stays open after saving, shows success toast (BUG-09)
 - [x] **UI-08**: DM Policy dropdown removes "pairing (not available)" option; auto-migrates config if set (BUG-13)
 - [x] **UI-09**: Queue tab Refresh button shows spinner and "Last refreshed" timestamp (BUG-14)
 - [ ] **UI-10**: Per-group trigger operator visible even when inheriting global (grayed out with effective value) (BUG-17)
@@ -33,9 +33,9 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 - [x] **UX-01**: Sessions tab has labels above role/subRole dropdowns with explanatory text box (CR-05)
 - [x] **UX-02**: Log tab search bar has 'x' clear button (CR-06)
 - [x] **UX-03**: All Refresh buttons across all tabs show spinner + "Last refreshed" timestamp on click (CR-07)
-- [ ] **UX-04**: Custom Keywords field in contact settings uses tag-style input with pill bubbles (CR-09)
-- [ ] **UX-05**: Mention Patterns field uses tag-style input with pill bubbles (CR-11)
-- [ ] **UX-06**: Group Filter Override Keywords field uses tag-style input with pill bubbles (CR-13)
+- [x] **UX-04**: Custom Keywords field in contact settings uses tag-style input with pill bubbles (CR-09)
+- [x] **UX-05**: Mention Patterns field uses tag-style input with pill bubbles (CR-11)
+- [x] **UX-06**: Group Filter Override Keywords field uses tag-style input with pill bubbles (CR-13)
 
 ### Background Sync & Directory
 
@@ -142,7 +142,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-04 | Phase 12 | Complete |
 | UI-05 | Phase 12 | Complete |
 | UI-06 | Phase 12 | Complete |
-| UI-07 | Phase 12 | Pending |
+| UI-07 | Phase 12 | Complete |
 | UI-08 | Phase 12 | Complete |
 | UI-09 | Phase 12 | Complete |
 | UI-10 | Phase 12 | Pending |
@@ -154,9 +154,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UX-01 | Phase 12 | Complete |
 | UX-02 | Phase 12 | Complete |
 | UX-03 | Phase 12 | Complete |
-| UX-04 | Phase 12 | Pending |
-| UX-05 | Phase 12 | Pending |
-| UX-06 | Phase 12 | Pending |
+| UX-04 | Phase 12 | Complete |
+| UX-05 | Phase 12 | Complete |
+| UX-06 | Phase 12 | Complete |
 | DIR-01 | Phase 12 | Pending |
 | DIR-02 | Phase 12 | Pending |
 | DIR-04 | Phase 12 | Pending |
