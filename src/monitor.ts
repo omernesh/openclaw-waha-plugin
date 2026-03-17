@@ -450,6 +450,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   /* SESSION ROW (Phase 11, Plan 01 - DASH-01) -- DO NOT CHANGE: compact multi-session row in Dashboard card */
   .session-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #1e293b; font-size:0.82rem; }
   .session-row:last-child { border-bottom:none; }
+  /* SESSION-SUB-HEADER (12-01, DASH-04) -- per-session name header inside stat cards */
+  .session-sub-header { font-weight:600; font-size:0.85rem; margin:8px 0 4px; color:#b0bec5; border-bottom:1px solid #333; padding-bottom:2px; }
+  /* SESSION-HEALTH-DETAIL (12-01, DASH-01) -- health detail rows inside session rows */
+  .session-health-detail { font-size:0.75rem; color:#64748b; padding:2px 0 2px 16px; }
 </style>
 </head>
 <body>
@@ -478,17 +482,23 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <!-- TAB: DASHBOARD -->
 <div class="tab-content active" id="content-dashboard">
 <main class="tab-pane">
+  <!-- 12-01, DASH-02: DM Keyword Filter card is collapsible via details/summary. DO NOT remove open attr (expanded by default). -->
   <div class="card" id="dm-filter-card">
-    <h2>DM Keyword Filter</h2>
-    <div class="stat-row" id="filter-stats"></div>
-    <div id="filter-patterns" style="margin-top:12px;"></div>
-    <div class="event-list" id="filter-events"></div>
+    <details class="settings-section" open>
+      <summary>DM Keyword Filter</summary>
+      <div class="stat-row" id="filter-stats"></div>
+      <div id="filter-patterns" style="margin-top:12px;"></div>
+      <div class="event-list" id="filter-events"></div>
+    </details>
   </div>
+  <!-- 12-01, DASH-02: Group Keyword Filter card is collapsible via details/summary. DO NOT remove open attr (expanded by default). -->
   <div class="card" id="group-filter-card">
-    <h2>Group Keyword Filter</h2>
-    <div class="stat-row" id="group-filter-stats"></div>
-    <div id="group-filter-patterns" style="margin-top:12px;"></div>
-    <div class="event-list" id="group-filter-events"></div>
+    <details class="settings-section" open>
+      <summary>Group Keyword Filter</summary>
+      <div class="stat-row" id="group-filter-stats"></div>
+      <div id="group-filter-patterns" style="margin-top:12px;"></div>
+      <div class="event-list" id="group-filter-events"></div>
+    </details>
   </div>
   <div class="card" id="presence-card">
     <h2>Presence System</h2>
@@ -506,7 +516,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="kv" id="health-kv" style="margin-top:8px;border-top:1px solid #334155;padding-top:8px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
       <div id="last-refresh"></div>
-      <button class="refresh-btn" onclick="loadStats()">Refresh</button>
+      <button class="refresh-btn" onclick="_accessKvBuilt=false;loadStats()">Refresh</button>
     </div>
   </div>
 </main>
@@ -924,7 +934,7 @@ function switchTab(name, btn) {
   document.querySelectorAll('nav button').forEach(function(el) { el.classList.remove('active'); });
   document.getElementById('content-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
-  if (name === 'dashboard') loadStats();
+  if (name === 'dashboard') { _accessKvBuilt = false; loadStats(); }
   if (name === 'settings') loadConfig();
   if (name === 'directory') loadDirectory();
   if (name === 'queue') loadQueue();
@@ -1409,6 +1419,41 @@ function createGodModeUsersField(containerId, opts) {
   };
 }
 
+// LABEL_MAP (12-01, DASH-03) -- human-readable display labels for raw config key names.
+// DO NOT REMOVE: applied in kvRow() calls throughout the dashboard to avoid showing raw camelCase keys.
+var LABEL_MAP = {
+  wpm: 'Words Per Minute',
+  readDelayMs: 'Read Delay (ms)',
+  typingDurationMs: 'Typing Duration (ms)',
+  pauseChance: 'Pause Chance',
+  presenceEnabled: 'Presence Enabled',
+  groupFilter: 'Group Filter',
+  dmFilter: 'DM Filter',
+  allowFrom: 'Allow From',
+  groupAllowFrom: 'Group Allow From',
+  allowedGroups: 'Allowed Groups',
+  godModeSuperUsers: 'God Mode Users',
+  dmPolicy: 'DM Policy',
+  groupPolicy: 'Group Policy',
+  mentionPatterns: 'Mention Patterns',
+  keywords: 'Keywords',
+  triggerOperator: 'Trigger Operator',
+  globalKeywords: 'Global Keywords',
+  groupKeywords: 'Group Keywords',
+  enabled: 'Enabled',
+  jitter: 'Jitter',
+  baseUrl: 'Base URL',
+  webhookPort: 'Webhook Port',
+  serverTime: 'Server Time'
+};
+function labelFor(key) { return LABEL_MAP[key] || key; }
+
+// _accessKvBuilt: guards Access Control Name Resolver div creation so they are built ONCE.
+// On 30s auto-refresh, loadStats() runs again but must NOT re-create Name Resolver divs —
+// doing so triggers new async fetches and causes visible flicker on the Access Control card.
+// Set to false only when the page first loads. DO NOT REMOVE (12-01, UI-01).
+var _accessKvBuilt = false;
+
 // ---- Tag Input instance variables (Phase 8, UI-02) -- initialized lazily in loadConfig() ----
 var tagInputAllowFrom = null;
 var tagInputGroupAllowFrom = null;
@@ -1428,9 +1473,15 @@ async function loadStats() {
     document.getElementById('status-badge').textContent = d.dmFilter.enabled ? 'Filter ON' : 'Filter OFF';
     document.getElementById('status-badge').style.background = d.dmFilter.enabled ? '#10b981' : '#f59e0b';
     var s = d.dmFilter.stats;
-    document.getElementById('filter-stats').innerHTML = [
-      stat('Allowed', s.allowed, '#10b981'),
-      stat('Dropped', s.dropped, '#f87171'),
+    // 12-01, DASH-04: session sub-headers inside stat cards
+    var sessionsForSubHeader = (d.sessions && Array.isArray(d.sessions)) ? d.sessions : [];
+    var sessionSubHtml = sessionsForSubHeader.map(function(sess) {
+      return '<div class="session-sub-header">' + esc(sess.name || sess.sessionId) + '</div>';
+    }).join('');
+    // 12-01, UI-02: labels changed from Allowed/Dropped to Passed/Filtered (BUG-03)
+    document.getElementById('filter-stats').innerHTML = sessionSubHtml + [
+      stat('Passed', s.allowed, '#10b981'),
+      stat('Filtered', s.dropped, '#f87171'),
       stat('Tokens Saved (est)', (s.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8'),
     ].join('');
     var pats = d.dmFilter.patterns;
@@ -1449,9 +1500,10 @@ async function loadStats() {
     if (d.groupFilter) {
       var gf = d.groupFilter;
       var gs = gf.stats || {allowed:0,dropped:0,tokensEstimatedSaved:0};
-      document.getElementById('group-filter-stats').innerHTML = [
-        stat('Allowed', gs.allowed, '#10b981'),
-        stat('Dropped', gs.dropped, '#f87171'),
+      // 12-01, UI-02: Group filter also uses Passed/Filtered labels; per-session sub-headers (DASH-04)
+      document.getElementById('group-filter-stats').innerHTML = sessionSubHtml + [
+        stat('Passed', gs.allowed, '#10b981'),
+        stat('Filtered', gs.dropped, '#f87171'),
         stat('Tokens Saved (est)', (gs.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8'),
       ].join('');
       var gpats = gf.patterns || [];
@@ -1471,46 +1523,54 @@ async function loadStats() {
       document.getElementById('group-filter-card').style.display = 'none';
     }
     var pr = d.presence;
-    document.getElementById('presence-kv').innerHTML = kvRow('enabled', pr.enabled !== false) +
-      kvRow('wpm', pr.wpm) + kvRow('readDelayMs', JSON.stringify(pr.readDelayMs)) +
-      kvRow('typingDurationMs', JSON.stringify(pr.typingDurationMs)) +
-      kvRow('pauseChance', pr.pauseChance) + kvRow('jitter', JSON.stringify(pr.jitter));
+    // 12-01, DASH-03: use labelFor() to convert raw config keys to human-readable labels
+    document.getElementById('presence-kv').innerHTML = kvRow(labelFor('enabled'), pr.enabled !== false) +
+      kvRow(labelFor('wpm'), pr.wpm) + kvRow(labelFor('readDelayMs'), JSON.stringify(pr.readDelayMs)) +
+      kvRow(labelFor('typingDurationMs'), JSON.stringify(pr.typingDurationMs)) +
+      kvRow(labelFor('pauseChance'), pr.pauseChance) + kvRow(labelFor('jitter'), JSON.stringify(pr.jitter));
     // Phase 8, UI-01 -- access-kv uses Name Resolver for JID display. DO NOT REVERT to innerHTML tags().
+    // 12-01, UI-01: _accessKvBuilt guard — only build Name Resolver divs on first load.
+    // On 30s auto-refresh loadStats() re-runs but must NOT rebuild these divs (causes flicker).
+    // DO NOT REMOVE this guard.
     var ac = d.access;
     var accessKv = document.getElementById('access-kv');
-    accessKv.innerHTML = kvRow('dmPolicy', ac.dmPolicy) + kvRow('groupPolicy', ac.groupPolicy);
-    var jidGroups = [
-      { key: 'allowFrom', arr: ac.allowFrom || [] },
-      { key: 'groupAllowFrom', arr: ac.groupAllowFrom || [] },
-      { key: 'allowedGroups', arr: ac.allowedGroups || [] }
-    ];
-    for (var gi = 0; gi < jidGroups.length; gi++) {
-      (function(grp) {
-        var keyEl = document.createElement('div');
-        keyEl.className = 'k';
-        keyEl.style.marginTop = '8px';
-        keyEl.textContent = grp.key;
-        var valEl = document.createElement('div');
-        valEl.className = 'tag-list';
-        valEl.style.padding = '4px 0';
-        valEl.id = 'nr-' + grp.key;
-        accessKv.appendChild(keyEl);
-        accessKv.appendChild(valEl);
-        if (!grp.arr.length) {
-          var noneEl = document.createElement('span');
-          noneEl.style.color = '#64748b';
-          noneEl.textContent = 'none';
-          valEl.appendChild(noneEl);
-        } else {
-          for (var ji = 0; ji < grp.arr.length; ji++) {
-            createNameResolver(valEl, grp.arr[ji]);
+    if (!_accessKvBuilt) {
+      _accessKvBuilt = true;
+      accessKv.innerHTML = kvRow(labelFor('dmPolicy'), ac.dmPolicy) + kvRow(labelFor('groupPolicy'), ac.groupPolicy);
+      var jidGroups = [
+        { key: 'allowFrom', arr: ac.allowFrom || [] },
+        { key: 'groupAllowFrom', arr: ac.groupAllowFrom || [] },
+        { key: 'allowedGroups', arr: ac.allowedGroups || [] }
+      ];
+      for (var gi = 0; gi < jidGroups.length; gi++) {
+        (function(grp) {
+          var keyEl = document.createElement('div');
+          keyEl.className = 'k';
+          keyEl.style.marginTop = '8px';
+          keyEl.textContent = labelFor(grp.key);
+          var valEl = document.createElement('div');
+          valEl.className = 'tag-list';
+          valEl.style.padding = '4px 0';
+          valEl.id = 'nr-' + grp.key;
+          accessKv.appendChild(keyEl);
+          accessKv.appendChild(valEl);
+          if (!grp.arr.length) {
+            var noneEl = document.createElement('span');
+            noneEl.style.color = '#64748b';
+            noneEl.textContent = 'none';
+            valEl.appendChild(noneEl);
+          } else {
+            for (var ji = 0; ji < grp.arr.length; ji++) {
+              createNameResolver(valEl, grp.arr[ji]);
+            }
           }
-        }
-      })(jidGroups[gi]);
-    }
+        })(jidGroups[gi]);
+      }
+    } // end if (!_accessKvBuilt)
+    // 12-01, DASH-03: use labelFor() for session-kv labels
     document.getElementById('session-kv').innerHTML =
-      kvRow('baseUrl', d.baseUrl) +
-      kvRow('webhookPort', d.webhookPort) + kvRow('serverTime', d.serverTime);
+      kvRow(labelFor('baseUrl'), d.baseUrl) +
+      kvRow(labelFor('webhookPort'), d.webhookPort) + kvRow(labelFor('serverTime'), d.serverTime);
     document.getElementById('last-refresh').textContent = 'Last refreshed: ' + new Date().toLocaleTimeString();
     // Load health status for session card (Phase 2, Plan 02)
     loadHealth();
@@ -1712,8 +1772,16 @@ async function loadDashboardSessions() {
       container.appendChild(emptyEl);
       return;
     }
+    // 12-01, DASH-01: each session now shows its own health details (consecutiveFailures, lastCheck, etc.)
     for (var i = 0; i < sessions.length; i++) {
       (function(s) {
+        // Session name sub-header
+        var headerEl = document.createElement('div');
+        headerEl.className = 'session-sub-header';
+        headerEl.textContent = s.name || s.sessionId;
+        container.appendChild(headerEl);
+
+        // Main session row
         var row = document.createElement('div');
         row.className = 'session-row';
         var nameEl = document.createElement('span');
@@ -1737,6 +1805,16 @@ async function loadDashboardSessions() {
         row.appendChild(dotEl);
         row.appendChild(wahaEl);
         container.appendChild(row);
+
+        // Health detail rows for this session (12-01, DASH-01)
+        var detailEl = document.createElement('div');
+        detailEl.className = 'session-health-detail';
+        var consecutiveFailures = typeof s.consecutiveFailures === 'number' ? s.consecutiveFailures : 0;
+        var lastCheck = s.lastCheck ? relTime(s.lastCheck) : 'never';
+        detailEl.textContent = 'Health: ' + (s.healthStatus || 'unknown') +
+          ' | Consecutive Failures: ' + consecutiveFailures +
+          ' | Last Check: ' + lastCheck;
+        container.appendChild(detailEl);
       })(sessions[i]);
     }
   } catch(e) {
@@ -3053,6 +3131,17 @@ export function createWahaWebhookServer(opts: {
         baseUrl: account.config.baseUrl ?? "",
         webhookPort: account.config.webhookPort ?? 8050,
         serverTime: new Date().toISOString(),
+        // 12-01, DASH-04: include per-session list so dashboard can render session sub-headers in stat cards
+        sessions: listEnabledWahaAccounts(opts.config).map((acc) => {
+          const h = getHealthState(acc.session);
+          return {
+            sessionId: acc.session,
+            name: acc.name ?? acc.session,
+            healthStatus: h?.status ?? "unknown",
+            consecutiveFailures: h?.consecutiveFailures ?? 0,
+            lastCheck: h?.lastCheckAt ?? null,
+          };
+        }),
       }));
       return;
     }
