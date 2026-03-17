@@ -336,8 +336,9 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .toggle input:checked + .slider { background: #0ea5e9; }
   .toggle input:checked + .slider::before { transform: translateX(18px); }
   /* TOOLTIP */
+  /* Phase 12, Plan 03 (UI-06): z-index raised to 1000 so tooltips render above card containers. DO NOT LOWER. */
   .tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; background: #334155; border-radius: 50%; font-size: 0.7rem; color: #94a3b8; cursor: help; flex-shrink: 0; }
-  .tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1e3a5f; color: #e2e8f0; font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; width: 220px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 200; white-space: normal; line-height: 1.4; border: 1px solid #334155; }
+  .tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1e3a5f; color: #e2e8f0; font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; width: 220px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 1000; white-space: normal; line-height: 1.4; border: 1px solid #334155; }
   .tip:hover::after { opacity: 1; }
   .save-btn { background: #10b981; color: #fff; border: none; padding: 10px 28px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; margin-top: 8px; transition: background .15s; }
   .save-btn:hover { background: #059669; }
@@ -353,7 +354,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .dir-stat { font-size: 0.8rem; color: #64748b; }
   .dir-stat span { color: #38bdf8; font-weight: 600; }
   .contact-list { display: grid; gap: 8px; }
-  .contact-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; overflow: hidden; }
+  /* Phase 12, Plan 03 (UI-06): overflow changed from hidden to visible so .tip::after tooltips are not clipped. DO NOT REVERT. */
+  .contact-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; overflow: visible; }
   .contact-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background .1s; }
   .contact-header:hover { background: #1a2540; }
   .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
@@ -871,7 +873,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <div class="dir-header">
     <div style="position:relative;flex:1;">
       <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()" style="width:100%;padding-right:28px;">
-      <button id="dir-search-clear" onclick="clearDirSearch()" aria-label="Clear search" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#94a3b8'">&#x2715;</button>
+      <button id="dir-search-clear" onclick="clearDirSearch()" aria-label="Clear search" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;display:none;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#94a3b8'">&#x2715;</button>
     </div>
     <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Refresh current tab from WAHA API">Refresh</button>
     <button class="refresh-btn" style="background:#7c3aed;" id="dir-refresh-all-btn" onclick="refreshDirectory()" title="Import all contacts, groups and newsletters from WAHA API">Refresh All</button>
@@ -918,7 +920,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <div class="card">
   <h2>Gateway Log</h2>
   <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-    <input type="text" id="log-search" placeholder="Filter logs..." oninput="debouncedLogSearch()" style="flex:1;min-width:180px;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">
+    <div style="position:relative;flex:1;display:flex;align-items:center;min-width:180px;">
+      <input type="text" id="log-search" placeholder="Filter logs..." oninput="debouncedLogSearch()" style="width:100%;padding:6px 30px 6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">
+      <button id="log-search-clear" onclick="clearLogSearch()" aria-label="Clear log filter" style="position:absolute;right:8px;background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;display:none;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#94a3b8'">&#x2715;</button>
+    </div>
     <button onclick="setLogLevel('all')" id="log-level-all" class="log-level-btn active">All</button>
     <button onclick="setLogLevel('error')" id="log-level-error" class="log-level-btn">Error</button>
     <button onclick="setLogLevel('warn')" id="log-level-warn" class="log-level-btn">Warn</button>
@@ -1623,7 +1628,20 @@ var logRefreshTimer = null;
 var logSearchTimeout = null;
 function debouncedLogSearch() {
   clearTimeout(logSearchTimeout);
+  // Phase 12, Plan 03 (UX-02): show/hide log search clear button based on input content
+  var clearBtn = document.getElementById('log-search-clear');
+  var searchEl = document.getElementById('log-search');
+  if (clearBtn && searchEl) clearBtn.style.display = searchEl.value ? 'block' : 'none';
   logSearchTimeout = setTimeout(loadLogs, 300);
+}
+
+// Phase 12, Plan 03 (UX-02): clear log search filter and reset results
+function clearLogSearch() {
+  var input = document.getElementById('log-search');
+  if (input) { input.value = ''; }
+  var clearBtn = document.getElementById('log-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  loadLogs();
 }
 
 function setLogLevel(level) {
@@ -2322,9 +2340,12 @@ function switchDirTab(tab, btn) {
   loadDirectory();
 }
 // UX-04: Clear search bar and reload directory
+// Phase 12, Plan 03 (UI-05): also hides the clear button after clearing
 function clearDirSearch() {
   var el = document.getElementById('dir-search');
   if (el) el.value = '';
+  var clearBtn = document.getElementById('dir-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
   dirOffset = 0;
   loadDirectory();
 }
@@ -2448,6 +2469,10 @@ var dirGroupPage = 1;
 var dirGroupPageSize = 25;
 function debouncedDirSearch() {
   clearTimeout(dirSearchTimeout);
+  // Phase 12, Plan 03 (UI-05): show/hide clear button based on input content
+  var clearBtn = document.getElementById('dir-search-clear');
+  var searchEl = document.getElementById('dir-search');
+  if (clearBtn && searchEl) clearBtn.style.display = searchEl.value ? 'block' : 'none';
   dirSearchTimeout = setTimeout(function() { dirOffset = 0; dirGroupPage = 1; loadDirectory(); }, 300);
 }
 async function loadDirectory() {
