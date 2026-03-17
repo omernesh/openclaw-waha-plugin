@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-03-17T15:19:36.958Z"
+stopped_at: Completed 17-03-PLAN.md
+last_updated: "2026-03-17T15:30:18.310Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 40
 ---
 
@@ -88,6 +88,7 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 17-modules-framework]: ModuleRegistry singleton pattern: getModulesForChat returns [] fast when no modules registered — zero-cost for deployments that don't use modules
 - [Phase 17-modules-framework]: Bulk checkbox in buildContactCard was already present from prior DIR-04 work; plan 17-02 only wired toolbar and tab-reload logic
 - [Phase 17-modules-framework]: Follow/unfollow bulk actions call WAHA channels API directly from server; no DB state change, partial success count returned
+- [Phase 17-modules-framework]: Module assignment UI uses details/summary expandable pattern; loadModuleAssignments called eagerly for count badges and lazily on details toggle
 
 ### Pending Todos
 
@@ -101,6 +102,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T15:19:36.954Z
-Stopped at: Completed 17-02-PLAN.md
+Last session: 2026-03-17T15:30:18.299Z
+Stopped at: Completed 17-03-PLAN.md
 Resume file: None

@@ -35,7 +35,7 @@ Full details: `.planning/milestones/v1.10-ROADMAP.md`
 - [x] **Phase 14: Name Resolution** — Resolve @lid JIDs to display names throughout the UI (completed 2026-03-17)
 - [x] **Phase 15: TTL Access** — Schema and infrastructure for auto-expiring allowlist entries (completed 2026-03-17)
 - [x] **Phase 16: Pairing Mode and Auto-Reply** — Passcode-gated onboarding and canned rejection messages (completed 2026-03-17)
-- [ ] **Phase 17: Modules Framework** — Bulk directory actions and extensible module system
+- [x] **Phase 17: Modules Framework** — Bulk directory actions and extensible module system (completed 2026-03-17)
 
 ## Phase Details
 
@@ -159,4 +159,4 @@ Plans:
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
 | 15. TTL Access | 3/3 | Complete    | 2026-03-17 | - |
 | 16. Pairing Mode and Auto-Reply | 3/3 | Complete    | 2026-03-17 | - |
-| 17. Modules Framework | 2/3 | In Progress|  | - |
+| 17. Modules Framework | 3/3 | Complete   | 2026-03-17 | - |

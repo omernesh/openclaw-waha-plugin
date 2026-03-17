@@ -94,8 +94,8 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 - [x] **MOD-01**: Module interface defined (init, config schema, inbound hook, outbound hook) (FEATURE-04)
 - [x] **MOD-02**: Module registry for registering and discovering modules at init time (FEATURE-04)
-- [ ] **MOD-03**: Modules admin tab between Sessions and Log with enable/disable toggles (FEATURE-04)
-- [ ] **MOD-04**: Module assignment UI — which groups/contacts/newsletters each module applies to (FEATURE-04)
+- [x] **MOD-03**: Modules admin tab between Sessions and Log with enable/disable toggles (FEATURE-04)
+- [x] **MOD-04**: Module assignment UI — which groups/contacts/newsletters each module applies to (FEATURE-04)
 - [x] **MOD-05**: Inbound pipeline checks active modules for incoming chat and routes accordingly (FEATURE-04)
 - [x] **MOD-06**: Modules are WhatsApp-specific — no cross-platform abstraction (FEATURE-04)
 
@@ -191,8 +191,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIR-05 | Phase 17 | Complete |
 | MOD-01 | Phase 17 | Complete |
 | MOD-02 | Phase 17 | Complete |
-| MOD-03 | Phase 17 | Pending |
-| MOD-04 | Phase 17 | Pending |
+| MOD-03 | Phase 17 | Complete |
+| MOD-04 | Phase 17 | Complete |
 | MOD-05 | Phase 17 | Complete |
 | MOD-06 | Phase 17 | Complete |
 
