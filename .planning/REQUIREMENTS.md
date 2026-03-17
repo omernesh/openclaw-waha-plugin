@@ -11,12 +11,12 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 - [x] **UI-01**: Dashboard Access Control card stops flickering/re-rendering every few seconds (BUG-02)
 - [x] **UI-02**: DM Keyword Filter stats use clear labels — "Passed" vs "Filtered" instead of "Allowed" vs "Dropped" (BUG-03)
-- [ ] **UI-03**: Sessions tab role/subRole dropdown updates visually immediately after save without page flicker (BUG-04)
-- [ ] **UI-04**: Sessions tab handles 502 during restart gracefully with polling overlay instead of raw error (BUG-05)
+- [x] **UI-03**: Sessions tab role/subRole dropdown updates visually immediately after save without page flicker (BUG-04)
+- [x] **UI-04**: Sessions tab handles 502 during restart gracefully with polling overlay instead of raw error (BUG-05)
 - [ ] **UI-05**: Directory search bar 'x' button clears search text and resets results (BUG-07)
 - [ ] **UI-06**: Tooltips render above container overflow boundaries and are fully readable (BUG-08)
 - [ ] **UI-07**: Contact settings drawer stays open after saving, shows success toast (BUG-09)
-- [ ] **UI-08**: DM Policy dropdown removes "pairing (not available)" option; auto-migrates config if set (BUG-13)
+- [x] **UI-08**: DM Policy dropdown removes "pairing (not available)" option; auto-migrates config if set (BUG-13)
 - [ ] **UI-09**: Queue tab Refresh button shows spinner and "Last refreshed" timestamp (BUG-14)
 - [ ] **UI-10**: Per-group trigger operator visible even when inheriting global (grayed out with effective value) (BUG-17)
 - [ ] **UI-11**: Channels tab Allow DM button is a toggle with clear visual state and undo capability (BUG-18)
@@ -30,7 +30,7 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### Sessions & Settings UX
 
-- [ ] **UX-01**: Sessions tab has labels above role/subRole dropdowns with explanatory text box (CR-05)
+- [x] **UX-01**: Sessions tab has labels above role/subRole dropdowns with explanatory text box (CR-05)
 - [ ] **UX-02**: Log tab search bar has 'x' clear button (CR-06)
 - [ ] **UX-03**: All Refresh buttons across all tabs show spinner + "Last refreshed" timestamp on click (CR-07)
 - [ ] **UX-04**: Custom Keywords field in contact settings uses tag-style input with pill bubbles (CR-09)
@@ -63,8 +63,8 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### Can Initiate Global Setting
 
-- [ ] **INIT-01**: Global "Can Initiate" toggle in Settings tab with default for all contacts (CR-10)
-- [ ] **INIT-02**: Per-contact "Can Initiate" becomes override: "Default (use global)" / "Allow" / "Block" (CR-10)
+- [x] **INIT-01**: Global "Can Initiate" toggle in Settings tab with default for all contacts (CR-10)
+- [x] **INIT-02**: Per-contact "Can Initiate" becomes override: "Default (use global)" / "Allow" / "Block" (CR-10)
 
 ### Pairing Mode
 
@@ -138,12 +138,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | UI-01 | Phase 12 | Complete |
 | UI-02 | Phase 12 | Complete |
-| UI-03 | Phase 12 | Pending |
-| UI-04 | Phase 12 | Pending |
+| UI-03 | Phase 12 | Complete |
+| UI-04 | Phase 12 | Complete |
 | UI-05 | Phase 12 | Pending |
 | UI-06 | Phase 12 | Pending |
 | UI-07 | Phase 12 | Pending |
-| UI-08 | Phase 12 | Pending |
+| UI-08 | Phase 12 | Complete |
 | UI-09 | Phase 12 | Pending |
 | UI-10 | Phase 12 | Pending |
 | UI-11 | Phase 12 | Pending |
@@ -151,7 +151,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-02 | Phase 12 | Complete |
 | DASH-03 | Phase 12 | Complete |
 | DASH-04 | Phase 12 | Complete |
-| UX-01 | Phase 12 | Pending |
+| UX-01 | Phase 12 | Complete |
 | UX-02 | Phase 12 | Pending |
 | UX-03 | Phase 12 | Pending |
 | UX-04 | Phase 12 | Pending |
@@ -160,8 +160,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIR-01 | Phase 12 | Pending |
 | DIR-02 | Phase 12 | Pending |
 | DIR-04 | Phase 12 | Pending |
-| INIT-01 | Phase 12 | Pending |
-| INIT-02 | Phase 12 | Pending |
+| INIT-01 | Phase 12 | Complete |
+| INIT-02 | Phase 12 | Complete |
 | SYNC-01 | Phase 13 | Pending |
 | SYNC-02 | Phase 13 | Pending |
 | SYNC-03 | Phase 13 | Pending |

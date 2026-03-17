@@ -3,11 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-03-17T01:25:41.309Z"
+last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
+progress:
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 5
+  completed_plans: 2
+  percent: 40
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.11
+milestone_name: Polish, Sync & Features
+status: in-progress
 stopped_at: null
 last_updated: "2026-03-17"
 last_activity: "2026-03-17 — Phase 12 Plan 01 complete: dashboard flickering fix, per-session health, collapsible filter cards, readable labels"
 progress:
-  total_phases: 6
+  [████░░░░░░] 40%
   completed_phases: 0
   total_plans: 0
   completed_plans: 1
@@ -43,6 +59,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - Passcode storage: hashing required. Exact storage (openclaw.json vs SQLite secrets table) to be decided in Phase 16 plan.
 - _accessKvBuilt guard pattern (12-01, 2026-03-17): Boolean flag prevents re-creating DOM subtrees on periodic refresh. Reset on tab-switch and manual Refresh. Use for any DOM tree that should be built once per page view.
 - LABEL_MAP pattern (12-01, 2026-03-17): Static lookup object + labelFor() helper at top of embedded script to convert raw config keys to human-readable labels.
+- [Phase 12-ui-bug-sprint]: canInitiate boolean kept in ContactDmSettings for shutup.ts compat; separate canInitiateOverride enum added for 3-state UI override (12-02, 2026-03-17)
+- [Phase 12-ui-bug-sprint]: Optimistic dropdown UI pattern: data-prev + onmousedown captures value before change, revert on error without full re-render (12-02, 2026-03-17)
 
 ### Pending Todos
 
@@ -56,6 +74,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-03-17T01:25:41.305Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
