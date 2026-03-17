@@ -2887,6 +2887,13 @@ async function loadContactsTable() {
     var upperNav = document.createElement('div');
     upperNav.innerHTML = buildPageNav(dirContactPage, totalPages, 'goContactPage');
     list.appendChild(upperNav);
+    // TTL-05: Sort expired entries to bottom of list.
+    // DO NOT REMOVE — expired entries should not be mixed with active contacts.
+    d.contacts.sort(function(a, b) {
+      if (a.expired && !b.expired) return 1;
+      if (!a.expired && b.expired) return -1;
+      return 0;
+    });
     // Contact cards — existing buildContactCard renders HTML, safe (uses esc() for user text)
     var cardsDiv = document.createElement('div');
     d.contacts.forEach(function(c) { cardsDiv.innerHTML += buildContactCard(c); });
@@ -2902,6 +2909,32 @@ async function loadContactsTable() {
     errEl.textContent = 'Error loading contacts: ' + (err instanceof Error ? err.message : String(err));
     list.appendChild(errEl);
   }
+}
+
+// Phase 15 (TTL-04/TTL-05): Generate a color-coded TTL badge for active or expired access grants.
+// Colors: green >1h remaining, yellow <1h, red <15m, gray for expired.
+// Called from buildContactCard for all contacts that have a non-null expiresAt.
+// DO NOT REMOVE — badge is the primary visual indicator of time-limited access in the directory.
+function formatTtlBadge(expiresAt, expired) {
+  if (!expiresAt) return '';
+  if (expired) return '<span class="ttl-badge ttl-expired">Expired</span>';
+  var now = Math.floor(Date.now() / 1000);
+  var remaining = expiresAt - now;
+  if (remaining <= 0) return '<span class="ttl-badge ttl-expired">Expired</span>';
+  var text;
+  if (remaining < 60) text = remaining + 's';
+  else if (remaining < 3600) text = Math.floor(remaining / 60) + 'm';
+  else if (remaining < 86400) {
+    var h = Math.floor(remaining / 3600);
+    var m = Math.floor((remaining % 3600) / 60);
+    text = h + 'h' + (m > 0 ? ' ' + m + 'm' : '');
+  } else {
+    var d = Math.floor(remaining / 86400);
+    text = d + 'd';
+  }
+  // TTL-04: green >1h, yellow <1h (but >15m), red <15m (900s)
+  var cls = remaining > 3600 ? 'ttl-green' : (remaining > 900 ? 'ttl-yellow' : 'ttl-red');
+  return '<span class="ttl-badge ' + cls + '">Expires in ' + text + '</span>';
 }
 
 function buildContactCard(c) {
@@ -3006,12 +3039,17 @@ function buildContactCard(c) {
     bulkCheckbox = tempDiv.innerHTML;
   }
 
-  return '<div class="contact-card" id="' + id + '" style="' + borderStyle + '">' +
+  // Phase 15 (TTL-04/TTL-05): TTL badge and expired card styling.
+  // DO NOT REMOVE — badge and dimming are primary visual indicators of time-limited access.
+  var ttlBadge = formatTtlBadge(c.expiresAt, c.expired);
+  var expiredClass = c.expired ? ' expired-card' : '';
+
+  return '<div class="contact-card' + expiredClass + '" id="' + id + '" style="' + borderStyle + '">' +
     '<div class="contact-header" onclick="' + clickAction + '" style="display:flex;align-items:center;">' +
       bulkCheckbox +
       '<div class="avatar" style="background:' + avatarBg + ';color:#fff">' + avatarContent + '</div>' +
       '<div class="contact-info">' +
-        '<div class="contact-name">' + esc(name) + '</div>' +
+        '<div class="contact-name">' + esc(name) + ttlBadge + '</div>' +
         '<div class="contact-jid">' + esc(c.jid) + '</div>' +
       '</div>' +
       '<div class="contact-meta">' +
