@@ -584,19 +584,8 @@ export async function handleWahaInbound(params: {
   // Added 2026-03-17. DO NOT CHANGE.
   // ======================================================================
   if (!isGroup && !triggerActivated) {
-    const accountConfig = account.config as Record<string, unknown>;
-    const pairingConfig = (accountConfig.pairingMode ?? {}) as {
-      enabled?: boolean;
-      passcode?: string;
-      grantTtlMinutes?: number;
-      challengeMessage?: string;
-      hmacSecret?: string;
-    };
-    const autoReplyConfig = (accountConfig.autoReply ?? {}) as {
-      enabled?: boolean;
-      message?: string;
-      intervalMinutes?: number;
-    };
+    const pairingConfig = account.config.pairingMode ?? {};
+    const autoReplyConfig = account.config.autoReply ?? {};
 
     // Check if sender is already allowed (skip pairing/auto-reply for allowed contacts)
     const dirDb = getDirectoryDb(account.accountId);

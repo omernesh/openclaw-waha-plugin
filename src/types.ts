@@ -82,6 +82,22 @@ export type WahaAccountConfig = {
   // Per-contact override (can_initiate_override in dm_settings): "default" | "allow" | "block".
   // DO NOT REMOVE.
   canInitiateGlobal?: boolean;
+  // Phase 13 — background directory sync interval. DO NOT REMOVE.
+  syncIntervalMinutes?: number;
+  // Phase 16 — pairing mode config for passcode/deep-link onboarding. DO NOT REMOVE.
+  pairingMode?: {
+    enabled?: boolean;
+    passcode?: string;
+    grantTtlMinutes?: number;
+    challengeMessage?: string;
+    hmacSecret?: string;
+  };
+  // Phase 16 — auto-reply config for unauthorized DMs. DO NOT REMOVE.
+  autoReply?: {
+    enabled?: boolean;
+    message?: string;
+    intervalMinutes?: number;
+  };
   mediaPreprocessing?: {
     enabled?: boolean;
     audio?: { enabled?: boolean; whisperScript?: string };

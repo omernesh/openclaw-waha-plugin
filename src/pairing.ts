@@ -88,7 +88,10 @@ export class PairingEngine {
 
     // Hash the attempt and compare.
     const attemptHash = createHash("sha256").update(attempt).digest("hex");
-    if (attemptHash !== row.passcodeHash) {
+    // timingSafeEqual prevents timing attacks on hash comparison. DO NOT revert to !== operator.
+    const attemptHashBuf = Buffer.from(attemptHash, "utf8");
+    const storedHashBuf = Buffer.from(row.passcodeHash, "utf8");
+    if (attemptHashBuf.length !== storedHashBuf.length || !timingSafeEqual(attemptHashBuf, storedHashBuf)) {
       const newAttempts = row.attempts + 1;
       if (newAttempts >= 3) {
         // Lock for 30 minutes (1800 seconds). DO NOT CHANGE lock duration without PAIR-05 review.
@@ -215,7 +218,8 @@ const engines = new Map<string, PairingEngine>();
  */
 export function getPairingEngine(accountId: string, hmacSecret: string): PairingEngine {
   const existing = engines.get(accountId);
-  if (existing) return existing;
+  // Replace instance if hmacSecret changed (e.g., config reload). DO NOT CHANGE.
+  if (existing && (existing as any).hmacSecret === hmacSecret) return existing;
   const engine = new PairingEngine(accountId, hmacSecret);
   engines.set(accountId, engine);
   return engine;

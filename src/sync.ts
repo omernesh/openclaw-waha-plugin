@@ -268,7 +268,7 @@ function syncExpiredToConfig(expiredJids: string[]): number {
     return removed;
   } catch (err) {
     console.error(`[waha] sync: syncExpiredToConfig failed: ${String(err)}`);
-    return 0;
+    return -1;
   }
 }
 
@@ -289,12 +289,17 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   state.currentPhase = "contacts";
 
   // Fetch bulk data with rate limiting — same as monitor.ts refresh handler
+  // Track API failures so we can report partial sync errors. DO NOT CHANGE.
+  let apiFailures = 0;
   const [rawChats, rawContacts, rawGroups, rawLids] = await Promise.all([
-    rateLimiter.run(() => getWahaChats({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] sync: getWahaChats failed: ${String(err)}`); return []; })),
-    rateLimiter.run(() => getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] sync: getWahaContacts failed: ${String(err)}`); return []; })),
-    rateLimiter.run(() => getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] sync: getWahaGroups failed: ${String(err)}`); return []; })),
-    rateLimiter.run(() => getWahaAllLids({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] sync: getWahaAllLids failed: ${String(err)}`); return []; })),
+    rateLimiter.run(() => getWahaChats({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaChats failed: ${String(err)}`); return []; })),
+    rateLimiter.run(() => getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaContacts failed: ${String(err)}`); return []; })),
+    rateLimiter.run(() => getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaGroups failed: ${String(err)}`); return []; })),
+    rateLimiter.run(() => getWahaAllLids({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaAllLids failed: ${String(err)}`); return []; })),
   ]);
+  if (apiFailures > 0) {
+    state.lastError = `${apiFailures} of 4 API calls failed`;
+  }
 
   const chatsArr = toArr(rawChats);
   const contactsArr = toArr(rawContacts);
@@ -537,7 +542,9 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   try {
     const expiredJids = db.getExpiredJids();
     const configRemoved = syncExpiredToConfig(expiredJids);
-    if (configRemoved > 0) {
+    if (configRemoved < 0) {
+      state.lastError = "TTL config sync failed";
+    } else if (configRemoved > 0) {
       console.log(`[waha] sync: removed ${configRemoved} expired JIDs from config allowFrom`);
     }
   } catch (err) {

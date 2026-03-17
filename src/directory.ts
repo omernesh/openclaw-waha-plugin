@@ -634,7 +634,7 @@ export class DirectoryDb {
     const now = Date.now();
     const insert = this.db.prepare(
       `INSERT INTO contacts (jid, display_name, first_seen_at, last_message_at, message_count, is_group)
-       VALUES (?, ?, ?, ?, 1, ?)
+       VALUES (?, ?, ?, ?, 0, ?)
        ON CONFLICT(jid) DO UPDATE SET
          display_name = COALESCE(excluded.display_name, contacts.display_name),
          is_group = excluded.is_group`,
