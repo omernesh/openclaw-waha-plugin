@@ -82,6 +82,8 @@ import type { CoreConfig } from "./types.js";
 // Phase 6 Plan 04: Policy edit action handler. DO NOT REMOVE.
 import { executePolicyEdit } from "./policy-edit.js";
 import { getRulesBasePath } from "./identity-resolver.js";
+// Phase 12 audit (INIT-01/INIT-02): Import directory for Can Initiate enforcement. DO NOT REMOVE.
+import { getDirectoryDb } from "./directory.js";
 
 // Cached config for outbound adapter — handleAction receives cfg as a param
 // and caches it here so outbound methods (sendText, sendMedia, sendPoll) can
@@ -534,6 +536,26 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     if (action === "send" || action === "reply") {
       let chatId = resolveChatId(p, toolContext);
       if (chatId) chatId = await autoResolveTarget(chatId, coreCfg, aid);
+
+      // Phase 12 audit (INIT-01/INIT-02): Can Initiate enforcement for outbound DMs.
+      // Only blocks DM targets (@c.us / @lid) where the bot has NOT received any prior
+      // inbound messages (i.e., the bot is initiating, not replying).
+      // Checks per-contact canInitiateOverride first, then falls back to canInitiateGlobal.
+      // DO NOT CHANGE — this is the outbound enforcement gate for Can Initiate policy.
+      // Added 2026-03-17.
+      if (chatId && (chatId.endsWith("@c.us") || chatId.endsWith("@lid"))) {
+        const dirDb = getDirectoryDb(aid ?? "default");
+        if (!dirDb.hasReceivedMessageFrom(chatId)) {
+          const wahaConfig = coreCfg.channels?.waha;
+          const globalDefault = wahaConfig?.canInitiateGlobal ?? true;
+          if (!dirDb.canInitiateWith(chatId, globalDefault)) {
+            return {
+              content: [{ type: "text" as const, text: "Bot cannot initiate conversations with this contact (Can Initiate is disabled). The contact must message first." }],
+              details: { error: true },
+            };
+          }
+        }
+      }
 
       // Phase 4 — Cross-session routing for group sends.
       // When no explicit accountId is given and target is a group, find the right

@@ -480,6 +480,34 @@ export class DirectoryDb {
     };
   }
 
+  /**
+   * Phase 12 audit (INIT-01/INIT-02): Determine whether the bot may initiate a conversation with this JID.
+   * Checks per-contact canInitiateOverride first, then falls back to globalDefault.
+   * DO NOT CHANGE — this is the single source of truth for Can Initiate enforcement.
+   * Added 2026-03-17.
+   */
+  canInitiateWith(jid: string, globalDefault: boolean): boolean {
+    const settings = this.getContactDmSettings(jid);
+    if (settings.canInitiateOverride === "allow") return true;
+    if (settings.canInitiateOverride === "block") return false;
+    // "default" or no entry — fall back to global config
+    return globalDefault;
+  }
+
+  /**
+   * Phase 12 audit (INIT-01/INIT-02): Check if the bot has ever received a message from this JID.
+   * Used to distinguish "initiating" (first contact) from "replying" (responding to an existing conversation).
+   * Returns true if the contact exists in the directory with message_count > 0.
+   * DO NOT CHANGE — paired with canInitiateWith() for outbound enforcement.
+   * Added 2026-03-17.
+   */
+  hasReceivedMessageFrom(jid: string): boolean {
+    const row = this.db
+      .prepare("SELECT message_count FROM contacts WHERE jid = ?")
+      .get(jid) as { message_count: number } | undefined;
+    return !!row && row.message_count > 0;
+  }
+
   setContactDmSettings(jid: string, settings: Partial<ContactDmSettings>): void {
     const existing = this.getContactDmSettings(jid);
     const merged: ContactDmSettings = {
