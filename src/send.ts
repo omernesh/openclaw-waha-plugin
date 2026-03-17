@@ -1457,21 +1457,21 @@ export async function deleteWahaProfilePicture(params: { cfg: CoreConfig; accoun
 export async function findWahaPhoneByLid(params: { cfg: CoreConfig; lid: string; accountId?: string }) {
   const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   return callWahaApi({ baseUrl, apiKey, method: "GET",
-    path: resolveSessionPath("/api/{session}/contacts/lids", params.cfg, params.accountId)
-      + `/${encodeURIComponent(params.lid)}/phone` });
+    path: resolveSessionPath("/api/{session}/lids", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.lid)}` });
 }
 
 export async function findWahaLidByPhone(params: { cfg: CoreConfig; phone: string; accountId?: string }) {
   const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   return callWahaApi({ baseUrl, apiKey, method: "GET",
-    path: resolveSessionPath("/api/{session}/contacts/lids/phone", params.cfg, params.accountId)
+    path: resolveSessionPath("/api/{session}/lids/pn", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.phone)}` });
 }
 
 export async function getWahaAllLids(params: { cfg: CoreConfig; accountId?: string }) {
   const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   return callWahaApi({ baseUrl, apiKey, method: "GET",
-    path: resolveSessionPath("/api/{session}/contacts/lids", params.cfg, params.accountId) });
+    path: resolveSessionPath("/api/{session}/lids", params.cfg, params.accountId) });
 }
 
 // ── Calls ──────────────────────────────────────────────────────

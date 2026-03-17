@@ -16,7 +16,7 @@ import { homedir } from "node:os";
 import { getDirectoryDb } from "./directory.js";
 import {
   getWahaChats, getWahaContacts, getWahaGroups, getWahaAllLids,
-  getWahaChannels, getWahaContact, getWahaNewsletter, findWahaLidByPhone, toArr
+  getWahaChannels, getWahaContact, getWahaNewsletter, toArr
 } from "./send.js";
 import type { CoreConfig } from "./types.js";
 
@@ -31,8 +31,8 @@ export interface SyncState {
   lastSyncAt: number | null;
   lastSyncDuration: number | null;
   itemsSynced: number;
-  /** Which phase the sync cycle is currently in: "contacts" | "groups" | "newsletters" | "names" | "lids" | null */
-  currentPhase: "contacts" | "groups" | "newsletters" | "names" | "lids" | null;
+  /** Which phase the sync cycle is currently in: "contacts" | "groups" | "newsletters" | "names" | null */
+  currentPhase: "contacts" | "groups" | "newsletters" | "names" | null;
   lastError: string | null;
 }
 
@@ -251,7 +251,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   for (const entry of lidsArr) {
     const rec = entry as Record<string, unknown>;
     const lid = String(rec.lid ?? rec.id ?? "");
-    const phone = String(rec.phone ?? rec.contactId ?? "");
+    const phone = String(rec.pn ?? rec.phone ?? rec.contactId ?? "");
     if (lid && lid.endsWith("@lid") && phone) {
       const cusJid = phone.includes("@") ? phone : `${phone}@c.us`;
       lidToCus.set(lid, cusJid);
@@ -381,68 +381,9 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
 
   if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length;
 
-  // ── Phase 1b: LID resolution via phone-to-LID API ──────────────────
-  // LID-SYNC: The bulk /contacts/lids endpoint returns empty on NOWEB engine.
-  // Instead, we call the per-phone /contacts/lids/phone/{phone} API for each
-  // allowed @c.us contact that doesn't already have a lid_mapping entry.
-  // FIX (2026-03-17): Read allowFrom/groupAllowFrom from config, NOT from the
-  // allow_list SQLite table which may be empty. The config arrays are the source
-  // of truth for which JIDs are allowed. DO NOT REVERT to db.getCusJidsMissingLidMapping().
-  // DO NOT CHANGE — this is the only reliable way to build LID mappings on NOWEB.
-  state.currentPhase = "lids";
-  let lidsResolved = 0;
-  try {
-    // Extract @c.us JIDs from config allowFrom + groupAllowFrom arrays
-    const configAllowFrom: string[] = Array.isArray(opts.config?.allowFrom)
-      ? opts.config.allowFrom : [];
-    const configGroupAllowFrom: string[] = Array.isArray(opts.config?.groupAllowFrom)
-      ? opts.config.groupAllowFrom : [];
-
-    // Combine both lists, deduplicate, keep only @c.us JIDs
-    const allCusJids = [...new Set([...configAllowFrom, ...configGroupAllowFrom])]
-      .filter((j): j is string => typeof j === 'string' && j.endsWith('@c.us'));
-
-    // Filter out JIDs that already have lid_mapping entries in SQLite
-    const missingLidJids = allCusJids.filter(j => !db.hasCusInLidMapping(j));
-    if (missingLidJids.length > 0) {
-      const LID_BATCH_SIZE = 3;
-      for (let i = 0; i < missingLidJids.length; i += LID_BATCH_SIZE) {
-        const batch = missingLidJids.slice(i, i + LID_BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map((cusJid) => {
-            // Extract phone number from @c.us JID (e.g., "972544329000@c.us" → "972544329000")
-            const phone = cusJid.replace("@c.us", "");
-            return rateLimiter.run(() =>
-              findWahaLidByPhone({ cfg: opts.config, phone, accountId: opts.accountId })
-                .then((result) => ({ cusJid, result: result as Record<string, unknown> }))
-            );
-          })
-        );
-        for (const r of results) {
-          if (r.status !== "fulfilled") continue;
-          const { cusJid, result } = r.value;
-          // WAHA returns { lid: "271862907039996@lid" } or similar
-          const lid = String(result?.lid ?? result?.id ?? "");
-          if (lid && lid.endsWith("@lid")) {
-            db.upsertLidMapping(lid, cusJid);
-            lidsResolved++;
-          }
-        }
-        // Delay between batches
-        if (i + LID_BATCH_SIZE < missingLidJids.length) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          if (opts.abortSignal.aborted) break;
-        }
-      }
-      if (lidsResolved > 0) {
-        console.log(`[waha] sync: resolved ${lidsResolved} LID mappings via phone-to-LID API`);
-      }
-    }
-  } catch (lidErr) {
-    console.warn(`[waha] sync: phone-to-LID resolution failed: ${String(lidErr)}`);
-  }
-
-  if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length;
+  // Phase 1b (per-JID phone-to-LID lookups) removed 2026-03-17.
+  // The bulk GET /api/{session}/lids endpoint now returns ALL mappings reliably,
+  // making individual lookups unnecessary. DO NOT RESTORE — bulk is much more efficient.
 
   // ── Phase 2: Newsletters ────────────────────────────────────────────
   state.currentPhase = "newsletters";
@@ -578,7 +519,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     `[waha] sync: cycle complete for ${opts.accountId} — ` +
     `${mappedContacts.length} contacts, ${mappedGroups.length} groups, ` +
     `${newsletterCount} newsletters, ${namesResolved} names resolved, ` +
-    `${lidsMerged} LIDs merged, ${lidsResolved} LIDs from phone API (${imported} upserted)`
+    `${lidsMerged} LIDs merged, ${lidToCus.size} LIDs from bulk API (${imported} upserted)`
   );
 
   return mappedContacts.length + mappedGroups.length + newsletterCount + namesResolved;
