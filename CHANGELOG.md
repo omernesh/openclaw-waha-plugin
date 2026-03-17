@@ -2,6 +2,52 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.15.0] - 2026-03-17
+
+### Added
+- **Background directory sync**: Continuous WAHA-to-SQLite sync with configurable interval (default 30min). All contacts, groups, and newsletters automatically cached locally. Uses setTimeout chain pattern (`src/sync.ts`).
+- **FTS5 full-text search**: Directory search queries local SQLite FTS5 index instead of WAHA API for instant results. Virtual table with auto-sync triggers.
+- **Name resolution**: All @lid JIDs resolved to contact names across dashboard, settings tag bubbles, contact picker, and group participants. Batch resolve endpoint with @lid-to-@c.us fallback.
+- **TTL-based access**: Auto-expiring allowlist entries with `expires_at` column and SQL-level enforcement. Color-coded TTL badges (green >1h, yellow <1h, red <15m). Expired entries grayed out and sorted to bottom.
+- **Pairing mode**: Passcode-gated temporary access for unknown contacts. 6-digit numeric passcode with SHA-256 hashing. wa.me deep links with HMAC-SHA256 tokens for zero-friction authorization. 3-attempt brute-force lockout (30 min). Admin panel config with passcode generator and wa.me link generator.
+- **Auto-reply**: Configurable canned rejection message for unauthorized DMs with template variables ({admin_name}, {phone}, {jid}). Rate-limited per contact (configurable interval). Zero LLM tokens consumed (`src/auto-reply.ts`).
+- **Modules framework**: Extensible `WahaModule` interface with `onInbound`/`onOutbound` hooks. Module registry with SQLite-backed assignments. Admin panel "Modules" tab with enable/disable toggles and chat assignment UI. Pipeline integration after fromMe+dedup+pairing checks (`src/module-registry.ts`, `src/module-types.ts`).
+- **Can Initiate**: Global toggle + per-contact 3-state override (Default/Allow/Block). Enforced in outbound path — bot can only initiate DMs to contacts who have messaged first (unless overridden).
+- **Contacts pagination**: Contacts tab now paginated matching Groups tab pattern (page nav + size selector 10/25/50/100).
+- **Contacts bulk select**: Checkbox per contact with "Select" toggle and bulk toolbar (Allow DM, Revoke DM).
+- **Channels bulk select**: Checkboxes with "Select" toggle and bulk toolbar (Allow DM, Revoke DM, Follow, Unfollow).
+- **Sync status indicator**: "Last synced: Xm ago" / "Syncing..." status bar in Directory tab.
+
+### Changed
+- **Dashboard**: Per-session health details and stat breakdowns with session sub-headers. Filter cards (DM/Group keyword) now collapsible. Human-readable labels throughout ("wpm" to "Words Per Minute"). Access Control card no longer flickers.
+- **Sessions tab**: Role/subRole dropdowns update immediately (optimistic UI). 502 during restart shows polling overlay. Labels above dropdowns with explanatory text box.
+- **Settings tab**: Custom Keywords and Mention Patterns use tag-style pill inputs. DM Policy "pairing" option removed with auto-migration to "allowlist".
+- **Directory**: Search bar clear button fixed. Tooltips no longer clipped by card overflow. Contact settings drawer stays open after save. Per-group trigger operator visible when inheriting global. Channel Allow DM is now a proper toggle. Bot sessions excluded from contacts listing. Bot participants show badge without action controls. Promoting to Bot Admin/Manager auto-enables Allow + Allow DM.
+- **Refresh buttons**: All tabs show spinner ("Refreshing...") + "Last refreshed: Xm ago" timestamp via shared `wrapRefreshButton()` helper.
+
+### Fixed
+- Dashboard Access Control card flickering (re-rendered every 30s, now guarded by `_accessKvBuilt`).
+- DM Keyword Filter stats labels ("Allowed"/"Dropped" changed to "Passed"/"Filtered").
+- Stale "pairing" defaults in config-schema.ts and inbound.ts fallback.
+- `bulkUpsertContacts` message_count set to 0 for sync-discovered contacts (was 1, breaking Can Initiate).
+- Passcode hash comparison uses `timingSafeEqual` (was vulnerable to timing attacks).
+- PairingEngine singleton now detects rotated hmacSecret.
+- Sync API failures tracked in `state.lastError` (previously reported silent success).
+- TTL config sync failure tracked (returns -1, caller sets lastError).
+- Config migration POST failure now shows error toast (was silently swallowed).
+- Module config JSON corruption now logged.
+- `enableModule`/`disableModule` reject unregistered module IDs.
+- Clipboard copy error handler added for pairing deep links.
+- HMAC secret generation deduplicated (channel.ts uses `generateHmacSecret` from pairing.ts).
+
+### New Files
+- `src/sync.ts` — Background directory sync engine
+- `src/pairing.ts` — Passcode pairing engine
+- `src/auto-reply.ts` — Auto-reply engine
+- `src/module-registry.ts` — Module registry
+- `src/module-types.ts` — WahaModule interface
+- `src/rate-limiter.ts` — Shared rate limiter (extracted from monitor.ts)
+
 ## [1.14.3] - 2026-03-15
 
 ### Added
