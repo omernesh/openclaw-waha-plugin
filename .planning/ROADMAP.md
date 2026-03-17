@@ -49,7 +49,14 @@ Full details: `.planning/milestones/v1.10-ROADMAP.md`
   3. Sessions tab role/subRole changes appear immediately without page reload, and a 502 during restart shows a polling overlay instead of a raw error
   4. Directory search bar, log search bar, and all tag-style input fields (Custom Keywords, Mention Patterns, Group Override Keywords) have a working clear/remove button
   5. Tooltips are fully visible and not clipped by container overflow; contact settings drawer stays open after saving
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Dashboard: fix flickering, per-session stats/health, collapsible cards, readable labels
+- [ ] 12-02-PLAN.md — Sessions: optimistic UI, 502 overlay, labels, pairing removal, Can Initiate
+- [ ] 12-03-PLAN.md — Refresh buttons, search clear buttons, tooltip overflow fix
+- [ ] 12-04-PLAN.md — Tag inputs for keywords/patterns, contact drawer stays open
+- [ ] 12-05-PLAN.md — Directory: trigger operator visibility, channel toggle, bot badge, role auto-grant
 
 ### Phase 13: Background Directory Sync
 **Goal**: The directory is always locally cached — contacts, groups, and newsletters are pulled from WAHA into SQLite continuously so search is instant and name lookups work without hitting the live API
@@ -124,7 +131,7 @@ Full details: `.planning/milestones/v1.10-ROADMAP.md`
 | 9. Settings UX Improvements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 10. Directory & Group Enhancements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 11. Dashboard, Sessions & Log | v1.10 | 2/2 | Complete | 2026-03-16 |
-| 12. UI Bug Sprint | v1.11 | 0/TBD | Not started | - |
+| 12. UI Bug Sprint | v1.11 | 0/5 | Not started | - |
 | 13. Background Directory Sync | v1.11 | 0/TBD | Not started | - |
 | 14. Name Resolution | v1.11 | 0/TBD | Not started | - |
 | 15. TTL Access | v1.11 | 0/TBD | Not started | - |
