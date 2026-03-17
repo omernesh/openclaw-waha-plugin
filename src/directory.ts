@@ -353,6 +353,56 @@ export class DirectoryDb {
     return this._rowToContact(row);
   }
 
+  /**
+   * Batch resolve JIDs to display names with @lid->@c.us fallback.
+   * Phase 14 (NAME-01): Admin panel JID surfaces need human names, not raw JID strings.
+   * Returns a Map<inputJid, displayName> — only includes JIDs that resolved successfully.
+   * For @lid JIDs with no direct match, tries the @c.us equivalent as fallback.
+   * Uses a single SQL IN query for efficiency (not per-JID lookups).
+   * DO NOT REMOVE — used by GET /api/admin/directory/resolve endpoint in monitor.ts.
+   */
+  resolveJids(jids: string[]): Map<string, string> {
+    if (jids.length === 0) return new Map();
+
+    // Batch lookup: collect all JIDs to query (originals + @c.us fallbacks for @lid JIDs)
+    const lidToCs = new Map<string, string>(); // @lid -> @c.us equivalent
+    const allJidsToQuery = new Set<string>(jids);
+    for (const jid of jids) {
+      if (jid.endsWith("@lid")) {
+        const csJid = jid.replace("@lid", "@c.us");
+        lidToCs.set(jid, csJid);
+        allJidsToQuery.add(csJid);
+      }
+    }
+
+    // Single batch query
+    const placeholders = [...allJidsToQuery].map(() => "?").join(", ");
+    const rows = this.db
+      .prepare(`SELECT jid, display_name FROM contacts WHERE jid IN (${placeholders}) AND display_name IS NOT NULL`)
+      .all(...[...allJidsToQuery]) as Array<{ jid: string; display_name: string }>;
+
+    const nameByJid = new Map<string, string>();
+    for (const row of rows) {
+      nameByJid.set(row.jid, row.display_name);
+    }
+
+    // Build result: for each input JID, try direct lookup then @lid->@c.us fallback
+    const result = new Map<string, string>();
+    for (const jid of jids) {
+      const direct = nameByJid.get(jid);
+      if (direct) {
+        result.set(jid, direct);
+      } else if (jid.endsWith("@lid")) {
+        const csJid = lidToCs.get(jid);
+        if (csJid) {
+          const csName = nameByJid.get(csJid);
+          if (csName) result.set(jid, csName);
+        }
+      }
+    }
+    return result;
+  }
+
   getContactDmSettings(jid: string): ContactDmSettings {
     const row = this.db
       .prepare("SELECT mode, mention_only, custom_keywords, can_initiate, can_initiate_override FROM dm_settings WHERE jid = ?")

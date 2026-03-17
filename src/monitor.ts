@@ -3844,12 +3844,44 @@ export function createWahaWebhookServer(opts: {
       const url = new URL(req.url, "http://localhost");
       const pathParts = url.pathname.replace("/api/admin/directory", "").split("/").filter(Boolean);
 
+      // GET /api/admin/directory/resolve — batch JID->name resolution with @lid->@c.us fallback.
+      // Phase 14 (NAME-01): Must be placed BEFORE the /:jid handler so "resolve" isn't treated as a JID.
+      // Accepts ?jids=jid1,jid2,... (URL-encoded comma-separated). Returns { resolved: { jid: name } }.
+      // JIDs with no resolved name are omitted from the response. DO NOT REMOVE.
+      if (pathParts.length === 1 && pathParts[0] === "resolve") {
+        try {
+          const jidsParam = url.searchParams.get("jids") ?? "";
+          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean);
+          const db = getDirectoryDb(opts.accountId);
+          const resolvedMap = db.resolveJids(jidArray);
+          const resolved: Record<string, string> = {};
+          for (const [jid, name] of resolvedMap) {
+            resolved[jid] = name;
+          }
+          writeJsonResponse(res, 200, { resolved });
+        } catch (err) {
+          console.error(`[waha] GET /api/admin/directory/resolve failed: ${String(err)}`);
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+
       // GET /api/admin/directory/:jid
       if (pathParts.length === 1 && pathParts[0]) {
         const jid = decodeURIComponent(pathParts[0]);
         try {
           const db = getDirectoryDb(opts.accountId);
-          const contact = db.getContact(jid);
+          let contact = db.getContact(jid);
+          // Phase 14 (NAME-01): @lid->@c.us fallback — if no direct match and JID ends with @lid,
+          // try the @c.us equivalent. Return the contact's data with the original @lid JID preserved.
+          // This lets the frontend show contact info for @lid entries even when stored as @c.us. DO NOT REMOVE.
+          if (!contact && jid.endsWith("@lid")) {
+            const csJid = jid.replace("@lid", "@c.us");
+            const csContact = db.getContact(csJid);
+            if (csContact) {
+              contact = { ...csContact, jid };
+            }
+          }
           if (!contact) {
             res.writeHead(404, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: "Contact not found" }));
