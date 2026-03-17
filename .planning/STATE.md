@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-03-17T13:14:01.898Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-17T13:31:30.850Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
   percent: 40
 ---
 
@@ -73,6 +73,9 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 14-name-resolution]: @lid->@c.us fallback: two-pass batch SQL query approach in resolveJids; resolve route before /:jid handler; getValue() returns raw JIDs for config save correctness; 50ms debounce on name resolution fetches
 - [Phase 14-name-resolution]: [Phase 14-name-resolution]: getGroupParticipants uses LEFT JOIN COALESCE for @lid->@c.us resolution at SQL level (14-02, 2026-03-17)
 - [Phase 14-name-resolution]: [Phase 14-name-resolution]: Contact picker batch resolve replaces N per-JID fetches with single /resolve call; getValue() returns raw JID strings unchanged (14-02, 2026-03-17)
+- [Phase 15-ttl-access]: TTL stored as Unix seconds matching SQLite strftime('%s','now') for direct query use
+- [Phase 15-ttl-access]: 24h grace period before expired allow_list rows deleted — keeps recently-expired visible in admin panel
+- [Phase 15-ttl-access]: PUT /ttl returns 404 if contact not in allow_list — cannot set TTL on non-existent entry
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T13:04:27.548Z
-Stopped at: Completed 14-02-PLAN.md
+Last session: 2026-03-17T13:31:19.058Z
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
