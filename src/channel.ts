@@ -22,6 +22,7 @@ import {
   type ResolvedWahaAccount,
 } from "./accounts.js";
 import { monitorWahaProvider } from "./monitor.js";
+import { startDirectorySync } from "./sync.js";
 import { configureReliability } from "./http-client.js";
 import { formatActionError } from "./error-formatter.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
@@ -892,6 +893,19 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
         abortSignal: ctx.abortSignal,
         statusSink: (patch) => ctx.setStatus({ accountId: ctx.accountId, ...patch }),
       });
+
+      // Phase 13 (SYNC-01): Start background directory sync alongside health checks.
+      // Uses same abortSignal — sync stops when the account logs out.
+      // DO NOT REMOVE — background sync keeps the directory populated for instant search.
+      const syncIntervalMinutes = (ctx.cfg as any)?.channels?.waha?.syncIntervalMinutes ?? 30;
+      if (syncIntervalMinutes > 0 && ctx.abortSignal) {
+        startDirectorySync({
+          accountId: account.accountId,
+          config: ctx.cfg as CoreConfig,
+          intervalMs: syncIntervalMinutes * 60_000,
+          abortSignal: ctx.abortSignal,
+        });
+      }
 
       await waitUntilAbort(ctx.abortSignal);
       stop();

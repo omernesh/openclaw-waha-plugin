@@ -19,6 +19,7 @@ import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
 import { startHealthCheck, getHealthState, type HealthState } from "./health.js";
+import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
 import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.js";
 import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
@@ -4027,217 +4028,25 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
-    // POST /api/admin/directory/refresh — bulk import contacts and groups from WAHA
+    // GET /api/admin/sync/status — sync status endpoint for admin panel status bar.
+    // Phase 13 (SYNC-03): Returns current SyncState for the account. DO NOT REMOVE.
+    if (req.url === "/api/admin/sync/status" && req.method === "GET") {
+      const state = getSyncState(opts.accountId);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(state ?? { status: "idle", lastSyncAt: null, lastSyncDuration: null, itemsSynced: 0, currentPhase: null, lastError: null }));
+      return;
+    }
+
+    // POST /api/admin/directory/refresh — trigger immediate background sync
+    // Phase 13: Redirected from inline refresh to triggerImmediateSync.
+    // The sync engine handles the full refresh pipeline. DO NOT revert to inline refresh.
     if (req.url === "/api/admin/directory/refresh" && req.method === "POST") {
       try {
-        const db = getDirectoryDb(opts.accountId);
-        const rateLimiter = new RateLimiter(3, 200);
-
-        // Fetch bulk data with rate limiting
-        const [rawChats, rawContacts, rawGroups, rawLids] = await Promise.all([
-          rateLimiter.run(() => getWahaChats({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] directory refresh: getWahaChats failed: ${String(err)}`); return []; })),
-          rateLimiter.run(() => getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] directory refresh: getWahaContacts failed: ${String(err)}`); return []; })),
-          rateLimiter.run(() => getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] directory refresh: getWahaGroups failed: ${String(err)}`); return []; })),
-          rateLimiter.run(() => getWahaAllLids({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { console.warn(`[waha] directory refresh: getWahaAllLids failed: ${String(err)}`); return []; })),
-        ]);
-        // toArr imported from send.ts — shared utility for normalizing WAHA API dict responses
-        const chatsArr = toArr(rawChats);
-        const contactsArr = toArr(rawContacts);
-        const groupsArr = toArr(rawGroups);
-        const lidsArr = toArr(rawLids);
-
-        // Build LID -> @c.us mapping from the WAHA LID API and contacts API
-        const lidToCus = new Map<string, string>();
-        for (const entry of lidsArr) {
-          const rec = entry as Record<string, unknown>;
-          const lid = String(rec.lid ?? rec.id ?? "");
-          const phone = String(rec.phone ?? rec.contactId ?? "");
-          if (lid && lid.endsWith("@lid") && phone) {
-            const cusJid = phone.includes("@") ? phone : `${phone}@c.us`;
-            lidToCus.set(lid, cusJid);
-          }
-        }
-        // Also build from contacts API (contacts may have linkedDevices or server-reported LIDs)
-        for (const c of contactsArr) {
-          const rec = c as Record<string, unknown>;
-          const jid = String(rec.id ?? "");
-          if (!jid || !jid.endsWith("@c.us")) continue;
-          const lid = (rec.lid as string) || (rec.linkedDeviceId as string) || undefined;
-          if (lid && lid.endsWith("@lid")) {
-            lidToCus.set(lid, jid);
-          }
-        }
-
-        // Build contact map from chats (primary source -- always works on NOWEB)
-        const contactMap = new Map<string, { jid: string; name?: string; isGroup: boolean }>();
-        for (const c of chatsArr) {
-          const rec = c as Record<string, unknown>;
-          const jid = String(rec.id ?? "");
-          if (!jid) continue;
-          const isGroup = jid.endsWith("@g.us");
-          const name = (rec.name as string) || undefined;
-          contactMap.set(jid, { jid, name, isGroup });
-        }
-
-        // Merge contacts API results (prefer contact name over chat name)
-        for (const c of contactsArr) {
-          const rec = c as Record<string, unknown>;
-          const jid = String(rec.id ?? "");
-          if (!jid) continue;
-          const name = (rec.name as string) || (rec.pushName as string) || undefined;
-          const existing = contactMap.get(jid);
-          if (existing) {
-            if (name) existing.name = name;
-          } else {
-            contactMap.set(jid, { jid, name, isGroup: jid.endsWith("@g.us") });
-          }
-        }
-
-        // Add groups from groups API (use subject for name)
-        for (const g of groupsArr) {
-          const rec = g as Record<string, unknown>;
-          const jid = String(rec.id ?? "");
-          if (!jid) continue;
-          const name = (rec.subject as string) || (rec.name as string) || undefined;
-          const existing = contactMap.get(jid);
-          if (existing) {
-            if (name) existing.name = name;
-            existing.isGroup = true;
-          } else {
-            contactMap.set(jid, { jid, name, isGroup: true });
-          }
-        }
-
-        // Normalize @s.whatsapp.net → @c.us (same person, different format)
-        for (const [jid, entry] of contactMap) {
-          if (!jid.endsWith("@s.whatsapp.net")) continue;
-          const cusJid = jid.replace("@s.whatsapp.net", "@c.us");
-          const cusEntry = contactMap.get(cusJid);
-          if (cusEntry) {
-            if (!cusEntry.name && entry.name) cusEntry.name = entry.name;
-          } else {
-            contactMap.set(cusJid, { jid: cusJid, name: entry.name, isGroup: entry.isGroup });
-          }
-          contactMap.delete(jid);
-        }
-
-        // Merge @lid entries into their @c.us counterparts using the LID map
-        for (const [jid, entry] of contactMap) {
-          if (!jid.endsWith("@lid")) continue;
-          const cusJid = lidToCus.get(jid);
-          if (cusJid) {
-            const cusEntry = contactMap.get(cusJid);
-            if (cusEntry) {
-              if (!cusEntry.name && entry.name) cusEntry.name = entry.name;
-            } else {
-              contactMap.set(cusJid, { jid: cusJid, name: entry.name, isGroup: false });
-            }
-          }
-          contactMap.delete(jid);
-        }
-
-        // Filter out any remaining @lid and @s.whatsapp.net entries
-        const filteredEntries = [...contactMap.values()].filter((e) => !e.jid.endsWith("@lid") && !e.jid.endsWith("@s.whatsapp.net"));
-        const mappedContacts = filteredEntries.filter((e) => !e.isGroup);
-        const mappedGroups = filteredEntries.filter((e) => e.isGroup);
-        const imported = db.bulkUpsertContacts(filteredEntries);
-
-        // Merge existing @lid and @s.whatsapp.net DB entries into their @c.us counterparts.
-        // getContacts() filters these out at SQL level (AP-02 fix), so we use getOrphanedLidEntries()
-        // to explicitly fetch only the ghost JID entries that need merging.
-        // DO NOT CHANGE — getContacts() never returns @lid/@s.whatsapp.net entries so the old
-        // db.getContacts({ limit: 10000 }) call was dead code.
-        let lidsMerged = 0;
-        try {
-          const orphanedEntries = db.getOrphanedLidEntries();
-          for (const c of orphanedEntries) {
-            if (c.jid.endsWith("@lid")) {
-              const cusJid = lidToCus.get(c.jid);
-              if (cusJid) {
-                db.mergeContacts(c.jid, cusJid);
-                lidsMerged++;
-              }
-            } else if (c.jid.endsWith("@s.whatsapp.net")) {
-              const cusJid = c.jid.replace("@s.whatsapp.net", "@c.us");
-              db.mergeContacts(c.jid, cusJid);
-              lidsMerged++;
-            }
-          }
-        } catch (mergeErr) {
-          console.warn(`[waha] LID merge partially failed: ${String(mergeErr)}`);
-        }
-
-        // Participants are loaded lazily when user clicks a group (not during bulk refresh)
-
-        // Second pass: resolve names for contacts/newsletters that still have no display_name
-        let namesResolved = 0;
-        try {
-          // Resolve nameless contacts via WAHA contacts API
-          const allContacts = db.getContacts({ limit: 5000, type: "contact" });
-          const namelessContacts = allContacts.filter((c) => !c.displayName && !c.jid.endsWith("@lid"));
-          const BATCH_SIZE = 5;
-          for (let i = 0; i < namelessContacts.length; i += BATCH_SIZE) {
-            const batch = namelessContacts.slice(i, i + BATCH_SIZE);
-            const results = await Promise.allSettled(
-              batch.map((c) =>
-                rateLimiter.run(() =>
-                  getWahaContact({ cfg: opts.config, contactId: c.jid, accountId: opts.accountId })
-                    .then((result) => ({ jid: c.jid, result: result as Record<string, unknown> }))
-                )
-              ),
-            );
-            for (const r of results) {
-              if (r.status !== "fulfilled") continue;
-              const { jid, result } = r.value;
-              const resolvedName =
-                (result.name as string) || (result.pushName as string) || (result.pushname as string) || undefined;
-              if (resolvedName) {
-                db.upsertContact(jid, resolvedName, false);
-                namesResolved++;
-              }
-            }
-            // Delay between batches for proper rate limiting
-            if (i + BATCH_SIZE < namelessContacts.length) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-          }
-
-          // Resolve nameless newsletters via WAHA channels API
-          const allNewsletters = db.getContacts({ limit: 5000, type: "newsletter" });
-          const namelessNewsletters = allNewsletters.filter((c) => !c.displayName);
-          for (let i = 0; i < namelessNewsletters.length; i += BATCH_SIZE) {
-            const batch = namelessNewsletters.slice(i, i + BATCH_SIZE);
-            const results = await Promise.allSettled(
-              batch.map((c) =>
-                rateLimiter.run(() =>
-                  getWahaNewsletter({ cfg: opts.config, newsletterId: c.jid, accountId: opts.accountId })
-                    .then((result) => ({ jid: c.jid, result }))
-                )
-              ),
-            );
-            for (const r of results) {
-              if (r.status !== "fulfilled") continue;
-              const { jid, result } = r.value;
-              if (!result) continue;
-              const resolvedName =
-                (result.name as string) || (result.subject as string) || (result.title as string) || undefined;
-              if (resolvedName) {
-                db.upsertContact(jid, resolvedName, false);
-                namesResolved++;
-              }
-            }
-            if (i + BATCH_SIZE < namelessNewsletters.length) {
-              await new Promise((resolve) => setTimeout(resolve, 500));
-            }
-          }
-        } catch (err) {
-          console.warn(`[waha] per-contact name resolution partially failed: ${String(err)}`);
-        }
-
+        triggerImmediateSync(opts.accountId);
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ imported, contacts: mappedContacts.length, groups: mappedGroups.length, participants: 0, namesResolved, lidsMerged }));
+        res.end(JSON.stringify({ triggered: true, message: "Sync triggered" }));
       } catch (err) {
-        console.error(`[waha] directory refresh failed: ${String(err)}`);
+        console.error(`[waha] sync trigger failed: ${String(err)}`);
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;

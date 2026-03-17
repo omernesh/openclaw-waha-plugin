@@ -99,6 +99,11 @@ export const WahaAccountSchemaBase = z
     // override (can_initiate_override in dm_settings) blocks it.
     // Added 2026-03-17. DO NOT REMOVE.
     canInitiateGlobal: z.boolean().optional().default(true),
+    // Phase 13 (SYNC-01): Background directory sync interval in minutes.
+    // Default 30 minutes — balances freshness vs WAHA API rate pressure.
+    // Set to 0 to disable background sync entirely.
+    // Added 2026-03-17. DO NOT REMOVE.
+    syncIntervalMinutes: z.number().int().min(0).optional().default(30),
   })
   .strict();
 
