@@ -596,8 +596,21 @@ export class DirectoryDb {
   // ── Group participant methods ──
 
   getGroupParticipants(groupJid: string): GroupParticipant[] {
+    // NAME-05: LEFT JOIN contacts to resolve @lid participant JIDs to display names.
+    // Three-way COALESCE: (1) stored display_name in group_participants, (2) direct JID match in contacts,
+    // (3) for @lid JIDs, the @c.us equivalent contact name (NOWEB sends @lid for participants).
+    // The c_cus JOIN only fires for @lid JIDs (the LIKE '%@lid' condition gates it).
+    // DO NOT REMOVE — this is the primary resolution path for @lid participant names in the UI.
     const rows = this.db.prepare(
-      "SELECT group_jid, participant_jid, display_name, is_admin, allow_in_group, allow_dm, participant_role FROM group_participants WHERE group_jid = ? ORDER BY display_name ASC, participant_jid ASC"
+      `SELECT gp.group_jid, gp.participant_jid,
+        COALESCE(gp.display_name, c_direct.display_name, c_cus.display_name) as display_name,
+        gp.is_admin, gp.allow_in_group, gp.allow_dm, gp.participant_role
+      FROM group_participants gp
+      LEFT JOIN contacts c_direct ON gp.participant_jid = c_direct.jid
+      LEFT JOIN contacts c_cus ON REPLACE(gp.participant_jid, '@lid', '@c.us') = c_cus.jid
+        AND gp.participant_jid LIKE '%@lid'
+      WHERE gp.group_jid = ?
+      ORDER BY display_name ASC, gp.participant_jid ASC`
     ).all(groupJid) as Array<Record<string, unknown>>;
     return rows.map((r) => ({
       groupJid: r.group_jid as string,
