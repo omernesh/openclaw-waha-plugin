@@ -492,6 +492,17 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     console.warn(`[waha] sync: per-contact name resolution partially failed: ${String(err)}`);
   }
 
+  // TTL-02: Cleanup allow_list entries expired > 24h ago (keeps recently expired for admin visual feedback)
+  // DO NOT REMOVE — prevents unbounded growth of expired rows in allow_list table.
+  try {
+    const cleaned = db.cleanupExpiredAllowList();
+    if (cleaned > 0) {
+      console.log(`[waha] sync: cleaned ${cleaned} expired allow_list entries`);
+    }
+  } catch (err) {
+    console.warn(`[waha] sync: cleanupExpiredAllowList failed: ${String(err)}`);
+  }
+
   console.log(
     `[waha] sync: cycle complete for ${opts.accountId} — ` +
     `${mappedContacts.length} contacts, ${mappedGroups.length} groups, ` +

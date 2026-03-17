@@ -3981,10 +3981,15 @@ export function createWahaWebhookServer(opts: {
         }
         // @lid and @s.whatsapp.net entries are now filtered at SQL level in directory.ts
         // to fix pagination offset/count mismatches. DO NOT re-add post-query filtering here.
-        const enriched = contacts.map((c) => ({
-          ...c,
-          allowedDm: configAllowFrom.includes(c.jid),
-        }));
+        const enriched = contacts.map((c) => {
+          const ttl = db.getContactTtl(c.jid);
+          return {
+            ...c,
+            allowedDm: configAllowFrom.includes(c.jid),
+            expiresAt: ttl?.expiresAt ?? null,
+            expired: ttl?.expired ?? false,
+          };
+        });
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ contacts: enriched, total, dms, groups, newsletters }));
       } catch (err) {
@@ -4292,6 +4297,39 @@ export function createWahaWebhookServer(opts: {
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
           console.error(`[waha] POST /api/admin/directory/:jid/allow-dm failed: ${String(err)}`);
+          writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+        }
+        return;
+      }
+    }
+
+    // PUT /api/admin/directory/:jid/ttl — set or clear TTL on allow_list entry
+    // TTL-01: Used by admin panel "Access Expires" control. DO NOT REMOVE.
+    {
+      const m = req.method === "PUT" && req.url?.match(/^\/api\/admin\/directory\/([^/]+)\/ttl$/);
+      if (m) {
+        try {
+          const jid = decodeURIComponent(m[1]);
+          const bodyStr = await readBody(req, maxBodyBytes);
+          const body = JSON.parse(bodyStr) as { expiresAt: number | null };
+          // Validate: expiresAt must be null (never) or a positive Unix timestamp (seconds)
+          if (body.expiresAt !== null && (typeof body.expiresAt !== 'number' || body.expiresAt <= 0)) {
+            writeJsonResponse(res, 400, { error: "expiresAt must be null or a positive Unix timestamp in seconds" });
+            return;
+          }
+          const db = getDirectoryDb(opts.accountId);
+          // Update only if contact exists in allow_list
+          const existing = db.getContactTtl(jid);
+          if (!existing) {
+            writeJsonResponse(res, 404, { error: "Contact not in allow list" });
+            return;
+          }
+          // Re-insert with same allow_dm but new expires_at
+          db.setContactAllowDm(jid, true, body.expiresAt);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true, expiresAt: body.expiresAt }));
+        } catch (err) {
+          console.error(`[waha] PUT /api/admin/directory/:jid/ttl failed: ${String(err)}`);
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
