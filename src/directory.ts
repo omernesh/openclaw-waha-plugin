@@ -538,6 +538,26 @@ export class DirectoryDb {
     return row?.cus ?? null;
   }
 
+  /**
+   * LID-SYNC: Get @c.us JIDs from allow_list and group_participants (allow_dm=1)
+   * that do NOT already have an entry in lid_mapping.
+   * Used by sync.ts to call the WAHA phone-to-LID API only for contacts that matter
+   * (i.e., those in Access Control) and only when we don't already have their mapping.
+   * DO NOT CHANGE — this is the targeted query that keeps LID sync efficient.
+   */
+  getCusJidsMissingLidMapping(): string[] {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT jid FROM (
+        SELECT jid FROM allow_list WHERE allow_dm = 1 AND jid LIKE '%@c.us'
+          AND (expires_at IS NULL OR expires_at > strftime('%s','now'))
+        UNION
+        SELECT participant_jid AS jid FROM group_participants WHERE allow_dm = 1 AND participant_jid LIKE '%@c.us'
+      )
+      WHERE jid NOT IN (SELECT cus FROM lid_mapping)
+    `).all() as Array<{ jid: string }>;
+    return rows.map(r => r.jid);
+  }
+
   getContactDmSettings(jid: string): ContactDmSettings {
     const row = this.db
       .prepare("SELECT mode, mention_only, custom_keywords, can_initiate, can_initiate_override FROM dm_settings WHERE jid = ?")

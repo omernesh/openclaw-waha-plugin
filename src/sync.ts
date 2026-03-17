@@ -16,7 +16,7 @@ import { homedir } from "node:os";
 import { getDirectoryDb } from "./directory.js";
 import {
   getWahaChats, getWahaContacts, getWahaGroups, getWahaAllLids,
-  getWahaChannels, getWahaContact, getWahaNewsletter, toArr
+  getWahaChannels, getWahaContact, getWahaNewsletter, findWahaLidByPhone, toArr
 } from "./send.js";
 import type { CoreConfig } from "./types.js";
 
@@ -31,8 +31,8 @@ export interface SyncState {
   lastSyncAt: number | null;
   lastSyncDuration: number | null;
   itemsSynced: number;
-  /** Which phase the sync cycle is currently in: "contacts" | "groups" | "newsletters" | "names" | null */
-  currentPhase: "contacts" | "groups" | "newsletters" | "names" | null;
+  /** Which phase the sync cycle is currently in: "contacts" | "groups" | "newsletters" | "names" | "lids" | null */
+  currentPhase: "contacts" | "groups" | "newsletters" | "names" | "lids" | null;
   lastError: string | null;
 }
 
@@ -381,6 +381,57 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
 
   if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length;
 
+  // ── Phase 1b: LID resolution via phone-to-LID API ──────────────────
+  // LID-SYNC: The bulk /contacts/lids endpoint returns empty on NOWEB engine.
+  // Instead, we call the per-phone /contacts/lids/phone/{phone} API for each
+  // allowed @c.us contact that doesn't already have a lid_mapping entry.
+  // This is scoped to allow_list + group_participants (allow_dm=1) only —
+  // we don't need LID mappings for contacts that aren't in Access Control.
+  // DO NOT CHANGE — this is the only reliable way to build LID mappings on NOWEB.
+  state.currentPhase = "lids";
+  let lidsResolved = 0;
+  try {
+    const missingLidJids = db.getCusJidsMissingLidMapping();
+    if (missingLidJids.length > 0) {
+      const LID_BATCH_SIZE = 3;
+      for (let i = 0; i < missingLidJids.length; i += LID_BATCH_SIZE) {
+        const batch = missingLidJids.slice(i, i + LID_BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map((cusJid) => {
+            // Extract phone number from @c.us JID (e.g., "972544329000@c.us" → "972544329000")
+            const phone = cusJid.replace("@c.us", "");
+            return rateLimiter.run(() =>
+              findWahaLidByPhone({ cfg: opts.config, phone, accountId: opts.accountId })
+                .then((result) => ({ cusJid, result: result as Record<string, unknown> }))
+            );
+          })
+        );
+        for (const r of results) {
+          if (r.status !== "fulfilled") continue;
+          const { cusJid, result } = r.value;
+          // WAHA returns { lid: "271862907039996@lid" } or similar
+          const lid = String(result?.lid ?? result?.id ?? "");
+          if (lid && lid.endsWith("@lid")) {
+            db.upsertLidMapping(lid, cusJid);
+            lidsResolved++;
+          }
+        }
+        // Delay between batches
+        if (i + LID_BATCH_SIZE < missingLidJids.length) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          if (opts.abortSignal.aborted) break;
+        }
+      }
+      if (lidsResolved > 0) {
+        console.log(`[waha] sync: resolved ${lidsResolved} LID mappings via phone-to-LID API`);
+      }
+    }
+  } catch (lidErr) {
+    console.warn(`[waha] sync: phone-to-LID resolution failed: ${String(lidErr)}`);
+  }
+
+  if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length;
+
   // ── Phase 2: Newsletters ────────────────────────────────────────────
   state.currentPhase = "newsletters";
 
@@ -515,7 +566,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     `[waha] sync: cycle complete for ${opts.accountId} — ` +
     `${mappedContacts.length} contacts, ${mappedGroups.length} groups, ` +
     `${newsletterCount} newsletters, ${namesResolved} names resolved, ` +
-    `${lidsMerged} LIDs merged (${imported} upserted)`
+    `${lidsMerged} LIDs merged, ${lidsResolved} LIDs from phone API (${imported} upserted)`
   );
 
   return mappedContacts.length + mappedGroups.length + newsletterCount + namesResolved;
