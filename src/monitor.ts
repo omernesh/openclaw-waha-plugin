@@ -2775,6 +2775,7 @@ function buildContactCard(c) {
     cbEl.type = 'checkbox';
     cbEl.style.cssText = 'margin-right:8px;width:18px;height:18px;accent-color:#1d4ed8;vertical-align:middle;flex-shrink:0;';
     cbEl.checked = bulkSelectedJids.has(c.jid);
+    if (cbEl.checked) cbEl.setAttribute('checked', '');
     cbEl.setAttribute('onclick', 'event.stopPropagation();toggleBulkItem(' + JSON.stringify(c.jid) + ',this)');
     var tempDiv = document.createElement('div');
     tempDiv.appendChild(cbEl);
@@ -3023,7 +3024,7 @@ async function setParticipantRole(groupJid, participantJid, role, prevRole, sele
     if (!d.ok) throw new Error(d.error || 'Participant not found — refresh participants first');
 
     var isPromotion = role === 'bot_admin' || role === 'manager';
-    var wasPrevileged = prevRole === 'bot_admin' || prevRole === 'manager';
+    var wasPrivileged = prevRole === 'bot_admin' || prevRole === 'manager';
 
     if (isPromotion) {
       // DIR-04: Auto-grant Allow (group) + Allow DM on promotion to bot_admin/manager
@@ -3047,7 +3048,7 @@ async function setParticipantRole(groupJid, participantJid, role, prevRole, sele
       } catch(autoErr) {
         showToast('Role updated. Auto-grant failed: ' + autoErr.message, true);
       }
-    } else if (wasPrevileged && role === 'participant') {
+    } else if (wasPrivileged && role === 'participant') {
       // DIR-04: Auto-revoke Allow DM on demotion to participant (group Allow kept as-is)
       try {
         await fetch('/api/admin/directory/' + encodeURIComponent(participantJid) + '/allow-dm', {

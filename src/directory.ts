@@ -418,7 +418,7 @@ export class DirectoryDb {
     const now = Date.now();
     const insert = this.db.prepare(
       `INSERT INTO contacts (jid, display_name, first_seen_at, last_message_at, message_count, is_group)
-       VALUES (?, ?, ?, ?, 0, ?)
+       VALUES (?, ?, ?, ?, 1, ?)
        ON CONFLICT(jid) DO UPDATE SET
          display_name = COALESCE(excluded.display_name, contacts.display_name),
          is_group = excluded.is_group`,
@@ -855,6 +855,8 @@ export class DirectoryDb {
       this.db.prepare("DELETE FROM group_participants WHERE participant_jid = ?").run(jid);
       // Also clean up group_participants rows where this JID is the group itself (prevents orphaned rows)
       this.db.prepare("DELETE FROM group_participants WHERE group_jid = ?").run(jid);
+      // Also clean up group_filter_overrides where this JID is the group (prevents orphaned filter rows)
+      this.db.prepare("DELETE FROM group_filter_overrides WHERE group_jid = ?").run(jid);
       this.db.prepare("DELETE FROM contacts WHERE jid = ?").run(jid);
     })();
   }
