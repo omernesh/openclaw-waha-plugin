@@ -406,6 +406,40 @@ export async function handleWahaInbound(params: {
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
 
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  LID-TO-CUS MAPPING CAPTURE — DO NOT CHANGE                       ║
+  // ║                                                                    ║
+  // ║  NOWEB engine sends @lid as participant but chatId is still @c.us  ║
+  // ║  for DMs. The WAHA /contacts/lids API returns 400 on NOWEB, so    ║
+  // ║  this inbound capture is the PRIMARY source of LID mappings.       ║
+  // ║                                                                    ║
+  // ║  DM case:  chatId=972xxx@c.us, senderId=271xxx@lid → direct map   ║
+  // ║  Group case: senderId=271xxx@lid, _data.author=972xxx@c.us → map  ║
+  // ║                                                                    ║
+  // ║  Non-fatal — errors silently caught. Runs before any filters so   ║
+  // ║  we capture mappings even for messages that get dropped later.     ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  if (senderId.endsWith("@lid")) {
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      if (!isGroup && chatId.endsWith("@c.us")) {
+        // DM: chatId IS the sender's @c.us JID
+        dirDb.upsertLidMapping(senderId, chatId);
+        runtime.log?.(`[waha] lid-map: ${senderId} → ${chatId} (from DM chatId)`);
+      } else if (isGroup) {
+        // Group: check _data.author or _data.from for @c.us JID
+        const _lidData = (rawPayload as Record<string, unknown> | undefined)?._data as Record<string, unknown> | undefined;
+        const authorCus =
+          (typeof _lidData?.author === "string" && _lidData.author.endsWith("@c.us") ? _lidData.author : null)
+          ?? (typeof _lidData?.from === "string" && _lidData.from.endsWith("@c.us") ? _lidData.from : null);
+        if (authorCus) {
+          dirDb.upsertLidMapping(senderId, authorCus);
+          runtime.log?.(`[waha] lid-map: ${senderId} → ${authorCus} (from group _data)`);
+        }
+      }
+    } catch { /* non-fatal — LID mapping is best-effort */ }
+  }
+
   // === Slash command detection (regex-based, NOT LLM-dependent) ===
   // Must run BEFORE mute check, dedup, trigger, and keyword filters.
   // /shutup and /unshutup commands bypass all filters to work even when muted.
