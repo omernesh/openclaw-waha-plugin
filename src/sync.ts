@@ -268,6 +268,15 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     }
   }
 
+  // NAME-01: Persist LID-to-@c.us mapping to SQLite so resolveJids() and getContact()
+  // can resolve @lid JIDs to their @c.us display names. The @lid number is completely
+  // different from the @c.us number — this mapping is the ONLY way to bridge them.
+  // DO NOT CHANGE — without this, @lid name resolution returns empty results.
+  const lidMappings = Array.from(lidToCus.entries()).map(([lid, cus]) => ({ lid, cus }));
+  if (lidMappings.length > 0) {
+    db.bulkUpsertLidMappings(lidMappings);
+  }
+
   // Build contact map from chats (primary source — always works on NOWEB)
   const contactMap = new Map<string, { jid: string; name?: string; isGroup: boolean }>();
   for (const c of chatsArr) {
