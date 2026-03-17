@@ -285,6 +285,32 @@ export class DirectoryDb {
       );
     `);
 
+    // NAME-01: LID-to-@c.us mapping table. Populated by sync.ts from WAHA's /contacts/lids endpoint.
+    // Used by resolveJids() and getContact() to resolve @lid JIDs to their @c.us display names.
+    // The @lid number (e.g., 271862907039996) is completely different from the @c.us number
+    // (e.g., 972544329000) — simple string replacement does NOT work. DO NOT CHANGE.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS lid_mapping (
+        lid TEXT PRIMARY KEY,
+        cus TEXT NOT NULL
+      );
+    `);
+
+    // FTS5 auto-repair: check integrity on startup, rebuild if corrupted
+    // DO NOT REMOVE — prevents "database disk image is malformed" errors after unclean shutdowns
+    try {
+      this.db.exec("INSERT INTO contacts_fts(contacts_fts) VALUES('integrity-check')");
+    } catch {
+      // FTS5 index corrupted — rebuild it
+      console.warn('[waha] [directory] FTS5 index corrupted, rebuilding...');
+      try {
+        this.db.exec("INSERT INTO contacts_fts(contacts_fts) VALUES('rebuild')");
+        console.warn('[waha] [directory] FTS5 index rebuilt successfully');
+      } catch (rebuildErr) {
+        console.error('[waha] [directory] FTS5 rebuild failed:', rebuildErr);
+      }
+    }
+
     // Phase 13 (SYNC-02): One-time FTS5 rebuild for databases created before FTS5 was added.
     // Only runs if the FTS table has fewer rows than contacts (i.e., triggers haven't populated it).
     // Safe on WAL mode — acquires write lock briefly, readers continue on snapshot. DO NOT REMOVE.
@@ -414,7 +440,22 @@ export class DirectoryDb {
       .get(jid) as Record<string, unknown> | undefined;
 
     if (!row) return null;
-    return this._rowToContact(row);
+    const contact = this._rowToContact(row);
+
+    // NAME-01: For @lid JIDs with no display name, try resolving via lid_mapping table.
+    // The @lid number is different from @c.us — we must look up the mapping to find the
+    // real @c.us JID and copy its display name. DO NOT CHANGE.
+    if (!contact.displayName && jid.endsWith("@lid")) {
+      const cusJid = this.resolveLidToCus(jid);
+      if (cusJid) {
+        const cusRow = this.db.prepare("SELECT display_name FROM contacts WHERE jid = ?").get(cusJid) as { display_name: string | null } | undefined;
+        if (cusRow?.display_name) {
+          contact.displayName = cusRow.display_name;
+        }
+      }
+    }
+
+    return contact;
   }
 
   /**
@@ -431,13 +472,18 @@ export class DirectoryDb {
     jids = jids.slice(0, 500);
 
     // Batch lookup: collect all JIDs to query (originals + @c.us fallbacks for @lid JIDs)
-    const lidToCs = new Map<string, string>(); // @lid -> @c.us equivalent
+    // NAME-01 FIX: Use lid_mapping table to find the REAL @c.us JID for @lid JIDs.
+    // The @lid number is completely different from the @c.us number — simple string
+    // replacement (e.g., replace('@lid','@c.us')) does NOT work. DO NOT CHANGE.
+    const lidToCs = new Map<string, string>(); // @lid -> real @c.us equivalent
     const allJidsToQuery = new Set<string>(jids);
     for (const jid of jids) {
       if (jid.endsWith("@lid")) {
-        const csJid = jid.replace("@lid", "@c.us");
-        lidToCs.set(jid, csJid);
-        allJidsToQuery.add(csJid);
+        const realCus = this.resolveLidToCus(jid);
+        if (realCus) {
+          lidToCs.set(jid, realCus);
+          allJidsToQuery.add(realCus);
+        }
       }
     }
 
@@ -467,6 +513,29 @@ export class DirectoryDb {
       }
     }
     return result;
+  }
+
+  // ── NAME-01: LID mapping methods ──────────────────────────────────
+  // Persist the LID-to-@c.us mapping from WAHA's /contacts/lids endpoint into SQLite.
+  // This is the ONLY reliable way to resolve @lid JIDs to display names, because the
+  // @lid number is completely different from the @c.us number (not a simple suffix swap).
+  // Called by sync.ts after building the lidToCus map. DO NOT CHANGE.
+
+  upsertLidMapping(lid: string, cus: string): void {
+    this.db.prepare("INSERT OR REPLACE INTO lid_mapping (lid, cus) VALUES (?, ?)").run(lid, cus);
+  }
+
+  bulkUpsertLidMappings(mappings: Array<{ lid: string; cus: string }>): void {
+    const stmt = this.db.prepare("INSERT OR REPLACE INTO lid_mapping (lid, cus) VALUES (?, ?)");
+    const tx = this.db.transaction((items: Array<{ lid: string; cus: string }>) => {
+      for (const m of items) stmt.run(m.lid, m.cus);
+    });
+    tx(mappings);
+  }
+
+  resolveLidToCus(lid: string): string | null {
+    const row = this.db.prepare("SELECT cus FROM lid_mapping WHERE lid = ?").get(lid) as { cus: string } | undefined;
+    return row?.cus ?? null;
   }
 
   getContactDmSettings(jid: string): ContactDmSettings {
