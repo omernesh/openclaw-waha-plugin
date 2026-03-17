@@ -77,11 +77,11 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### TTL Access
 
-- [ ] **TTL-01**: Contact/group settings card has "Access Expires" field with Never/datetime/duration options (FEATURE-02)
+- [x] **TTL-01**: Contact/group settings card has "Access Expires" field with Never/datetime/duration options (FEATURE-02)
 - [x] **TTL-02**: SQLite allow_list table has expires_at column with automatic expiry enforcement (FEATURE-02)
 - [x] **TTL-03**: Inbound filter checks expires_at before granting access — expired entries treated as blocked (FEATURE-02)
-- [ ] **TTL-04**: Admin panel shows remaining time on active TTL grants (FEATURE-02)
-- [ ] **TTL-05**: Expired entries visually marked in Directory (grayed out or badge) (FEATURE-02)
+- [x] **TTL-04**: Admin panel shows remaining time on active TTL grants (FEATURE-02)
+- [x] **TTL-05**: Expired entries visually marked in Directory (grayed out or badge) (FEATURE-02)
 
 ### Auto-Reply
 
@@ -172,11 +172,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAME-03 | Phase 14 | Complete |
 | NAME-04 | Phase 14 | Complete |
 | NAME-05 | Phase 14 | Complete |
-| TTL-01 | Phase 15 | Pending |
+| TTL-01 | Phase 15 | Complete |
 | TTL-02 | Phase 15 | Complete |
 | TTL-03 | Phase 15 | Complete |
-| TTL-04 | Phase 15 | Pending |
-| TTL-05 | Phase 15 | Pending |
+| TTL-04 | Phase 15 | Complete |
+| TTL-05 | Phase 15 | Complete |
 | PAIR-01 | Phase 16 | Pending |
 | PAIR-02 | Phase 16 | Pending |
 | PAIR-03 | Phase 16 | Pending |

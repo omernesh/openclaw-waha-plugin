@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-17T13:31:30.850Z"
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-03-17T13:41:58.561Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 40
 ---
 
@@ -76,6 +76,7 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 15-ttl-access]: TTL stored as Unix seconds matching SQLite strftime('%s','now') for direct query use
 - [Phase 15-ttl-access]: 24h grace period before expired allow_list rows deleted — keeps recently-expired visible in admin panel
 - [Phase 15-ttl-access]: PUT /ttl returns 404 if contact not in allow_list — cannot set TTL on non-existent entry
+- [Phase 15-ttl-access]: Access Expires dropdown fires immediately on change (no separate Save) — separate UX from DM settings Save button
 
 ### Pending Todos
 
@@ -89,6 +90,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T13:31:19.058Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-03-17T13:41:58.552Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None

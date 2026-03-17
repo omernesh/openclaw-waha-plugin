@@ -33,7 +33,7 @@ Full details: `.planning/milestones/v1.10-ROADMAP.md`
 - [x] **Phase 12: UI Bug Sprint** — Fix all standalone admin panel regressions and polish items (completed 2026-03-17)
 - [x] **Phase 13: Background Directory Sync** — Continuous WAHA-to-SQLite sync with local search (completed 2026-03-17)
 - [x] **Phase 14: Name Resolution** — Resolve @lid JIDs to display names throughout the UI (completed 2026-03-17)
-- [ ] **Phase 15: TTL Access** — Schema and infrastructure for auto-expiring allowlist entries
+- [x] **Phase 15: TTL Access** — Schema and infrastructure for auto-expiring allowlist entries (completed 2026-03-17)
 - [ ] **Phase 16: Pairing Mode and Auto-Reply** — Passcode-gated onboarding and canned rejection messages
 - [ ] **Phase 17: Modules Framework** — Bulk directory actions and extensible module system
 
@@ -146,6 +146,6 @@ Plans:
 | 12. UI Bug Sprint | 5/5 | Complete    | 2026-03-17 | - |
 | 13. Background Directory Sync | 2/2 | Complete    | 2026-03-17 | - |
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
-| 15. TTL Access | 1/2 | In Progress|  | - |
+| 15. TTL Access | 2/2 | Complete   | 2026-03-17 | - |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
 | 17. Modules Framework | v1.11 | 0/TBD | Not started | - |
