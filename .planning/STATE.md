@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 12-04-PLAN.md
-last_updated: "2026-03-17T01:38:49.494Z"
+stopped_at: Completed 12-05-PLAN.md
+last_updated: "2026-03-17T01:52:15.308Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 40
 ---
 
@@ -64,6 +64,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 12-ui-bug-sprint]: wrapRefreshButton pattern (12-03, 2026-03-17): wireRefreshBtn IIFE wires all 5 Refresh buttons with spinner + relative timestamp; extraSetup param handles per-tab pre-load logic
 - [Phase 12-ui-bug-sprint]: contact-card overflow:visible (12-03, 2026-03-17): changed from overflow:hidden so .tip::after tooltips escape card boundary; card layout is unaffected
 - [Phase 12-ui-bug-sprint]: Lazy tag input init in toggleContactSettings via customKeywordTagInputs registry; data-init-kw attribute seeds value from buildContactCard without extra API call (12-04, 2026-03-17)
+- [Phase 12-ui-bug-sprint]: Bot JID lookup via WAHA /me with 5-min cache (12-05, 2026-03-17): fetchBotJids() caches session->JID mapping to avoid per-request API calls while keeping data fresh for admin panel
+- [Phase 12-ui-bug-sprint]: Role auto-grant/revoke pattern (12-05, 2026-03-17): promote to bot_admin/manager auto-enables Allow+Allow DM; demote to participant auto-revokes Allow DM only (group Allow preserved)
 
 ### Pending Todos
 
@@ -77,6 +79,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T01:38:42.894Z
-Stopped at: Completed 12-04-PLAN.md
+Last session: 2026-03-17T01:52:15.304Z
+Stopped at: Completed 12-05-PLAN.md
 Resume file: None

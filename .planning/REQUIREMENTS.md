@@ -18,8 +18,8 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 - [x] **UI-07**: Contact settings drawer stays open after saving, shows success toast (BUG-09)
 - [x] **UI-08**: DM Policy dropdown removes "pairing (not available)" option; auto-migrates config if set (BUG-13)
 - [x] **UI-09**: Queue tab Refresh button shows spinner and "Last refreshed" timestamp (BUG-14)
-- [ ] **UI-10**: Per-group trigger operator visible even when inheriting global (grayed out with effective value) (BUG-17)
-- [ ] **UI-11**: Channels tab Allow DM button is a toggle with clear visual state and undo capability (BUG-18)
+- [x] **UI-10**: Per-group trigger operator visible even when inheriting global (grayed out with effective value) (BUG-17)
+- [x] **UI-11**: Channels tab Allow DM button is a toggle with clear visual state and undo capability (BUG-18)
 
 ### Dashboard Polish
 
@@ -55,10 +55,10 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### Directory UX
 
-- [ ] **DIR-01**: Directory excludes bot's own session JIDs from contact listing (CR-12)
-- [ ] **DIR-02**: Bot session participants shown in groups with "bot" badge but without action buttons (CR-14)
+- [x] **DIR-01**: Directory excludes bot's own session JIDs from contact listing (CR-12)
+- [x] **DIR-02**: Bot session participants shown in groups with "bot" badge but without action buttons (CR-14)
 - [ ] **DIR-03**: Contacts tab supports bulk select with checkboxes and bulk action toolbar (Allow DM, Revoke DM, Set Mode) (CR-15)
-- [ ] **DIR-04**: Promoting participant to Bot Admin/Manager auto-enables Allow and Allow DM (CR-16)
+- [x] **DIR-04**: Promoting participant to Bot Admin/Manager auto-enables Allow and Allow DM (CR-16)
 - [ ] **DIR-05**: Channels tab supports bulk select with checkboxes and bulk action toolbar (CR-17)
 
 ### Can Initiate Global Setting
@@ -145,8 +145,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-07 | Phase 12 | Complete |
 | UI-08 | Phase 12 | Complete |
 | UI-09 | Phase 12 | Complete |
-| UI-10 | Phase 12 | Pending |
-| UI-11 | Phase 12 | Pending |
+| UI-10 | Phase 12 | Complete |
+| UI-11 | Phase 12 | Complete |
 | DASH-01 | Phase 12 | Complete |
 | DASH-02 | Phase 12 | Complete |
 | DASH-03 | Phase 12 | Complete |
@@ -157,9 +157,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UX-04 | Phase 12 | Complete |
 | UX-05 | Phase 12 | Complete |
 | UX-06 | Phase 12 | Complete |
-| DIR-01 | Phase 12 | Pending |
-| DIR-02 | Phase 12 | Pending |
-| DIR-04 | Phase 12 | Pending |
+| DIR-01 | Phase 12 | Complete |
+| DIR-02 | Phase 12 | Complete |
+| DIR-04 | Phase 12 | Complete |
 | INIT-01 | Phase 12 | Complete |
 | INIT-02 | Phase 12 | Complete |
 | SYNC-01 | Phase 13 | Pending |
