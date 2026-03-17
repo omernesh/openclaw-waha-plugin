@@ -114,7 +114,12 @@ Plans:
   3. A wa.me deep link with an obfuscated token automatically authorizes a contact when they click it — zero manual passcode entry required
   4. Passcode brute-forcing is blocked — after 3 wrong attempts the contact is rate-limited for 30 minutes
   5. The admin panel shows active temporary grants with remaining TTL and a manual revoke button
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — Pairing engine, auto-reply engine, SQLite tables, config schema
+- [ ] 16-02-PLAN.md — Inbound pipeline wiring, engine initialization at login
+- [ ] 16-03-PLAN.md — Admin panel: Settings UI (pairing + auto-reply), Directory badges, revoke API
 
 ### Phase 17: Modules Framework
 **Goal**: The plugin is extensible — developers can register WhatsApp-specific modules that hook into the inbound pipeline, and admins can enable/disable them and assign them to chats from the admin panel
@@ -148,5 +153,5 @@ Plans:
 | 13. Background Directory Sync | 2/2 | Complete    | 2026-03-17 | - |
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
 | 15. TTL Access | 3/3 | Complete    | 2026-03-17 | - |
-| 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
+| 16. Pairing Mode and Auto-Reply | v1.11 | 0/3 | Not started | - |
 | 17. Modules Framework | v1.11 | 0/TBD | Not started | - |
