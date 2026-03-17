@@ -57,9 +57,9 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 - [x] **DIR-01**: Directory excludes bot's own session JIDs from contact listing (CR-12)
 - [x] **DIR-02**: Bot session participants shown in groups with "bot" badge but without action buttons (CR-14)
-- [ ] **DIR-03**: Contacts tab supports bulk select with checkboxes and bulk action toolbar (Allow DM, Revoke DM, Set Mode) (CR-15)
+- [x] **DIR-03**: Contacts tab supports bulk select with checkboxes and bulk action toolbar (Allow DM, Revoke DM, Set Mode) (CR-15)
 - [x] **DIR-04**: Promoting participant to Bot Admin/Manager auto-enables Allow and Allow DM (CR-16)
-- [ ] **DIR-05**: Channels tab supports bulk select with checkboxes and bulk action toolbar (CR-17)
+- [x] **DIR-05**: Channels tab supports bulk select with checkboxes and bulk action toolbar (CR-17)
 
 ### Can Initiate Global Setting
 
@@ -187,8 +187,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REPLY-02 | Phase 16 | Complete |
 | REPLY-03 | Phase 16 | Complete |
 | REPLY-04 | Phase 16 | Complete |
-| DIR-03 | Phase 17 | Pending |
-| DIR-05 | Phase 17 | Pending |
+| DIR-03 | Phase 17 | Complete |
+| DIR-05 | Phase 17 | Complete |
 | MOD-01 | Phase 17 | Complete |
 | MOD-02 | Phase 17 | Complete |
 | MOD-03 | Phase 17 | Pending |
