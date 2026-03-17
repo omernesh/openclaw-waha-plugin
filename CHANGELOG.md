@@ -2,6 +2,20 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.15.1] - 2026-03-17
+
+### Fixed
+- **Critical: Admin panel JS broken** — Template literal apostrophe in TTL tooltip (`contact\'s` → `contact\\'s`) prevented all JavaScript from loading.
+- **Critical: @lid name resolution** — LID API endpoints used wrong path (`/contacts/lids` → `/lids`). Now correctly fetches all LID-to-phone mappings from WAHA bulk endpoint. 101+ LID mappings populated per sync cycle.
+- **LID mapping persistence** — New `lid_mapping` SQLite table stores LID-to-@c.us mappings. `resolveJids()` and `getContact()` use it for @lid→name resolution. Also captured from inbound webhook messages.
+- **Sessions tab "Failed to fetch"** — Added `fetchWithRetry()` helper with 8s timeout + 1 automatic retry on all read-only admin panel fetches.
+- **FTS5 index corruption** — Auto-rebuild on startup if `integrity-check` fails. Prevents "database disk image is malformed" errors after unclean shutdowns.
+- **dmPolicy "pairing" stale config** — Live config on hpg6 updated from "pairing" to "allowlist".
+- **RateLimiter duplication** — Extracted to shared `src/rate-limiter.ts`, imported by both `sync.ts` and `monitor.ts`.
+
+### New Files
+- `src/rate-limiter.ts` — Shared rate limiter (extracted from monitor.ts)
+
 ## [1.15.0] - 2026-03-17
 
 ### Added
