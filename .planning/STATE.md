@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 16-03-PLAN.md
-last_updated: "2026-03-17T15:00:42.255Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-03-17T15:19:36.958Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 18
+  completed_plans: 17
   percent: 40
 ---
 
@@ -84,6 +84,10 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 16-pairing-mode-and-auto-reply]: verifyDeepLinkToken called with full messageText in inbound.ts -- function extracts its own regex; pre-extracted token would cause mismatch
 - [Phase 16-pairing-mode-and-auto-reply]: Extended getContactTtl return type to include source field — reuses existing per-contact query without a new DB method
 - [Phase 16-pairing-mode-and-auto-reply]: hmacSecret excluded from frontend config save — managed server-side only, never round-trips through browser
+- [Phase 17-modules-framework]: message.messageId used in ModuleContext (not message.id?.id) — WahaInboundMessage uses messageId directly
+- [Phase 17-modules-framework]: ModuleRegistry singleton pattern: getModulesForChat returns [] fast when no modules registered — zero-cost for deployments that don't use modules
+- [Phase 17-modules-framework]: Bulk checkbox in buildContactCard was already present from prior DIR-04 work; plan 17-02 only wired toolbar and tab-reload logic
+- [Phase 17-modules-framework]: Follow/unfollow bulk actions call WAHA channels API directly from server; no DB state change, partial success count returned
 
 ### Pending Todos
 
@@ -97,6 +101,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T14:55:32.264Z
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-03-17T15:19:36.954Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None

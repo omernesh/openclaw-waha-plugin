@@ -159,4 +159,4 @@ Plans:
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
 | 15. TTL Access | 3/3 | Complete    | 2026-03-17 | - |
 | 16. Pairing Mode and Auto-Reply | 3/3 | Complete    | 2026-03-17 | - |
-| 17. Modules Framework | v1.11 | 0/3 | Not started | - |
+| 17. Modules Framework | 2/3 | In Progress|  | - |
