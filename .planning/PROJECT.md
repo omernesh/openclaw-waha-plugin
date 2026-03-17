@@ -2,28 +2,11 @@
 
 ## What This Is
 
-A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with an embedded admin panel for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies.
+A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with an embedded admin panel for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies. v1.11 adds background directory sync with FTS5 full-text search, name resolution for @lid JIDs across all admin panel surfaces, TTL-based auto-expiring access for contacts and groups, passcode-gated pairing mode with wa.me deep links, an auto-reply system for unauthorized DMs, and a modules framework with admin panel integration.
 
 ## Core Value
 
 Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-
-## Current Milestone: v1.11 Polish, Sync & Features
-
-**Goal:** Fix all bugs and CRs from v1.10 human verification, implement background directory sync, and add pairing mode, TTL access, auto-reply, and modules system.
-
-**Target features:**
-- Name resolution across all UI (dashboard, settings, directory, participants)
-- Background WAHA→SQLite directory sync with local search
-- Dashboard polish (per-session stats, collapsible cards, human-readable labels)
-- Sessions tab UX (role change, labels, restart handling)
-- Consistent tag-style inputs throughout settings
-- Directory UX (search fix, tooltips, bulk edit, channels, pagination)
-- Refresh button feedback across all tabs
-- Pairing mode (passcode-gated temporary access with wa.me deep links)
-- TTL-based access for contacts and groups
-- Auto-reply canned message to unauthorized DMs
-- Modules system with admin panel tab
 
 ## Requirements
 
@@ -66,22 +49,22 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Admin panel: logs tab with live tail and level filtering — v1.10
 - ✓ Admin panel: shared UI component library (Button, Badge, Modal, Toast, Table, Form) — v1.10
 - ✓ Admin panel: security hardening (textContent only, no innerHTML, input sanitization) — v1.10
+- ✓ Background directory sync (WAHA→SQLite) with FTS5 full-text search — v1.11
+- ✓ Name resolution for @lid JIDs across dashboard, settings, directory, participants — v1.11
+- ✓ Dashboard polish (per-session stats, collapsible cards, human-readable labels) — v1.11
+- ✓ Sessions tab UX improvements (optimistic role save, 502 overlay, labels) — v1.11
+- ✓ Consistent tag-style inputs throughout settings (custom keywords, mention patterns, group overrides) — v1.11
+- ✓ Directory UX (search fix, tooltips, bulk edit, pagination, bot exclusion) — v1.11
+- ✓ Refresh button feedback across all tabs — v1.11
+- ✓ Can Initiate global setting with per-contact override — v1.11
+- ✓ TTL-based auto-expiring access for contacts and groups — v1.11
+- ✓ Pairing mode (passcode-gated temporary access with wa.me deep links) — v1.11
+- ✓ Auto-reply canned message to unauthorized DMs — v1.11
+- ✓ Modules system with admin panel tab and module framework — v1.11
 
 ### Active
 
-<!-- v1.11 — bugs, CRs, and features from human verification -->
-
-- [ ] Fix name resolution for @lid JIDs across dashboard, settings, directory, participants
-- [ ] Background directory sync (WAHA→SQLite) with local search
-- [ ] Dashboard per-session stats, collapsible cards, human-readable labels, flicker fix
-- [ ] Sessions tab role change UX, labels, 502 restart handling
-- [ ] Consistent tag-style inputs (custom keywords, mention patterns, group override keywords)
-- [ ] Directory search fix, tooltip clipping, drawer persistence, pagination, bulk edit
-- [ ] Refresh button visual feedback across all tabs
-- [ ] Pairing mode — passcode-gated temporary access with wa.me deep links
-- [ ] TTL-based auto-expiring access for contacts and groups
-- [ ] Auto-reply canned message to unauthorized DMs
-- [ ] Modules system with admin panel tab and module framework
+- [ ] F2: Inbound group events (join/leave/promote/demote)
 
 ### Out of Scope
 
@@ -97,7 +80,7 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 ## Context
 
 - **Runtime**: TypeScript on Node.js, deployed to hpg6 Linux server
-- **Codebase**: 13,026 LOC TypeScript (33 source files), 5,619 LOC tests (29 files), 313 passing tests
+- **Codebase**: 13,026+ LOC TypeScript (38+ source files including v1.11 additions: sync.ts, pairing.ts, auto-reply.ts, module-registry.ts, module-types.ts), 5,619+ LOC tests, 313+ passing tests
 - **WAHA Engine**: NOWEB (has known limitations — poll.vote <5% capture, contacts API needs store.enabled)
 - **Gateway**: OpenClaw at `/usr/lib/node_modules/openclaw/dist/` — READ-ONLY, not ours
 - **Sessions**: `3cf11776_logan` (bot), `3cf11776_omer` (Omer/human)
@@ -137,6 +120,12 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | Shared UI component library in admin panel | Eliminates duplication, consistent styling, single place to harden | ✓ Good |
 | textContent only (no innerHTML) in admin panel | Eliminates XSS attack surface on all dynamic content | ✓ Good |
 | Rules enforcement at inbound/outbound layer (not action handler) | Policies apply uniformly regardless of action type | ✓ Good |
+| FTS5 for directory search | Instant local full-text search without WAHA API round-trips | ✓ Good |
+| setTimeout chain for background sync (not setInterval) | Prevents sync pile-up when syncs take longer than interval | ✓ Good |
+| SQLite-level TTL enforcement (expires_at WHERE clause) | Access expiry checked at query time, no background reaper needed | ✓ Good |
+| HMAC-SHA256 deep link tokens (one-use, verifiable without DB) | Stateless token verification for pairing mode, no token table needed | ✓ Good |
+| Module hooks after fromMe+dedup+pairing (pipeline ordering) | Modules only see validated, deduplicated, authorized messages | ✓ Good |
+| Can Initiate enforcement via message_count check | Distinguishes first contact (initiation) from ongoing replies | ✓ Good |
 
 ---
-*Last updated: 2026-03-17 after v1.11 milestone start*
+*Last updated: 2026-03-17 after v1.11 milestone*

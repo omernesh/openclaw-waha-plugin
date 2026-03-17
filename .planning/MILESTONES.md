@@ -1,5 +1,14 @@
 # Milestones
 
+## v1.11 Polish, Sync & Features (Shipped: 2026-03-17)
+
+**Phases completed:** 6 phases, 18 plans, 6 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
 ## v1.10 Admin Panel & Multi-Session (Shipped: 2026-03-16)
 
 **Phases:** 11 | **Plans:** 28 | **Timeline:** 6 days (2026-03-11 → 2026-03-16)
