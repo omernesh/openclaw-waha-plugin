@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 15-03-PLAN.md
-last_updated: "2026-03-17T14:17:33.149Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-03-17T14:45:06.587Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 15
+  completed_plans: 13
   percent: 40
 ---
 
@@ -78,6 +78,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 15-ttl-access]: PUT /ttl returns 404 if contact not in allow_list — cannot set TTL on non-existent entry
 - [Phase 15-ttl-access]: Access Expires dropdown fires immediately on change (no separate Save) — separate UX from DM settings Save button
 - [Phase 15-ttl-access]: TTL-03 config sync runs before TTL-02 24h cleanup — expired JIDs must be in SQLite when syncExpiredToConfig reads them
+- [Phase 16-pairing-mode-and-auto-reply]: PairingEngine uses DirectoryDb public API methods (not private db cast) to avoid TypeScript errors
+- [Phase 16-pairing-mode-and-auto-reply]: HMAC tokens are stateless 12-char hex tokens: hmac(jid, hmacSecret).slice(0,12) — no DB lookup on verify
 
 ### Pending Todos
 
@@ -91,6 +93,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T14:07:57.370Z
-Stopped at: Completed 15-03-PLAN.md
+Last session: 2026-03-17T14:45:06.582Z
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
