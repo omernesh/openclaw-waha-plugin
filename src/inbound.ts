@@ -41,6 +41,10 @@ import { SHUTUP_RE, checkShutupAuthorization, handleShutupCommand, checkPendingS
 // Imported for local use and re-exported so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
 import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
 export { detectTriggerWord, resolveTriggerTarget };
+// Phase 16 Plan 02: Pairing challenge + auto-reply engines for unauthorized DMs.
+// DO NOT REMOVE — imported for inbound pipeline hooks added below. Added 2026-03-17.
+import { getPairingEngine } from "./pairing.js";
+import { getAutoReplyEngine } from "./auto-reply.js";
 
 const CHANNEL_ID = "waha" as const;
 
@@ -569,6 +573,183 @@ export async function handleWahaInbound(params: {
   }
 
   statusSink?.({ lastInboundAt: message.timestamp });
+
+  // ======================================================================
+  // Phase 16: Custom pairing challenge + auto-reply for unauthorized DMs
+  // Pipeline position: after fromMe+dedup+trigger, before DM policy check.
+  // Only fires for DMs (not groups), non-trigger messages from unknown contacts.
+  // DO NOT MOVE -- must run before gateway's built-in pairing/access check below.
+  // Added 2026-03-17. DO NOT CHANGE.
+  // ======================================================================
+  if (!isGroup && !triggerActivated) {
+    const accountConfig = account.config as Record<string, unknown>;
+    const pairingConfig = (accountConfig.pairingMode ?? {}) as {
+      enabled?: boolean;
+      passcode?: string;
+      grantTtlMinutes?: number;
+      challengeMessage?: string;
+      hmacSecret?: string;
+    };
+    const autoReplyConfig = (accountConfig.autoReply ?? {}) as {
+      enabled?: boolean;
+      message?: string;
+      intervalMinutes?: number;
+    };
+
+    // Check if sender is already allowed (skip pairing/auto-reply for allowed contacts)
+    const dirDb = getDirectoryDb(account.accountId);
+    const senderAllowed = dirDb.isContactAllowedDm(senderId);
+
+    if (!senderAllowed) {
+      const messageText = (textBody ?? "").trim();
+
+      // --- Pairing mode: challenge/response ---
+      if (pairingConfig.enabled && pairingConfig.hmacSecret) {
+        const engine = getPairingEngine(account.accountId, pairingConfig.hmacSecret);
+
+        // Check for deep link token: PAIR-{12 hex chars}
+        // verifyDeepLinkToken extracts the token internally and recomputes expected HMAC.
+        // DO NOT CHANGE -- pass full messageText, not just the token (function extracts its own regex).
+        if (/^PAIR-[a-f0-9]{12}$/i.test(messageText)) {
+          if (engine.verifyDeepLinkToken(senderId, messageText)) {
+            // Grant access with TTL
+            const grantTtlMinutes = pairingConfig.grantTtlMinutes ?? 1440;
+            engine.grantAccess(senderId, grantTtlMinutes);
+            runtime.log?.(`[waha] [pairing] deep link verified for ${senderId}, granted access (TTL ${grantTtlMinutes}min)`);
+            // Send welcome confirmation
+            try {
+              await sendWahaText({
+                cfg: config as any,
+                to: chatId,
+                text: "Access granted! You can now chat with me.",
+                accountId: account.accountId,
+              });
+              statusSink?.({ lastOutboundAt: Date.now() });
+            } catch (err) {
+              runtime.error?.(`[waha] [pairing] welcome message failed for ${senderId}: ${String(err)}`);
+            }
+            return; // Message handled -- do not pass to LLM
+          } else {
+            runtime.log?.(`[waha] [pairing] invalid deep link token from ${senderId}`);
+            // Fall through to passcode check / challenge send below
+          }
+        }
+
+        // Check for passcode attempt (6 digits)
+        if (/^\d{6}$/.test(messageText)) {
+          const result = engine.verifyPasscode(senderId, messageText);
+          if (result.success) {
+            // Grant access with TTL
+            const grantTtlMinutes = pairingConfig.grantTtlMinutes ?? 1440;
+            engine.grantAccess(senderId, grantTtlMinutes);
+            runtime.log?.(`[waha] [pairing] passcode verified for ${senderId}, granted access (TTL ${grantTtlMinutes}min)`);
+            try {
+              await sendWahaText({
+                cfg: config as any,
+                to: chatId,
+                text: "Access granted! You can now chat with me.",
+                accountId: account.accountId,
+              });
+              statusSink?.({ lastOutboundAt: Date.now() });
+            } catch (err) {
+              runtime.error?.(`[waha] [pairing] welcome message failed for ${senderId}: ${String(err)}`);
+            }
+            return; // Message handled
+          } else if (result.reason === "locked") {
+            runtime.log?.(`[waha] [pairing] ${senderId} locked out (too many attempts)`);
+            try {
+              await sendWahaText({
+                cfg: config as any,
+                to: chatId,
+                text: "Too many incorrect attempts. Please try again later.",
+                accountId: account.accountId,
+              });
+              statusSink?.({ lastOutboundAt: Date.now() });
+            } catch (err) {
+              runtime.error?.(`[waha] [pairing] lockout message failed: ${String(err)}`);
+            }
+            return; // Do not pass to LLM
+          } else if (result.reason === "wrong") {
+            runtime.log?.(`[waha] [pairing] wrong passcode from ${senderId}`);
+            try {
+              await sendWahaText({
+                cfg: config as any,
+                to: chatId,
+                text: "Incorrect passcode. Please try again.",
+                accountId: account.accountId,
+              });
+              statusSink?.({ lastOutboundAt: Date.now() });
+            } catch (err) {
+              runtime.error?.(`[waha] [pairing] wrong passcode message failed: ${String(err)}`);
+            }
+            return;
+          }
+          // If reason is "not_found" or "expired", fall through to send challenge
+        }
+
+        // No valid passcode/token -- send challenge message (creates challenge if needed)
+        if (!engine.hasActiveChallenge(senderId)) {
+          engine.createChallenge(senderId);
+        }
+        const challengeMsg = pairingConfig.challengeMessage
+          ?? "Welcome! Please enter the 6-digit passcode to get started.";
+        try {
+          await sendWahaText({
+            cfg: config as any,
+            to: chatId,
+            text: challengeMsg,
+            accountId: account.accountId,
+          });
+          statusSink?.({ lastOutboundAt: Date.now() });
+        } catch (err) {
+          runtime.error?.(`[waha] [pairing] challenge message failed for ${senderId}: ${String(err)}`);
+        }
+        runtime.log?.(`[waha] [pairing] challenge sent to ${senderId}`);
+        return; // Do not pass to LLM -- zero tokens consumed
+
+      // --- Auto-reply: canned rejection ---
+      } else if (autoReplyConfig.enabled) {
+        const autoReplyEngine = getAutoReplyEngine(account.accountId);
+        const intervalSeconds = (autoReplyConfig.intervalMinutes ?? 1440) * 60;
+
+        if (autoReplyEngine.shouldReply(senderId, intervalSeconds)) {
+          // Resolve {admin_name} from directory (best-effort, non-fatal)
+          let adminName = "the administrator";
+          try {
+            const adminContact = dirDb.getContact?.(senderId);
+            void adminContact; // field not used here — just keeping the try as extensible
+          } catch {
+            // Non-fatal -- use default admin name
+          }
+
+          const messageTemplate = autoReplyConfig.message
+            ?? "Hey! Thanks for reaching out. Unfortunately, I'm not permitted to chat with you right now. Please ask {admin_name} to add you to my allow list.";
+
+          try {
+            await autoReplyEngine.sendRejection({
+              jid: senderId,
+              chatId,
+              messageTemplate,
+              adminName,
+              cfg: config as any,
+              accountId: account.accountId,
+            });
+            statusSink?.({ lastOutboundAt: Date.now() });
+          } catch (err) {
+            runtime.error?.(`[waha] [auto-reply] rejection failed for ${senderId}: ${String(err)}`);
+          }
+        } else {
+          runtime.log?.(`[waha] [auto-reply] rate-limited for ${senderId}, skipping`);
+        }
+        // Return here -- unauthorized contact should not consume LLM tokens.
+        // The DM policy check below would also drop them, but returning here is explicit
+        // and prevents any edge case where dmPolicy is configured to allow unknown senders.
+        // DO NOT CHANGE -- zero-token guarantee for unauthorized contacts.
+        return;
+      }
+      // If neither pairing nor auto-reply is enabled, fall through to existing DM policy check
+    }
+  }
 
   const dmPolicy = account.config.dmPolicy ?? "pairing";
   const defaultGroupPolicy = resolveDefaultGroupPolicy(config as OpenClawConfig);
