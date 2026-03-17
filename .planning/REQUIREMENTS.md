@@ -136,13 +136,71 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| UI-01 | Phase 12 | Pending |
+| UI-02 | Phase 12 | Pending |
+| UI-03 | Phase 12 | Pending |
+| UI-04 | Phase 12 | Pending |
+| UI-05 | Phase 12 | Pending |
+| UI-06 | Phase 12 | Pending |
+| UI-07 | Phase 12 | Pending |
+| UI-08 | Phase 12 | Pending |
+| UI-09 | Phase 12 | Pending |
+| UI-10 | Phase 12 | Pending |
+| UI-11 | Phase 12 | Pending |
+| DASH-01 | Phase 12 | Pending |
+| DASH-02 | Phase 12 | Pending |
+| DASH-03 | Phase 12 | Pending |
+| DASH-04 | Phase 12 | Pending |
+| UX-01 | Phase 12 | Pending |
+| UX-02 | Phase 12 | Pending |
+| UX-03 | Phase 12 | Pending |
+| UX-04 | Phase 12 | Pending |
+| UX-05 | Phase 12 | Pending |
+| UX-06 | Phase 12 | Pending |
+| DIR-01 | Phase 12 | Pending |
+| DIR-02 | Phase 12 | Pending |
+| DIR-04 | Phase 12 | Pending |
+| INIT-01 | Phase 12 | Pending |
+| INIT-02 | Phase 12 | Pending |
+| SYNC-01 | Phase 13 | Pending |
+| SYNC-02 | Phase 13 | Pending |
+| SYNC-03 | Phase 13 | Pending |
+| SYNC-04 | Phase 13 | Pending |
+| SYNC-05 | Phase 13 | Pending |
+| NAME-01 | Phase 14 | Pending |
+| NAME-02 | Phase 14 | Pending |
+| NAME-03 | Phase 14 | Pending |
+| NAME-04 | Phase 14 | Pending |
+| NAME-05 | Phase 14 | Pending |
+| TTL-01 | Phase 15 | Pending |
+| TTL-02 | Phase 15 | Pending |
+| TTL-03 | Phase 15 | Pending |
+| TTL-04 | Phase 15 | Pending |
+| TTL-05 | Phase 15 | Pending |
+| PAIR-01 | Phase 16 | Pending |
+| PAIR-02 | Phase 16 | Pending |
+| PAIR-03 | Phase 16 | Pending |
+| PAIR-04 | Phase 16 | Pending |
+| PAIR-05 | Phase 16 | Pending |
+| PAIR-06 | Phase 16 | Pending |
+| REPLY-01 | Phase 16 | Pending |
+| REPLY-02 | Phase 16 | Pending |
+| REPLY-03 | Phase 16 | Pending |
+| REPLY-04 | Phase 16 | Pending |
+| DIR-03 | Phase 17 | Pending |
+| DIR-05 | Phase 17 | Pending |
+| MOD-01 | Phase 17 | Pending |
+| MOD-02 | Phase 17 | Pending |
+| MOD-03 | Phase 17 | Pending |
+| MOD-04 | Phase 17 | Pending |
+| MOD-05 | Phase 17 | Pending |
+| MOD-06 | Phase 17 | Pending |
 
 **Coverage:**
-- v1.11 requirements: 54 total
-- Mapped to phases: 0
-- Unmapped: 54 ⚠️
+- v1.11 requirements: 59 total
+- Mapped to phases: 59
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after initial definition*
+*Last updated: 2026-03-17 — traceability populated after roadmap creation*
