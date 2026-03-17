@@ -136,7 +136,7 @@ Plans:
 | 10. Directory & Group Enhancements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 11. Dashboard, Sessions & Log | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 12. UI Bug Sprint | 5/5 | Complete    | 2026-03-17 | - |
-| 13. Background Directory Sync | 2/2 | Complete   | 2026-03-17 | - |
+| 13. Background Directory Sync | 2/2 | Complete    | 2026-03-17 | - |
 | 14. Name Resolution | v1.11 | 0/TBD | Not started | - |
 | 15. TTL Access | v1.11 | 0/TBD | Not started | - |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
