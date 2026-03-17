@@ -1072,11 +1072,14 @@ function normalizeTags(input) {
 }
 
 // ---- Tag Input (Phase 8, UI-02) -- DO NOT CHANGE: pill bubble input factory for JID list fields ----
+// Phase 14 (NAME-01): supports resolveNames option — pills show resolved contact names with raw JID tooltip.
+// getValue() always returns raw JID strings (NOT names) — critical for config save correctness. DO NOT CHANGE.
 function createTagInput(containerId, opts) {
   opts = opts || {};
   var container = typeof containerId === 'string' ? document.getElementById(containerId) : containerId;
   if (!container) return null;
   var tags = [];
+  var _resolveTimer = null;
   var wrap = document.createElement('div');
   wrap.className = 'ti-wrap';
   var input = document.createElement('input');
@@ -1087,6 +1090,38 @@ function createTagInput(containerId, opts) {
   while (container.firstChild) container.removeChild(container.firstChild);
   container.appendChild(wrap);
 
+  function applyResolvedNames(resolvedMap) {
+    // Update pill text with resolved names; keep raw JID in title tooltip. DO NOT REMOVE.
+    var pills = wrap.querySelectorAll('.ti-tag');
+    for (var i = 0; i < pills.length; i++) {
+      var pill = pills[i];
+      var jid = pill.getAttribute('data-jid');
+      if (jid && resolvedMap[jid]) {
+        var textNode = pill.firstChild;
+        if (textNode && textNode.nodeType === 3) {
+          textNode.nodeValue = resolvedMap[jid] + ' ';
+        }
+        pill.title = jid;
+      }
+    }
+  }
+
+  function scheduleResolve() {
+    // Phase 14 (NAME-01): debounced batch resolve — fires once 50ms after last renderTags call.
+    // Prevents N+1 fetch calls when setValue sets multiple tags at once. DO NOT REMOVE.
+    if (!opts.resolveNames) return;
+    if (_resolveTimer) clearTimeout(_resolveTimer);
+    _resolveTimer = setTimeout(function() {
+      _resolveTimer = null;
+      if (!tags.length) return;
+      var jidsParam = encodeURIComponent(tags.join(','));
+      fetch('/api/admin/directory/resolve?jids=' + jidsParam)
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) { if (data && data.resolved) applyResolvedNames(data.resolved); })
+        .catch(function() { /* graceful fallback — pills keep raw JID text */ });
+    }, 50);
+  }
+
   function renderTags() {
     var existing = wrap.querySelectorAll('.ti-tag');
     for (var i = 0; i < existing.length; i++) wrap.removeChild(existing[i]);
@@ -1094,6 +1129,7 @@ function createTagInput(containerId, opts) {
       (function(idx, val) {
         var pill = document.createElement('span');
         pill.className = 'ti-tag';
+        pill.setAttribute('data-jid', val);
         pill.appendChild(document.createTextNode(val + ' '));
         var rm = document.createElement('span');
         rm.className = 'ti-remove';
@@ -1108,6 +1144,7 @@ function createTagInput(containerId, opts) {
         wrap.insertBefore(pill, input);
       })(j, tags[j]);
     }
+    scheduleResolve();
   }
 
   function addTag(val) {
@@ -1577,6 +1614,15 @@ async function loadStats() {
     if (!_accessKvBuilt) {
       _accessKvBuilt = true;
       accessKv.innerHTML = kvRow(labelFor('dmPolicy'), ac.dmPolicy) + kvRow(labelFor('groupPolicy'), ac.groupPolicy);
+      // Phase 14 (NAME-01): dedupLidCus removes @lid entries when the equivalent @c.us JID is also present.
+      // NOWEB puts both @lid and @c.us in groupAllowFrom — same person should appear once. DO NOT REMOVE.
+      function dedupLidCus(arr) {
+        var cusSet = {};
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i].endsWith('@c.us')) cusSet[arr[i].replace('@c.us', '')] = true;
+        }
+        return arr.filter(function(j) { return !(j.endsWith('@lid') && cusSet[j.replace('@lid', '')]); });
+      }
       var jidGroups = [
         { key: 'allowFrom', arr: ac.allowFrom || [] },
         { key: 'groupAllowFrom', arr: ac.groupAllowFrom || [] },
@@ -1594,14 +1640,15 @@ async function loadStats() {
           valEl.id = 'nr-' + grp.key;
           accessKv.appendChild(keyEl);
           accessKv.appendChild(valEl);
-          if (!grp.arr.length) {
+          var dedupedArr = dedupLidCus(grp.arr);
+          if (!dedupedArr.length) {
             var noneEl = document.createElement('span');
             noneEl.style.color = '#64748b';
             noneEl.textContent = 'none';
             valEl.appendChild(noneEl);
           } else {
-            for (var ji = 0; ji < grp.arr.length; ji++) {
-              createNameResolver(valEl, grp.arr[ji]);
+            for (var ji = 0; ji < dedupedArr.length; ji++) {
+              createNameResolver(valEl, dedupedArr[ji]);
             }
           }
         })(jidGroups[gi]);
@@ -2117,9 +2164,10 @@ async function loadConfig() {
     setVal('s-dmPolicy', w.dmPolicy || 'allowlist');
     setVal('s-groupPolicy', w.groupPolicy || 'allowlist');
     // Phase 8, UI-02 -- Tag Input components replace textareas for JID lists. DO NOT REVERT to setVal.
-    if (!tagInputAllowFrom) tagInputAllowFrom = createTagInput('s-allowFrom-ti', { placeholder: '972544329000@c.us' });
-    if (!tagInputGroupAllowFrom) tagInputGroupAllowFrom = createTagInput('s-groupAllowFrom-ti', { placeholder: 'Phone or JID, press Enter' });
-    if (!tagInputAllowedGroups) tagInputAllowedGroups = createTagInput('s-allowedGroups-ti', { placeholder: '120363421825201386@g.us' });
+    // Phase 14 (NAME-01): resolveNames:true enables pill name resolution via /api/admin/directory/resolve. DO NOT REMOVE.
+    if (!tagInputAllowFrom) tagInputAllowFrom = createTagInput('s-allowFrom-ti', { placeholder: '972544329000@c.us', resolveNames: true });
+    if (!tagInputGroupAllowFrom) tagInputGroupAllowFrom = createTagInput('s-groupAllowFrom-ti', { placeholder: 'Phone or JID, press Enter', resolveNames: true });
+    if (!tagInputAllowedGroups) tagInputAllowedGroups = createTagInput('s-allowedGroups-ti', { placeholder: '120363421825201386@g.us', resolveNames: true });
     if (tagInputAllowFrom) tagInputAllowFrom.setValue(w.allowFrom || []);
     if (tagInputGroupAllowFrom) tagInputGroupAllowFrom.setValue(w.groupAllowFrom || []);
     if (tagInputAllowedGroups) tagInputAllowedGroups.setValue(w.allowedGroups || []);
