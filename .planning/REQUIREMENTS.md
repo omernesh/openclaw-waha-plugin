@@ -47,10 +47,10 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### Name Resolution
 
-- [ ] **NAME-01**: Dashboard Access Control card resolves @lid JIDs to contact names, merges with @c.us equivalents (BUG-01)
+- [x] **NAME-01**: Dashboard Access Control card resolves @lid JIDs to contact names, merges with @c.us equivalents (BUG-01)
 - [ ] **NAME-02**: God Mode Users tag bubbles in Settings display resolved contact/group names (BUG-10)
 - [ ] **NAME-03**: God Mode Users contact picker searches local SQLite directory successfully (BUG-11)
-- [ ] **NAME-04**: Allow From, Group Allow From, Allowed Groups tag bubbles display resolved names with JID tooltips (BUG-12)
+- [x] **NAME-04**: Allow From, Group Allow From, Allowed Groups tag bubbles display resolved names with JID tooltips (BUG-12)
 - [ ] **NAME-05**: Group participants display resolved contact names instead of raw LID numbers (BUG-16)
 
 ### Directory UX
@@ -167,10 +167,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-03 | Phase 13 | Complete |
 | SYNC-04 | Phase 13 | Complete |
 | SYNC-05 | Phase 13 | Complete |
-| NAME-01 | Phase 14 | Pending |
+| NAME-01 | Phase 14 | Complete |
 | NAME-02 | Phase 14 | Pending |
 | NAME-03 | Phase 14 | Pending |
-| NAME-04 | Phase 14 | Pending |
+| NAME-04 | Phase 14 | Complete |
 | NAME-05 | Phase 14 | Pending |
 | TTL-01 | Phase 15 | Pending |
 | TTL-02 | Phase 15 | Pending |

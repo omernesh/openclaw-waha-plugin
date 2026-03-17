@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-03-17T03:07:05.803Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-03-17T12:58:42.973Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
   percent: 40
 ---
 
@@ -70,6 +70,7 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 13]: Background sync engine (sync.ts) uses setTimeout chain + per-account Map state, stores opts at startDirectorySync call time for triggerImmediateSync re-use
 - [Phase 13-background-directory-sync]: Inline refresh handler removed from monitor.ts: 200-line code replaced with 3-line triggerImmediateSync(), pipeline lives only in sync.ts
 - [Phase 13-background-directory-sync]: Contacts tab uses pagination matching Groups tab: loadContactsTable() with buildPageNav(goFn) generic pagination
+- [Phase 14-name-resolution]: @lid->@c.us fallback: two-pass batch SQL query approach in resolveJids; resolve route before /:jid handler; getValue() returns raw JIDs for config save correctness; 50ms debounce on name resolution fetches
 
 ### Pending Todos
 
@@ -83,6 +84,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T02:57:06.341Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-03-17T12:58:37.142Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None
