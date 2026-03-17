@@ -24,6 +24,7 @@ import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.j
 import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 import { getPairingEngine } from "./pairing.js";
+import { getModuleRegistry } from "./module-registry.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
 const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
@@ -4459,6 +4460,125 @@ export function createWahaWebhookServer(opts: {
       } catch (err) {
         console.error(`[waha] PUT /api/admin/sessions role failed: ${String(err)}`);
         writeJsonResponse(res, 500, { error: "Failed to save role" });
+      }
+      return;
+    }
+
+    // =========================================================================
+    // Module management API (Phase 17, Plan 03 — MOD-03, MOD-04)
+    // =========================================================================
+
+    // GET /api/admin/modules — list all registered modules with assignment counts
+    if (req.url === "/api/admin/modules" && req.method === "GET") {
+      try {
+        const registry = getModuleRegistry();
+        const db = getDirectoryDb(opts.accountId);
+        const modules = registry.listModules().map((mod) => {
+          const assignments = db.getModuleAssignments(mod.id);
+          return { ...mod, assignmentCount: assignments.length };
+        });
+        writeJsonResponse(res, 200, { modules });
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/modules failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to list modules" });
+      }
+      return;
+    }
+
+    // PUT /api/admin/modules/:id/enable — enable a module globally
+    if (req.method === "PUT" && req.url?.match(/^\/api\/admin\/modules\/[^/]+\/enable$/)) {
+      try {
+        const moduleId = decodeURIComponent((req.url || "").split("/")[4] || "");
+        if (!moduleId) {
+          writeJsonResponse(res, 400, { error: "Missing module id" });
+          return;
+        }
+        getModuleRegistry().enableModule(moduleId);
+        writeJsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        console.error(`[waha] PUT /api/admin/modules enable failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to enable module" });
+      }
+      return;
+    }
+
+    // PUT /api/admin/modules/:id/disable — disable a module globally
+    if (req.method === "PUT" && req.url?.match(/^\/api\/admin\/modules\/[^/]+\/disable$/)) {
+      try {
+        const moduleId = decodeURIComponent((req.url || "").split("/")[4] || "");
+        if (!moduleId) {
+          writeJsonResponse(res, 400, { error: "Missing module id" });
+          return;
+        }
+        getModuleRegistry().disableModule(moduleId);
+        writeJsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        console.error(`[waha] PUT /api/admin/modules disable failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to disable module" });
+      }
+      return;
+    }
+
+    // GET /api/admin/modules/:id/assignments — list chat assignments for a module
+    if (req.method === "GET" && req.url?.match(/^\/api\/admin\/modules\/[^/]+\/assignments$/)) {
+      try {
+        const moduleId = decodeURIComponent((req.url || "").split("/")[4] || "");
+        if (!moduleId) {
+          writeJsonResponse(res, 400, { error: "Missing module id" });
+          return;
+        }
+        const db = getDirectoryDb(opts.accountId);
+        const assignments = db.getModuleAssignments(moduleId);
+        writeJsonResponse(res, 200, { assignments });
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/modules assignments failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to list assignments" });
+      }
+      return;
+    }
+
+    // POST /api/admin/modules/:id/assignments — assign a chat JID to a module
+    if (req.method === "POST" && req.url?.match(/^\/api\/admin\/modules\/[^/]+\/assignments$/)) {
+      try {
+        const moduleId = decodeURIComponent((req.url || "").split("/")[4] || "");
+        if (!moduleId) {
+          writeJsonResponse(res, 400, { error: "Missing module id" });
+          return;
+        }
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const { jid } = JSON.parse(bodyStr) as { jid?: string };
+        if (!jid || typeof jid !== "string") {
+          writeJsonResponse(res, 400, { error: "jid must be a non-empty string" });
+          return;
+        }
+        const db = getDirectoryDb(opts.accountId);
+        db.assignModule(moduleId, jid);
+        writeJsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        console.error(`[waha] POST /api/admin/modules assignments failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to add assignment" });
+      }
+      return;
+    }
+
+    // DELETE /api/admin/modules/:id/assignments/:jid — remove a chat assignment from a module
+    if (req.method === "DELETE" && req.url?.match(/^\/api\/admin\/modules\/[^/]+\/assignments\/.+$/)) {
+      try {
+        const urlParts = (req.url || "").split("/");
+        // URL: /api/admin/modules/{id}/assignments/{jid}
+        // parts: ['', 'api', 'admin', 'modules', '{id}', 'assignments', '{jid}']
+        const moduleId = decodeURIComponent(urlParts[4] || "");
+        const jid = decodeURIComponent(urlParts.slice(6).join("/") || "");
+        if (!moduleId || !jid) {
+          writeJsonResponse(res, 400, { error: "Missing module id or jid" });
+          return;
+        }
+        const db = getDirectoryDb(opts.accountId);
+        db.unassignModule(moduleId, jid);
+        writeJsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        console.error(`[waha] DELETE /api/admin/modules assignment failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Failed to remove assignment" });
       }
       return;
     }
