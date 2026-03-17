@@ -131,7 +131,7 @@ Plans:
 | 9. Settings UX Improvements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 10. Directory & Group Enhancements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 11. Dashboard, Sessions & Log | v1.10 | 2/2 | Complete | 2026-03-16 |
-| 12. UI Bug Sprint | v1.11 | 0/5 | Not started | - |
+| 12. UI Bug Sprint | 1/5 | In Progress|  | - |
 | 13. Background Directory Sync | v1.11 | 0/TBD | Not started | - |
 | 14. Name Resolution | v1.11 | 0/TBD | Not started | - |
 | 15. TTL Access | v1.11 | 0/TBD | Not started | - |

@@ -9,8 +9,8 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### UI Bug Fixes
 
-- [ ] **UI-01**: Dashboard Access Control card stops flickering/re-rendering every few seconds (BUG-02)
-- [ ] **UI-02**: DM Keyword Filter stats use clear labels — "Passed" vs "Filtered" instead of "Allowed" vs "Dropped" (BUG-03)
+- [x] **UI-01**: Dashboard Access Control card stops flickering/re-rendering every few seconds (BUG-02)
+- [x] **UI-02**: DM Keyword Filter stats use clear labels — "Passed" vs "Filtered" instead of "Allowed" vs "Dropped" (BUG-03)
 - [ ] **UI-03**: Sessions tab role/subRole dropdown updates visually immediately after save without page flicker (BUG-04)
 - [ ] **UI-04**: Sessions tab handles 502 during restart gracefully with polling overlay instead of raw error (BUG-05)
 - [ ] **UI-05**: Directory search bar 'x' button clears search text and resets results (BUG-07)
@@ -23,10 +23,10 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 ### Dashboard Polish
 
-- [ ] **DASH-01**: Dashboard health section shows per-session health details (CR-01)
-- [ ] **DASH-02**: Dashboard filter cards (DM Keyword, Group Keyword) are collapsible (CR-02)
-- [ ] **DASH-03**: Dashboard labels use human-readable text — "wpm" → "Words Per Minute", etc. (CR-03)
-- [ ] **DASH-04**: Dashboard stats show per-session breakdowns with session name sub-headers (CR-04)
+- [x] **DASH-01**: Dashboard health section shows per-session health details (CR-01)
+- [x] **DASH-02**: Dashboard filter cards (DM Keyword, Group Keyword) are collapsible (CR-02)
+- [x] **DASH-03**: Dashboard labels use human-readable text — "wpm" → "Words Per Minute", etc. (CR-03)
+- [x] **DASH-04**: Dashboard stats show per-session breakdowns with session name sub-headers (CR-04)
 
 ### Sessions & Settings UX
 
@@ -136,8 +136,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-01 | Phase 12 | Pending |
-| UI-02 | Phase 12 | Pending |
+| UI-01 | Phase 12 | Complete |
+| UI-02 | Phase 12 | Complete |
 | UI-03 | Phase 12 | Pending |
 | UI-04 | Phase 12 | Pending |
 | UI-05 | Phase 12 | Pending |
@@ -147,10 +147,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-09 | Phase 12 | Pending |
 | UI-10 | Phase 12 | Pending |
 | UI-11 | Phase 12 | Pending |
-| DASH-01 | Phase 12 | Pending |
-| DASH-02 | Phase 12 | Pending |
-| DASH-03 | Phase 12 | Pending |
-| DASH-04 | Phase 12 | Pending |
+| DASH-01 | Phase 12 | Complete |
+| DASH-02 | Phase 12 | Complete |
+| DASH-03 | Phase 12 | Complete |
+| DASH-04 | Phase 12 | Complete |
 | UX-01 | Phase 12 | Pending |
 | UX-02 | Phase 12 | Pending |
 | UX-03 | Phase 12 | Pending |
