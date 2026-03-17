@@ -23,6 +23,7 @@ import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
 import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.js";
 import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
+import { getPairingEngine } from "./pairing.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
 const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
@@ -629,6 +630,82 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
             <span>Can Initiate (Global Default) <span class="tip" data-tip="When enabled, the bot can start new conversations with any contact. When disabled, the bot can only respond to incoming messages unless a per-contact override allows initiation.">?</span></span>
             <label class="toggle" style="margin-left:auto"><input type="checkbox" id="canInitiateGlobal" name="canInitiateGlobal" checked><span class="slider"></span></label>
           </label>
+        </div>
+      </div>
+    </details>
+
+    <details class="settings-section">
+      <summary>Pairing Mode</summary>
+      <div class="field-group">
+        <div class="field">
+          <label class="toggle-wrap">
+            <span>Enable Pairing Mode <span class="tip" data-tip="When enabled, unknown DM senders can enter a passcode to get added to the allow list automatically.">?</span></span>
+            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="pairingEnabled" name="pairingEnabled"><span class="slider"></span></label>
+          </label>
+        </div>
+        <div id="pairingFields" style="display:none">
+          <div class="field">
+            <label>Passcode (6 digits) <span class="tip" data-tip="The 6-digit code contacts must enter to get DM access. Click Generate to create a random one.">?</span></label>
+            <div style="display:flex;gap:8px">
+              <input type="text" id="pairingPasscode" name="pairingPasscode" maxlength="6" pattern="[0-9]{6}" placeholder="123456" style="flex:1;font-family:monospace;font-size:1.1em;letter-spacing:2px">
+              <button type="button" id="generatePasscode" class="btn btn-sm">Generate</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Grant TTL <span class="tip" data-tip="How long pairing-granted access lasts. After this period, access is automatically revoked.">?</span></label>
+            <select id="pairingGrantTtl" name="pairingGrantTtl">
+              <option value="60">1 hour</option>
+              <option value="360">6 hours</option>
+              <option value="1440" selected>24 hours</option>
+              <option value="10080">7 days</option>
+              <option value="43200">30 days</option>
+              <option value="0">Never expires</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Challenge Message <span class="tip" data-tip="The message sent to unknown DMs asking them to enter the passcode.">?</span></label>
+            <textarea id="pairingChallengeMsg" name="pairingChallengeMsg" rows="2" style="width:100%"></textarea>
+          </div>
+          <div class="field">
+            <label>wa.me Deep Link <span class="tip" data-tip="Share this link to let a specific contact start a pairing flow. Enter their JID below to generate.">?</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="pairingDeepLinkJid" placeholder="972544329000@c.us" style="flex:1">
+              <button type="button" id="generateDeepLink" class="btn btn-sm">Generate</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+              <input type="text" id="pairingDeepLink" readonly style="flex:1;font-family:monospace;font-size:0.85em;background:#0f172a;border-color:#334155">
+              <button type="button" id="copyDeepLink" class="btn btn-sm">Copy</button>
+            </div>
+            <small style="color:#666">Share this link for zero-friction authorization (JID-specific HMAC token)</small>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="settings-section">
+      <summary>Auto-Reply</summary>
+      <div class="field-group">
+        <div class="field">
+          <label class="toggle-wrap">
+            <span>Send rejection message to unauthorized DMs <span class="tip" data-tip="When enabled, contacts whose DMs are blocked will receive an automatic reply explaining they are not authorized.">?</span></span>
+            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="autoReplyEnabled" name="autoReplyEnabled"><span class="slider"></span></label>
+          </label>
+        </div>
+        <div id="autoReplyFields" style="display:none">
+          <div class="field">
+            <label>Rejection Message <span class="tip" data-tip="Message sent to blocked DMs. Use {admin_name} to insert the bot owner's name.">?</span></label>
+            <textarea id="autoReplyMessage" name="autoReplyMessage" rows="3" style="width:100%"></textarea>
+            <small style="color:#666">Template variables: {admin_name}</small>
+          </div>
+          <div class="field">
+            <label>Rate Limit <span class="tip" data-tip="Minimum minutes between auto-replies to the same contact to prevent spam.">?</span></label>
+            <select id="autoReplyInterval" name="autoReplyInterval">
+              <option value="60">1 hour</option>
+              <option value="360">6 hours</option>
+              <option value="1440" selected>24 hours</option>
+              <option value="10080">7 days</option>
+            </select>
+          </div>
         </div>
       </div>
     </details>
@@ -2230,6 +2307,19 @@ async function loadConfig() {
     setVal('s-markdownTables', md.tables || 'auto');
     // Phase 12, Plan 02 (INIT-01): Global Can Initiate toggle. Default true. DO NOT REMOVE.
     setChk('canInitiateGlobal', w.canInitiateGlobal !== false);
+    // Phase 16: Pairing Mode config load. DO NOT REMOVE.
+    var pm = w.pairingMode || {};
+    setChk('pairingEnabled', pm.enabled === true);
+    setVal('pairingPasscode', pm.passcode || '');
+    setVal('pairingGrantTtl', String(pm.grantTtlMinutes || 1440));
+    setVal('pairingChallengeMsg', pm.challengeMessage || 'Welcome! Please enter the 6-digit passcode to get started.');
+    document.getElementById('pairingFields').style.display = pm.enabled ? '' : 'none';
+    // Phase 16: Auto-Reply config load. DO NOT REMOVE.
+    var ar = w.autoReply || {};
+    setChk('autoReplyEnabled', ar.enabled === true);
+    setVal('autoReplyMessage', ar.message || 'Hey! Thanks for reaching out. Unfortunately, I\\'m not permitted to chat with you right now. Please ask the admin to add you to the allow list.');
+    setVal('autoReplyInterval', String(ar.intervalMinutes || 1440));
+    document.getElementById('autoReplyFields').style.display = ar.enabled ? '' : 'none';
     setChk('s-reactions', (w.actions || {}).reactions !== false);
     setChk('s-blockStreaming', w.blockStreaming === true);
     var mp = w.mediaPreprocessing || {};
@@ -2302,6 +2392,19 @@ async function saveSettings(e) {
       },
       // Phase 12, Plan 02 (INIT-01): Global Can Initiate toggle. DO NOT REMOVE.
       canInitiateGlobal: getChk('canInitiateGlobal'),
+      // Phase 16: Pairing Mode config save. DO NOT REMOVE.
+      pairingMode: {
+        enabled: getChk('pairingEnabled'),
+        passcode: document.getElementById('pairingPasscode').value || undefined,
+        grantTtlMinutes: parseInt(document.getElementById('pairingGrantTtl').value) || 1440,
+        challengeMessage: document.getElementById('pairingChallengeMsg').value || undefined,
+      },
+      // Phase 16: Auto-Reply config save. DO NOT REMOVE.
+      autoReply: {
+        enabled: getChk('autoReplyEnabled'),
+        message: document.getElementById('autoReplyMessage').value || undefined,
+        intervalMinutes: parseInt(document.getElementById('autoReplyInterval').value) || 1440,
+      },
       actions: { reactions: getChk('s-reactions') },
       blockStreaming: getChk('s-blockStreaming'),
       mediaPreprocessing: {
@@ -2408,6 +2511,54 @@ function toggleMediaSubToggles() {
   var masterEl = document.getElementById('s-mediaEnabled');
   var subDiv = document.getElementById('media-sub-toggles');
   if (masterEl && subDiv) subDiv.style.display = masterEl.checked ? 'grid' : 'none';
+}
+
+// ---- Phase 16: Pairing Mode and Auto-Reply UI logic ----
+// Toggle show/hide for pairing fields section on checkbox change. DO NOT REMOVE.
+document.getElementById('pairingEnabled').addEventListener('change', function() {
+  document.getElementById('pairingFields').style.display = this.checked ? '' : 'none';
+});
+// Toggle show/hide for auto-reply fields section on checkbox change. DO NOT REMOVE.
+document.getElementById('autoReplyEnabled').addEventListener('change', function() {
+  document.getElementById('autoReplyFields').style.display = this.checked ? '' : 'none';
+});
+// Generate a random 6-digit passcode. DO NOT REMOVE.
+document.getElementById('generatePasscode').addEventListener('click', function() {
+  var code = String(Math.floor(100000 + Math.random() * 900000));
+  document.getElementById('pairingPasscode').value = code;
+});
+// Generate wa.me deep link for a specific JID. Calls /api/admin/pairing/deeplink. DO NOT REMOVE.
+document.getElementById('generateDeepLink').addEventListener('click', async function() {
+  var jid = document.getElementById('pairingDeepLinkJid').value.trim();
+  if (!jid) { showToast('Enter a JID first', true); return; }
+  try {
+    var r = await fetch('/api/admin/pairing/deeplink?jid=' + encodeURIComponent(jid));
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Failed');
+    document.getElementById('pairingDeepLink').value = d.link;
+    showToast('Deep link generated');
+  } catch(e) {
+    showToast('Error: ' + e.message, true);
+  }
+});
+// Copy deep link to clipboard. DO NOT REMOVE.
+document.getElementById('copyDeepLink').addEventListener('click', function() {
+  var el = document.getElementById('pairingDeepLink');
+  if (el.value) {
+    navigator.clipboard.writeText(el.value).then(function() { showToast('Link copied!'); });
+  }
+});
+// Revoke a pairing grant from the Directory tab. DO NOT REMOVE.
+async function revokePairingGrant(jid) {
+  if (!confirm('Revoke pairing access for ' + jid + '?')) return;
+  try {
+    var r = await fetch('/api/admin/pairing/grant/' + encodeURIComponent(jid), { method: 'DELETE' });
+    if (!r.ok) { var d = await r.json(); throw new Error(d.error || 'Failed'); }
+    showToast('Pairing access revoked');
+    loadContactsTable && loadContactsTable();
+  } catch(e) {
+    showToast('Failed to revoke: ' + e.message, true);
+  }
 }
 
 // ---- Directory sub-tabs ----
@@ -3043,13 +3194,20 @@ function buildContactCard(c) {
   // DO NOT REMOVE — badge and dimming are primary visual indicators of time-limited access.
   var ttlBadge = formatTtlBadge(c.expiresAt, c.expired);
   var expiredClass = c.expired ? ' expired-card' : '';
+  // Phase 16: Pairing source badge + revoke link. DO NOT REMOVE — shows which contacts were auto-granted via pairing.
+  var pairingBadge = '';
+  var pairingRevoke = '';
+  if (c.source === 'pairing') {
+    pairingBadge = '<span style="background:#e3f2fd;color:#1565c0;font-size:0.75em;padding:2px 6px;border-radius:4px;margin-left:4px">Pairing</span>';
+    pairingRevoke = '<a href="#" onclick="event.stopPropagation();revokePairingGrant(\\'' + esc(c.jid) + '\\');return false" style="color:#c62828;font-size:0.75em;margin-left:4px">Revoke</a>';
+  }
 
   return '<div class="contact-card' + expiredClass + '" id="' + id + '" style="' + borderStyle + '">' +
     '<div class="contact-header" onclick="' + clickAction + '" style="display:flex;align-items:center;">' +
       bulkCheckbox +
       '<div class="avatar" style="background:' + avatarBg + ';color:#fff">' + avatarContent + '</div>' +
       '<div class="contact-info">' +
-        '<div class="contact-name">' + esc(name) + ttlBadge + '</div>' +
+        '<div class="contact-name">' + esc(name) + ttlBadge + pairingBadge + pairingRevoke + '</div>' +
         '<div class="contact-jid">' + esc(c.jid) + '</div>' +
       '</div>' +
       '<div class="contact-meta">' +
@@ -4118,6 +4276,8 @@ export function createWahaWebhookServer(opts: {
             allowedDm: configAllowFrom.includes(c.jid),
             expiresAt: ttl?.expiresAt ?? null,
             expired: ttl?.expired ?? false,
+            // Phase 16: include allow_list source for pairing badge in Directory tab. DO NOT REMOVE.
+            source: ttl?.source ?? null,
           };
         });
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -4630,6 +4790,49 @@ export function createWahaWebhookServer(opts: {
         }
         return;
       }
+    }
+
+    // Phase 16: GET /api/admin/pairing/deeplink?jid=<jid>
+    // Generates a wa.me deep link with HMAC token for a specific JID. DO NOT REMOVE.
+    if (req.method === "GET" && req.url?.startsWith("/api/admin/pairing/deeplink")) {
+      try {
+        const urlObj = new URL(req.url, "http://localhost");
+        const jid = urlObj.searchParams.get("jid");
+        if (!jid) {
+          writeJsonResponse(res, 400, { error: "jid parameter required" });
+          return;
+        }
+        const hmacSecret = (account.config.pairingMode as Record<string, unknown> | undefined)?.hmacSecret as string | undefined;
+        if (!hmacSecret) {
+          writeJsonResponse(res, 400, { error: "pairingMode.hmacSecret not configured" });
+          return;
+        }
+        const token = getPairingEngine(opts.accountId, hmacSecret).generateDeepLinkToken(jid);
+        const phone = jid.replace(/@.*$/, "");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ link: `https://wa.me/${phone}?text=PAIR-${token}` }));
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/pairing/deeplink failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
+      return;
+    }
+
+    // Phase 16: DELETE /api/admin/pairing/grant/:jid
+    // Revokes pairing access for a specific JID. DO NOT REMOVE.
+    if (req.method === "DELETE" && req.url?.startsWith("/api/admin/pairing/grant/")) {
+      try {
+        const jid = decodeURIComponent(req.url.replace("/api/admin/pairing/grant/", ""));
+        const db = getDirectoryDb(opts.accountId);
+        db.revokePairingGrant(jid);
+        syncAllowList(getConfigPath(), "allowFrom", jid, false);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (err) {
+        console.error(`[waha] DELETE /api/admin/pairing/grant failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
+      return;
     }
 
     if (req.method !== "POST" || !req.url || !req.url.startsWith(path)) {

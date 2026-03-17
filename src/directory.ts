@@ -646,12 +646,12 @@ export class DirectoryDb {
    * expiresAt: Unix timestamp in seconds (null = permanent).
    * expired: true if expiresAt is set and has passed.
    */
-  getContactTtl(jid: string): { expiresAt: number | null; expired: boolean } | null {
-    const row = this.db.prepare("SELECT expires_at FROM allow_list WHERE jid = ?").get(jid) as { expires_at: number | null } | undefined;
+  getContactTtl(jid: string): { expiresAt: number | null; expired: boolean; source: string | null } | null {
+    const row = this.db.prepare("SELECT expires_at, source FROM allow_list WHERE jid = ?").get(jid) as { expires_at: number | null; source: string | null } | undefined;
     if (row === undefined) return null;
     const expiresAt = row.expires_at ?? null;
     const expired = expiresAt !== null && expiresAt <= Math.floor(Date.now() / 1000);
-    return { expiresAt, expired };
+    return { expiresAt, expired, source: row.source ?? null };
   }
 
   /**
