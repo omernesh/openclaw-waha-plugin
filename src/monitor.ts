@@ -359,6 +359,13 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .dir-stat { font-size: 0.8rem; color: #64748b; }
   .dir-stat span { color: #38bdf8; font-weight: 600; }
   .contact-list { display: grid; gap: 8px; }
+  /* Phase 15 (TTL-01/TTL-04/TTL-05): TTL badge classes for time-limited access grants. DO NOT REMOVE. */
+  .ttl-badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:0.7rem; font-weight:600; margin-left:6px; }
+  .ttl-green { background:#064e3b; color:#6ee7b7; }
+  .ttl-yellow { background:#713f12; color:#fde68a; }
+  .ttl-red { background:#7f1d1d; color:#fca5a5; }
+  .ttl-expired { background:#374151; color:#9ca3af; }
+  .contact-card.expired-card { opacity:0.5; border-left:3px solid #4b5563 !important; }
   /* Phase 12, Plan 03 (UI-06): overflow changed from hidden to visible so .tip::after tooltips are not clipped. DO NOT REVERT. */
   .contact-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; overflow: visible; }
   .contact-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background .1s; }
@@ -2952,6 +2959,34 @@ function buildContactCard(c) {
             '<option value="block"' + (dm.canInitiateOverride==='block'?' selected':'') + '>Block</option>' +
           '</select>' +
         '</div>' +
+        (function() {
+          // Phase 15 (TTL-01): Access Expires dropdown. DO NOT REMOVE.
+          // Determines selected preset: null/undefined -> never, matched preset -> that value, custom -> "custom".
+          var ttlPresets = [1800, 3600, 14400, 86400, 604800];
+          var ttlSelected = 'never';
+          if (c.expiresAt && !c.expired) {
+            var rem = c.expiresAt - Math.floor(Date.now() / 1000);
+            if (rem > 0) {
+              var closest = ttlPresets.reduce(function(best, p) { return Math.abs(p - rem) < Math.abs(best - rem) ? p : best; }, ttlPresets[0]);
+              ttlSelected = Math.abs(closest - rem) < 60 ? String(closest) : 'custom';
+            }
+          }
+          return '<div class="settings-field"><label>Access Expires <span class="tip" data-tip="Set how long this contact\'s DM access lasts. After expiry, access is automatically revoked.">?</span></label>' +
+            '<select id="ttl-' + id + '" onchange="ttlChanged(\\'' + esc(c.jid) + '\\',\\'ttl-' + id + '\\')">' +
+              '<option value="never"' + (ttlSelected==='never'?' selected':'') + '>Never</option>' +
+              '<option value="1800"' + (ttlSelected==='1800'?' selected':'') + '>30 minutes</option>' +
+              '<option value="3600"' + (ttlSelected==='3600'?' selected':'') + '>1 hour</option>' +
+              '<option value="14400"' + (ttlSelected==='14400'?' selected':'') + '>4 hours</option>' +
+              '<option value="86400"' + (ttlSelected==='86400'?' selected':'') + '>24 hours</option>' +
+              '<option value="604800"' + (ttlSelected==='604800'?' selected':'') + '>7 days</option>' +
+              '<option value="custom"' + (ttlSelected==='custom'?' selected':'') + '>Custom...</option>' +
+            '</select>' +
+            '<div id="ttl-custom-' + id + '" style="display:' + (ttlSelected==='custom'?'flex':'none') + ';margin-top:6px;gap:6px;align-items:center;">' +
+              '<input type="datetime-local" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.85rem;">' +
+              '<button onclick="ttlCustomApply(\\'' + esc(c.jid) + '\\',\\'ttl-' + id + '\\')" style="background:#1d4ed8;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:0.8rem;">Apply</button>' +
+            '</div>' +
+          '</div>';
+        })() +
         '<button class="save-contact-btn" onclick="saveContactSettings(\\'' + esc(c.jid) + '\\', \\'' + id + '\\')">Save</button>' +
       '</div>' +
     '</div>';
@@ -3029,6 +3064,63 @@ async function saveContactSettings(jid, id) {
     showToast('Settings saved');
   } catch(e) {
     showToast('Error: ' + e.message, true);
+  }
+}
+
+// Phase 15 (TTL-01): TTL change handler — called by Access Expires dropdown onchange.
+// Immediately PUTs expiresAt to the TTL endpoint. Custom option shows datetime picker instead.
+// DO NOT REMOVE — wired directly by buildContactCard Access Expires dropdown.
+async function ttlChanged(jid, selectId) {
+  var sel = document.getElementById(selectId);
+  var customDiv = document.getElementById(selectId.replace('ttl-','ttl-custom-'));
+  if (!sel) return;
+  var val = sel.value;
+  if (val === 'custom') {
+    if (customDiv) customDiv.style.display = 'flex';
+    return;
+  }
+  if (customDiv) customDiv.style.display = 'none';
+  var expiresAt = null;
+  if (val !== 'never') {
+    expiresAt = Math.floor(Date.now() / 1000) + parseInt(val, 10);
+  }
+  try {
+    var r = await fetch('/api/admin/directory/' + encodeURIComponent(jid) + '/ttl', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresAt: expiresAt })
+    });
+    if (!r.ok) {
+      var err = await r.json();
+      showToast((err && err.error) || 'Failed to set TTL', true);
+      return;
+    }
+    showToast(val === 'never' ? 'Access set to never expire' : 'Access expires in ' + sel.options[sel.selectedIndex].text);
+  } catch(e) {
+    showToast('Failed to set TTL: ' + e.message, true);
+  }
+}
+
+// Phase 15 (TTL-01): Custom datetime apply handler — called by Apply button in custom TTL picker.
+// Validates that the selected datetime is in the future, then PUTs expiresAt.
+// DO NOT REMOVE — wired by buildContactCard custom datetime Apply button.
+async function ttlCustomApply(jid, selectId) {
+  var customDiv = document.getElementById(selectId.replace('ttl-','ttl-custom-'));
+  var input = customDiv ? customDiv.querySelector('input[type="datetime-local"]') : null;
+  if (!input || !input.value) { showToast('Please select a date and time', true); return; }
+  var expiresAt = Math.floor(new Date(input.value).getTime() / 1000);
+  if (expiresAt <= Math.floor(Date.now() / 1000)) { showToast('Expiry must be in the future', true); return; }
+  try {
+    var r = await fetch('/api/admin/directory/' + encodeURIComponent(jid) + '/ttl', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresAt: expiresAt })
+    });
+    if (!r.ok) { var err = await r.json(); showToast((err && err.error) || 'Failed', true); return; }
+    showToast('Access expires at ' + new Date(expiresAt * 1000).toLocaleString());
+    if (customDiv) customDiv.style.display = 'none';
+  } catch(e) {
+    showToast('Failed: ' + e.message, true);
   }
 }
 
