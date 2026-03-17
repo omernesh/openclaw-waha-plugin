@@ -574,10 +574,9 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
       <summary>Access Control</summary>
       <div class="field-group">
         <div class="field">
-          <label>DM Policy <span class="tip" data-tip="How to handle DMs from unknown senders. open: accept all. closed: block all. allowlist: only contacts in Allow From list. pairing: not supported in current SDK integration.">?</span></label>
+          <label>DM Policy <span class="tip" data-tip="How to handle DMs from unknown senders. open: accept all. closed: block all. allowlist: only contacts in Allow From list.">?</span></label>
           <select id="s-dmPolicy" name="dmPolicy">
-            <!-- UX-01: pairing disabled - SDK integration not verified -->
-            <option value="pairing" disabled>pairing (not available)</option>
+            <!-- Phase 12, Plan 02 (UI-08): pairing option removed — no longer supported. Auto-migrated to allowlist on load. DO NOT ADD BACK. -->
             <option value="open">open</option>
             <option value="closed">closed</option>
             <option value="allowlist">allowlist</option>
@@ -1824,7 +1823,10 @@ async function loadDashboardSessions() {
 
 // ---- Sessions Tab (Phase 4, Plan 04) ----
 // Phase 11, Plan 01 (SESS-01): saveSessionRole -- save role/subRole via PUT endpoint. DO NOT REMOVE.
-async function saveSessionRole(sessionId, role, subRole) {
+// Phase 12, Plan 02 (UI-03): Optimistic UI — do NOT call loadSessions() on success (causes flicker).
+//   The dropdown already shows the new value (user just changed it). On error, revert to old value.
+//   On 502 (gateway restarting), show polling overlay via showSessionRestartOverlay().
+async function saveSessionRole(sessionId, role, subRole, selectEl, prevVal) {
   try {
     var body = {};
     if (role !== null) body.role = role;
@@ -1834,16 +1836,91 @@ async function saveSessionRole(sessionId, role, subRole) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
+    if (r.status === 502) {
+      // UI-04: Gateway is restarting — show polling overlay instead of raw error
+      showSessionRestartOverlay();
+      return;
+    }
     if (r.ok) {
-      showToast('Role saved. Restart gateway to apply changes.');
-      loadSessions();
+      // Optimistic UI: dropdown already shows the new value — just toast, do NOT call loadSessions()
+      showToast('Saved. Restart required for changes to take effect.');
     } else {
       var errData = await r.json().catch(function() { return {}; });
+      // Revert dropdown to previous value on error
+      if (selectEl && prevVal != null) selectEl.value = prevVal;
       showToast(errData.error || 'Failed to save role', true);
     }
   } catch(e) {
-    showToast('Error saving role: ' + (e.message || String(e)), true);
+    // Network error (e.g. server dropped connection during restart) — show overlay
+    showSessionRestartOverlay();
   }
+}
+
+// Phase 12, Plan 02 (UI-04): Show a polling overlay when a 502 occurs during session role save.
+// Reuses the same pattern as saveAndRestart() but polls /api/admin/sessions instead of /api/admin/stats.
+// DO NOT REMOVE — 502 happens when gateway is mid-restart.
+function showSessionRestartOverlay() {
+  // Avoid duplicate overlays
+  if (document.getElementById('restart-overlay')) return;
+  var overlay = document.createElement('div');
+  overlay.id = 'restart-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;';
+  var inner = document.createElement('div');
+  inner.style.cssText = 'text-align:center;';
+  var title = document.createElement('div');
+  title.style.cssText = 'font-size:1.5em;font-weight:bold;margin-bottom:16px;';
+  title.textContent = 'Gateway restarting...';
+  inner.appendChild(title);
+  var spinStyle = document.createElement('style');
+  spinStyle.textContent = '.spin{display:inline-block;width:36px;height:36px;border:4px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;}@keyframes spin{to{transform:rotate(360deg);}}';
+  inner.appendChild(spinStyle);
+  var spinWrap = document.createElement('div');
+  spinWrap.style.cssText = 'margin-bottom:24px;';
+  var spinEl = document.createElement('div');
+  spinEl.className = 'spin';
+  spinWrap.appendChild(spinEl);
+  inner.appendChild(spinWrap);
+  var statusEl = document.createElement('div');
+  statusEl.id = 'restart-status';
+  statusEl.style.cssText = 'font-size:0.95em;color:#aaa;';
+  statusEl.textContent = 'Waiting for server...';
+  inner.appendChild(statusEl);
+  var manualEl = document.createElement('div');
+  manualEl.id = 'restart-manual';
+  manualEl.style.cssText = 'display:none;margin-top:20px;';
+  var refreshBtn = document.createElement('button');
+  refreshBtn.style.cssText = 'padding:10px 24px;font-size:1em;cursor:pointer;background:#3b82f6;color:#fff;border:none;border-radius:6px;';
+  refreshBtn.textContent = 'Refresh Manually';
+  refreshBtn.onclick = function() { location.reload(); };
+  manualEl.appendChild(refreshBtn);
+  inner.appendChild(manualEl);
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+  pollSessionsUntilReady(Date.now());
+}
+function pollSessionsUntilReady(startedAt) {
+  var statusEl = document.getElementById('restart-status');
+  var manualEl = document.getElementById('restart-manual');
+  var elapsed = Math.floor((Date.now() - startedAt) / 1000);
+  if (Date.now() - startedAt >= 30000) {
+    if (statusEl) statusEl.textContent = 'Gateway did not respond within 30s. Try refreshing manually.';
+    if (manualEl) manualEl.style.display = '';
+    return;
+  }
+  if (statusEl) statusEl.textContent = 'Waiting for server... ' + elapsed + 's elapsed';
+  setTimeout(function() {
+    fetch('/api/admin/sessions').then(function(r) {
+      if (r.ok) {
+        var ov = document.getElementById('restart-overlay');
+        if (ov) ov.remove();
+        loadSessions();
+      } else {
+        pollSessionsUntilReady(startedAt);
+      }
+    }).catch(function() {
+      pollSessionsUntilReady(startedAt);
+    });
+  }, 2000);
 }
 
 async function loadSessions() {
@@ -1874,16 +1951,25 @@ async function loadSessions() {
       var lastCheckStr = s.lastCheck ? relTime(s.lastCheck) : 'never';
       var wahaStatus = esc(s.wahaStatus || 'UNKNOWN');
       // Phase 11, Plan 01 (SESS-01): role/subRole are dropdowns. DO NOT revert to static spans.
+      // Phase 12, Plan 02 (UI-03, UX-01): Optimistic UI — pass this + data-prev for revert on error.
+      //   data-prev is set by onmousedown (captures value before change).
+      //   Labels added above each dropdown. DO NOT REMOVE.
       var roleSelect =
-        '<select onchange="saveSessionRole(' + "'" + esc(s.sessionId) + "'" + ', this.value, null)" style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;">' +
-          '<option value="bot"' + (s.role === 'bot' ? ' selected' : '') + '>bot</option>' +
-          '<option value="human"' + (s.role === 'human' ? ' selected' : '') + '>human</option>' +
-        '</select>';
+        '<div style="display:inline-flex;flex-direction:column;align-items:flex-start;">' +
+          '<label style="display:block;font-size:0.75rem;color:#90a4ae;margin-bottom:2px;">Role</label>' +
+          '<select data-prev="' + esc(s.role || 'bot') + '" onmousedown="this.dataset.prev=this.value" onchange="saveSessionRole(' + "'" + esc(s.sessionId) + "'" + ',this.value,null,this,this.dataset.prev)" style="background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;">' +
+            '<option value="bot"' + (s.role === 'bot' ? ' selected' : '') + '>bot</option>' +
+            '<option value="human"' + (s.role === 'human' ? ' selected' : '') + '>human</option>' +
+          '</select>' +
+        '</div>';
       var subRoleSelect =
-        '<select onchange="saveSessionRole(' + "'" + esc(s.sessionId) + "'" + ', null, this.value)" style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;margin-left:4px;">' +
-          '<option value="full-access"' + (s.subRole === 'full-access' ? ' selected' : '') + '>full-access</option>' +
-          '<option value="listener"' + (s.subRole === 'listener' ? ' selected' : '') + '>listener</option>' +
-        '</select>';
+        '<div style="display:inline-flex;flex-direction:column;align-items:flex-start;margin-left:8px;">' +
+          '<label style="display:block;font-size:0.75rem;color:#90a4ae;margin-bottom:2px;">Sub-Role</label>' +
+          '<select data-prev="' + esc(s.subRole || 'full-access') + '" onmousedown="this.dataset.prev=this.value" onchange="saveSessionRole(' + "'" + esc(s.sessionId) + "'" + ',null,this.value,this,this.dataset.prev)" style="background:' + subRoleBadgeColor(s.subRole) + ';color:#fff;font-size:0.72rem;padding:2px 6px;border-radius:6px;border:1px solid #475569;cursor:pointer;">' +
+            '<option value="full-access"' + (s.subRole === 'full-access' ? ' selected' : '') + '>full-access</option>' +
+            '<option value="listener"' + (s.subRole === 'listener' ? ' selected' : '') + '>listener</option>' +
+          '</select>' +
+        '</div>';
       return '<div class="contact-card" style="background:#0f172a;">' +
         '<div class="contact-header" style="cursor:default;">' +
           '<div class="avatar" style="background:' + roleBadgeColor(s.role) + ';font-size:0.85rem;">' + esc((s.name || s.sessionId || '?').substring(0, 2).toUpperCase()) + '</div>' +
@@ -1907,6 +1993,15 @@ async function loadSessions() {
         '</div>' +
       '</div>';
     }).join('');
+    // Phase 12, Plan 02 (UX-01): Append explanatory text box after session rows. DO NOT REMOVE.
+    html += '<div class="sessions-explainer" style="font-size:0.78rem;color:#78909c;background:#1a1f2e;padding:10px 12px;border-radius:6px;margin-top:12px;line-height:1.6;">' +
+      '<strong style="display:block;margin-bottom:4px;color:#90a4ae;">Role Options:</strong>' +
+      'bot — AI-controlled session, processes messages automatically<br>' +
+      'human — User-controlled session, messages monitored but not auto-responded to<br>' +
+      '<strong style="display:block;margin-top:8px;margin-bottom:4px;color:#90a4ae;">Sub-Role Options:</strong>' +
+      'full-access — Can send and receive messages<br>' +
+      'listener — Can only receive/monitor messages, outgoing sends are blocked' +
+    '</div>';
     container.innerHTML = html;
   } catch(e) {
     while (container.firstChild) container.removeChild(container.firstChild);
@@ -1954,7 +2049,18 @@ async function loadConfig() {
     setVal('s-webhookPath', w.webhookPath || '/webhook/waha');
     setVal('s-triggerWord', w.triggerWord || '');
     setVal('s-triggerResponseMode', w.triggerResponseMode || 'dm');
-    setVal('s-dmPolicy', w.dmPolicy || 'pairing');
+    // Phase 12, Plan 02 (UI-08): Auto-migrate pairing to allowlist — pairing is no longer supported.
+    // DO NOT REMOVE — configs with dmPolicy=pairing must be silently migrated on load.
+    if (w.dmPolicy === 'pairing') {
+      w.dmPolicy = 'allowlist';
+      showToast("DM Policy was set to 'pairing' which is no longer available. Migrated to 'allowlist'.", false);
+      fetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waha: { dmPolicy: 'allowlist' } })
+      }).catch(function() { /* silent — migration best-effort */ });
+    }
+    setVal('s-dmPolicy', w.dmPolicy || 'allowlist');
     setVal('s-groupPolicy', w.groupPolicy || 'allowlist');
     // Phase 8, UI-02 -- Tag Input components replace textareas for JID lists. DO NOT REVERT to setVal.
     if (!tagInputAllowFrom) tagInputAllowFrom = createTagInput('s-allowFrom-ti', { placeholder: '972544329000@c.us' });
@@ -2028,7 +2134,7 @@ async function saveSettings(e) {
       webhookPath: getVal('s-webhookPath') || '/webhook/waha',
       triggerWord: getVal('s-triggerWord') || undefined,
       triggerResponseMode: getVal('s-triggerResponseMode') || 'dm',
-      dmPolicy: getVal('s-dmPolicy') || 'pairing',
+      dmPolicy: getVal('s-dmPolicy') || 'allowlist',
       groupPolicy: getVal('s-groupPolicy') || 'allowlist',
       // Phase 8, UI-02 -- read from Tag Input components. DO NOT REVERT to splitLines(getVal(...)).
       allowFrom: tagInputAllowFrom ? tagInputAllowFrom.getValue() : [],
@@ -3124,7 +3230,7 @@ export function createWahaWebhookServer(opts: {
           allowFrom: account.config.allowFrom ?? [],
           groupAllowFrom: account.config.groupAllowFrom ?? [],
           allowedGroups: account.config.allowedGroups ?? [],
-          dmPolicy: account.config.dmPolicy ?? "pairing",
+          dmPolicy: account.config.dmPolicy ?? "allowlist",
           groupPolicy: account.config.groupPolicy ?? "allowlist",
         },
         session: account.config.session ?? "unknown",
