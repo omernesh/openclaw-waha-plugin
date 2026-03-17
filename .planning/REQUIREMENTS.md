@@ -71,8 +71,8 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 - [x] **PAIR-01**: Unknown contact DMs bot → bot replies with scripted passcode challenge (zero LLM tokens) (FEATURE-01)
 - [x] **PAIR-02**: Correct passcode grants temporary allowlist entry with configurable TTL (FEATURE-01)
 - [x] **PAIR-03**: wa.me deep link with obfuscated passcode parameter enables zero-friction auto-authorization (FEATURE-01)
-- [ ] **PAIR-04**: Passcode is configurable per-session in admin panel (FEATURE-01)
-- [ ] **PAIR-05**: Admin panel shows active temporary grants with remaining TTL and manual revoke (FEATURE-01)
+- [x] **PAIR-04**: Passcode is configurable per-session in admin panel (FEATURE-01)
+- [x] **PAIR-05**: Admin panel shows active temporary grants with remaining TTL and manual revoke (FEATURE-01)
 - [x] **PAIR-06**: Passcode attempts are rate-limited to prevent brute force (FEATURE-01)
 
 ### TTL Access
@@ -88,7 +88,7 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 - [x] **REPLY-01**: Unauthorized DMs receive a configurable canned rejection message (zero LLM tokens) (FEATURE-03)
 - [x] **REPLY-02**: Rejection message supports template variables (e.g., bot admin name) (FEATURE-03)
 - [x] **REPLY-03**: Auto-reply is rate-limited per contact (once per configurable interval, default 24h) (FEATURE-03)
-- [ ] **REPLY-04**: "Send rejection message" toggle in Settings (on/off, some admins prefer silent drop) (FEATURE-03)
+- [x] **REPLY-04**: "Send rejection message" toggle in Settings (on/off, some admins prefer silent drop) (FEATURE-03)
 
 ### Modules System
 
@@ -180,13 +180,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PAIR-01 | Phase 16 | Complete |
 | PAIR-02 | Phase 16 | Complete |
 | PAIR-03 | Phase 16 | Complete |
-| PAIR-04 | Phase 16 | Pending |
-| PAIR-05 | Phase 16 | Pending |
+| PAIR-04 | Phase 16 | Complete |
+| PAIR-05 | Phase 16 | Complete |
 | PAIR-06 | Phase 16 | Complete |
 | REPLY-01 | Phase 16 | Complete |
 | REPLY-02 | Phase 16 | Complete |
 | REPLY-03 | Phase 16 | Complete |
-| REPLY-04 | Phase 16 | Pending |
+| REPLY-04 | Phase 16 | Complete |
 | DIR-03 | Phase 17 | Pending |
 | DIR-05 | Phase 17 | Pending |
 | MOD-01 | Phase 17 | Pending |

@@ -34,7 +34,7 @@ Full details: `.planning/milestones/v1.10-ROADMAP.md`
 - [x] **Phase 13: Background Directory Sync** — Continuous WAHA-to-SQLite sync with local search (completed 2026-03-17)
 - [x] **Phase 14: Name Resolution** — Resolve @lid JIDs to display names throughout the UI (completed 2026-03-17)
 - [x] **Phase 15: TTL Access** — Schema and infrastructure for auto-expiring allowlist entries (completed 2026-03-17)
-- [ ] **Phase 16: Pairing Mode and Auto-Reply** — Passcode-gated onboarding and canned rejection messages
+- [x] **Phase 16: Pairing Mode and Auto-Reply** — Passcode-gated onboarding and canned rejection messages (completed 2026-03-17)
 - [ ] **Phase 17: Modules Framework** — Bulk directory actions and extensible module system
 
 ## Phase Details
@@ -153,5 +153,5 @@ Plans:
 | 13. Background Directory Sync | 2/2 | Complete    | 2026-03-17 | - |
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
 | 15. TTL Access | 3/3 | Complete    | 2026-03-17 | - |
-| 16. Pairing Mode and Auto-Reply | 2/3 | In Progress|  | - |
+| 16. Pairing Mode and Auto-Reply | 3/3 | Complete   | 2026-03-17 | - |
 | 17. Modules Framework | v1.11 | 0/TBD | Not started | - |

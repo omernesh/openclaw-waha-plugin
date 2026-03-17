@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 16-02-PLAN.md
-last_updated: "2026-03-17T14:52:01.174Z"
+stopped_at: Completed 16-03-PLAN.md
+last_updated: "2026-03-17T14:55:32.270Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
   percent: 40
 ---
 
@@ -82,6 +82,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 16-pairing-mode-and-auto-reply]: HMAC tokens are stateless 12-char hex tokens: hmac(jid, hmacSecret).slice(0,12) — no DB lookup on verify
 - [Phase 16-pairing-mode-and-auto-reply]: engine.grantAccess() used in inbound.ts instead of direct setContactAllowDmWithSource() -- routes through PairingEngine public API for encapsulation
 - [Phase 16-pairing-mode-and-auto-reply]: verifyDeepLinkToken called with full messageText in inbound.ts -- function extracts its own regex; pre-extracted token would cause mismatch
+- [Phase 16-pairing-mode-and-auto-reply]: Extended getContactTtl return type to include source field — reuses existing per-contact query without a new DB method
+- [Phase 16-pairing-mode-and-auto-reply]: hmacSecret excluded from frontend config save — managed server-side only, never round-trips through browser
 
 ### Pending Todos
 
@@ -95,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T14:51:46.796Z
-Stopped at: Completed 16-02-PLAN.md
+Last session: 2026-03-17T14:55:32.264Z
+Stopped at: Completed 16-03-PLAN.md
 Resume file: None
