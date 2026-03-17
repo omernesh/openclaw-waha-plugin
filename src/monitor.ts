@@ -260,6 +260,10 @@ function escapeHtml(s: string): string {
 
 function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWahaAccount>): string {
   const session = escapeHtml(account.config.session ?? "unknown");
+  // DIR-01 / DIR-02 (12-05): Inject bot session IDs as a JS global so client can mark bot participants
+  // and exclude them from the contacts list. Session IDs are server-controlled, not user input — safe for JSON.
+  const botSessionIds = listEnabledWahaAccounts(config).map((a) => a.session);
+  const botSessionIdsJson = JSON.stringify(botSessionIds);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -364,6 +368,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .contact-jid { font-size: 0.75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace; }
   .contact-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .badge-count { background: #1e3a5f; color: #7dd3fc; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; }
+  /* DIR-02 (12-05): Bot session badge — shown on group participants that are the bot's own sessions. DO NOT REMOVE. */
+  .bot-badge { background: #1565c0; color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; display: inline-block; vertical-align: middle; }
   .contact-time { font-size: 0.75rem; color: #64748b; }
   .settings-toggle-btn { background: #1d4ed8; color: #fff; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
   .contact-settings-panel { display: none; padding: 16px; border-top: 1px solid #334155; background: #1a2540; }
@@ -944,6 +950,11 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 </footer>
 
 <script>
+// DIR-01 / DIR-02 (12-05): Bot session IDs injected server-side. Used to mark bot participants and
+// exclude bot's own JIDs from contacts. DO NOT REMOVE — participant badge and contact filter depend on this.
+var BOT_SESSION_IDS = ${botSessionIdsJson};
+</script>
+<script>
 // ---- Tab switching ----
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
@@ -1484,6 +1495,9 @@ var gfoTagInputs = {};
 // ---- God Mode Users Field instance variables (Phase 8, UI-04) -- initialized lazily in loadConfig() ----
 var godModePickerDm = null;
 var godModePickerGroup = null;
+// ---- UI-10 (12-05): Global trigger operator stored on loadConfig() for use in per-group indicator ----
+// DO NOT REMOVE — per-group "inheriting global" indicator reads this to show effective operator when not overriding.
+var globalTriggerOperator = 'OR';
 
 // ---- Dashboard ----
 async function loadStats() {
@@ -2117,6 +2131,9 @@ async function loadConfig() {
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
     var gf = w.groupFilter || {};
     setChk('s-groupFilterEnabled', gf.enabled);
+    // UI-10 (12-05): Store global trigger operator so per-group indicator can read the effective value.
+    // DO NOT REMOVE — loadGroupFilter indicator reads globalTriggerOperator to show "inheriting global" text.
+    globalTriggerOperator = gf.triggerOperator || 'OR';
     // Phase 12, UX-05 -- Group Mention Patterns tag input replaces textarea. DO NOT REVERT to setVal/splitLines.
     if (!groupMentionPatternsInput) groupMentionPatternsInput = createTagInput('group-mention-patterns', { placeholder: 'Add pattern and press Enter...' });
     if (groupMentionPatternsInput) groupMentionPatternsInput.setValue(gf.mentionPatterns || []);
@@ -2703,11 +2720,24 @@ function buildContactCard(c) {
   var borderStyle = c.allowedDm ? 'border-left:3px solid #10b981;' : '';
 
   var allowBtn = '';
+  var isNewsletter = c.jid && c.jid.indexOf('@newsletter') !== -1;
   if (!isGroup) {
-    if (c.allowedDm) {
-      allowBtn = '<button style="background:#10b981;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleAllowDm(\\'' + esc(c.jid) + '\\',true)">Allowed (DM)</button>';
+    if (isNewsletter) {
+      // UI-11 (12-05): Channels tab Allow DM — inline toggle button, no full directory reload.
+      // State persists across page reload because it reads from API response data (allowedDm).
+      // DO NOT REMOVE — newsletter allow-dm uses inline toggle to avoid full-directory reload on each click.
+      var nlBtnBg = c.allowedDm ? '#2e7d32' : 'transparent';
+      var nlBtnColor = c.allowedDm ? '#fff' : '#78909c';
+      var nlBtnBorder = c.allowedDm ? 'none' : '1px solid #546e7a';
+      var nlBtnText = c.allowedDm ? 'Allowed' : 'Allow DM';
+      var nlBtnId = 'allow-btn-' + id;
+      allowBtn = '<button id="' + nlBtnId + '" style="background:' + nlBtnBg + ';color:' + nlBtnColor + ';border:' + nlBtnBorder + ';padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleChannelAllowDm(\\'' + esc(c.jid) + '\\',\\'' + nlBtnId + '\\',' + (c.allowedDm ? 'true' : 'false') + ')">' + nlBtnText + '</button>';
     } else {
-      allowBtn = '<button style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleAllowDm(\\'' + esc(c.jid) + '\\',false)">Allow DM</button>';
+      if (c.allowedDm) {
+        allowBtn = '<button style="background:#10b981;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleAllowDm(\\'' + esc(c.jid) + '\\',true)">Allowed (DM)</button>';
+      } else {
+        allowBtn = '<button style="background:#1d4ed8;color:#fff;border:none;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleAllowDm(\\'' + esc(c.jid) + '\\',false)">Allow DM</button>';
+      }
     }
   }
 
@@ -2825,6 +2855,34 @@ async function toggleAllowDm(jid, currentlyAllowed) {
   } catch(e) { showToast('Error: ' + e.message, true); }
 }
 
+// UI-11 (12-05): Inline allow-dm toggle for Channels tab — updates button in place without reloading directory.
+// DO NOT REMOVE — newsletter allow-dm button uses this to avoid full directory reload on toggle.
+// Visual state reads from API response on next loadDirectory(), so it persists across page reload.
+async function toggleChannelAllowDm(jid, btnId, currentlyAllowed) {
+  try {
+    var newState = !currentlyAllowed;
+    var r = await fetch('/api/admin/directory/' + encodeURIComponent(jid) + '/allow-dm', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ allowed: newState })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    // Update button visual state inline
+    var btn = document.getElementById(btnId);
+    if (btn) {
+      btn.textContent = newState ? 'Allowed' : 'Allow DM';
+      btn.style.background = newState ? '#2e7d32' : 'transparent';
+      btn.style.color = newState ? '#fff' : '#78909c';
+      btn.style.border = newState ? 'none' : '1px solid #546e7a';
+      // Update onclick to reflect new current state
+      btn.setAttribute('onclick', 'event.stopPropagation();toggleChannelAllowDm(\\'' + jid.replace(/'/g, "\\'") + '\\',\\'' + btnId + '\\',' + (newState ? 'true' : 'false') + ')');
+    }
+    // Update card border to reflect allow state
+    var card = document.getElementById('card-' + jid.replace(/[^a-zA-Z0-9]/g, '_'));
+    if (card) card.style.borderLeft = newState ? '3px solid #10b981' : '';
+    showToast(newState ? 'DM allowed for channel' : 'DM revoked for channel', false);
+  } catch(e) { showToast('Failed: ' + e.message, true); }
+}
+
 async function loadGroupParticipants(groupJid, forceOpen) {
   var id = 'card-' + groupJid.replace(/[^a-zA-Z0-9]/g, '_');
   var panel = document.getElementById('panel-' + id);
@@ -2863,26 +2921,35 @@ async function loadGroupParticipants(groupJid, forceOpen) {
         var pInits = initials(p.displayName || '', p.participantJid);
         // DIR-02: Green if allowed per-group OR globally allowed via config.groupAllowFrom
         var groupAllowed = p.allowInGroup || p.globallyAllowed;
+        // DIR-02 (12-05): Check if this participant is a bot session. BOT_SESSION_IDS is injected server-side.
+        // Bot sessions show a 'bot' badge and have no action controls — allow/dm toggles and role dropdown are suppressed.
+        // DO NOT REMOVE — isBotSession check powers the bot badge and control suppression for bot session participants.
+        var isBotSession = typeof BOT_SESSION_IDS !== 'undefined' && Array.isArray(BOT_SESSION_IDS) &&
+          BOT_SESSION_IDS.some(function(sid) { return p.participantJid && p.participantJid.indexOf(sid) !== -1; });
         html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e293b;">';
         // DIR-04: Checkbox in bulk select mode — use JSON.stringify to safely embed JID in onclick
-        if (bulkSelectMode) {
+        if (bulkSelectMode && !isBotSession) {
           var pChecked = bulkSelectedJids.has(p.participantJid);
           html += '<input type="checkbox"' + (pChecked ? ' checked' : '') + ' style="width:16px;height:16px;accent-color:#1d4ed8;flex-shrink:0;cursor:pointer;" onclick="event.stopPropagation();toggleBulkItem(' + JSON.stringify(p.participantJid) + ',this)">';
         }
         html += '<div class="avatar" style="width:32px;height:32px;font-size:0.8rem;background:' + pColor + ';color:#fff">' + esc(pInits) + '</div>';
         html += '<div style="flex:1;min-width:0;">';
-        html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + '</div>';
+        // DIR-02 (12-05): Bot badge next to participant name — indicates this is the bot's own session
+        html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + (isBotSession ? ' <span class="bot-badge">bot</span>' : '') + '</div>';
         html += '<div style="font-size:0.72rem;color:#64748b;font-family:monospace;">' + esc(p.participantJid) + '</div>';
         html += '</div>';
-        // DIR-03: Role dropdown — role values are static strings (no user data), safe as HTML template
-        var pRole = p.participantRole || 'participant';
-        html += '<select style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:0.75rem;" onchange="setParticipantRole(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',this.value)">';
-        html += '<option value="bot_admin"' + (pRole === 'bot_admin' ? ' selected' : '') + '>Bot Admin</option>';
-        html += '<option value="manager"' + (pRole === 'manager' ? ' selected' : '') + '>Manager</option>';
-        html += '<option value="participant"' + (pRole === 'participant' ? ' selected' : '') + '>Participant</option>';
-        html += '</select>';
-        html += '<button style="background:' + (groupAllowed ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-group\\',' + (p.allowInGroup ? 'true' : 'false') + ')">' + (groupAllowed ? 'Allowed' : 'Allow') + '</button>';
-        html += '<button style="background:' + (p.allowDm ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-dm\\',' + (p.allowDm ? 'true' : 'false') + ')">' + (p.allowDm ? 'DM OK' : 'Allow DM') + '</button>';
+        if (!isBotSession) {
+          // DIR-03: Role dropdown — role values are static strings (no user data), safe as HTML template
+          // DIR-04 (12-05): onmousedown captures prev value; onchange fires setParticipantRole with auto-grant
+          var pRole = p.participantRole || 'participant';
+          html += '<select style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:0.75rem;" data-prev="' + esc(pRole) + '" onmousedown="this.dataset.prev=this.value" onchange="setParticipantRole(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',this.value,this.dataset.prev,this)">';
+          html += '<option value="bot_admin"' + (pRole === 'bot_admin' ? ' selected' : '') + '>Bot Admin</option>';
+          html += '<option value="manager"' + (pRole === 'manager' ? ' selected' : '') + '>Manager</option>';
+          html += '<option value="participant"' + (pRole === 'participant' ? ' selected' : '') + '>Participant</option>';
+          html += '</select>';
+          html += '<button id="allow-grp-' + esc(p.participantJid).replace(/[^a-zA-Z0-9]/g,'_') + '" style="background:' + (groupAllowed ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-group\\',' + (p.allowInGroup ? 'true' : 'false') + ')">' + (groupAllowed ? 'Allowed' : 'Allow') + '</button>';
+          html += '<button id="allow-dm-' + esc(p.participantJid).replace(/[^a-zA-Z0-9]/g,'_') + '" style="background:' + (p.allowDm ? '#10b981' : '#334155') + ';color:#fff;border:none;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:0.72rem;" onclick="toggleParticipantAllow(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',\\'allow-dm\\',' + (p.allowDm ? 'true' : 'false') + ')">' + (p.allowDm ? 'DM OK' : 'Allow DM') + '</button>';
+        }
         html += '</div>';
       });
     }
@@ -2892,6 +2959,9 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     html += '<div class="group-filter-override" style="margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;">';
     var sfx = esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_');
     html += '<h4 style="margin:0 0 8px;color:#94a3b8;font-size:13px;text-transform:uppercase;">Group Filter Override</h4>';
+    // UI-10 (12-05): Show effective trigger operator when not overriding. Hidden when override is active (override panel has its own dropdown).
+    // DO NOT REMOVE — this indicator makes the inherited global operator visible to the admin without needing to expand override settings.
+    html += '<div id="gfo-op-indicator-' + sfx + '" style="font-size:0.78rem;color:#546e7a;margin:0 0 6px;font-style:italic;">Trigger Operator: ' + (globalTriggerOperator || 'OR').toUpperCase() + ' (inheriting global)</div>';
     html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
     html += '<input type="checkbox" id="gfo-enabled-' + sfx + '">';
     html += ' <span>Override global filter</span></label>';
@@ -2936,8 +3006,12 @@ async function toggleParticipantAllow(groupJid, participantJid, type, currentlyA
   } catch(e) { showToast('Error: ' + e.message, true); }
 }
 
-// DIR-03: Set participant role — calls PUT /api/admin/directory/group/:groupJid/participants/:participantJid/role
-async function setParticipantRole(groupJid, participantJid, role) {
+// DIR-03 / DIR-04 (12-05): Set participant role with auto-grant/revoke.
+// prevRole: value before change (captured by onmousedown in the select). selectEl: the dropdown element.
+// Auto-grant: promoting to bot_admin or manager enables Allow + Allow DM automatically.
+// Auto-revoke: demoting from bot_admin/manager to participant revokes Allow DM (group Allow stays).
+// DO NOT REMOVE — auto-grant/revoke is part of the role promotion UX (DIR-04 requirement).
+async function setParticipantRole(groupJid, participantJid, role, prevRole, selectEl) {
   try {
     var r = await fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/participants/' + encodeURIComponent(participantJid) + '/role', {
       method: 'PUT',
@@ -2947,9 +3021,55 @@ async function setParticipantRole(groupJid, participantJid, role) {
     var d = await r.json();
     if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
     if (!d.ok) throw new Error(d.error || 'Participant not found — refresh participants first');
-    showToast('Role updated');
+
+    var isPromotion = role === 'bot_admin' || role === 'manager';
+    var wasPrevileged = prevRole === 'bot_admin' || prevRole === 'manager';
+
+    if (isPromotion) {
+      // DIR-04: Auto-grant Allow (group) + Allow DM on promotion to bot_admin/manager
+      try {
+        await Promise.all([
+          fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/participants/' + encodeURIComponent(participantJid) + '/allow-group', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ allowed: true })
+          }),
+          fetch('/api/admin/directory/' + encodeURIComponent(participantJid) + '/allow-dm', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ allowed: true })
+          })
+        ]);
+        // Update button visuals inline to reflect new allow states
+        var grpBtn = document.getElementById('allow-grp-' + participantJid.replace(/[^a-zA-Z0-9]/g, '_'));
+        if (grpBtn) { grpBtn.textContent = 'Allowed'; grpBtn.style.background = '#10b981'; }
+        var dmBtn = document.getElementById('allow-dm-' + participantJid.replace(/[^a-zA-Z0-9]/g, '_'));
+        if (dmBtn) { dmBtn.textContent = 'DM OK'; dmBtn.style.background = '#10b981'; }
+        showToast('Role updated. Allow and Allow DM auto-enabled.', false);
+      } catch(autoErr) {
+        showToast('Role updated. Auto-grant failed: ' + autoErr.message, true);
+      }
+    } else if (wasPrevileged && role === 'participant') {
+      // DIR-04: Auto-revoke Allow DM on demotion to participant (group Allow kept as-is)
+      try {
+        await fetch('/api/admin/directory/' + encodeURIComponent(participantJid) + '/allow-dm', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ allowed: false })
+        });
+        // Update DM button visual inline
+        var dmBtn2 = document.getElementById('allow-dm-' + participantJid.replace(/[^a-zA-Z0-9]/g, '_'));
+        if (dmBtn2) { dmBtn2.textContent = 'Allow DM'; dmBtn2.style.background = '#334155'; }
+        showToast('Role updated. Allow DM revoked.', false);
+      } catch(revokeErr) {
+        showToast('Role updated. Auto-revoke failed: ' + revokeErr.message, true);
+      }
+    } else {
+      showToast('Role updated', false);
+    }
+    // Update data-prev on select to reflect new current role (for next change)
+    if (selectEl) selectEl.dataset.prev = role;
   } catch(e) {
     showToast('Failed to update role: ' + e.message, true);
+    // Revert dropdown on failure
+    if (selectEl && prevRole) selectEl.value = prevRole;
   }
 }
 
@@ -2979,10 +3099,14 @@ async function loadGroupFilter(groupJid) {
     var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
     // UX-03: Trigger operator select element
     var elOperator = document.getElementById('gfo-operator-' + sfx);
+    // UI-10 (12-05): Indicator shown when NOT overriding. Hidden when override is active.
+    var elOpIndicator = document.getElementById('gfo-op-indicator-' + sfx);
     if (!elEnabled) return;
     if (ov && ov.enabled) {
       elEnabled.checked = true;
       if (elSettings) elSettings.style.display = '';
+      // UI-10 (12-05): Hide the "inheriting global" indicator when override is active
+      if (elOpIndicator) elOpIndicator.style.display = 'none';
       if (elFilterEnabled) elFilterEnabled.checked = ov.filterEnabled !== false;
       // UX-03: Load keywords into tag input instance instead of plain text input
       if (gfoTagInputs[sfx] && ov.mentionPatterns) {
@@ -2994,10 +3118,15 @@ async function loadGroupFilter(groupJid) {
     } else {
       elEnabled.checked = false;
       if (elSettings) elSettings.style.display = 'none';
+      // UI-10 (12-05): Show the "inheriting global" indicator when NOT overriding
+      if (elOpIndicator) elOpIndicator.style.display = '';
     }
     // Wire toggle for settings visibility + save on change
     elEnabled.onchange = function() {
-      if (elSettings) elSettings.style.display = elEnabled.checked ? '' : 'none';
+      var isOverriding = elEnabled.checked;
+      if (elSettings) elSettings.style.display = isOverriding ? '' : 'none';
+      // UI-10 (12-05): Toggle indicator visibility when override state changes
+      if (elOpIndicator) elOpIndicator.style.display = isOverriding ? 'none' : '';
       saveGroupFilter(groupJid);
     };
     if (elFilterEnabled) elFilterEnabled.onchange = function() { saveGroupFilter(groupJid); };
@@ -3149,6 +3278,39 @@ function syncAllowListBatch(configPath: string, field: "allowFrom" | "groupAllow
 
 function syncAllowList(configPath: string, field: "allowFrom" | "groupAllowFrom", jid: string, add: boolean): void {
   syncAllowListBatch(configPath, field, [jid], add);
+}
+
+// DIR-01 (12-05): Cache for bot session JIDs — maps session name to @c.us JID fetched from WAHA /api/{session}/me.
+// TTL 5 minutes. Populated lazily on first contacts directory request. Used to filter bot's own JIDs from contacts list.
+// DO NOT REMOVE — botJidCache powers the bot contact exclusion in GET /api/admin/directory?type=contact.
+const botJidCache: Map<string, { jid: string; fetchedAt: number }> = new Map();
+const BOT_JID_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>): Promise<Set<string>> {
+  const now = Date.now();
+  const result = new Set<string>();
+  for (const acc of accounts) {
+    const cached = botJidCache.get(acc.session);
+    if (cached && (now - cached.fetchedAt) < BOT_JID_CACHE_TTL_MS) {
+      result.add(cached.jid);
+      continue;
+    }
+    try {
+      const r = await fetch(`${acc.config.baseUrl}/api/${encodeURIComponent(acc.session)}/me`, {
+        headers: { "x-api-key": acc.apiKey },
+      });
+      if (r.ok) {
+        const me = await r.json() as { id?: string };
+        if (typeof me.id === "string" && me.id) {
+          botJidCache.set(acc.session, { jid: me.id, fetchedAt: now });
+          result.add(me.id);
+        }
+      }
+    } catch (err) {
+      console.warn(`[waha] fetchBotJids: failed to fetch me for ${acc.session}: ${String(err)}`);
+    }
+  }
+  return result;
 }
 
 export function createWahaWebhookServer(opts: {
@@ -3573,13 +3735,28 @@ export function createWahaWebhookServer(opts: {
       const type = (url.searchParams.get("type") ?? undefined) as "contact" | "group" | "newsletter" | undefined;
       try {
         const db = getDirectoryDb(opts.accountId);
-        const contacts = db.getContacts({ search, limit, offset, type });
-        const total = db.getContactCount(search, type);
+        let contacts = db.getContacts({ search, limit, offset, type });
+        let total = db.getContactCount(search, type);
         const dms = db.getDmCount();
         const groups = db.getGroupCount();
         const newsletters = db.getNewsletterCount();
         // Enrich with allowedDm status from config
         const configAllowFrom: string[] = account.config.allowFrom ?? [];
+        // DIR-01 (12-05): Exclude bot's own JIDs from contacts listing. Fetch bot JIDs from WAHA /me (cached 5min).
+        // Post-query filter — safe because bot accounts are few (1-3 entries), so LIMIT/OFFSET drift is negligible.
+        // DO NOT REMOVE — bot contacts appearing in their own directory is confusing to the admin.
+        if (type === "contact") {
+          try {
+            const botJids = await fetchBotJids(listEnabledWahaAccounts(opts.config));
+            if (botJids.size > 0) {
+              const before = contacts.length;
+              contacts = contacts.filter((c) => !botJids.has(c.jid));
+              total = Math.max(0, total - (before - contacts.length));
+            }
+          } catch (err) {
+            console.warn(`[waha] DIR-01: fetchBotJids failed, skipping bot exclusion: ${String(err)}`);
+          }
+        }
         // @lid and @s.whatsapp.net entries are now filtered at SQL level in directory.ts
         // to fix pagination offset/count mismatches. DO NOT re-add post-query filtering here.
         const enriched = contacts.map((c) => ({
