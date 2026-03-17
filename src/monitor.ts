@@ -1329,6 +1329,7 @@ function createContactPicker(containerId, opts) {
     results = [];
   }
 
+  // NAME-03: Contact picker search queries local SQLite via FTS5 (Phase 13). No changes needed.
   function doSearch(query) {
     // Minimum 2 characters before triggering search
     if (!query || query.length < 2) { closeDropdown(); return; }
@@ -1364,23 +1365,26 @@ function createContactPicker(containerId, opts) {
       // best-effort cosmetic enrichment, not data-fetching logic.
       selected = (jids || []).map(function(jid) { return { jid: jid, displayName: jid }; });
       renderChips();
-      // Resolve display names asynchronously (best-effort)
-      selected.forEach(function(item) {
-        fetch('/api/admin/directory/' + encodeURIComponent(item.jid))
+      // NAME-02: Batch resolve display names via single /api/admin/directory/resolve call.
+      // Replaces N individual per-JID fetches with one batch call for efficiency.
+      // @lid JIDs are resolved via the @c.us fallback in resolveJids() (Plan 01).
+      var needResolve = selected.filter(function(s) { return s.displayName === s.jid; }).map(function(s) { return s.jid; });
+      if (needResolve.length > 0) {
+        fetch('/api/admin/directory/resolve?jids=' + encodeURIComponent(needResolve.join(',')))
           .then(function(r) { return r.ok ? r.json() : null; })
           .then(function(data) {
-            if (data && data.displayName) {
-              for (var k = 0; k < selected.length; k++) {
-                if (selected[k].jid === item.jid) {
-                  selected[k].displayName = data.displayName;
-                  break;
-                }
+            if (!data || !data.resolved) return;
+            var changed = false;
+            for (var k = 0; k < selected.length; k++) {
+              if (data.resolved[selected[k].jid]) {
+                selected[k].displayName = data.resolved[selected[k].jid];
+                changed = true;
               }
-              renderChips();
             }
+            if (changed) renderChips();
           })
-          .catch(function(err) { console.warn('[waha] name resolve failed:', item.jid, err); });
-      });
+          .catch(function(err) { console.warn('[waha] batch name resolve failed:', err); });
+      }
     },
     getSelected: function() { return selected.slice(); },
     // Allow callers to directly set selected with full objects (jid + displayName + any extra fields)
@@ -1389,24 +1393,26 @@ function createContactPicker(containerId, opts) {
     setSelectedObjects: function(items) {
       selected = (items || []).slice();
       renderChips();
-      // Resolve display names for items that only have jid as displayName
-      selected.forEach(function(item) {
-        if (item.displayName && item.displayName !== item.jid) return; // already has a name
-        fetch('/api/admin/directory/' + encodeURIComponent(item.jid))
+      // NAME-02: Batch resolve display names for items that only have jid as displayName.
+      // Replaces N individual per-JID fetches with one batch call for efficiency.
+      // @lid JIDs are resolved via the @c.us fallback in resolveJids() (Plan 01).
+      var needResolve = selected.filter(function(s) { return !s.displayName || s.displayName === s.jid; }).map(function(s) { return s.jid; });
+      if (needResolve.length > 0) {
+        fetch('/api/admin/directory/resolve?jids=' + encodeURIComponent(needResolve.join(',')))
           .then(function(r) { return r.ok ? r.json() : null; })
           .then(function(data) {
-            if (data && data.displayName) {
-              for (var k = 0; k < selected.length; k++) {
-                if (selected[k].jid === item.jid) {
-                  selected[k].displayName = data.displayName;
-                  break;
-                }
+            if (!data || !data.resolved) return;
+            var changed = false;
+            for (var k = 0; k < selected.length; k++) {
+              if (data.resolved[selected[k].jid]) {
+                selected[k].displayName = data.resolved[selected[k].jid];
+                changed = true;
               }
-              renderChips();
             }
+            if (changed) renderChips();
           })
-          .catch(function(err) { console.warn('[waha] name resolve failed:', item.jid, err); });
-      });
+          .catch(function(err) { console.warn('[waha] batch name resolve failed:', err); });
+      }
     }
   };
 }
