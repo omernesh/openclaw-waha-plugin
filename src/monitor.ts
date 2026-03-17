@@ -3264,7 +3264,7 @@ function buildContactCard(c) {
               ttlSelected = Math.abs(closest - rem) < 60 ? String(closest) : 'custom';
             }
           }
-          return '<div class="settings-field"><label>Access Expires <span class="tip" data-tip="Set how long this contact\'s DM access lasts. After expiry, access is automatically revoked.">?</span></label>' +
+          return '<div class="settings-field"><label>Access Expires <span class="tip" data-tip="Set how long this contact\\'s DM access lasts. After expiry, access is automatically revoked.">?</span></label>' +
             '<select id="ttl-' + id + '" onchange="ttlChanged(\\'' + esc(c.jid) + '\\',\\'ttl-' + id + '\\')">' +
               '<option value="never"' + (ttlSelected==='never'?' selected':'') + '>Never</option>' +
               '<option value="1800"' + (ttlSelected==='1800'?' selected':'') + '>30 minutes</option>' +
