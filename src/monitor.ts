@@ -305,6 +305,11 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   #last-refresh { color: #64748b; font-size: 0.75rem; text-align: right; margin-top: 4px; }
   .refresh-btn { background: #1d4ed8; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
   .refresh-btn:hover { background: #2563eb; }
+  /* Phase 12, Plan 03 (UX-03 + UI-09): shared refresh button spinner + timestamp */
+  .refresh-wrap { display:inline-flex; flex-direction:column; align-items:center; gap:2px; }
+  .refresh-ts { font-size:0.7rem; color:#78909c; }
+  @keyframes pulse-refresh { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .refreshing { animation: pulse-refresh 1s ease-in-out infinite; pointer-events:none; }
   /* SETTINGS */
   .settings-section { margin-bottom: 8px; }
   .settings-section summary { cursor: pointer; font-weight: 600; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
@@ -516,7 +521,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="kv" id="health-kv" style="margin-top:8px;border-top:1px solid #334155;padding-top:8px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
       <div id="last-refresh"></div>
-      <button class="refresh-btn" onclick="_accessKvBuilt=false;loadStats()">Refresh</button>
+      <button class="refresh-btn" id="refresh-dashboard" onclick="_accessKvBuilt=false;loadStats()">Refresh</button>
     </div>
   </div>
 </main>
@@ -887,7 +892,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="stat-row" id="queue-stats"></div>
     <div class="kv" id="queue-kv" style="margin-top:12px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;">
-      <button class="refresh-btn" onclick="loadQueue()">Refresh</button>
+      <button class="refresh-btn" id="refresh-queue" onclick="loadQueue()">Refresh</button>
     </div>
   </div>
 </main>
@@ -901,7 +906,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div id="sessions-list" style="display:grid;gap:12px;margin-top:4px;"></div>
     <p style="margin-top:16px;font-size:0.78rem;color:#64748b;border-top:1px solid #334155;padding-top:12px;">Changes take effect after gateway restart.</p>
     <div style="margin-top:8px;display:flex;justify-content:flex-end;">
-      <button class="refresh-btn" onclick="loadSessions()">Refresh</button>
+      <button class="refresh-btn" id="refresh-sessions" onclick="loadSessions()">Refresh</button>
     </div>
   </div>
 </main>
@@ -919,7 +924,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button onclick="setLogLevel('warn')" id="log-level-warn" class="log-level-btn">Warn</button>
     <button onclick="setLogLevel('info')" id="log-level-info" class="log-level-btn">Info</button>
     <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#94a3b8;cursor:pointer;"><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
-    <button onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#1e293b;color:#e2e8f0;">Refresh</button>
+    <button id="refresh-log" onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#1e293b;color:#e2e8f0;">Refresh</button>
   </div>
   <div id="log-source" style="font-size:0.72rem;color:#64748b;margin-bottom:6px;"></div>
   <div id="log-output" style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;max-height:70vh;overflow-y:auto;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;line-height:1.4;margin:0;"></div>
@@ -2988,6 +2993,70 @@ async function saveGroupFilter(groupJid) {
     elEnabled.disabled = false;
   }
 }
+
+// ---- Phase 12, Plan 03 (UX-03 + UI-09): Shared Refresh button helper ----
+// DO NOT REMOVE: wrapRefreshButton wraps any Refresh button with:
+//   1. "Refreshing..." text + pulse animation while the load function runs
+//   2. "Last refreshed: Xm ago" timestamp below the button, auto-updating every 30s
+// Applied uniformly to all 5 tabs (dashboard, sessions, log, queue, directory).
+function wrapRefreshButton(btn, loadFn) {
+  var tsEl = document.createElement("span");
+  tsEl.className = "refresh-ts";
+  tsEl.textContent = "";
+  btn.parentNode.insertBefore(tsEl, btn.nextSibling);
+
+  var lastRefreshed = null;
+
+  function updateTs() {
+    if (!lastRefreshed) return;
+    var diff = Math.floor((Date.now() - lastRefreshed) / 1000);
+    if (diff < 60) tsEl.textContent = "Just now";
+    else if (diff < 3600) tsEl.textContent = Math.floor(diff / 60) + "m ago";
+    else tsEl.textContent = Math.floor(diff / 3600) + "h ago";
+  }
+
+  // Update relative time every 30s
+  setInterval(updateTs, 30000);
+
+  btn.addEventListener("click", function() {
+    var origText = btn.textContent;
+    btn.textContent = "Refreshing...";
+    btn.classList.add("refreshing");
+    btn.disabled = true;
+
+    Promise.resolve(loadFn()).then(function() {
+      lastRefreshed = Date.now();
+      updateTs();
+    }).catch(function(err) {
+      console.warn("[waha] refresh failed:", err);
+    }).then(function() {
+      btn.textContent = origText;
+      btn.classList.remove("refreshing");
+      btn.disabled = false;
+    });
+  });
+}
+
+// Wire wrapRefreshButton to all 5 tab Refresh buttons after DOM is ready.
+// DO NOT REMOVE: removes inline onclick handlers would break _accessKvBuilt reset on dashboard.
+// We keep onclick AND add wrapRefreshButton — onclick fires but wrapRefreshButton's click
+// handler also fires. To avoid double-call, we override the onclick after wrapping.
+(function() {
+  function wireRefreshBtn(id, loadFn, extraSetup) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.removeAttribute("onclick");
+    if (extraSetup) btn.addEventListener("click", function() { extraSetup(); }, true);
+    wrapRefreshButton(btn, loadFn);
+  }
+  // Dashboard: must reset _accessKvBuilt before calling loadStats
+  wireRefreshBtn("refresh-dashboard", loadStats, function() { _accessKvBuilt = false; });
+  wireRefreshBtn("refresh-sessions", loadSessions, null);
+  wireRefreshBtn("refresh-log", loadLogs, null);
+  wireRefreshBtn("refresh-queue", loadQueue, null);
+  // Directory uses dir-refresh-btn (simple refresh of current view, not full import)
+  wireRefreshBtn("dir-refresh-btn", loadDirectory, null);
+})();
 </script>
 </body>
 </html>`;
