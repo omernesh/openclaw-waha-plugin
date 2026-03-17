@@ -329,6 +329,18 @@ export class DirectoryDb {
     return '"' + term.replace(/"/g, '""') + '"';
   }
 
+  /**
+   * Build the FTS5 type-filter SQL fragment for contact queries.
+   * Used by both getContacts() and getContactCount() to keep filters in sync.
+   * Returns an empty string when no type filter is needed.
+   */
+  private _buildTypeCondition(type?: ContactType): string {
+    if (type === "contact") return "AND c.is_group = 0 AND c.jid NOT LIKE '%@newsletter'";
+    if (type === "group") return "AND c.is_group = 1";
+    if (type === "newsletter") return "AND c.jid LIKE '%@newsletter'";
+    return "";
+  }
+
   getContacts(opts?: { search?: string; limit?: number; offset?: number; type?: ContactType }): ContactRecord[] {
     const limit = opts?.limit ?? 50;
     const offset = opts?.offset ?? 0;
@@ -339,13 +351,7 @@ export class DirectoryDb {
       // FTS5 MATCH — instant indexed search instead of LIKE full table scan.
       // Phase 13 (SYNC-02, SYNC-05). DO NOT revert to LIKE — FTS5 is indexed, LIKE is O(n).
       const ftsQuery = search.split(/\s+/).filter(Boolean).map(t => this._fts5Quote(t)).join(' ');
-      const typeCond = type === "contact"
-        ? "AND c.is_group = 0 AND c.jid NOT LIKE '%@newsletter'"
-        : type === "group"
-        ? "AND c.is_group = 1"
-        : type === "newsletter"
-        ? "AND c.jid LIKE '%@newsletter'"
-        : "";
+      const typeCond = this._buildTypeCondition(type);
       const ftsSql = `
         SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
                d.mode, d.mention_only, d.custom_keywords, d.can_initiate, d.can_initiate_override
@@ -539,13 +545,7 @@ export class DirectoryDb {
       // FTS5 count — must match getContacts() FTS5 query for pagination accuracy.
       // Phase 13 (SYNC-02). DO NOT REMOVE.
       const ftsQuery = search.trim().split(/\s+/).filter(Boolean).map(t => this._fts5Quote(t)).join(' ');
-      const typeCond = type === "contact"
-        ? "AND c.is_group = 0 AND c.jid NOT LIKE '%@newsletter'"
-        : type === "group"
-        ? "AND c.is_group = 1"
-        : type === "newsletter"
-        ? "AND c.jid LIKE '%@newsletter'"
-        : "";
+      const typeCond = this._buildTypeCondition(type);
       const ftsSql = `
         SELECT COUNT(*) as cnt
         FROM contacts_fts

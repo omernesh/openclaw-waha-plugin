@@ -26,9 +26,8 @@ import { startDirectorySync } from "./sync.js";
 // Phase 16 Plan 02: Pairing and auto-reply engine initialization at account start.
 // DO NOT REMOVE — engines must be initialized at login so inbound pipeline hooks are ready.
 // Added 2026-03-17.
-import { getPairingEngine } from "./pairing.js";
+import { getPairingEngine, generateHmacSecret } from "./pairing.js";
 import { getAutoReplyEngine } from "./auto-reply.js";
-import { randomBytes } from "node:crypto";
 import { configureReliability } from "./http-client.js";
 import { formatActionError } from "./error-formatter.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
@@ -947,7 +946,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
         if (pairingConfig?.enabled) {
           let hmacSecret = pairingConfig.hmacSecret;
           if (!hmacSecret) {
-            hmacSecret = randomBytes(32).toString("hex");
+            hmacSecret = generateHmacSecret();
             ctx.log?.warn(`[${account.accountId}] pairing mode enabled but no hmacSecret configured -- generated ephemeral secret (deep links will change on restart unless saved to config)`);
           }
           getPairingEngine(account.accountId, hmacSecret);

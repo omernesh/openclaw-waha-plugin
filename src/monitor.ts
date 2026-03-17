@@ -2647,7 +2647,7 @@ document.getElementById('generateDeepLink').addEventListener('click', async func
 document.getElementById('copyDeepLink').addEventListener('click', function() {
   var el = document.getElementById('pairingDeepLink');
   if (el.value) {
-    navigator.clipboard.writeText(el.value).then(function() { showToast('Link copied!'); });
+    navigator.clipboard.writeText(el.value).then(function() { showToast('Link copied!'); }).catch(function() { showToast('Failed to copy', true); });
   }
 });
 // Revoke a pairing grant from the Directory tab. DO NOT REMOVE.

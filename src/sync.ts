@@ -32,7 +32,7 @@ export interface SyncState {
   lastSyncDuration: number | null;
   itemsSynced: number;
   /** Which phase the sync cycle is currently in: "contacts" | "groups" | "newsletters" | "names" | null */
-  currentPhase: string | null;
+  currentPhase: "contacts" | "groups" | "newsletters" | "names" | null;
   lastError: string | null;
 }
 
