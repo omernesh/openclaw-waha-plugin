@@ -67,7 +67,11 @@ Plans:
   2. Directory search returns results instantly from the local database — no waiting for WAHA API calls
   3. The Directory tab shows "Last synced" timestamp and sync progress indicator so the user knows sync is running
   4. Contacts tab has pagination matching the Groups tab so both tabs behave consistently
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Sync engine (sync.ts) + FTS5 full-text search in directory.ts
+- [ ] 13-02-PLAN.md — Config wiring, sync startup, status API, contacts pagination, status bar UI
 
 ### Phase 14: Name Resolution
 **Goal**: Raw @lid JIDs are never shown to the user — every JID in the admin panel displays a resolved contact name with the JID as a tooltip, populated from the locally synced directory
@@ -132,7 +136,7 @@ Plans:
 | 10. Directory & Group Enhancements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 11. Dashboard, Sessions & Log | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 12. UI Bug Sprint | 5/5 | Complete    | 2026-03-17 | - |
-| 13. Background Directory Sync | v1.11 | 0/TBD | Not started | - |
+| 13. Background Directory Sync | v1.11 | 0/2 | Not started | - |
 | 14. Name Resolution | v1.11 | 0/TBD | Not started | - |
 | 15. TTL Access | v1.11 | 0/TBD | Not started | - |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
