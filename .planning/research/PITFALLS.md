@@ -1,250 +1,351 @@
 # Domain Pitfalls
 
-**Domain:** Reliability hardening and multi-session support for a production WhatsApp plugin (WAHA + OpenClaw)
-**Researched:** 2026-03-11
-**Confidence:** HIGH (based on codebase analysis + lessons learned history + community patterns)
+**Domain:** v1.11 feature additions to existing brittle WhatsApp plugin (background sync, pairing mode, TTL access, auto-reply, modules system)
+**Researched:** 2026-03-17
+**Confidence:** HIGH (based on codebase analysis, bugs.md findings, lessons-learned history, and established patterns in similar feature domains)
+
+---
 
 ## Critical Pitfalls
 
-Mistakes that cause production outages, data loss, or require significant rework.
+### Pitfall 1: Background Sync Race Condition With Inbound Webhook Writes
 
-### Pitfall 1: AbortController Timeout Aborting Response Body Reads
+**What goes wrong:**
+Background sync pulls the full contacts/groups list from WAHA and writes it to SQLite in a loop. Meanwhile, the inbound webhook handler also writes to the same `contacts` and `group_participants` tables when new messages arrive (upsert-on-message pattern). These two writers collide. Even with SQLite WAL mode, if the background sync runs a multi-row transaction and the webhook handler tries to upsert mid-transaction, the webhook write either deadlocks or silently fails with `SQLITE_BUSY`. The busy_timeout is already set but a long-running bulk sync transaction will exhaust it.
 
-**What goes wrong:** Adding `AbortSignal.timeout(30000)` to `fetch()` in `callWahaApi` can abort mid-response-body-read. The HTTP connection completes (status 200), but reading `response.json()` or `response.text()` takes time on large payloads (e.g., `getWahaGroups` returning hundreds of groups). The abort fires during the body parse, throwing `TimeoutError` on a request that actually succeeded server-side. The side effect (message sent, group created) already happened, but the caller thinks it failed and may retry.
+**Why it happens:**
+The background sync naturally batches writes for efficiency (single transaction for 1000 contacts). The existing inbound webhook handler was written assuming it's the only writer. The sync loop has no awareness of concurrent webhook writes and vice versa.
 
-**Why it happens:** `AbortSignal.timeout()` measures wall-clock time from signal creation, not from TCP connect. Large JSON responses or slow network reads eat into the budget after the server already processed the mutation.
+**How to avoid:**
+- Run background sync writes in small page-sized batches (50-100 rows) with a `yield` between batches — never one mega-transaction across all contacts
+- Add a dedicated write serializer: both the sync loop and webhook handler acquire a single-writer async mutex before writing to `DirectoryDb`
+- Use `INSERT OR REPLACE` (upsert) not DELETE+INSERT — shorter write window, safer for concurrent access
+- Do NOT use a separate SQLite connection for the sync loop; reuse the singleton `getDirectoryDb()` instance
 
-**Consequences:** Duplicate messages sent to WhatsApp users. Duplicate group operations. The LLM receives an error and may retry the action, compounding the problem.
+**Warning signs:**
+- `SQLITE_BUSY` errors in logs during the first sync run
+- Contacts visible in WAHA but not appearing in the directory tab after sync completes
+- Intermittent "no such row" errors from webhook handler immediately after sync finishes
 
-**Prevention:**
-- Use separate timeouts for connect vs. body read, or set a generous timeout (30s) that accounts for body parsing time
-- For mutation operations (send, edit, delete, create), do NOT retry on timeout -- return a warning like "Request may have succeeded but confirmation timed out"
-- Use `AbortSignal.timeout()` (static method) rather than manual `setTimeout` + `controller.abort()` to avoid timer leak cleanup complexity
-- Handle `error.name === 'TimeoutError'` distinctly from `error.name === 'AbortError'` (manual cancellation) in error logging
-
-**Detection:** Monitor for duplicate messages in WhatsApp chats after deploying timeout logic. Check logs for "TimeoutError" on endpoints that return large payloads (`/api/groups`, `/api/contacts`, `/api/chats/overview`).
-
-**Phase:** Phase 1 (R5: Request Timeouts)
-
----
-
-### Pitfall 2: Rate Limiter Breaking Existing Synchronous Call Patterns
-
-**What goes wrong:** The current `callWahaApi` is a simple async function -- callers `await` it and get a result. Wrapping it in a token-bucket rate limiter changes the timing contract: calls that used to resolve in ~50ms now queue for seconds. Callers that fire multiple API calls in sequence (e.g., `autoResolveTarget` calls `getGroups` + `getChatsOverview` + `getChannels` in sequence) suddenly take 3x longer because each call waits for a token.
-
-**Why it happens:** Token bucket limiters add queuing delay that is invisible to callers. The `resolveWahaTarget` function makes 3 sequential API calls -- at 20 req/s that's fine, but if the bucket is partially drained by concurrent webhook-triggered API calls (presence updates, read receipts), the resolve calls queue behind them.
-
-**Consequences:** Name resolution takes 5-10 seconds instead of <1s. The LLM times out waiting for the action response. User messages appear to hang. Presence calls (which are fire-and-forget `.catch(() => {})` pattern) drain the rate limiter budget, starving actual user-facing operations.
-
-**Prevention:**
-- Implement priority lanes: presence/typing calls get LOW priority, user-facing sends/resolves get HIGH priority
-- Or: exempt fire-and-forget calls (presence, read receipts) from the rate limiter entirely -- they already swallow errors
-- Set the rate limit generously (30-50 req/s) since WAHA is local (127.0.0.1) and can handle high throughput -- the limiter is a safety net, not a throttle
-- Add the rate limiter at the `callWahaApi` level (single chokepoint), NOT per-function -- avoids missing any call paths
-- Use `tryRemoveTokens()` (sync, non-blocking) for fire-and-forget calls: if no token available, skip the call silently
-
-**Detection:** After deploying, measure p95 latency of `autoResolveTarget`. If it exceeds 3s, the rate limiter is too aggressive or presence calls are draining the budget.
-
-**Phase:** Phase 1 (R2: Outbound Rate Limiter)
+**Phase to address:** Background sync phase (any phase implementing CR-08)
 
 ---
 
-### Pitfall 3: Session Guardrail Regression During Multi-Session Support
+### Pitfall 2: Background Sync Exhausting the Rate Limiter and Starving User-Facing Calls
 
-**What goes wrong:** The current `assertAllowedSession()` hardcodes "only logan sessions can send." Multi-session support requires allowing other sessions to send (e.g., a human session triggered by `!sammie`). Developers weaken the guardrail to "allow any configured session" but forget to re-implement the core safety: the bot should never impersonate the human user's identity in contexts the human didn't authorize.
+**What goes wrong:**
+Background sync makes repeated WAHA API calls to paginate through contacts/groups/newsletters. The token-bucket rate limiter from Phase 1 (R2) is shared across ALL outbound WAHA calls. If the sync loop runs at full speed, it drains the bucket and causes user-facing sends (triggered by the agent) to queue behind sync pages. A busy sync run can cause a visible "hang" of 3-10 seconds before the agent's message is sent.
 
-**Why it happens:** The guardrail was already accidentally removed once (see send.ts header comment, v1.9.0 history). The code comment says "DO NOT REMOVE" but multi-session fundamentally requires changing it. The temptation is to just remove the check and rely on config-level session roles, but a config error could then let the bot send as Omer.
+**Why it happens:**
+The rate limiter was built to protect against flood, not to distinguish sync calls from user-facing calls. Background sync is the highest-volume API consumer in the system — it can easily generate 100+ calls in a single run.
 
-**Consequences:** Bot sends messages AS the human user (Omer) in personal chats, groups, or to contacts. This is a privacy/trust violation with no undo -- WhatsApp messages are delivered permanently.
+**How to avoid:**
+- Run sync calls through a SEPARATE low-priority token bucket, or exempt them from the shared limiter but cap the sync loop to 2 calls/second max
+- Add a `syncPaused` flag: when a user-facing send is queued, pause the sync loop until the send completes
+- Alternatively: use `setTimeout`-based pacing in the sync loop (e.g., 500ms delay between pages) — no shared limiter needed, just explicit throttling
+- Track sync calls separately in metrics so you can observe their rate impact
 
-**Prevention:**
-- Replace hardcoded guardrail with config-driven allowlist, but keep the default-deny principle: sessions not explicitly listed as `bot` or `full-access` CANNOT send
-- Add a runtime assertion: if a session has role `human` and sub-role `listener`, throw on any send attempt (not just log)
-- Add an integration test that verifies: given a human-listener session, all 80+ send functions throw
-- Keep the guardrail function name `assertAllowedSession` and the DO NOT REMOVE comment -- update the comment to explain the new logic
-- Log every cross-session send with session ID, target chat, and triggering user for audit
+**Warning signs:**
+- Agent send latency rises above 3 seconds when background sync is running
+- Rate-limiter queue depth visible in Queue tab spikes during sync
+- Gateway logs show "token bucket empty" during sync windows
 
-**Detection:** After deploying multi-session, grep gateway logs for the human session ID sending outbound messages. Any occurrence that isn't explicitly trigger-word-initiated is a regression.
-
-**Phase:** Phase 5 (M1-M3: Session Registry + Roles)
-
----
-
-### Pitfall 4: Webhook Deduplication by MessageId Breaking Legitimate Retries
-
-**What goes wrong:** Adding messageId-based deduplication (sliding window of last 100 IDs) to prevent duplicate webhook processing. But WAHA sometimes delivers the same messageId for genuinely different events: `message` and `message.any` events share the same messageId. The current code already filters `message.any` events (processes only `message`), but adding messageId dedup on top creates a second filter layer that can interact badly -- if the event type filter order changes, the dedup layer silently drops the real event.
-
-**Why it happens:** The deduplication and event-type filtering are solving overlapping problems. Developers add messageId dedup "for safety" without realizing the event-type filter already handles the `message`/`message.any` duplicate case.
-
-**Consequences:** Legitimate inbound messages silently dropped. Users message Sammie and get no response. No error logged because the dedup layer considers it "already processed."
-
-**Prevention:**
-- Dedup key should be `${event.type}:${messageId}` not just `messageId` -- this way `message` and `message.any` events with the same messageId are distinct entries, and true duplicates (same type + same ID) are caught
-- Use a `Set` with a circular buffer (not a `Map` with timestamps) for the sliding window -- simpler, no cleanup timer needed
-- Log when dedup fires (at DEBUG level) so dropped messages are traceable
-- Keep the existing `message`-only event type filter as the primary guard -- dedup is a secondary safety net
-
-**Detection:** After deploying, monitor "messages processed" count in admin panel filter stats. If it drops compared to pre-deploy baseline without a corresponding drop in WhatsApp traffic, dedup is over-filtering.
-
-**Phase:** Phase 1 (R5: Webhook Deduplication)
-
-## Moderate Pitfalls
-
-### Pitfall 5: LRU Cache Returning Stale Name-to-JID Mappings
-
-**What goes wrong:** Converting `_resolveCache` from unbounded `Map` to LRU cache with max size. The current 30s TTL works because the cache is small and entries expire quickly. With LRU + max size, entries can survive much longer if they're frequently accessed (LRU promotes on read). A contact who changes their WhatsApp display name or a group that gets renamed will have stale name mappings that persist as long as the entry keeps getting read.
-
-**Why it happens:** LRU eviction is based on access recency, not staleness. The `lru-cache` npm package does support TTL, but `ttlAutopurge` defaults to `false` -- stale entries remain in the cache contributing to max size until explicitly accessed (lazy expiry).
-
-**Prevention:**
-- Use `lru-cache` with BOTH `max` (1000) AND `ttl` (30000ms) AND `ttlAutopurge: true`
-- Keep the 30s TTL from the current implementation -- it's well-tuned for the name resolution use case
-- Do NOT increase TTL just because you're adding LRU -- the TTL protects against staleness, LRU protects against unbounded growth. They solve different problems
-- Test: rename a group, then immediately resolve by old name -- should miss cache and re-fetch
-
-**Phase:** Phase 1 (R4: Cache Bounds)
+**Phase to address:** Background sync phase — must build throttling in from day one, not as a follow-up
 
 ---
 
-### Pitfall 6: Trigger Word Matching False Positives in Group Chats
+### Pitfall 3: Passcode System Vulnerable to Brute-Force and Replay
 
-**What goes wrong:** Implementing `!sammie` trigger word activation for group chats. The trigger word appears inside normal conversation: "I told !sammie about it" or "use !sammie-style formatting" or Hebrew text containing the substring. The bot activates on messages that weren't directed at it, consuming LLM tokens and sending unwanted responses.
+**What goes wrong:**
+Pairing mode uses a numeric passcode. Without rate limiting on passcode attempts, any WhatsApp user who DMs the bot can brute-force a 4-6 digit passcode in seconds. Even with a correct passcode, if the same passcode is reused across sessions (per-session static config), a person who previously learned the passcode can re-authenticate at any time, bypassing the TTL expiry intention.
 
-**Why it happens:** Simple substring or regex matching (`/!sammie/i`) catches the trigger word in any position. WhatsApp group messages are conversational -- people reference the bot by name when talking ABOUT it, not TO it.
+**Why it happens:**
+Passcode systems are naturally stateless unless you explicitly track failed attempts. The "per-session or per-contact" passcode scoping (from FEATURE-01) makes it tempting to keep a single static passcode in config — but static passcodes are replayable forever.
 
-**Prevention:**
-- Match trigger word at START of message only: `/^!sammie\b/i` (word boundary prevents partial matches)
-- Or: require the trigger word to be the ONLY text before the prompt: `/^!sammie\s+(.+)/i` and extract group 1 as the prompt
-- Allow configurable trigger words per session (not hardcoded) so different deployments can use different prefixes
-- Add a cooldown per-user-per-group: if the same user triggers the bot more than 3 times in 60 seconds, suppress and log
-- Consider requiring trigger word + mention (`@Sammie !sammie do X`) for extra-noisy groups -- but don't make this the default, it's too verbose
+**How to avoid:**
+- Rate-limit passcode attempts: max 3 attempts per contact per 30 minutes, then a 24-hour lockout — store attempt count + lockout_until in SQLite
+- Generate time-scoped passcodes (TOTP-style rotation: passcode changes every 24h) OR support single-use passcodes that are invalidated after first successful use
+- For the `wa.me` link injection use case (FEATURE-01): passcodes in links should be one-time tokens (UUID or random 8-char alphanumeric), not a shared static code
+- Never log the passcode in plaintext in gateway logs — log only "passcode attempt from [JID]: MATCH/NO_MATCH"
+- Store passcode hash (bcrypt or SHA-256 with salt), not plaintext, in config
 
-**Detection:** Monitor false positive rate by checking how often the bot responds in groups where no one explicitly requested it. Admin panel should show trigger activations per group.
+**Warning signs:**
+- Multiple failed passcode attempts from the same JID in a short window (check logs)
+- Admin reports a contact gained access unexpectedly (replay of old passcode)
 
-**Phase:** Phase 5 (M5: Trigger Word Activation)
-
----
-
-### Pitfall 7: Cross-Session Message Routing Loops
-
-**What goes wrong:** Bot session (logan) receives a trigger-word message from human session (omer) in a group. Bot processes it, sends a response to the group. The webhook for the bot's own outgoing message arrives back at the inbound handler. If the bot's message contains the trigger word (e.g., quoting the user's message), it triggers processing again, creating an infinite loop.
-
-**Why it happens:** WAHA sends webhooks for ALL messages in monitored chats, including messages sent BY the bot session itself. The current code may filter by `fromMe` in some paths but not all. Multi-session adds complexity: a message from the bot session IS `fromMe` for that session, but might not be filtered correctly if the webhook arrives tagged with a different session's perspective.
-
-**Consequences:** Infinite message loop in a WhatsApp group. Bot floods the chat. WAHA rate-limits or bans the session. Users are spammed.
-
-**Prevention:**
-- Always filter `fromMe: true` messages in the inbound webhook handler BEFORE any trigger word processing
-- Maintain a "recently sent" set of messageIds (last 50) -- if an inbound webhook messageId matches a recently sent message, skip immediately
-- Add a circuit breaker: if the bot sends more than 5 messages to the same chat within 10 seconds, pause processing for that chat for 60 seconds
-- For cross-session routing (bot sends via human session), track the messageId returned by the send API and add it to the "recently sent" set of BOTH sessions
-- Log loop detection events at WARN level
-
-**Detection:** Any chat where the bot sends >3 consecutive messages without human interaction is suspicious. Add this as an admin panel metric.
-
-**Phase:** Phase 5 (M6-M7: Bot Response Routing + Fallback Logic)
+**Phase to address:** Pairing mode phase (FEATURE-01) — security must be in the initial design
 
 ---
 
-### Pitfall 8: Silent Error Swallowing in Presence Calls Hiding Real Issues
+### Pitfall 4: TTL Expiry Checked at Read Time But Not Cleaned Up — Zombie Grants
 
-**What goes wrong:** The codebase has ~20 instances of `.catch(() => {})` on presence/typing calls (grep confirmed). When adding structured error logging (Phase 1, R1), developers must decide: log these failures or keep them silent. If they add logging, presence errors flood the logs (presence calls fail frequently when contacts are offline). If they keep them silent, genuine API connectivity issues (wrong API key, WAHA down) are hidden behind the same `.catch(() => {})`.
+**What goes wrong:**
+TTL access grants have an `expires_at` column in SQLite. The inbound filter checks `expires_at > now()` before allowing a message. This appears to work — but expired entries are never deleted from the DB. Over time (especially with pairing mode creating lots of temporary grants), the table accumulates thousands of expired rows. SQLite query performance degrades on unindexed `expires_at` scans. Worse: the admin panel's "active TTL grants" view shows the right count, but the underlying query joins against the expired rows and runs slowly.
 
-**Why it happens:** Presence/typing indicators are cosmetic -- failure doesn't affect message delivery. The `.catch(() => {})` pattern was a pragmatic choice. But it masks real problems: if WAHA goes down, the first N presence calls fail silently before a real send call finally surfaces the error.
+**Why it happens:**
+Lazy expiry (check at read, never delete) is the easiest implementation. Developers ship it and forget the cleanup step because it "works" in testing with small data.
 
-**Prevention:**
-- Replace `.catch(() => {})` with `.catch(logPresenceError)` where `logPresenceError` logs at DEBUG level normally, but escalates to WARN if >5 consecutive presence failures occur (circuit breaker pattern)
-- Track consecutive presence failure count per session -- if it exceeds threshold, trigger a session health check (R3)
-- Do NOT promote all presence errors to WARN/ERROR -- the logs will be unreadable
-- Keep the fire-and-forget pattern (no await) -- presence calls must not block message delivery
+**How to avoid:**
+- Add a periodic cleanup job (every 15 minutes) that `DELETE FROM dm_settings WHERE expires_at IS NOT NULL AND expires_at < ?` with `Date.now()` — run it in the existing health-ping setTimeout chain to avoid a new timer
+- Add an index on `expires_at` in the migration: `CREATE INDEX IF NOT EXISTS idx_expires_at ON dm_settings(expires_at) WHERE expires_at IS NOT NULL`
+- Cap the maximum TTL duration in the admin panel (e.g., max 7 days) to bound accumulation even without cleanup
+- Log cleanup runs at DEBUG level with count of rows deleted
 
-**Detection:** After deploying error logging, check that presence errors appear at DEBUG level in logs. If they're absent, the logging isn't connected. If they flood at WARN level, the threshold is too low.
+**Warning signs:**
+- Directory tab slows down after a week of pairing mode use
+- SQLite file size grows unexpectedly (check with `ls -lh ~/.openclaw/`)
+- Admin panel "active TTL grants" count is correct but query takes >100ms
 
-**Phase:** Phase 1 (R1: Error Logging) and Phase 2 (R3: Session Health Check)
-
-## Minor Pitfalls
-
-### Pitfall 9: Config PUT Replacing Entire WAHA Session Config
-
-**What goes wrong:** When adding multi-session management (admin panel session tab), the PUT endpoint for WAHA session config REPLACES the entire config object. Updating one field (e.g., webhook URL) without including all other fields (noweb.store, markOnline, metadata) silently deletes them.
-
-**Prevention:**
-- Always GET the current session config, merge changes, then PUT the full object
-- Add a helper function `patchWahaSessionConfig(session, partial)` that does GET-merge-PUT atomically
-- Document this in LESSONS_LEARNED.md (it's already mentioned but easy to forget)
-
-**Phase:** Phase 5 (M4: Admin Panel Session Management)
+**Phase to address:** TTL access phase (FEATURE-02) — index and cleanup must be part of the schema migration
 
 ---
 
-### Pitfall 10: Memory Leak from Unbounded Event Listeners in Multi-Session
+### Pitfall 5: Auto-Reply Spam Loop — Bot Replies to Its Own Rejection Message
 
-**What goes wrong:** Each session registers webhook listeners, interval timers (health checks), and presence subscriptions. When sessions are added/removed dynamically, old listeners and timers are not cleaned up, causing memory leaks over hours/days.
+**What goes wrong:**
+Auto-reply sends a canned "you're not allowed" message to unauthorized DMs (FEATURE-03). The bot sends this message using its own session. WAHA delivers a webhook for the bot's outbound message. If `fromMe` filtering is not airtight, the inbound handler processes the bot's own message, determines the bot's JID is also "unauthorized" (it's not in the allow list for itself), and sends another canned reply. Repeat.
 
-**Prevention:**
-- Track all intervals and listeners per session in a `Map<sessionId, Disposable[]>`
-- When removing a session, iterate and dispose all registered resources
-- Use `AbortController` per session to cancel all associated async operations on session removal
-- Add a memory usage metric to the admin panel status tab
+**Why it happens:**
+The `fromMe` flag in WAHA webhooks is session-relative. The existing code filters `fromMe: true` in the main message path, but the auto-reply logic is new code that runs in a pre-filter phase BEFORE the existing `fromMe` check. If the ordering is wrong, the bot replies to itself.
 
-**Phase:** Phase 5 (M1: Session Registry)
+**How to avoid:**
+- Auto-reply logic MUST be inserted AFTER the `fromMe` check, not before it — even though it feels like a "pre-LLM" filter, it's still post-`fromMe`-filter
+- Maintain a `recentlyReplied` Set (by contact JID + time window) — if we already sent a canned reply to this JID in the last 24h, skip the send entirely (already planned in FEATURE-03 rate limit requirement)
+- Add the bot's own session JIDs to the auto-reply exclusion list — never send a canned reply to a message from any of our own sessions
+- Test specifically: send a DM from the bot session to itself and verify no reply loop occurs
 
----
+**Warning signs:**
+- Gateway logs show the same outbound "canned reply" message sent more than once in rapid succession to the same JID
+- WAHA logs show the bot session sending hundreds of messages to itself
 
-### Pitfall 11: SQLite WAL Mode Conflicts Under Multi-Session Write Contention
-
-**What goes wrong:** The `DirectoryDb` uses SQLite in WAL mode, which supports concurrent reads but only one writer at a time. Multi-session support means multiple inbound webhook handlers writing contact/participant records simultaneously. SQLite will handle this with busy-wait, but if a write takes too long (bulk directory refresh), other writes queue up and eventually timeout with `SQLITE_BUSY`.
-
-**Prevention:**
-- Set `busy_timeout` pragma (e.g., 5000ms) so SQLite retries instead of immediately failing
-- Batch directory refresh writes in a single transaction (already good practice, verify it's done)
-- Consider separate directory databases per session if write contention becomes measurable
-- Monitor `SQLITE_BUSY` errors in logs after deploying multi-session
-
-**Phase:** Phase 5 (M1: Session Registry)
+**Phase to address:** Auto-reply phase (FEATURE-03)
 
 ---
 
-### Pitfall 12: 429 Backoff Timer Stacking
+### Pitfall 6: Auto-Reply Rate Limit State Lost on Gateway Restart — Spam Window
 
-**What goes wrong:** Multiple concurrent API calls all receive 429 responses simultaneously. Each one independently starts an exponential backoff retry. When the backoff period expires, all pending calls retry at the same instant, creating a "thundering herd" that triggers another round of 429s.
+**What goes wrong:**
+The 24-hour "only reply once per contact" rate limit for auto-reply (FEATURE-03) is stored in memory (a `Map` with timestamps). When the gateway restarts (which happens on every code deploy), the map is cleared. An unauthorized contact who triggered the auto-reply 2 minutes before the restart will receive another canned reply immediately after the restart when they DM again.
 
-**Prevention:**
-- Add jitter to backoff delays: `delay = baseDelay * 2^attempt + random(0, baseDelay)`
-- Use a shared backoff state: when one call receives 429, ALL pending calls should wait (not just the one that got rejected)
-- Read the `Retry-After` header from WAHA's 429 response if present -- it's more accurate than exponential guessing
-- Cap max retries at 3 with max delay of 30s
+**Why it happens:**
+In-memory state is the easiest implementation. Developers don't anticipate the restart-on-deploy pattern (every phase deploys, every deploy restarts the gateway).
 
-**Phase:** Phase 1 (R2: 429 Backoff Safety Net)
+**How to avoid:**
+- Store auto-reply timestamps in SQLite (`contacts` table, add `last_auto_reply_at` column) — persists across restarts
+- Alternative: use a TTL-aware in-memory store that re-hydrates from SQLite on startup
+- The cleanup overhead is minimal — a single extra column on `contacts`, written only when auto-reply fires
 
-## Phase-Specific Warnings
+**Warning signs:**
+- User reports receiving two "not allowed" messages shortly apart — check if a deploy happened between them
+- Test: send unauthorized DM, restart gateway within 1 minute, send another DM — verify no second reply
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Phase 1: Request Timeouts | AbortController aborting during response body read | Generous timeout (30s), don't retry mutations on timeout |
-| Phase 1: Rate Limiter | Presence calls draining the rate limit budget | Exempt or deprioritize fire-and-forget calls |
-| Phase 1: Cache Bounds | LRU keeping stale entries alive via access recency | Use TTL + LRU together, keep 30s TTL |
-| Phase 1: 429 Backoff | Thundering herd on backoff expiry | Add jitter, use shared backoff state |
-| Phase 1: Webhook Dedup | Over-filtering legitimate messages | Dedup key = `eventType:messageId`, not just messageId |
-| Phase 1: Error Logging | Presence errors flooding logs | Log at DEBUG, escalate after consecutive failures |
-| Phase 2: Message Queue | Queue overflow dropping DMs in favor of group spam | Priority queue: DMs > groups > presence |
-| Phase 2: Session Health | Health check ping counted against rate limiter | Exempt health pings from rate limiting |
-| Phase 5: Session Guardrail | Removing DO NOT REMOVE guard for multi-session | Replace with config-driven allowlist, keep default-deny |
-| Phase 5: Trigger Words | False positives in group conversations | Match at message start only with word boundary |
-| Phase 5: Cross-Session Routing | Message routing loops between sessions | Filter fromMe + recently-sent set + circuit breaker |
-| Phase 5: Session Config | PUT replacing entire config, deleting fields | GET-merge-PUT helper function |
-| Phase 5: Session Lifecycle | Memory leaks from uncleared listeners/timers | Per-session disposable registry |
+**Phase to address:** Auto-reply phase (FEATURE-03) — persistence must be in the initial design
+
+---
+
+### Pitfall 7: Module System Inbound Hook Ordering Breaks Existing Pipeline
+
+**What goes wrong:**
+The module framework (FEATURE-04) adds inbound hooks — each module gets a chance to intercept/transform messages. This hook pipeline runs inside `handleWahaInbound`. The existing inbound pipeline has carefully ordered checks: `fromMe` filter → dedup claim → shutup check → trigger word → DM policy → group policy → LLM dispatch. Inserting module hooks at the wrong position (e.g., before dedup claim or after LLM dispatch) causes modules to fire on messages they shouldn't see, or fire after the message has already been processed.
+
+**Why it happens:**
+The existing pipeline has no extension points by design — it was built as a monolithic waterfall. Adding module hooks as an afterthought without understanding the ordering invariants breaks the pipeline.
+
+**How to avoid:**
+- Define explicit hook slots with documented semantics: `PRE_FILTER` (before fromMe/dedup), `POST_FILTER` (after policy, before LLM), `POST_DISPATCH` (after LLM response sent)
+- Modules should NOT be allowed to hook `PRE_FILTER` — that's reserved for system-level guards (fromMe, dedup, shutup)
+- Module hooks should receive a `context` object that includes the policy resolution result — modules should augment, not re-implement policy
+- Run module hooks in deterministic order (registration order, documented) — non-deterministic ordering creates hard-to-reproduce bugs
+- Any exception from a module hook MUST be caught and logged without stopping the pipeline — one bad module should not take down all message processing
+
+**Warning signs:**
+- Messages being silently dropped after a module is registered
+- Duplicate LLM dispatches (module hook fires AND the main pipeline fires)
+- `fromMe` messages reaching module hooks (means hooks are before the fromMe filter)
+
+**Phase to address:** Modules phase (FEATURE-04)
+
+---
+
+### Pitfall 8: Module Isolation Failure — Modules Sharing Mutable State
+
+**What goes wrong:**
+Two modules registered for the same group both maintain in-memory state (e.g., a "moderator" module tracks recent messages, an "event planner" module tracks RSVPs). If they share a mutable object passed through the hook context, one module's mutations affect the other. More subtly: if modules are implemented as closures over the same config object, a config update in one module leaks into another.
+
+**Why it happens:**
+The plugin is a single Node.js module — everything shares the same process heap. Module isolation requires explicit design (copies, freezes, separate namespaces). Without it, modules naturally share everything.
+
+**How to avoid:**
+- Each module receives a COPY of the relevant config slice, not a reference: `Object.freeze(structuredClone(moduleConfig))`
+- Module state must be stored in a module-scoped namespace (e.g., `Map<string, ModuleState>` keyed by module ID) — never on a shared singleton
+- Module hooks receive an immutable context snapshot — if a module needs to signal state changes, it returns a result object rather than mutating the context
+- Use TypeScript `readonly` types on all hook context objects to make mutation a compile error
+
+**Warning signs:**
+- Module A behavior changes after installing Module B with no direct interaction between them
+- Config update for one module affects another module's behavior
+- Test: register two modules that each log their received config — verify the logs show independent values
+
+**Phase to address:** Modules phase (FEATURE-04)
+
+---
+
+### Pitfall 9: Background Sync Full-Resync on Every Startup Causing Startup Lag
+
+**What goes wrong:**
+Background sync is implemented to always start from page 1 on gateway startup (full resync). With 500+ contacts, this takes 2-5 minutes during which directory search returns incomplete results. Worse: if the gateway restarts frequently (every code deploy), the sync never finishes before the next restart. The directory is perpetually 20% populated.
+
+**Why it happens:**
+"Start from scratch on restart" is the simplest correctness guarantee. Incremental sync requires tracking a cursor (last sync timestamp or a sequence number from WAHA). Developers defer cursor tracking as a "future optimization."
+
+**How to avoid:**
+- Store the last successful sync timestamp in SQLite (`sync_state` table or a `_meta` key-value table)
+- On startup: if last sync was < 24h ago, run an incremental sync (only new/changed contacts) — if > 24h, run full resync
+- Better: use WAHA's contact update webhooks to do real-time incremental updates, with a daily full resync for safety
+- Add a "Sync in progress: X/Y contacts" indicator in the Directory tab so the admin can see sync state
+- The initial full sync should run at LOW priority (2 calls/second max) so it doesn't impact startup
+
+**Warning signs:**
+- Directory tab shows "10 contacts" immediately after startup but grows to 500 contacts over 5 minutes (resync is working but slow)
+- Gateway restart frequency matches sync completion time — net result is perpetually incomplete sync
+
+**Phase to address:** Background sync phase (CR-08)
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| In-memory TTL tracking (no SQLite) | No schema migration needed | Lost on every restart, spam window after deploy | Never — restarts are too frequent |
+| Single mega-transaction for bulk sync writes | Simpler code | SQLITE_BUSY collisions with webhook writes | Never — batch instead |
+| Static passcode in config | Easy to configure | Replayable forever, no invalidation | Never — security feature |
+| Module hooks as direct pipeline mutations | Fewer abstractions | Ordering bugs, tight coupling | Never in production pipeline |
+| Sync loop using shared rate limiter | No extra code | Starves user-facing calls during sync | Only if sync rate is capped at 1 call/2s independently |
+| Full resync on every startup | Always correct data | Never finishes if restarts are frequent | Only for initial implementation (v1) with a ticket to add cursor |
+| Auto-reply rate limit in memory | Fast, no DB write | Allows spam after restart | Never — add `last_auto_reply_at` column from day one |
+| Passcode in plaintext config | Easy to set up | Leaked in logs, git history | Never — hash it |
+
+---
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| WAHA contacts API | Assuming it returns an array | Returns a dict keyed by JID — use `Object.values()` |
+| WAHA contacts API | Calling without `store.enabled` | Returns 400 if `config.noweb.store.enabled` is not `True` |
+| WAHA pagination | Assuming one call returns all results | Use `limit` + `offset` parameters, paginate until result < limit |
+| SQLite WAL mode | Starting multiple long transactions concurrently | Use small batches + async mutex for concurrent writers |
+| template literal in monitor.ts | Single backslashes in embedded JS | Double-escape ALL backslashes: `\\w` not `\w`, `\\'` not `\'` |
+| Admin panel dynamic content | Using innerHTML for any user-controlled data | Always use textContent — innerHTML is XSS; already hardened in v1.10, do NOT regress |
+| OpenClaw config write | Writing to wrong path | Always write to `~/.openclaw/openclaw.json`, never the workspace path |
+| OpenClaw config write | Sending bare config fields | POST `/api/admin/config` expects `{"waha": {...}}` wrapper |
+| TTL column in SQLite | Storing as ISO string | Store as Unix timestamp (integer milliseconds) — easier range queries |
+| WAHA `@lid` JIDs | Treating as opaque identifiers in allowlists | `groupAllowFrom` needs BOTH `@c.us` AND `@lid` for the same person |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Full contact list re-render on every name resolution callback | Dashboard Access Control card flickers every few seconds (BUG-02) | Debounce renders, only re-render changed entries | Immediately with 2+ sessions |
+| Sync loop using shared rate limiter without priority | Agent send latency > 3s during sync | Separate sync token bucket or explicit throttle | When contact list > 200 entries |
+| Expired TTL rows never deleted | SQLite file grows, directory queries slow | Periodic cleanup job + index on `expires_at` | After 1-2 weeks of pairing mode use |
+| Directory search querying WAHA API in realtime | Search takes 2-5s, rate-limited | Search local SQLite (CR-08 fix) | At any scale > 50 contacts |
+| Module hook array scanned for every inbound message | Linear scan per module per message | Use a Set-based dispatch table keyed by hook slot | When modules > 5 |
+| Auto-reply sending to same contact multiple times per restart | Contacts get spam on every deploy | Persist `last_auto_reply_at` in SQLite | On every deploy (multiple times per day) |
+
+---
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Static numeric passcode in config | Brute-forced in seconds, replayable forever | Rate-limit attempts (3/30min), rotate daily, or use one-time tokens for `wa.me` links |
+| Passcode in plaintext in config/logs | Leaked in git history, log aggregators | Hash it (SHA-256+salt minimum), never log the value |
+| No attempt rate limiting on passcode | Brute-force in < 1 minute | Max 3 attempts per JID per 30 minutes, 24h lockout |
+| Module hook receiving mutable config reference | One module corrupts another's config | Pass `Object.freeze(structuredClone(config))` to each module |
+| Auto-reply canned message with admin names | Leaks admin identity to unauthorized contacts | Only include admin name if the config explicitly opts in; default to generic message |
+| TTL grant admin UI without CSRF protection | Unauthorized grant revocations | Admin panel already runs on local network only (127.0.0.1) — acceptable for this deployment |
+| innerHTML for module-supplied content | XSS if a module renders user data in HTML | All module-supplied content must go through textContent (same rule as base admin panel) |
+
+---
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Sync progress shown as raw numbers only | Admin doesn't know if sync is stuck | Show "Syncing: 47/500 contacts (last updated 2m ago)" with a stuck detection threshold |
+| Pairing mode passcode reset with no warning | Admin changes passcode, existing active grants still work | Rotating the passcode should NOT invalidate already-granted TTL sessions (TTL grants are independent) |
+| TTL expiry shown as absolute timestamp | Admin can't tell how much time is left | Show relative time ("Expires in 2h 15m") with a tooltip showing the absolute time |
+| Module enable/disable requiring gateway restart | Admin enables a module, nothing happens until restart | Show "Restart required" banner prominently after any module change |
+| Bulk sync "Refresh Now" button with no feedback | Admin clicks, nothing visible happens for 10s | Show spinner + "Syncing..." immediately, "Done" with count when complete |
+| Dashboard re-renders clearing per-session section scroll position | User scrolls down to a session, name resolution fires, view jumps back | Preserve scroll position across incremental renders |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **Background sync:** Verify it runs incrementally after the first full sync — check that restarting the gateway does NOT trigger a full resync if last sync was < 24h ago
+- [ ] **TTL expiry:** Verify expired entries are actually DELETED from SQLite after the cleanup job runs — not just excluded from queries
+- [ ] **TTL expiry:** Verify the admin panel "active grants" count goes to zero after all grants expire, not just becomes invisible
+- [ ] **Passcode brute-force protection:** Verify that after 3 wrong attempts, the 4th attempt is silently dropped even if it's the correct passcode
+- [ ] **Passcode replay:** Verify that a passcode used in a previous TTL window cannot grant access again (if using one-time tokens)
+- [ ] **Auto-reply loop:** Verify the bot does NOT reply to its own canned rejection message — send an auto-reply, then have the bot "see" it via webhook
+- [ ] **Auto-reply rate limit persistence:** Verify restarting the gateway does NOT allow a second canned reply to fire for a contact who already received one within 24h
+- [ ] **Module hook ordering:** Verify `fromMe: true` messages NEVER reach module hooks — add a test that sends a bot-outbound message and asserts no module hook fired
+- [ ] **Module isolation:** Verify updating Module A's config does NOT change Module B's behavior — test by logging received config in both
+- [ ] **Sync + webhook concurrency:** Verify that a message received during a bulk sync write does NOT result in a `SQLITE_BUSY` error or a silently dropped contact upsert
+- [ ] **Name resolution for @lid JIDs:** Verify that BUG-01 (Access Control card showing raw `@lid` JIDs) is fixed — every `@lid` entry in allowFrom/groupAllowFrom must display a resolved name or be paired with its `@c.us` equivalent
+- [ ] **Template literal double-escaping:** Verify any new regex or string in monitor.ts embedded JS uses double-escaped backslashes — run the admin panel in a browser and check browser console for JS syntax errors
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Background sync race → corrupted directory | MEDIUM | Run `POST /api/admin/directory/refresh` to rebuild from WAHA API; add write serialization before next deploy |
+| Auto-reply spam loop | HIGH | Immediately deploy a hotfix with `fromMe` guard before the auto-reply logic; check if WAHA session is temporarily banned |
+| Passcode brute-forced | MEDIUM | Rotate passcode in admin panel; all existing TTL grants from that passcode remain valid (TTL is independent); add rate limiting in hotfix |
+| TTL cleanup never ran → slow directory | LOW | Run `DELETE FROM dm_settings WHERE expires_at IS NOT NULL AND expires_at < ?` manually via SSH; add cleanup job before next deploy |
+| Module hook crash taking down message pipeline | HIGH | Wrap ALL module hook invocations in try/catch; re-deploy with the broken module disabled; do NOT let module exceptions propagate |
+| Sync draining rate limiter → agent hangs | MEDIUM | Reduce sync rate constant (calls/second) via config hot-patch; long term: separate rate bucket for sync vs user-facing |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Background sync race condition with webhook writes | Background sync phase (CR-08) | Stress test: 200 contacts syncing while 10 messages arrive; zero SQLITE_BUSY in logs |
+| Sync draining rate limiter | Background sync phase (CR-08) | Measure send latency during sync; must be < 1s p95 |
+| Startup full-resync causing perpetually incomplete directory | Background sync phase (CR-08) | Restart gateway twice in 2 minutes; second restart does NOT trigger full resync |
+| Passcode brute-force and replay | Pairing mode phase (FEATURE-01) | 4th wrong attempt is blocked; passcode cannot be reused after TTL expiry |
+| TTL zombie grants accumulating | TTL access phase (FEATURE-02) | After 15-minute cleanup window, expired rows are GONE from SQLite (not just hidden) |
+| Auto-reply spam loop | Auto-reply phase (FEATURE-03) | Bot sends canned reply; WAHA webhook for it arrives; no second reply fires |
+| Auto-reply rate limit lost on restart | Auto-reply phase (FEATURE-03) | Restart gateway mid-24h window; no second canned reply fires |
+| Module hook ordering breaks pipeline | Modules phase (FEATURE-04) | `fromMe: true` messages never reach module hooks; duplicate dispatches impossible |
+| Module isolation failure | Modules phase (FEATURE-04) | Module A config change does not affect Module B behavior |
+| Dashboard re-render flicker (BUG-02) | Dashboard polish phase | Dashboard stable for 60s with no visible flicker after initial load |
+| @lid JIDs not resolved in UI (BUG-01) | Name resolution phase | Every `@lid` in allowFrom/groupAllowFrom shows a name or is paired with @c.us entry |
+| template literal double-escape | Any monitor.ts change | Open admin panel in browser; zero JS console errors |
+
+---
 
 ## Sources
 
-- Codebase analysis: `src/send.ts`, `src/channel.ts`, `src/inbound.ts`, `src/accounts.ts`, `src/directory.ts`, `src/presence.ts` (direct inspection)
-- Project history: `docs/LESSONS_LEARNED.md`, `docs/ROADMAP.md`, `CLAUDE.md` (verified patterns and past regressions)
-- [AbortController Guide - Better Stack](https://betterstack.com/community/guides/scaling-nodejs/understanding-abortcontroller/)
-- [AbortSignal.timeout() - MDN](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static)
-- [Managing Async Operations with AbortController - AppSignal](https://blog.appsignal.com/2025/02/12/managing-asynchronous-operations-in-nodejs-with-abortcontroller.html)
-- [Token Bucket Rate Limiter - CodeSignal](https://codesignal.com/learn/courses/throttling-api-requests/lessons/throttling-api-requests-with-token-bucket-1)
-- [limiter npm package](https://www.npmjs.com/package/limiter)
-- [lru-cache npm package](https://www.npmjs.com/package/lru-cache)
-- [LRU Cache in Node.js - DEV Community](https://dev.to/darkmavis1980/when-and-how-to-use-lru-cache-in-nodejs-backend-projects-42c8)
-- [WAHA Scaling - 500+ Sessions](https://dev.to/waha/waha-scaling-how-to-handle-500-whatsapp-sessions-3fie)
-- [WAHA Sessions API - DeepWiki](https://deepwiki.com/devlikeapro/waha/4.1-sessions-api)
+- Codebase analysis: `src/inbound.ts`, `src/directory.ts`, `src/monitor.ts`, `src/send.ts` (direct inspection)
+- Project bugs file: `.planning/phases/11-dashboard-sessions-log/bugs.md` — 18 bugs and CRs from human verification
+- Project context: `CLAUDE.md` (brittle code patterns, DO NOT CHANGE markers, deployment constraints)
+- Project decisions: `.planning/PROJECT.md` (architectural decisions, key constraints)
+- Lessons learned: `docs/LESSONS_LEARNED.md` (past regressions, hard-won fixes)
+- Previous pitfalls research: `.planning/research/PITFALLS.md` (v1.10 milestone patterns)
+- WAHA quirks: CLAUDE.md § "Key WAHA API Quirks" (dict-not-array, @lid dual JID, media URL expiry)
+- SQLite concurrency: WAL mode documentation — readers don't block writers, but only one writer at a time
+- Passcode security: OWASP Authentication Cheat Sheet — rate limiting, hashing, one-time token patterns
+
+---
+*Pitfalls research for: v1.11 additions to WAHA OpenClaw plugin*
+*Researched: 2026-03-17*
