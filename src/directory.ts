@@ -266,6 +266,25 @@ export class DirectoryDb {
       if (!(e instanceof Error) || !e.message.includes("duplicate column")) throw e;
     }
 
+    // Phase 17 (MOD-01, MOD-02): Module system tables.
+    // module_assignments: which modules apply to which chats. PRIMARY KEY (module_id, jid).
+    // module_config: per-module settings storage. config_json defaults to '{}'.
+    // Created with CREATE TABLE IF NOT EXISTS — safe to run on existing databases. DO NOT REMOVE.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS module_assignments (
+        module_id TEXT NOT NULL,
+        jid TEXT NOT NULL,
+        assigned_at INTEGER NOT NULL,
+        PRIMARY KEY (module_id, jid)
+      );
+
+      CREATE TABLE IF NOT EXISTS module_config (
+        module_id TEXT PRIMARY KEY,
+        config_json TEXT DEFAULT '{}',
+        updated_at INTEGER NOT NULL
+      );
+    `);
+
     // Phase 13 (SYNC-02): One-time FTS5 rebuild for databases created before FTS5 was added.
     // Only runs if the FTS table has fewer rows than contacts (i.e., triggers haven't populated it).
     // Safe on WAL mode — acquires write lock briefly, readers continue on snapshot. DO NOT REMOVE.
@@ -1253,6 +1272,75 @@ export class DirectoryDb {
           }
         : undefined,
     };
+  }
+  // ===========================================================================
+  // Phase 17 (MOD-01, MOD-02): Module assignment and config methods.
+  // These provide CRUD access to module_assignments and module_config tables.
+  // Used by module-registry.ts. DO NOT REMOVE.
+  // ===========================================================================
+
+  /**
+   * Return all JIDs assigned to a given module.
+   */
+  getModuleAssignments(moduleId: string): string[] {
+    const rows = this.db.prepare(
+      "SELECT jid FROM module_assignments WHERE module_id = ?"
+    ).all(moduleId) as Array<{ jid: string }>;
+    return rows.map((r) => r.jid);
+  }
+
+  /**
+   * Return all module IDs assigned to a given chat JID.
+   */
+  getChatModules(jid: string): string[] {
+    const rows = this.db.prepare(
+      "SELECT module_id FROM module_assignments WHERE jid = ?"
+    ).all(jid) as Array<{ module_id: string }>;
+    return rows.map((r) => r.module_id);
+  }
+
+  /**
+   * Assign a module to a chat. Upserts — safe to call if already assigned.
+   */
+  assignModule(moduleId: string, jid: string): void {
+    const now = Math.floor(Date.now() / 1000);
+    this.db.prepare(
+      "INSERT OR REPLACE INTO module_assignments (module_id, jid, assigned_at) VALUES (?, ?, ?)"
+    ).run(moduleId, jid, now);
+  }
+
+  /**
+   * Remove a module assignment from a chat. No-op if not assigned.
+   */
+  unassignModule(moduleId: string, jid: string): void {
+    this.db.prepare(
+      "DELETE FROM module_assignments WHERE module_id = ? AND jid = ?"
+    ).run(moduleId, jid);
+  }
+
+  /**
+   * Get stored config for a module. Returns {} if no config stored.
+   */
+  getModuleConfig(moduleId: string): Record<string, unknown> {
+    const row = this.db.prepare(
+      "SELECT config_json FROM module_config WHERE module_id = ?"
+    ).get(moduleId) as { config_json: string } | undefined;
+    if (!row) return {};
+    try {
+      return JSON.parse(row.config_json) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * Store config for a module. Replaces previous config entirely.
+   */
+  setModuleConfig(moduleId: string, config: Record<string, unknown>): void {
+    const now = Math.floor(Date.now() / 1000);
+    this.db.prepare(
+      "INSERT OR REPLACE INTO module_config (module_id, config_json, updated_at) VALUES (?, ?, ?)"
+    ).run(moduleId, JSON.stringify(config), now);
   }
 }
 
