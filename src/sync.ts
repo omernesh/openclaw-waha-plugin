@@ -385,13 +385,25 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   // LID-SYNC: The bulk /contacts/lids endpoint returns empty on NOWEB engine.
   // Instead, we call the per-phone /contacts/lids/phone/{phone} API for each
   // allowed @c.us contact that doesn't already have a lid_mapping entry.
-  // This is scoped to allow_list + group_participants (allow_dm=1) only —
-  // we don't need LID mappings for contacts that aren't in Access Control.
+  // FIX (2026-03-17): Read allowFrom/groupAllowFrom from config, NOT from the
+  // allow_list SQLite table which may be empty. The config arrays are the source
+  // of truth for which JIDs are allowed. DO NOT REVERT to db.getCusJidsMissingLidMapping().
   // DO NOT CHANGE — this is the only reliable way to build LID mappings on NOWEB.
   state.currentPhase = "lids";
   let lidsResolved = 0;
   try {
-    const missingLidJids = db.getCusJidsMissingLidMapping();
+    // Extract @c.us JIDs from config allowFrom + groupAllowFrom arrays
+    const configAllowFrom: string[] = Array.isArray(opts.config?.allowFrom)
+      ? opts.config.allowFrom : [];
+    const configGroupAllowFrom: string[] = Array.isArray(opts.config?.groupAllowFrom)
+      ? opts.config.groupAllowFrom : [];
+
+    // Combine both lists, deduplicate, keep only @c.us JIDs
+    const allCusJids = [...new Set([...configAllowFrom, ...configGroupAllowFrom])]
+      .filter((j): j is string => typeof j === 'string' && j.endsWith('@c.us'));
+
+    // Filter out JIDs that already have lid_mapping entries in SQLite
+    const missingLidJids = allCusJids.filter(j => !db.hasCusInLidMapping(j));
     if (missingLidJids.length > 0) {
       const LID_BATCH_SIZE = 3;
       for (let i = 0; i < missingLidJids.length; i += LID_BATCH_SIZE) {

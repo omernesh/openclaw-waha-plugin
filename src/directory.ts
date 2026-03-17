@@ -558,6 +558,17 @@ export class DirectoryDb {
     return rows.map(r => r.jid);
   }
 
+  /**
+   * Check if a @c.us JID already has a lid_mapping entry.
+   * Used by sync.ts Phase 1b to filter out JIDs that already have LID mappings
+   * when reading allowFrom/groupAllowFrom from config (instead of allow_list table).
+   * DO NOT REMOVE — needed because allow_list table may be empty while config has JIDs.
+   */
+  hasCusInLidMapping(cusJid: string): boolean {
+    const row = this.db.prepare('SELECT 1 FROM lid_mapping WHERE cus = ? LIMIT 1').get(cusJid);
+    return !!row;
+  }
+
   getContactDmSettings(jid: string): ContactDmSettings {
     const row = this.db
       .prepare("SELECT mode, mention_only, custom_keywords, can_initiate, can_initiate_override FROM dm_settings WHERE jid = ?")
