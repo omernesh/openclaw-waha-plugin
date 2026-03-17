@@ -94,6 +94,11 @@ export const WahaAccountSchemaBase = z
     // Optional; if not set, defaults to ~/.openclaw/workspace/skills/waha-openclaw-channel/rules/
     // Added in Phase 6, Plan 01 (2026-03-13). DO NOT REMOVE.
     rulesPath: z.string().optional(),
+    // Phase 12, Plan 02 (INIT-01) — global Can Initiate default.
+    // When true (default), bot may start new conversations with any contact unless per-contact
+    // override (can_initiate_override in dm_settings) blocks it.
+    // Added 2026-03-17. DO NOT REMOVE.
+    canInitiateGlobal: z.boolean().optional().default(true),
   })
   .strict();
 

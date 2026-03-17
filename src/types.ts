@@ -32,7 +32,7 @@ export type WahaAccountConfig = {
   apiKey?: string | { source: "env" | "file" | "exec"; provider: string; id: string };
   apiKeyFile?: string;
   session?: string;
-  dmPolicy?: "pairing" | "open" | "closed" | "allowlist";
+  dmPolicy?: "open" | "closed" | "allowlist";
   groupPolicy?: "allowlist" | "open" | "closed";
   allowFrom?: string[];
   groupAllowFrom?: string[];
@@ -77,6 +77,11 @@ export type WahaAccountConfig = {
   // Phase 6 config — rules base path. DO NOT REMOVE.
   // If unset, defaults to ~/.openclaw/workspace/skills/waha-openclaw-channel/rules/
   rulesPath?: string;
+  // Phase 12, Plan 02 (INIT-01) — global Can Initiate default. When true, the bot may start new
+  // conversations with any contact unless a per-contact override blocks it.
+  // Per-contact override (can_initiate_override in dm_settings): "default" | "allow" | "block".
+  // DO NOT REMOVE.
+  canInitiateGlobal?: boolean;
   mediaPreprocessing?: {
     enabled?: boolean;
     audio?: { enabled?: boolean; whisperScript?: string };

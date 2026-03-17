@@ -21,6 +21,10 @@ export type ContactDmSettings = {
   mentionOnly: boolean;
   customKeywords: string; // comma-separated
   canInitiate: boolean;
+  // Phase 12, Plan 02 (INIT-02): 3-state per-contact Can Initiate override.
+  // "default" = use global canInitiateGlobal setting. "allow" = always allow. "block" = always block.
+  // Stored in can_initiate_override column. DO NOT REMOVE.
+  canInitiateOverride: "default" | "allow" | "block";
 };
 
 /** DIR-03: Plugin-level role for a group participant. No WhatsApp meaning — admin panel label only. */
@@ -85,6 +89,7 @@ const DEFAULT_DM_SETTINGS: ContactDmSettings = {
   mentionOnly: false,
   customKeywords: "",
   canInitiate: true,
+  canInitiateOverride: "default",
 };
 
 /** TTL for pending selections — 60 seconds to respond. DO NOT CHANGE. */
@@ -189,6 +194,18 @@ export class DirectoryDb {
       const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
       if (!msg.includes('duplicate column')) throw migrationErr;
     }
+
+    // Phase 12, Plan 02 (INIT-02): Add can_initiate_override column to dm_settings.
+    // Stores 3-state per-contact Can Initiate: "default" | "allow" | "block".
+    // "default" = use global canInitiateGlobal setting. DO NOT REMOVE.
+    try {
+      this.db.prepare(
+        `ALTER TABLE dm_settings ADD COLUMN can_initiate_override TEXT NOT NULL DEFAULT 'default'`
+      ).run();
+    } catch (migrationErr: unknown) {
+      const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
+      if (!msg.includes('duplicate column')) throw migrationErr;
+    }
   }
 
   upsertContact(jid: string, displayName?: string, isGroup?: boolean): void {
@@ -223,7 +240,7 @@ export class DirectoryDb {
 
     let sql = `
       SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
-             d.mode, d.mention_only, d.custom_keywords, d.can_initiate
+             d.mode, d.mention_only, d.custom_keywords, d.can_initiate, d.can_initiate_override
       FROM contacts c
       LEFT JOIN dm_settings d ON c.jid = d.jid
     `;
@@ -264,7 +281,7 @@ export class DirectoryDb {
     const row = this.db
       .prepare(
         `SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
-                d.mode, d.mention_only, d.custom_keywords, d.can_initiate
+                d.mode, d.mention_only, d.custom_keywords, d.can_initiate, d.can_initiate_override
          FROM contacts c
          LEFT JOIN dm_settings d ON c.jid = d.jid
          WHERE c.jid = ?`,
@@ -277,16 +294,18 @@ export class DirectoryDb {
 
   getContactDmSettings(jid: string): ContactDmSettings {
     const row = this.db
-      .prepare("SELECT mode, mention_only, custom_keywords, can_initiate FROM dm_settings WHERE jid = ?")
+      .prepare("SELECT mode, mention_only, custom_keywords, can_initiate, can_initiate_override FROM dm_settings WHERE jid = ?")
       .get(jid) as Record<string, unknown> | undefined;
 
     if (!row) return { ...DEFAULT_DM_SETTINGS };
 
+    const override = (row.can_initiate_override as string) ?? "default";
     return {
       mode: (row.mode as string) === "listen_only" ? "listen_only" : "active",
       mentionOnly: row.mention_only === 1,
       customKeywords: (row.custom_keywords as string) ?? "",
       canInitiate: row.can_initiate !== 0,
+      canInitiateOverride: (override === "allow" || override === "block") ? override : "default",
     };
   }
 
@@ -297,12 +316,13 @@ export class DirectoryDb {
       mentionOnly: settings.mentionOnly ?? existing.mentionOnly,
       customKeywords: settings.customKeywords ?? existing.customKeywords,
       canInitiate: settings.canInitiate ?? existing.canInitiate,
+      canInitiateOverride: settings.canInitiateOverride ?? existing.canInitiateOverride,
     };
 
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO dm_settings (jid, mode, mention_only, custom_keywords, can_initiate, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO dm_settings (jid, mode, mention_only, custom_keywords, can_initiate, can_initiate_override, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         jid,
@@ -310,6 +330,7 @@ export class DirectoryDb {
         merged.mentionOnly ? 1 : 0,
         merged.customKeywords,
         merged.canInitiate ? 1 : 0,
+        merged.canInitiateOverride,
         Date.now(),
       );
   }
@@ -383,7 +404,7 @@ export class DirectoryDb {
   getOrphanedLidEntries(): ContactRecord[] {
     const sql = `
       SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
-             d.mode, d.mention_only, d.custom_keywords, d.can_initiate
+             d.mode, d.mention_only, d.custom_keywords, d.can_initiate, d.can_initiate_override
       FROM contacts c
       LEFT JOIN dm_settings d ON c.jid = d.jid
       WHERE c.jid LIKE '%@lid' OR c.jid LIKE '%@s.whatsapp.net'
@@ -869,6 +890,10 @@ export class DirectoryDb {
             mentionOnly: row.mention_only === 1,
             customKeywords: (row.custom_keywords as string) ?? "",
             canInitiate: row.can_initiate !== 0,
+            canInitiateOverride: (() => {
+              const v = row.can_initiate_override as string | null | undefined;
+              return (v === "allow" || v === "block") ? v : "default";
+            })(),
           }
         : undefined,
     };

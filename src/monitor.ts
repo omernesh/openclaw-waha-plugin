@@ -602,6 +602,13 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           <label>Allowed Groups <span class="tip" data-tip="Group JIDs the bot will respond in. Press Enter or comma to add. Leave empty to allow all groups (with open policy).">?</span></label>
           <div id="s-allowedGroups-ti"></div>
         </div>
+        <div class="field">
+          <!-- Phase 12, Plan 02 (INIT-01): Global Can Initiate toggle. Default on. DO NOT REMOVE. -->
+          <label class="toggle-wrap">
+            <span>Can Initiate (Global Default) <span class="tip" data-tip="When enabled, the bot can start new conversations with any contact. When disabled, the bot can only respond to incoming messages unless a per-contact override allows initiation.">?</span></span>
+            <label class="toggle" style="margin-left:auto"><input type="checkbox" id="canInitiateGlobal" name="canInitiateGlobal" checked><span class="slider"></span></label>
+          </label>
+        </div>
       </div>
     </details>
 
@@ -2106,6 +2113,8 @@ async function loadConfig() {
     var md = w.markdown || {};
     setChk('s-markdownEnabled', md.enabled !== false);
     setVal('s-markdownTables', md.tables || 'auto');
+    // Phase 12, Plan 02 (INIT-01): Global Can Initiate toggle. Default true. DO NOT REMOVE.
+    setChk('canInitiateGlobal', w.canInitiateGlobal !== false);
     setChk('s-reactions', (w.actions || {}).reactions !== false);
     setChk('s-blockStreaming', w.blockStreaming === true);
     var mp = w.mediaPreprocessing || {};
@@ -2174,6 +2183,8 @@ async function saveSettings(e) {
         enabled: getChk('s-markdownEnabled'),
         tables: getVal('s-markdownTables') || 'auto',
       },
+      // Phase 12, Plan 02 (INIT-01): Global Can Initiate toggle. DO NOT REMOVE.
+      canInitiateGlobal: getChk('canInitiateGlobal'),
       actions: { reactions: getChk('s-reactions') },
       blockStreaming: getChk('s-blockStreaming'),
       mediaPreprocessing: {
@@ -2643,7 +2654,7 @@ function buildContactCard(c) {
   var name = c.displayName || c.jid;
   var color = avatarColor(c.jid);
   var inits = initials(c.displayName || '', c.jid);
-  var dm = c.dmSettings || {mode:'active',mentionOnly:false,customKeywords:'',canInitiate:true};
+  var dm = c.dmSettings || {mode:'active',mentionOnly:false,customKeywords:'',canInitiate:true,canInitiateOverride:'default'};
   var id = 'card-' + c.jid.replace(/[^a-zA-Z0-9]/g, '_');
   var isGroup = c.isGroup;
   var avatarBg = isGroup ? '#1e3a5f' : color;
@@ -2674,7 +2685,13 @@ function buildContactCard(c) {
         '<div class="settings-field"><label>Mode <span class="tip" data-tip="Active: bot responds to this contact. Listen Only: messages arrive but bot does not reply.">?</span></label><select id="mode-' + id + '"><option value="active"' + (dm.mode==='active'?' selected':'') + '>Active</option><option value="listen_only"' + (dm.mode==='listen_only'?' selected':'') + '>Listen Only</option></select></div>' +
         '<div class="settings-field"><label><input type="checkbox" id="mo-' + id + '"' + (dm.mentionOnly?' checked':'') + '> Mention Only <span class="tip" data-tip="When checked, bot only responds if it is explicitly @mentioned in the message.">?</span></label></div>' +
         '<div class="settings-field"><label>Custom Keywords <span class="tip" data-tip="Comma-separated regex patterns. Bot responds only if the message matches one. Overrides global keyword filter for this contact.">?</span></label><input type="text" id="kw-' + id + '" value="' + esc(dm.customKeywords) + '" placeholder="keyword1, keyword2"></div>' +
-        '<div class="settings-field"><label><input type="checkbox" id="ci-' + id + '"' + (dm.canInitiate?' checked':'') + '> Can Initiate <span class="tip" data-tip="When checked, bot is allowed to send the first message to this contact. Uncheck to prevent unsolicited outbound messages.">?</span></label></div>' +
+        '<div class="settings-field"><label>Can Initiate <span class="tip" data-tip="Override the global Can Initiate setting for this contact. Default: follow the global toggle in Settings. Allow: always allow initiation. Block: never initiate.">?</span></label>' +
+          '<select id="ci-' + id + '">' +
+            '<option value="default"' + (dm.canInitiateOverride==='default'?' selected':'') + '>Default (use global)</option>' +
+            '<option value="allow"' + (dm.canInitiateOverride==='allow'?' selected':'') + '>Allow</option>' +
+            '<option value="block"' + (dm.canInitiateOverride==='block'?' selected':'') + '>Block</option>' +
+          '</select>' +
+        '</div>' +
         '<button class="save-contact-btn" onclick="saveContactSettings(\\'' + esc(c.jid) + '\\', \\'' + id + '\\')">Save</button>' +
       '</div>' +
     '</div>';
@@ -2720,11 +2737,12 @@ async function saveContactSettings(jid, id) {
   var mode = document.getElementById('mode-' + id)?.value || 'active';
   var mentionOnly = document.getElementById('mo-' + id)?.checked || false;
   var customKeywords = document.getElementById('kw-' + id)?.value || '';
-  var canInitiate = document.getElementById('ci-' + id)?.checked ?? true;
+  // Phase 12, Plan 02 (INIT-02): Can Initiate is now a 3-option dropdown (default/allow/block). DO NOT REVERT to checkbox.
+  var canInitiateOverride = document.getElementById('ci-' + id)?.value || 'default';
   try {
     var r = await fetch('/api/admin/directory/' + encodeURIComponent(jid) + '/settings', {
       method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({mode, mentionOnly, customKeywords, canInitiate})
+      body: JSON.stringify({mode, mentionOnly, customKeywords, canInitiateOverride})
     });
     var result = await r.json();
     if (!r.ok) throw new Error(result.error || 'Save failed');
@@ -3467,6 +3485,8 @@ export function createWahaWebhookServer(opts: {
             mentionOnly?: boolean;
             customKeywords?: string;
             canInitiate?: boolean;
+            // Phase 12, Plan 02 (INIT-02): 3-state Can Initiate override. Validated below. DO NOT REMOVE.
+            canInitiateOverride?: string;
           };
 
           const db = getDirectoryDb(opts.accountId);
@@ -3477,11 +3497,19 @@ export function createWahaWebhookServer(opts: {
             db.upsertContact(jid, undefined, false);
           }
 
+          // Validate canInitiateOverride — must be "default", "allow", or "block"
+          const rawOverride = settings.canInitiateOverride;
+          const canInitiateOverride: "default" | "allow" | "block" =
+            rawOverride === "allow" ? "allow"
+            : rawOverride === "block" ? "block"
+            : "default";
+
           db.setContactDmSettings(jid, {
             mode: settings.mode === "listen_only" ? "listen_only" : "active",
             mentionOnly: Boolean(settings.mentionOnly),
             customKeywords: settings.customKeywords ?? "",
             canInitiate: settings.canInitiate !== false,
+            canInitiateOverride,
           });
 
           res.writeHead(200, { "Content-Type": "application/json" });
