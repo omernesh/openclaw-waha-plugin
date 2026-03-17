@@ -29,7 +29,7 @@
     "plugin"
   ],
   "author": "Omer Nesher",
-  "license": "MIT",
+  "license": "CC-BY-NC-4.0",
   "scripts": {
     "test": "vitest run --reporter=verbose"
   },
