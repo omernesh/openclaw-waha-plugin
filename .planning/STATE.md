@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-03-17T12:58:42.973Z"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-03-17T13:04:34.209Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 40
 ---
 
@@ -71,6 +71,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 13-background-directory-sync]: Inline refresh handler removed from monitor.ts: 200-line code replaced with 3-line triggerImmediateSync(), pipeline lives only in sync.ts
 - [Phase 13-background-directory-sync]: Contacts tab uses pagination matching Groups tab: loadContactsTable() with buildPageNav(goFn) generic pagination
 - [Phase 14-name-resolution]: @lid->@c.us fallback: two-pass batch SQL query approach in resolveJids; resolve route before /:jid handler; getValue() returns raw JIDs for config save correctness; 50ms debounce on name resolution fetches
+- [Phase 14-name-resolution]: [Phase 14-name-resolution]: getGroupParticipants uses LEFT JOIN COALESCE for @lid->@c.us resolution at SQL level (14-02, 2026-03-17)
+- [Phase 14-name-resolution]: [Phase 14-name-resolution]: Contact picker batch resolve replaces N per-JID fetches with single /resolve call; getValue() returns raw JID strings unchanged (14-02, 2026-03-17)
 
 ### Pending Todos
 
@@ -84,6 +86,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T12:58:37.142Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-03-17T13:04:27.548Z
+Stopped at: Completed 14-02-PLAN.md
 Resume file: None
