@@ -130,7 +130,12 @@ Plans:
   2. The admin panel has a Modules tab where modules can be enabled/disabled and assigned to specific groups/contacts/newsletters
   3. Contacts and channels tabs support bulk select with checkboxes and a bulk action toolbar (Allow DM, Revoke DM, Set Mode)
   4. Module hooks only fire after the fromMe and dedup checks — the bot's own messages never reach module hooks
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — Module interface, registry, SQLite tables, inbound pipeline wiring
+- [ ] 17-02-PLAN.md — Bulk select for Contacts and Channels tabs
+- [ ] 17-03-PLAN.md — Modules admin tab UI with enable/disable and chat assignment
 
 ## Progress
 
@@ -154,4 +159,4 @@ Plans:
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
 | 15. TTL Access | 3/3 | Complete    | 2026-03-17 | - |
 | 16. Pairing Mode and Auto-Reply | 3/3 | Complete    | 2026-03-17 | - |
-| 17. Modules Framework | v1.11 | 0/TBD | Not started | - |
+| 17. Modules Framework | v1.11 | 0/3 | Not started | - |
