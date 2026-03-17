@@ -208,9 +208,10 @@ async function tick(opts: SyncOptions, state: SyncState): Promise<void> {
 
   try {
     const itemsSynced = await runSyncCycle(opts, state);
+    const endTime = Date.now();
     state.status = "idle";
-    state.lastSyncAt = Date.now();
-    state.lastSyncDuration = Date.now() - startTime;
+    state.lastSyncAt = endTime;
+    state.lastSyncDuration = endTime - startTime;
     state.itemsSynced = itemsSynced;
     state.lastError = null;
   } catch (err: unknown) {
@@ -386,6 +387,8 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
 
   // Participants are loaded lazily when user clicks a group (not during bulk refresh)
 
+  if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length;
+
   // ── Phase 2: Newsletters ────────────────────────────────────────────
   state.currentPhase = "newsletters";
 
@@ -413,6 +416,8 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   } catch (newsletterErr) {
     console.warn(`[waha] sync: newsletter sync failed: ${String(newsletterErr)}`);
   }
+
+  if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length + newsletterCount;
 
   // ── Phase 3: Name resolution ────────────────────────────────────────
   // Second pass: resolve names for contacts/newsletters that still have no display_name
@@ -447,6 +452,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
       // Delay between batches for proper rate limiting
       if (i + BATCH_SIZE < namelessContacts.length) {
         await new Promise((resolve) => setTimeout(resolve, 500));
+        if (opts.abortSignal.aborted) break;
       }
     }
 
@@ -479,6 +485,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
       }
       if (i + BATCH_SIZE < namelessNewsletters.length) {
         await new Promise((resolve) => setTimeout(resolve, 500));
+        if (opts.abortSignal.aborted) break;
       }
     }
   } catch (err) {

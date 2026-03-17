@@ -489,7 +489,7 @@ export class DirectoryDb {
       WHERE c.jid LIKE '%@lid' OR c.jid LIKE '%@s.whatsapp.net'
     `;
     const rows = this.db.prepare(sql).all() as Array<Record<string, unknown>>;
-    return rows.map(this._rowToContact);
+    return rows.map(this._rowToContact.bind(this));
   }
 
   bulkUpsertContacts(contacts: Array<{ jid: string; name?: string; isGroup?: boolean }>): number {

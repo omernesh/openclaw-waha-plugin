@@ -897,7 +897,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       // Phase 13 (SYNC-01): Start background directory sync alongside health checks.
       // Uses same abortSignal — sync stops when the account logs out.
       // DO NOT REMOVE — background sync keeps the directory populated for instant search.
-      const syncIntervalMinutes = (ctx.cfg as any)?.channels?.waha?.syncIntervalMinutes ?? 30;
+      const syncIntervalMinutes = (account.config as Record<string, unknown>).syncIntervalMinutes as number | undefined ?? 30;
       if (syncIntervalMinutes > 0 && ctx.abortSignal) {
         startDirectorySync({
           accountId: account.accountId,
