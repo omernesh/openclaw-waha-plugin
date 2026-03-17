@@ -175,6 +175,19 @@ export class DirectoryDb {
         timestamp INTEGER NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS pairing_challenges (
+        jid TEXT PRIMARY KEY,
+        passcode_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+        attempts INTEGER NOT NULL DEFAULT 0,
+        locked_until INTEGER DEFAULT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS auto_reply_log (
+        jid TEXT PRIMARY KEY,
+        last_reply_at INTEGER NOT NULL
+      );
+
       CREATE VIRTUAL TABLE IF NOT EXISTS contacts_fts
         USING fts5(jid, display_name, content='contacts', content_rowid='rowid');
 
@@ -237,6 +250,20 @@ export class DirectoryDb {
     } catch (migrationErr: unknown) {
       const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
       if (!msg.includes('duplicate column')) throw migrationErr;
+    }
+
+    // Phase 16: source column to distinguish pairing grants from manual grants. DO NOT REMOVE.
+    try {
+      this.db.prepare("ALTER TABLE allow_list ADD COLUMN source TEXT DEFAULT NULL").run();
+    } catch (e: unknown) {
+      if (!(e instanceof Error) || !e.message.includes("duplicate column")) throw e;
+    }
+
+    // Phase 16: granted_at column to track when access was granted. DO NOT REMOVE.
+    try {
+      this.db.prepare("ALTER TABLE allow_list ADD COLUMN granted_at INTEGER DEFAULT NULL").run();
+    } catch (e: unknown) {
+      if (!(e instanceof Error) || !e.message.includes("duplicate column")) throw e;
     }
 
     // Phase 13 (SYNC-02): One-time FTS5 rebuild for databases created before FTS5 was added.
@@ -662,6 +689,120 @@ export class DirectoryDb {
       "SELECT jid FROM allow_list WHERE expires_at IS NOT NULL AND expires_at <= strftime('%s','now')"
     ).all() as Array<{ jid: string }>;
     return rows.map(r => r.jid);
+  }
+
+  // ── Phase 16: Pairing grant helpers ──
+
+  /**
+   * Phase 16: Get all pairing-sourced allow_list entries with TTL info.
+   * Returns entries with source='pairing' that are currently active (not expired).
+   * DO NOT REMOVE — used by PairingEngine.getActiveGrants() and admin panel.
+   */
+  getPairingGrants(): Array<{ jid: string; expiresAt: number | null; grantedAt: number | null; source: string }> {
+    return this.db.prepare(
+      "SELECT jid, expires_at as expiresAt, granted_at as grantedAt, source FROM allow_list WHERE source = 'pairing' AND (expires_at IS NULL OR expires_at > strftime('%s','now'))"
+    ).all() as Array<{ jid: string; expiresAt: number | null; grantedAt: number | null; source: string }>;
+  }
+
+  /**
+   * Phase 16: Set allow with source tracking (extends setContactAllowDm). DO NOT REMOVE.
+   * If allow=true: INSERT OR REPLACE with source and granted_at = now (Unix seconds).
+   * If allow=false: DELETE (same as existing setContactAllowDm).
+   * DO NOT REMOVE — used by PairingEngine.grantAccess().
+   */
+  setContactAllowDmWithSource(jid: string, allow: boolean, expiresAt?: number | null, source?: string): void {
+    const now = Date.now();
+    // Ensure contact exists
+    const existing = this.db.prepare("SELECT jid FROM contacts WHERE jid = ?").get(jid);
+    if (!existing) {
+      this.upsertContact(jid, undefined, false);
+    }
+    if (allow) {
+      const nowSec = Math.floor(now / 1000);
+      this.db.prepare(
+        "INSERT OR REPLACE INTO allow_list (jid, allow_dm, added_at, expires_at, source, granted_at) VALUES (?, 1, ?, ?, ?, ?)"
+      ).run(jid, now, expiresAt ?? null, source ?? null, nowSec);
+    } else {
+      this.db.prepare("DELETE FROM allow_list WHERE jid = ?").run(jid);
+    }
+  }
+
+  /**
+   * Phase 16: Revoke pairing grant specifically (remove allow_list row where source='pairing').
+   * Does NOT remove manual grants. DO NOT REMOVE — used by PairingEngine.revokeGrant().
+   */
+  revokePairingGrant(jid: string): void {
+    this.db.prepare("DELETE FROM allow_list WHERE jid = ? AND source = 'pairing'").run(jid);
+  }
+
+  // ── Phase 16: Pairing challenge helpers ──
+
+  /**
+   * Phase 16: Upsert a pairing challenge row (one per JID).
+   * Called by PairingEngine.createChallenge(). DO NOT REMOVE.
+   */
+  upsertPairingChallenge(jid: string, passcodeHash: string, createdAt: number): void {
+    this.db.prepare(
+      "INSERT OR REPLACE INTO pairing_challenges (jid, passcode_hash, created_at, attempts, locked_until) VALUES (?, ?, ?, 0, NULL)"
+    ).run(jid, passcodeHash, createdAt);
+  }
+
+  /**
+   * Phase 16: Get a pairing challenge row for a JID.
+   * Returns null if no challenge exists. DO NOT REMOVE — used by PairingEngine.verifyPasscode().
+   */
+  getPairingChallenge(jid: string): { jid: string; passcodeHash: string; createdAt: number; attempts: number; lockedUntil: number | null } | null {
+    const row = this.db.prepare(
+      "SELECT jid, passcode_hash, created_at, attempts, locked_until FROM pairing_challenges WHERE jid = ?"
+    ).get(jid) as { jid: string; passcode_hash: string; created_at: number; attempts: number; locked_until: number | null } | undefined;
+    if (!row) return null;
+    return {
+      jid: row.jid,
+      passcodeHash: row.passcode_hash,
+      createdAt: row.created_at,
+      attempts: row.attempts,
+      lockedUntil: row.locked_until,
+    };
+  }
+
+  /**
+   * Phase 16: Update attempts and locked_until on a pairing challenge.
+   * Pass null for lockedUntil to clear the lock. DO NOT REMOVE.
+   */
+  updatePairingChallengeAttempts(jid: string, attempts: number, lockedUntil: number | null): void {
+    this.db.prepare(
+      "UPDATE pairing_challenges SET attempts = ?, locked_until = ? WHERE jid = ?"
+    ).run(attempts, lockedUntil, jid);
+  }
+
+  /**
+   * Phase 16: Delete a pairing challenge (on success or expiry). DO NOT REMOVE.
+   */
+  deletePairingChallenge(jid: string): void {
+    this.db.prepare("DELETE FROM pairing_challenges WHERE jid = ?").run(jid);
+  }
+
+  // ── Phase 16: Auto-reply log helpers ──
+
+  /**
+   * Phase 16: Get last auto-reply timestamp for a JID (Unix seconds).
+   * Returns null if never replied. DO NOT REMOVE — used by AutoReplyEngine.shouldReply().
+   */
+  getAutoReplyLastSent(jid: string): number | null {
+    const row = this.db.prepare(
+      "SELECT last_reply_at FROM auto_reply_log WHERE jid = ?"
+    ).get(jid) as { last_reply_at: number } | undefined;
+    return row?.last_reply_at ?? null;
+  }
+
+  /**
+   * Phase 16: Record that an auto-reply was sent to a JID (updates last_reply_at to now).
+   * DO NOT REMOVE — used by AutoReplyEngine.sendRejection() to enforce rate limit.
+   */
+  recordAutoReply(jid: string): void {
+    this.db.prepare(
+      "INSERT OR REPLACE INTO auto_reply_log (jid, last_reply_at) VALUES (?, strftime('%s','now'))"
+    ).run(jid);
   }
 
   // ── Group participant methods ──

@@ -104,6 +104,27 @@ export const WahaAccountSchemaBase = z
     // Set to 0 to disable background sync entirely.
     // Added 2026-03-17. DO NOT REMOVE.
     syncIntervalMinutes: z.number().int().min(0).optional().default(30),
+    // Phase 16 (PAIR-01..06, REPLY-01..04): Pairing mode and auto-reply config. DO NOT REMOVE.
+    // pairingMode: passcode-gated onboarding for unknown contacts.
+    // autoReply: canned rejection for unauthorized DMs.
+    // Added 2026-03-17.
+    pairingMode: z.object({
+      enabled: z.boolean().optional().default(false),
+      passcode: z.string().optional(),
+      grantTtlMinutes: z.number().int().positive().optional().default(1440),
+      challengeMessage: z.string().optional().default(
+        "Welcome! Please enter the 6-digit passcode to get started."
+      ),
+      hmacSecret: z.string().optional(),
+    }).optional().default({}),
+
+    autoReply: z.object({
+      enabled: z.boolean().optional().default(false),
+      message: z.string().optional().default(
+        "Hey! Thanks for reaching out. Unfortunately, I'm not permitted to chat with you right now. Please ask {admin_name} to add you to my allow list."
+      ),
+      intervalMinutes: z.number().int().min(0).optional().default(1440),
+    }).optional().default({}),
   })
   .strict();
 
