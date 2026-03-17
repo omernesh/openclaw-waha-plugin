@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.11
 milestone_name: Polish, Sync & Features
 status: in-progress
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-03-17T02:44:58.492Z"
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-03-17T02:57:06.345Z"
 last_activity: "2026-03-17 — Plan 12-01 complete: dashboard UI bug fixes (6 requirements)"
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 40
 ---
 
@@ -68,6 +68,8 @@ Progress: [█░░░░░░░░░] 2% (v1.11 milestone)
 - [Phase 12-ui-bug-sprint]: Role auto-grant/revoke pattern (12-05, 2026-03-17): promote to bot_admin/manager auto-enables Allow+Allow DM; demote to participant auto-revokes Allow DM only (group Allow preserved)
 - [Phase 13]: FTS5 MATCH replaces LIKE for directory search — O(log n) vs O(n), trigger-based index maintenance
 - [Phase 13]: Background sync engine (sync.ts) uses setTimeout chain + per-account Map state, stores opts at startDirectorySync call time for triggerImmediateSync re-use
+- [Phase 13-background-directory-sync]: Inline refresh handler removed from monitor.ts: 200-line code replaced with 3-line triggerImmediateSync(), pipeline lives only in sync.ts
+- [Phase 13-background-directory-sync]: Contacts tab uses pagination matching Groups tab: loadContactsTable() with buildPageNav(goFn) generic pagination
 
 ### Pending Todos
 
@@ -81,6 +83,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-17T02:44:58.488Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-03-17T02:57:06.341Z
+Stopped at: Completed 13-02-PLAN.md
 Resume file: None

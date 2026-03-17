@@ -41,8 +41,8 @@ Requirements for v1.11 milestone. Each maps to roadmap phases.
 
 - [x] **SYNC-01**: Background WAHA→SQLite sync continuously pulls contacts/groups/newsletters with rate limiting (CR-08)
 - [x] **SYNC-02**: Directory search queries local SQLite DB, not WAHA API — instant results (CR-08)
-- [ ] **SYNC-03**: Sync status indicator shows "Last synced" timestamp and sync progress in Directory tab (CR-08)
-- [ ] **SYNC-04**: Contacts tab has pagination matching Groups tab pattern (BUG-15)
+- [x] **SYNC-03**: Sync status indicator shows "Last synced" timestamp and sync progress in Directory tab (CR-08)
+- [x] **SYNC-04**: Contacts tab has pagination matching Groups tab pattern (BUG-15)
 - [x] **SYNC-05**: Directory search finds contacts by name from locally synced data (BUG-06)
 
 ### Name Resolution
@@ -164,8 +164,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INIT-02 | Phase 12 | Complete |
 | SYNC-01 | Phase 13 | Complete |
 | SYNC-02 | Phase 13 | Complete |
-| SYNC-03 | Phase 13 | Pending |
-| SYNC-04 | Phase 13 | Pending |
+| SYNC-03 | Phase 13 | Complete |
+| SYNC-04 | Phase 13 | Complete |
 | SYNC-05 | Phase 13 | Complete |
 | NAME-01 | Phase 14 | Pending |
 | NAME-02 | Phase 14 | Pending |

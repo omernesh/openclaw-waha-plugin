@@ -31,7 +31,7 @@ Full details: `.planning/milestones/v1.10-ROADMAP.md`
 **Milestone Goal:** Fix all bugs and CRs from v1.10 human verification, implement background directory sync, and add pairing mode, TTL access, auto-reply, and modules system.
 
 - [x] **Phase 12: UI Bug Sprint** — Fix all standalone admin panel regressions and polish items (completed 2026-03-17)
-- [ ] **Phase 13: Background Directory Sync** — Continuous WAHA-to-SQLite sync with local search
+- [x] **Phase 13: Background Directory Sync** — Continuous WAHA-to-SQLite sync with local search (completed 2026-03-17)
 - [ ] **Phase 14: Name Resolution** — Resolve @lid JIDs to display names throughout the UI
 - [ ] **Phase 15: TTL Access** — Schema and infrastructure for auto-expiring allowlist entries
 - [ ] **Phase 16: Pairing Mode and Auto-Reply** — Passcode-gated onboarding and canned rejection messages
@@ -136,7 +136,7 @@ Plans:
 | 10. Directory & Group Enhancements | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 11. Dashboard, Sessions & Log | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 12. UI Bug Sprint | 5/5 | Complete    | 2026-03-17 | - |
-| 13. Background Directory Sync | 1/2 | In Progress|  | - |
+| 13. Background Directory Sync | 2/2 | Complete   | 2026-03-17 | - |
 | 14. Name Resolution | v1.11 | 0/TBD | Not started | - |
 | 15. TTL Access | v1.11 | 0/TBD | Not started | - |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
