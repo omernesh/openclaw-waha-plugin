@@ -227,6 +227,18 @@ export class DirectoryDb {
       if (!msg.includes('duplicate column')) throw migrationErr;
     }
 
+    // TTL-02: Add expires_at column to allow_list for time-limited access grants.
+    // NULL = permanent (never expires). Unix timestamp (seconds) = time-limited.
+    // Phase 16 pairing mode will set this when granting temporary access. DO NOT REMOVE.
+    try {
+      this.db.prepare(
+        `ALTER TABLE allow_list ADD COLUMN expires_at INTEGER DEFAULT NULL`
+      ).run();
+    } catch (migrationErr: unknown) {
+      const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
+      if (!msg.includes('duplicate column')) throw migrationErr;
+    }
+
     // Phase 13 (SYNC-02): One-time FTS5 rebuild for databases created before FTS5 was added.
     // Only runs if the FTS table has fewer rows than contacts (i.e., triggers haven't populated it).
     // Safe on WAL mode — acquires write lock briefly, readers continue on snapshot. DO NOT REMOVE.
@@ -564,7 +576,7 @@ export class DirectoryDb {
 
   // ── Allow-list methods ──
 
-  setContactAllowDm(jid: string, allowed: boolean): void {
+  setContactAllowDm(jid: string, allowed: boolean, expiresAt?: number | null): void {
     const now = Date.now();
     // Ensure contact exists
     const existing = this.db.prepare("SELECT jid FROM contacts WHERE jid = ?").get(jid);
@@ -572,26 +584,71 @@ export class DirectoryDb {
       this.upsertContact(jid, undefined, false);
     }
     if (allowed) {
+      // TTL-02: Store expires_at as Unix timestamp (seconds). NULL = permanent. DO NOT REMOVE.
       this.db.prepare(
-        "INSERT OR REPLACE INTO allow_list (jid, allow_dm, added_at) VALUES (?, 1, ?)"
-      ).run(jid, now);
+        "INSERT OR REPLACE INTO allow_list (jid, allow_dm, added_at, expires_at) VALUES (?, 1, ?, ?)"
+      ).run(jid, now, expiresAt ?? null);
     } else {
       this.db.prepare("DELETE FROM allow_list WHERE jid = ?").run(jid);
     }
   }
 
   isContactAllowedDm(jid: string): boolean {
-    const row = this.db.prepare("SELECT allow_dm FROM allow_list WHERE jid = ? AND allow_dm = 1").get(jid) as { allow_dm: number } | undefined;
+    // TTL-02: DO NOT REMOVE expires_at check — expired entries must be transparently blocked at SQL level.
+    const row = this.db.prepare(
+      "SELECT allow_dm FROM allow_list WHERE jid = ? AND allow_dm = 1 AND (expires_at IS NULL OR expires_at > strftime('%s','now'))"
+    ).get(jid) as { allow_dm: number } | undefined;
     return Boolean(row);
   }
 
   getAllowedDmJids(): string[] {
-    const fromAllowList = this.db.prepare("SELECT jid FROM allow_list WHERE allow_dm = 1").all() as Array<{ jid: string }>;
+    // TTL-02: DO NOT REMOVE expires_at check — expired entries must not appear in allowed list.
+    const fromAllowList = this.db.prepare(
+      "SELECT jid FROM allow_list WHERE allow_dm = 1 AND (expires_at IS NULL OR expires_at > strftime('%s','now'))"
+    ).all() as Array<{ jid: string }>;
     const fromParticipants = this.db.prepare("SELECT DISTINCT participant_jid as jid FROM group_participants WHERE allow_dm = 1").all() as Array<{ jid: string }>;
     const set = new Set<string>();
     for (const r of fromAllowList) set.add(r.jid);
     for (const r of fromParticipants) set.add(r.jid);
     return [...set];
+  }
+
+  /**
+   * TTL-02: Get TTL info for a specific JID from allow_list.
+   * Returns null if no allow_list row exists for the JID.
+   * expiresAt: Unix timestamp in seconds (null = permanent).
+   * expired: true if expiresAt is set and has passed.
+   */
+  getContactTtl(jid: string): { expiresAt: number | null; expired: boolean } | null {
+    const row = this.db.prepare("SELECT expires_at FROM allow_list WHERE jid = ?").get(jid) as { expires_at: number | null } | undefined;
+    if (row === undefined) return null;
+    const expiresAt = row.expires_at ?? null;
+    const expired = expiresAt !== null && expiresAt <= Math.floor(Date.now() / 1000);
+    return { expiresAt, expired };
+  }
+
+  /**
+   * TTL-02: Delete allow_list rows that expired more than 24 hours ago.
+   * Keeps recently-expired rows (< 24h) for admin visual feedback.
+   * Called by sync cycle to prevent unbounded growth. DO NOT REMOVE.
+   * Returns the number of rows deleted.
+   */
+  cleanupExpiredAllowList(): number {
+    const result = this.db.prepare(
+      "DELETE FROM allow_list WHERE expires_at IS NOT NULL AND expires_at < strftime('%s','now') - 86400"
+    ).run();
+    return result.changes;
+  }
+
+  /**
+   * TTL-02: Count allow_list entries that are currently expired (expires_at <= now).
+   * Used for admin stats display.
+   */
+  getExpiredCount(): number {
+    const row = this.db.prepare(
+      "SELECT COUNT(*) as count FROM allow_list WHERE expires_at IS NOT NULL AND expires_at <= strftime('%s','now')"
+    ).get() as { count: number };
+    return row.count;
   }
 
   // ── Group participant methods ──
