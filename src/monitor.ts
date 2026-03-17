@@ -629,8 +629,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           </label>
         </div>
         <div class="field">
-          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). DMs must match at least one. One per line. Example: bot, help, @bot">?</span></label>
-          <textarea id="s-mentionPatterns" name="mentionPatterns" rows="4" placeholder="bot&#10;help&#10;hello"></textarea>
+          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). DMs must match at least one. Press Enter or comma to add each pattern.">?</span></label>
+          <div id="dm-mention-patterns"></div>
         </div>
         <div class="field">
           <label class="toggle-wrap">
@@ -667,8 +667,8 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           </label>
         </div>
         <div class="field">
-          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). Group messages must match at least one. One per line. This uses OpenClaw's built-in group interaction filtering with regex support.">?</span></label>
-          <textarea id="s-groupMentionPatterns" name="groupMentionPatterns" rows="4" placeholder="bot&#10;@bot&#10;help"></textarea>
+          <label>Mention Patterns <span class="tip" data-tip="Regex patterns (case-insensitive). Group messages must match at least one. Press Enter or comma to add each pattern.">?</span></label>
+          <div id="group-mention-patterns"></div>
         </div>
         <div class="field">
           <label class="toggle-wrap">
@@ -1474,6 +1474,11 @@ var _accessKvBuilt = false;
 var tagInputAllowFrom = null;
 var tagInputGroupAllowFrom = null;
 var tagInputAllowedGroups = null;
+// ---- Mention Patterns tag input instances (Phase 12, UX-05) -- initialized lazily in loadConfig() ----
+var dmMentionPatternsInput = null;
+var groupMentionPatternsInput = null;
+// ---- Custom Keywords tag input instances (Phase 12, UX-04) -- keyed by sanitized contact ID ----
+var customKeywordTagInputs = {};
 // ---- Group Filter Override tag input instances (Phase 9, UX-03) -- keyed by sanitized JID suffix ----
 var gfoTagInputs = {};
 // ---- God Mode Users Field instance variables (Phase 8, UI-04) -- initialized lazily in loadConfig() ----
@@ -2101,7 +2106,9 @@ async function loadConfig() {
     if (tagInputAllowedGroups) tagInputAllowedGroups.setValue(w.allowedGroups || []);
     var dm = w.dmFilter || {};
     setChk('s-dmFilterEnabled', dm.enabled);
-    setVal('s-mentionPatterns', (dm.mentionPatterns || []).join('\\n'));
+    // Phase 12, UX-05 -- DM Mention Patterns tag input replaces textarea. DO NOT REVERT to setVal/splitLines.
+    if (!dmMentionPatternsInput) dmMentionPatternsInput = createTagInput('dm-mention-patterns', { placeholder: 'Add pattern and press Enter...' });
+    if (dmMentionPatternsInput) dmMentionPatternsInput.setValue(dm.mentionPatterns || []);
     setChk('s-godModeBypass', dm.godModeBypass !== false);
     setVal('s-godModeScope', dm.godModeScope || 'all');
     // Phase 8, UI-04 -- God Mode Users Field (Contact Picker with paired JID support)
@@ -2110,7 +2117,9 @@ async function loadConfig() {
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
     var gf = w.groupFilter || {};
     setChk('s-groupFilterEnabled', gf.enabled);
-    setVal('s-groupMentionPatterns', (gf.mentionPatterns || []).join('\\n'));
+    // Phase 12, UX-05 -- Group Mention Patterns tag input replaces textarea. DO NOT REVERT to setVal/splitLines.
+    if (!groupMentionPatternsInput) groupMentionPatternsInput = createTagInput('group-mention-patterns', { placeholder: 'Add pattern and press Enter...' });
+    if (groupMentionPatternsInput) groupMentionPatternsInput.setValue(gf.mentionPatterns || []);
     setChk('s-groupGodModeBypass', gf.godModeBypass !== false);
     setVal('s-groupGodModeScope', gf.godModeScope || 'all');
     // Phase 8, UI-04 -- God Mode Users Field (Contact Picker with paired JID support)
@@ -2174,7 +2183,8 @@ async function saveSettings(e) {
       allowedGroups: tagInputAllowedGroups ? tagInputAllowedGroups.getValue() : [],
       dmFilter: {
         enabled: getChk('s-dmFilterEnabled'),
-        mentionPatterns: splitLines(getVal('s-mentionPatterns')),
+        // Phase 12, UX-05 -- read from Mention Patterns tag input. DO NOT REVERT to splitLines(getVal(...)).
+        mentionPatterns: dmMentionPatternsInput ? dmMentionPatternsInput.getValue() : [],
         godModeBypass: getChk('s-godModeBypass'),
         godModeScope: getVal('s-godModeScope') || 'all',
         // Phase 8, UI-04 -- read from God Mode Users Field. DO NOT REVERT to splitLines(getVal(...)).
@@ -2183,7 +2193,8 @@ async function saveSettings(e) {
       },
       groupFilter: {
         enabled: getChk('s-groupFilterEnabled'),
-        mentionPatterns: splitLines(getVal('s-groupMentionPatterns')),
+        // Phase 12, UX-05 -- read from Group Mention Patterns tag input. DO NOT REVERT to splitLines(getVal(...)).
+        mentionPatterns: groupMentionPatternsInput ? groupMentionPatternsInput.getValue() : [],
         godModeBypass: getChk('s-groupGodModeBypass'),
         godModeScope: getVal('s-groupGodModeScope') || 'all',
         // Phase 8, UI-04 -- read from God Mode Users Field. DO NOT REVERT to splitLines(getVal(...)).
@@ -2714,7 +2725,7 @@ function buildContactCard(c) {
       '<div class="settings-fields">' +
         '<div class="settings-field"><label>Mode <span class="tip" data-tip="Active: bot responds to this contact. Listen Only: messages arrive but bot does not reply.">?</span></label><select id="mode-' + id + '"><option value="active"' + (dm.mode==='active'?' selected':'') + '>Active</option><option value="listen_only"' + (dm.mode==='listen_only'?' selected':'') + '>Listen Only</option></select></div>' +
         '<div class="settings-field"><label><input type="checkbox" id="mo-' + id + '"' + (dm.mentionOnly?' checked':'') + '> Mention Only <span class="tip" data-tip="When checked, bot only responds if it is explicitly @mentioned in the message.">?</span></label></div>' +
-        '<div class="settings-field"><label>Custom Keywords <span class="tip" data-tip="Comma-separated regex patterns. Bot responds only if the message matches one. Overrides global keyword filter for this contact.">?</span></label><input type="text" id="kw-' + id + '" value="' + esc(dm.customKeywords) + '" placeholder="keyword1, keyword2"></div>' +
+        '<div class="settings-field"><label>Custom Keywords <span class="tip" data-tip="Regex patterns. Bot responds only if the message matches one. Overrides global keyword filter for this contact. Press Enter to add each keyword.">?</span></label><div id="kw-' + id + '" data-init-kw="' + esc(JSON.stringify((dm.customKeywords || '').split(',').map(function(s){return s.trim();}).filter(Boolean))) + '"></div></div>' +
         '<div class="settings-field"><label>Can Initiate <span class="tip" data-tip="Override the global Can Initiate setting for this contact. Default: follow the global toggle in Settings. Allow: always allow initiation. Block: never initiate.">?</span></label>' +
           '<select id="ci-' + id + '">' +
             '<option value="default"' + (dm.canInitiateOverride==='default'?' selected':'') + '>Default (use global)</option>' +
@@ -2761,12 +2772,29 @@ function buildContactCard(c) {
 function toggleContactSettings(jid) {
   var id = 'card-' + jid.replace(/[^a-zA-Z0-9]/g, '_');
   var panel = document.getElementById('panel-' + id);
-  if (panel) panel.classList.toggle('open');
+  if (!panel) return;
+  panel.classList.toggle('open');
+  // Phase 12, UX-04 — lazily init Custom Keywords tag input on first open.
+  // DO NOT CHANGE: createTagInput requires the container div to exist in DOM. We only call it once per contact
+  // (null-guard prevents re-creation). data-init-kw holds the initial value as JSON from buildContactCard.
+  if (!customKeywordTagInputs[id]) {
+    var kwContainer = document.getElementById('kw-' + id);
+    if (kwContainer) {
+      customKeywordTagInputs[id] = createTagInput('kw-' + id, { placeholder: 'Add keyword and press Enter...' });
+      try {
+        var initKw = JSON.parse(kwContainer.getAttribute('data-init-kw') || '[]');
+        customKeywordTagInputs[id].setValue(Array.isArray(initKw) ? initKw : []);
+      } catch(e) { /* ignore malformed init data */ }
+    }
+  }
 }
 async function saveContactSettings(jid, id) {
   var mode = document.getElementById('mode-' + id)?.value || 'active';
   var mentionOnly = document.getElementById('mo-' + id)?.checked || false;
-  var customKeywords = document.getElementById('kw-' + id)?.value || '';
+  // Phase 12, UX-04 -- read customKeywords from tag input (returns array, joined to comma-string for backend).
+  // DO NOT REVERT to reading .value from a plain text input — the input is now a tag input container div.
+  var kwArr = customKeywordTagInputs[id] ? customKeywordTagInputs[id].getValue() : [];
+  var customKeywords = kwArr.join(',');
   // Phase 12, Plan 02 (INIT-02): Can Initiate is now a 3-option dropdown (default/allow/block). DO NOT REVERT to checkbox.
   var canInitiateOverride = document.getElementById('ci-' + id)?.value || 'default';
   try {
@@ -2776,9 +2804,9 @@ async function saveContactSettings(jid, id) {
     });
     var result = await r.json();
     if (!r.ok) throw new Error(result.error || 'Save failed');
-    showToast('Settings saved for ' + jid);
-    var panel = document.getElementById('panel-' + id);
-    if (panel) panel.classList.remove('open');
+    // Phase 12, UI-07 — drawer stays open after save (BUG-09). DO NOT add panel.classList.remove('open') here.
+    // User should be able to continue editing without reopening the drawer. Toast confirms save succeeded.
+    showToast('Settings saved');
   } catch(e) {
     showToast('Error: ' + e.message, true);
   }
