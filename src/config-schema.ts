@@ -50,7 +50,7 @@ export const WahaAccountSchemaBase = z
     webhookPublicUrl: z.string().optional(),
     webhookHmacKey: buildSecretInputSchema().optional(),
     webhookHmacKeyFile: z.string().optional(),
-    dmPolicy: DmPolicySchema.optional().default("pairing"),
+    dmPolicy: DmPolicySchema.optional().default("allowlist"),
     groupPolicy: GroupPolicySchema.optional().default("allowlist"),
     allowFrom: z.array(z.string()).optional(),
     groupAllowFrom: z.array(z.string()).optional(),

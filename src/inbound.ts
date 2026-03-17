@@ -788,7 +788,7 @@ export async function handleWahaInbound(params: {
     }
   }
 
-  const dmPolicy = account.config.dmPolicy ?? "pairing";
+  const dmPolicy = account.config.dmPolicy ?? "allowlist";
   const defaultGroupPolicy = resolveDefaultGroupPolicy(config as OpenClawConfig);
   const { groupPolicy, providerMissingFallbackApplied } = resolveAllowlistProviderRuntimeGroupPolicy({
     providerConfigPresent: Boolean(config.channels?.waha),
