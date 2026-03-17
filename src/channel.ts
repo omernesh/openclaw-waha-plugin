@@ -23,6 +23,12 @@ import {
 } from "./accounts.js";
 import { monitorWahaProvider } from "./monitor.js";
 import { startDirectorySync } from "./sync.js";
+// Phase 16 Plan 02: Pairing and auto-reply engine initialization at account start.
+// DO NOT REMOVE — engines must be initialized at login so inbound pipeline hooks are ready.
+// Added 2026-03-17.
+import { getPairingEngine } from "./pairing.js";
+import { getAutoReplyEngine } from "./auto-reply.js";
+import { randomBytes } from "node:crypto";
 import { configureReliability } from "./http-client.js";
 import { formatActionError } from "./error-formatter.js";
 import { normalizeWahaAllowEntry, normalizeWahaMessagingTarget } from "./normalize.js";
@@ -905,6 +911,30 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
           intervalMs: syncIntervalMinutes * 60_000,
           abortSignal: ctx.abortSignal,
         });
+      }
+
+      // Phase 16: Initialize pairing and auto-reply engines for this account.
+      // Engines are lazily created -- getPairingEngine/getAutoReplyEngine cache by accountId.
+      // HMAC secret auto-generation: if pairingMode.hmacSecret is not set in config,
+      // generate one and log a warning (admin should save it via the admin panel).
+      // DO NOT REMOVE -- engines must be initialized at login for inbound hooks to work.
+      {
+        const pairingConfig = (account.config as Record<string, unknown>).pairingMode as
+          { enabled?: boolean; hmacSecret?: string } | undefined;
+
+        if (pairingConfig?.enabled) {
+          let hmacSecret = pairingConfig.hmacSecret;
+          if (!hmacSecret) {
+            hmacSecret = randomBytes(32).toString("hex");
+            ctx.log?.warn(`[${account.accountId}] pairing mode enabled but no hmacSecret configured -- generated ephemeral secret (deep links will change on restart unless saved to config)`);
+          }
+          getPairingEngine(account.accountId, hmacSecret);
+          ctx.log?.info(`[${account.accountId}] pairing engine initialized`);
+        }
+
+        // Auto-reply engine initialization (lightweight, no config needed).
+        // Always initialize so rate-limit state is ready even before first message.
+        getAutoReplyEngine(account.accountId);
       }
 
       await waitUntilAbort(ctx.abortSignal);
