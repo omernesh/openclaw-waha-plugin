@@ -1594,7 +1594,7 @@ var globalTriggerOperator = 'OR';
 // ---- Dashboard ----
 async function loadStats() {
   try {
-    var r = await fetch('/api/admin/stats');
+    var r = await fetchWithRetry('/api/admin/stats');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     document.getElementById('status-badge').textContent = d.dmFilter.enabled ? 'Filter ON' : 'Filter OFF';
@@ -1806,7 +1806,7 @@ async function loadLogs() {
   search = search.trim();
   var url = '/api/admin/logs?lines=200&level=' + currentLogLevel + (search ? '&search=' + encodeURIComponent(search) : '');
   try {
-    var r = await fetch(url);
+    var r = await fetchWithRetry(url);
     if (!r.ok) {
       var errBody = await r.json().catch(function() { return {}; });
       throw new Error(errBody.error || 'HTTP ' + r.status);
@@ -1861,7 +1861,7 @@ async function loadLogs() {
 // ---- Queue Stats (Phase 2, Plan 02) ----
 async function loadQueue() {
   try {
-    var r = await fetch('/api/admin/queue');
+    var r = await fetchWithRetry('/api/admin/queue');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     var statsHtml = [
@@ -1902,7 +1902,7 @@ function healthDotColor(healthy, healthStatus) {
 // DO NOT REMOVE: renders all config sessions in the Dashboard session card.
 async function loadDashboardSessions() {
   try {
-    var r = await fetch('/api/admin/sessions');
+    var r = await fetchWithRetry('/api/admin/sessions');
     var container = document.getElementById('dashboard-sessions');
     if (!container) return;
     if (!r.ok) {
@@ -2074,6 +2074,32 @@ function pollSessionsUntilReady(startedAt) {
   }, 2000);
 }
 
+// fetchWithRetry: wraps fetch with a timeout (8s) and one automatic retry on network failure.
+// Handles transient "Failed to fetch" errors caused by gateway restarts or proxy hiccups.
+// DO NOT REMOVE — without this, any tab that fetches data will show a permanent error if the
+// first request fails (e.g. during gateway restart), with no way to recover except manual refresh.
+async function fetchWithRetry(url, opts, retries) {
+  retries = typeof retries === 'number' ? retries : 1;
+  for (var attempt = 0; attempt <= retries; attempt++) {
+    try {
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, 8000);
+      var mergedOpts = Object.assign({}, opts || {}, { signal: controller.signal });
+      var r = await fetch(url, mergedOpts);
+      clearTimeout(timeoutId);
+      return r;
+    } catch(err) {
+      clearTimeout(timeoutId);
+      if (attempt < retries) {
+        // Wait 1s before retrying on network error
+        await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 async function loadSessions() {
   var container = document.getElementById('sessions-list');
   if (!container) return;
@@ -2083,7 +2109,7 @@ async function loadSessions() {
   loadingEl.textContent = 'Loading...';
   container.appendChild(loadingEl);
   try {
-    var r = await fetch('/api/admin/sessions');
+    var r = await fetchWithRetry('/api/admin/sessions');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var sessions = await r.json();
     while (container.firstChild) container.removeChild(container.firstChild);
@@ -2172,7 +2198,7 @@ async function loadModules() {
   listEl.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Loading...</div>';
   emptyEl.style.display = 'none';
   try {
-    var r = await fetch('/api/admin/modules');
+    var r = await fetchWithRetry('/api/admin/modules');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var data = await r.json();
     var modules = data.modules || [];
@@ -2308,7 +2334,7 @@ async function removeModuleAssignment(moduleId, jid) {
 // ---- Settings ----
 async function loadConfig() {
   try {
-    var r = await fetch('/api/admin/config');
+    var r = await fetchWithRetry('/api/admin/config');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     var w = d.waha || {};
@@ -2321,7 +2347,7 @@ async function loadConfig() {
       var sel = document.getElementById('s-session');
       if (!sel) return;
       try {
-        var sr = await fetch('/api/admin/sessions');
+        var sr = await fetchWithRetry('/api/admin/sessions');
         if (sr.ok) {
           var sessions = await sr.json();
           var currentSession = w.session || '';
@@ -2884,7 +2910,7 @@ async function loadDirectory() {
   var typeParam = currentDirTab === 'contacts' ? '&type=contact' : '&type=newsletter';
   var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + typeParam + (search ? '&search=' + encodeURIComponent(search) : '');
   try {
-    var r = await fetch(url);
+    var r = await fetchWithRetry(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
     document.getElementById('dir-stats').innerHTML =
