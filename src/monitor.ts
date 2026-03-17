@@ -13,7 +13,7 @@ import {
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
-import { getWahaChats, getWahaContact, getWahaContacts, getWahaGroups, getWahaGroupParticipants, getWahaNewsletter, getWahaAllLids, toArr } from "./send.js";
+import { getWahaGroupParticipants } from "./send.js";
 import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
@@ -877,6 +877,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button class="dir-tab" onclick="switchDirTab('groups',this)" id="dtab-groups">Groups</button>
     <button class="dir-tab" onclick="switchDirTab('newsletters',this)" id="dtab-newsletters">Channels</button>
   </div>
+  <div id="syncStatusBar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:8px;background:#0f172a;border:1px solid #334155;border-radius:6px;font-size:13px;color:#94a3b8;">
+    <span id="syncStatusIcon"></span>
+    <span id="syncStatusText">Checking sync status...</span>
+  </div>
   <div class="dir-header">
     <div style="position:relative;flex:1;">
       <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()" style="width:100%;padding-right:28px;">
@@ -964,7 +968,7 @@ function switchTab(name, btn) {
   if (btn) btn.classList.add('active');
   if (name === 'dashboard') { _accessKvBuilt = false; loadStats(); }
   if (name === 'settings') loadConfig();
-  if (name === 'directory') loadDirectory();
+  if (name === 'directory') { loadDirectory(); updateSyncStatus(); }
   if (name === 'queue') loadQueue();
   if (name === 'sessions') loadSessions();
   if (name === 'logs') { loadLogs(); startLogRefresh(); } else { stopLogRefresh(); }
@@ -2360,6 +2364,7 @@ function switchDirTab(tab, btn) {
   if (searchEl) searchEl.value = '';                      // UX-04: clear on tab switch
   dirOffset = 0;
   dirGroupPage = 1;  // DIR-01: reset groups page on tab switch
+  dirContactPage = 1;  // Phase 13: reset contacts page on tab switch
   dirAutoImported = false;
   // DIR-04: Clear bulk selection state on tab switch (Pitfall 4)
   bulkSelectMode = false;
@@ -2378,17 +2383,59 @@ function clearDirSearch() {
   dirOffset = 0;
   loadDirectory();
 }
+// ---- Sync status bar (Phase 13, SYNC-03) ----
+// Updates the sync status bar at the top of the Directory tab.
+// Fetches /api/admin/sync/status and updates #syncStatusIcon and #syncStatusText.
+// All text set via textContent — no user data, no XSS risk.
+// DO NOT REMOVE — status bar informs admin of background sync activity.
+async function updateSyncStatus() {
+  try {
+    var r = await fetch('/api/admin/sync/status');
+    var s = await r.json();
+    var icon = document.getElementById('syncStatusIcon');
+    var text = document.getElementById('syncStatusText');
+    if (!icon || !text) return;
+    if (s.status === 'running') {
+      icon.textContent = '\\u27f3';
+      icon.style.animation = 'spin 1s linear infinite';
+      text.textContent = 'Syncing' + (s.currentPhase ? ' ' + s.currentPhase + '...' : '...');
+    } else if (s.status === 'error') {
+      icon.textContent = '\\u26a0';
+      icon.style.animation = '';
+      text.textContent = 'Sync error: ' + (s.lastError || 'unknown');
+    } else {
+      icon.textContent = '\\u2713';
+      icon.style.animation = '';
+      if (s.lastSyncAt) {
+        var ago = Math.round((Date.now() - s.lastSyncAt) / 60000);
+        text.textContent = 'Last synced: ' + (ago < 1 ? 'just now' : ago + 'm ago') + ' (' + (s.itemsSynced || 0) + ' items)';
+      } else {
+        text.textContent = 'Sync not started yet';
+      }
+    }
+  } catch (e) {
+    // silently ignore -- status bar is informational
+  }
+}
+
 // ---- Directory refresh ----
 async function refreshDirectory() {
   var btn = document.getElementById('dir-refresh-all-btn');
-  if (btn) { btn.textContent = 'Importing...'; btn.disabled = true; }
+  if (btn) { btn.textContent = 'Syncing...'; btn.disabled = true; }
   try {
     var r = await fetch('/api/admin/directory/refresh', { method: 'POST' });
     var d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Refresh failed');
-    showToast('Imported ' + d.contacts + ' contacts, ' + d.groups + ' groups' + (d.namesResolved ? ', resolved ' + d.namesResolved + ' names' : ''));
-    dirOffset = 0;
-    await loadDirectory();
+    showToast('Sync triggered');
+    // Poll sync status for a few seconds to show progress
+    var pollCount = 0;
+    var pollInterval = setInterval(function() {
+      updateSyncStatus();
+      pollCount++;
+      if (pollCount >= 10) clearInterval(pollInterval);
+    }, 1000);
+    // Reload directory data after a short delay to show new entries
+    setTimeout(function() { dirOffset = 0; loadDirectory(); }, 3000);
   } catch(e) {
     showToast('Refresh error: ' + e.message, true);
   } finally {
@@ -2496,17 +2543,22 @@ var dirSearchTimeout = null;
 // DIR-01: Groups tab pagination state
 var dirGroupPage = 1;
 var dirGroupPageSize = 25;
+// Phase 13: Contacts tab pagination state (mirrors groups tab pattern)
+var dirContactPage = 1;
+var dirContactPageSize = 25;
 function debouncedDirSearch() {
   clearTimeout(dirSearchTimeout);
   // Phase 12, Plan 03 (UI-05): show/hide clear button based on input content
   var clearBtn = document.getElementById('dir-search-clear');
   var searchEl = document.getElementById('dir-search');
   if (clearBtn && searchEl) clearBtn.style.display = searchEl.value ? 'block' : 'none';
-  dirSearchTimeout = setTimeout(function() { dirOffset = 0; dirGroupPage = 1; loadDirectory(); }, 300);
+  dirSearchTimeout = setTimeout(function() { dirOffset = 0; dirGroupPage = 1; dirContactPage = 1; loadDirectory(); }, 300);
 }
 async function loadDirectory() {
   // DIR-01: groups tab uses a separate paginated table renderer — do not use infinite-scroll path
   if (currentDirTab === 'groups') { return loadGroupsTable(); }
+  // Phase 13: contacts tab uses paginated renderer matching groups tab
+  if (currentDirTab === 'contacts') { return loadContactsTable(); }
   var search = document.getElementById('dir-search').value.trim();
   var typeParam = currentDirTab === 'contacts' ? '&type=contact' : '&type=newsletter';
   var url = '/api/admin/directory?limit=50&offset=' + (dirOffset || 0) + typeParam + (search ? '&search=' + encodeURIComponent(search) : '');
@@ -2560,10 +2612,14 @@ async function loadDirectory() {
 })();
 // DIR-01: Navigate to a specific groups page — called from buildPageNav onclick handlers
 function goGroupPage(page) { dirGroupPage = page; loadGroupsTable(); }
+// Phase 13: Navigate to a specific contacts page — called from buildPageNav onclick handlers
+function goContactPage(page) { dirContactPage = page; loadContactsTable(); }
 
-// DIR-01: Build page navigation HTML — pure function, returns '' for single-page results.
+// DIR-01 / Phase 13: Build page navigation HTML — pure function, returns '' for single-page results.
+// goFn is the callback function name string (e.g. 'goGroupPage' or 'goContactPage').
 // All button labels and onclick args are static integers — no user data, no XSS risk.
-function buildPageNav(currentPage, totalPages) {
+// DO NOT REMOVE — shared by groups and contacts tab pagination.
+function buildPageNav(currentPage, totalPages, goFn) {
   if (totalPages <= 1) return '';
   var start = Math.max(1, currentPage - 2);
   var end = Math.min(totalPages, start + 4);
@@ -2572,13 +2628,13 @@ function buildPageNav(currentPage, totalPages) {
   var sDis  = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.8rem;opacity:0.5;pointer-events:none;';
   var sCur  = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1d4ed8;color:#fff;cursor:pointer;font-size:0.8rem;font-weight:bold;';
   var nav = '<div class="page-nav">';
-  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="goGroupPage(1)">First</button>';
-  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="goGroupPage(' + (currentPage - 1) + ')">Prev</button>';
+  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="' + goFn + '(1)">First</button>';
+  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="' + goFn + '(' + (currentPage - 1) + ')">Prev</button>';
   for (var pg = start; pg <= end; pg++) {
-    nav += '<button style="' + (pg === currentPage ? sCur : sBase) + '" onclick="goGroupPage(' + pg + ')">' + pg + '</button>';
+    nav += '<button style="' + (pg === currentPage ? sCur : sBase) + '" onclick="' + goFn + '(' + pg + ')">' + pg + '</button>';
   }
-  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="goGroupPage(' + (currentPage + 1) + ')">Next</button>';
-  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="goGroupPage(' + totalPages + ')">Last</button>';
+  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="' + goFn + '(' + (currentPage + 1) + ')">Next</button>';
+  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="' + goFn + '(' + totalPages + ')">Last</button>';
   nav += '</div>';
   return nav;
 }
@@ -2636,7 +2692,7 @@ async function loadGroupsTable() {
     list.appendChild(sizeRow);
     // Upper nav — buildPageNav output is static-integer HTML, no user data
     var upperNav = document.createElement('div');
-    upperNav.innerHTML = buildPageNav(dirGroupPage, totalPages);
+    upperNav.innerHTML = buildPageNav(dirGroupPage, totalPages, 'goGroupPage');
     list.appendChild(upperNav);
     // Groups table — all user text (names, JIDs) set via textContent
     var table = document.createElement('table');
@@ -2698,13 +2754,91 @@ async function loadGroupsTable() {
     list.appendChild(table);
     // Lower nav — same static-integer HTML
     var lowerNav = document.createElement('div');
-    lowerNav.innerHTML = buildPageNav(dirGroupPage, totalPages);
+    lowerNav.innerHTML = buildPageNav(dirGroupPage, totalPages, 'goGroupPage');
     list.appendChild(lowerNav);
   } catch(err) {
     while (list.firstChild) { list.removeChild(list.firstChild); }
     var errEl = document.createElement('div');
     errEl.style.cssText = 'color:#ef4444;padding:16px;';
     errEl.textContent = 'Error loading groups: ' + (err instanceof Error ? err.message : String(err));
+    list.appendChild(errEl);
+  }
+}
+
+// Phase 13: Render contacts tab as a paginated list.
+// Uses DOM methods for all user-supplied text (JIDs, names).
+// buildPageNav output is static-integer-only HTML — safe to assign via innerHTML.
+// Mirrors loadGroupsTable() pagination pattern. DO NOT remove — replaces infinite-scroll for contacts.
+async function loadContactsTable() {
+  var search = document.getElementById('dir-search').value.trim();
+  var offset = (dirContactPage - 1) * dirContactPageSize;
+  var url = '/api/admin/directory?type=contact&limit=' + dirContactPageSize + '&offset=' + offset + (search ? '&search=' + encodeURIComponent(search) : '');
+  var list = document.getElementById('contact-list');
+  try {
+    var r = await fetch(url);
+    if (!r.ok) {
+      var errBody; try { errBody = await r.json(); } catch(_) {}
+      throw new Error((errBody && errBody.error) || 'HTTP ' + r.status);
+    }
+    var d = await r.json();
+    var totalPages = Math.ceil((d.total || 0) / dirContactPageSize) || 1;
+    document.getElementById('dir-stats').innerHTML =
+      '<div class="dir-stat">Contacts <span>' + d.dms + '</span></div>' +
+      '<div class="dir-stat">Groups <span>' + d.groups + '</span></div>' +
+      '<div class="dir-stat">Newsletters <span>' + (d.newsletters || 0) + '</span></div>' +
+      '<div class="dir-stat">Showing <span>' + d.total + '</span></div>';
+    document.getElementById('load-more-btn').style.display = 'none';
+    // Clear list
+    while (list.firstChild) { list.removeChild(list.firstChild); }
+    // Auto-import if empty
+    if (d.total === 0 && !dirAutoImported) {
+      dirAutoImported = true;
+      refreshDirectory();
+      return;
+    }
+    if (!d.contacts || d.contacts.length === 0) {
+      var emptyEl = document.createElement('div');
+      emptyEl.style.cssText = 'color:#64748b;text-align:center;padding:32px;';
+      emptyEl.textContent = 'No contacts found.';
+      list.appendChild(emptyEl);
+      return;
+    }
+    // Page-size selector — option values/labels are static integers, safe
+    var sizeRow = document.createElement('div');
+    sizeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
+    var sizeLabel = document.createElement('label');
+    sizeLabel.style.cssText = 'font-size:0.8rem;color:#94a3b8;';
+    sizeLabel.textContent = 'Contacts per page:';
+    var sizeSelect = document.createElement('select');
+    sizeSelect.className = 'page-size-select';
+    sizeSelect.setAttribute('onchange', 'dirContactPageSize=parseInt(this.value);dirContactPage=1;loadContactsTable();');
+    [10, 25, 50, 100].forEach(function(sz) {
+      var opt = document.createElement('option');
+      opt.value = String(sz);
+      opt.textContent = String(sz);
+      if (sz === dirContactPageSize) { opt.selected = true; }
+      sizeSelect.appendChild(opt);
+    });
+    sizeRow.appendChild(sizeLabel);
+    sizeRow.appendChild(sizeSelect);
+    list.appendChild(sizeRow);
+    // Upper nav — buildPageNav output is static-integer HTML, no user data
+    var upperNav = document.createElement('div');
+    upperNav.innerHTML = buildPageNav(dirContactPage, totalPages, 'goContactPage');
+    list.appendChild(upperNav);
+    // Contact cards — existing buildContactCard renders HTML, safe (uses esc() for user text)
+    var cardsDiv = document.createElement('div');
+    d.contacts.forEach(function(c) { cardsDiv.innerHTML += buildContactCard(c); });
+    list.appendChild(cardsDiv);
+    // Lower nav
+    var lowerNav = document.createElement('div');
+    lowerNav.innerHTML = buildPageNav(dirContactPage, totalPages, 'goContactPage');
+    list.appendChild(lowerNav);
+  } catch(err) {
+    while (list.firstChild) { list.removeChild(list.firstChild); }
+    var errEl = document.createElement('div');
+    errEl.style.cssText = 'color:#ef4444;padding:16px;';
+    errEl.textContent = 'Error loading contacts: ' + (err instanceof Error ? err.message : String(err));
     list.appendChild(errEl);
   }
 }
