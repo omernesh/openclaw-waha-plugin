@@ -651,6 +651,19 @@ export class DirectoryDb {
     return row.count;
   }
 
+  /**
+   * TTL-03: Get JIDs of allow_list entries that have expired (expires_at <= now).
+   * Used by sync cycle to remove expired JIDs from the config file allowFrom array.
+   * This returns ALL expired entries (not just > 24h), because config removal must happen
+   * as soon as the TTL fires, not 24 hours later. DO NOT REMOVE — critical for TTL enforcement.
+   */
+  getExpiredJids(): string[] {
+    const rows = this.db.prepare(
+      "SELECT jid FROM allow_list WHERE expires_at IS NOT NULL AND expires_at <= strftime('%s','now')"
+    ).all() as Array<{ jid: string }>;
+    return rows.map(r => r.jid);
+  }
+
   // ── Group participant methods ──
 
   getGroupParticipants(groupJid: string): GroupParticipant[] {

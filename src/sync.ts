@@ -10,6 +10,9 @@
 // (Phase 13, 2026-03-17). Both must stay in sync — if the pipeline changes here,
 // update the monitor.ts handler too (or better: have monitor.ts call triggerImmediateSync).
 
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { getDirectoryDb } from "./directory.js";
 import {
   getWahaChats, getWahaContacts, getWahaGroups, getWahaAllLids,
@@ -231,6 +234,41 @@ async function tick(opts: SyncOptions, state: SyncState): Promise<void> {
 
     unrefTimer(nextTimer);
     syncTimers.set(opts.accountId, nextTimer);
+  }
+}
+
+/**
+ * TTL-03: Remove expired JIDs from the openclaw.json allowFrom array.
+ * This is the critical bridge between SQLite TTL expiry and the config-based inbound filter.
+ * Without this, expired entries remain in allowFrom and inbound continues to grant access.
+ * DO NOT REMOVE — closing this gap is what makes TTL enforcement actually work.
+ */
+function syncExpiredToConfig(expiredJids: string[]): number {
+  if (expiredJids.length === 0) return 0;
+  const configPath = process.env.OPENCLAW_CONFIG_PATH ?? join(homedir(), ".openclaw", "openclaw.json");
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const channels = (config.channels as Record<string, unknown>) ?? {};
+    const waha = (channels.waha as Record<string, unknown>) ?? {};
+    const allowFrom: string[] = Array.isArray(waha.allowFrom) ? (waha.allowFrom as string[]) : [];
+    let removed = 0;
+    for (const jid of expiredJids) {
+      const idx = allowFrom.indexOf(jid);
+      if (idx >= 0) {
+        allowFrom.splice(idx, 1);
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      waha.allowFrom = allowFrom;
+      config.channels = { ...channels, waha };
+      writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+    }
+    return removed;
+  } catch (err) {
+    console.error(`[waha] sync: syncExpiredToConfig failed: ${String(err)}`);
+    return 0;
   }
 }
 
@@ -490,6 +528,20 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     }
   } catch (err) {
     console.warn(`[waha] sync: per-contact name resolution partially failed: ${String(err)}`);
+  }
+
+  // TTL-03: Remove expired JIDs from config file allowFrom BEFORE cleanup.
+  // This is the critical enforcement step — inbound.ts reads from config, not SQLite.
+  // Without this, expired entries remain in allowFrom and messages continue to pass.
+  // DO NOT REMOVE — this is what makes TTL actually block expired contacts.
+  try {
+    const expiredJids = db.getExpiredJids();
+    const configRemoved = syncExpiredToConfig(expiredJids);
+    if (configRemoved > 0) {
+      console.log(`[waha] sync: removed ${configRemoved} expired JIDs from config allowFrom`);
+    }
+  } catch (err) {
+    console.warn(`[waha] sync: syncExpiredToConfig failed: ${String(err)}`);
   }
 
   // TTL-02: Cleanup allow_list entries expired > 24h ago (keeps recently expired for admin visual feedback)
