@@ -488,6 +488,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button onclick="switchTab('directory', this)" id="tab-directory">Directory</button>
     <button onclick="switchTab('queue', this)" id="tab-queue">Queue</button>
     <button onclick="switchTab('sessions', this)" id="tab-sessions">Sessions</button>
+    <button onclick="switchTab('modules', this)" id="tab-modules">Modules</button>
     <button onclick="switchTab('logs', this)" id="tab-logs">Log</button>
   </nav>
   <span class="badge" id="status-badge">Loading...</span>
@@ -1010,6 +1011,22 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 </main>
 </div>
 
+<!-- TAB: MODULES (Phase 17, Plan 03 — MOD-03, MOD-04) -->
+<div class="tab-content" id="content-modules">
+<main class="tab-pane">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;font-size:1.1rem;color:#e2e8f0;">Registered Modules</h2>
+      <button class="refresh-btn" id="refresh-modules">Refresh</button>
+    </div>
+    <div id="modules-list"></div>
+    <div id="modules-empty" style="display:none;color:#64748b;text-align:center;padding:32px 0;">
+      No modules registered. Modules are loaded at gateway startup.
+    </div>
+  </div>
+</main>
+</div>
+
 <!-- TAB: LOG -->
 <div class="tab-content" id="content-logs">
 <main class="tab-pane">
@@ -1056,6 +1073,7 @@ function switchTab(name, btn) {
   if (name === 'directory') { loadDirectory(); updateSyncStatus(); }
   if (name === 'queue') loadQueue();
   if (name === 'sessions') loadSessions();
+  if (name === 'modules') loadModules();
   if (name === 'logs') { loadLogs(); startLogRefresh(); } else { stopLogRefresh(); }
   location.hash = name;
 }
@@ -1063,7 +1081,7 @@ function switchTab(name, btn) {
 // Init from hash
 (function() {
   var hash = location.hash.replace('#','') || 'dashboard';
-  var valid = ['dashboard','settings','directory','logs','queue','sessions'];
+  var valid = ['dashboard','settings','directory','logs','queue','sessions','modules'];
   if (!valid.includes(hash)) hash = 'dashboard';
   var btn = document.getElementById('tab-' + hash);
   switchTab(hash, btn);
@@ -2201,6 +2219,148 @@ async function loadSessions() {
     errEl.style.cssText = 'color:#ef4444;font-size:0.85rem;';
     errEl.textContent = 'Failed to load sessions: ' + (e.message || String(e));
     container.appendChild(errEl);
+  }
+}
+
+// ---- Modules Tab (Phase 17, Plan 03 — MOD-03, MOD-04) ----
+// DO NOT REMOVE: Renders registered modules with enable/disable toggles and assignment management.
+async function loadModules() {
+  var listEl = document.getElementById('modules-list');
+  var emptyEl = document.getElementById('modules-empty');
+  if (!listEl || !emptyEl) return;
+  listEl.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Loading...</div>';
+  emptyEl.style.display = 'none';
+  try {
+    var r = await fetch('/api/admin/modules');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    var modules = data.modules || [];
+    listEl.innerHTML = '';
+    if (modules.length === 0) {
+      emptyEl.style.display = '';
+      return;
+    }
+    modules.forEach(function(mod) {
+      var card = document.createElement('div');
+      card.style.cssText = 'background:#0f172a;border-radius:10px;margin-bottom:14px;overflow:hidden;border:1px solid #1e293b;';
+      var toggleId = 'mod-toggle-' + mod.id;
+      var assignSectionId = 'mod-assign-' + mod.id;
+      var assignListId = 'mod-assign-list-' + mod.id;
+      var headerHtml =
+        '<div style="padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:0.95rem;font-weight:600;color:#e2e8f0;">' + esc(mod.name) + '</div>' +
+            '<div style="font-size:0.78rem;color:#94a3b8;margin-top:2px;">' + esc(mod.description || '') + '</div>' +
+            '<div style="font-size:0.72rem;color:#64748b;margin-top:4px;">v' + esc(mod.version || '') +
+              ' &bull; <span id="mod-count-' + esc(mod.id) + '">' + esc(String(mod.assignmentCount || 0)) + '</span> chat(s) assigned</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-left:12px;">' +
+            '<label class="toggle" title="' + (mod.enabled ? 'Enabled' : 'Disabled') + '">' +
+              '<input type="checkbox" id="' + esc(toggleId) + '"' + (mod.enabled ? ' checked' : '') +
+                ' onchange="toggleModule(' + "'" + esc(mod.id) + "'" + ', this)">' +
+              '<span class="slider"></span>' +
+            '</label>' +
+          '</div>' +
+        '</div>';
+      var assignHtml =
+        '<details style="border-top:1px solid #1e293b;" id="' + esc(assignSectionId) + '">' +
+          '<summary style="padding:10px 16px;cursor:pointer;font-size:0.82rem;color:#94a3b8;list-style:none;display:flex;align-items:center;gap:6px;">' +
+            '<span style="font-size:0.7rem;">&#9654;</span> Chat Assignments' +
+          '</summary>' +
+          '<div style="padding:12px 16px 16px;background:#0a1120;">' +
+            '<div id="' + esc(assignListId) + '" style="margin-bottom:10px;"></div>' +
+            '<div style="display:flex;gap:8px;align-items:center;">' +
+              '<input type="text" id="mod-jid-input-' + esc(mod.id) + '" placeholder="Chat JID (e.g. 123@c.us)" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">' +
+              '<button onclick="addModuleAssignment(' + "'" + esc(mod.id) + "'" + ')" style="padding:5px 12px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.78rem;cursor:pointer;">Add</button>' +
+            '</div>' +
+          '</div>' +
+        '</details>';
+      card.innerHTML = headerHtml + assignHtml;
+      listEl.appendChild(card);
+      // Load assignments for this module
+      loadModuleAssignments(mod.id);
+      // Wire toggle on details to lazy-load
+      var details = document.getElementById(assignSectionId);
+      if (details) {
+        details.addEventListener('toggle', function() {
+          if (details.open) loadModuleAssignments(mod.id);
+        });
+      }
+    });
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:#ef4444;font-size:0.85rem;">Failed to load modules: ' + esc(e.message || String(e)) + '</div>';
+  }
+}
+
+async function loadModuleAssignments(moduleId) {
+  var listEl = document.getElementById('mod-assign-list-' + moduleId);
+  var countEl = document.getElementById('mod-count-' + moduleId);
+  if (!listEl) return;
+  listEl.innerHTML = '<span style="color:#64748b;font-size:0.78rem;">Loading...</span>';
+  try {
+    var r = await fetch('/api/admin/modules/' + encodeURIComponent(moduleId) + '/assignments');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var data = await r.json();
+    var assignments = data.assignments || [];
+    if (countEl) countEl.textContent = String(assignments.length);
+    if (assignments.length === 0) {
+      listEl.innerHTML = '<div style="color:#64748b;font-size:0.78rem;">No chats assigned.</div>';
+      return;
+    }
+    listEl.innerHTML = assignments.map(function(jid) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1e293b;">' +
+        '<span style="font-size:0.8rem;color:#e2e8f0;font-family:monospace;">' + esc(jid) + '</span>' +
+        '<button onclick="removeModuleAssignment(' + "'" + esc(moduleId) + "','" + esc(jid) + "'" + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.85rem;padding:2px 6px;" title="Remove">&times;</button>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:#ef4444;font-size:0.78rem;">Failed to load assignments.</div>';
+  }
+}
+
+async function toggleModule(moduleId, checkbox) {
+  var action = checkbox.checked ? 'enable' : 'disable';
+  try {
+    var r = await fetch('/api/admin/modules/' + encodeURIComponent(moduleId) + '/' + action, { method: 'PUT' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Module ' + action + 'd');
+  } catch(e) {
+    // Revert optimistic UI
+    checkbox.checked = !checkbox.checked;
+    showToast('Failed to ' + action + ' module: ' + (e.message || String(e)), true);
+  }
+}
+
+async function addModuleAssignment(moduleId) {
+  var input = document.getElementById('mod-jid-input-' + moduleId);
+  if (!input) return;
+  var jid = input.value.trim();
+  if (!jid) { showToast('Enter a chat JID first', true); return; }
+  try {
+    var r = await fetch('/api/admin/modules/' + encodeURIComponent(moduleId) + '/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jid: jid })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    input.value = '';
+    showToast('Chat assigned to module');
+    loadModuleAssignments(moduleId);
+  } catch(e) {
+    showToast('Failed to add assignment: ' + (e.message || String(e)), true);
+  }
+}
+
+async function removeModuleAssignment(moduleId, jid) {
+  try {
+    var r = await fetch('/api/admin/modules/' + encodeURIComponent(moduleId) + '/assignments/' + encodeURIComponent(jid), {
+      method: 'DELETE'
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Assignment removed');
+    loadModuleAssignments(moduleId);
+  } catch(e) {
+    showToast('Failed to remove assignment: ' + (e.message || String(e)), true);
   }
 }
 
@@ -3720,6 +3880,7 @@ function wrapRefreshButton(btn, loadFn) {
   // Dashboard: must reset _accessKvBuilt before calling loadStats
   wireRefreshBtn("refresh-dashboard", loadStats, function() { _accessKvBuilt = false; });
   wireRefreshBtn("refresh-sessions", loadSessions, null);
+  wireRefreshBtn("refresh-modules", loadModules, null);
   wireRefreshBtn("refresh-log", loadLogs, null);
   wireRefreshBtn("refresh-queue", loadQueue, null);
   // Directory uses dir-refresh-btn (simple refresh of current view, not full import)
