@@ -97,7 +97,11 @@ Plans:
   2. Expired entries are automatically treated as blocked — the inbound filter rejects them at the SQL layer without needing code-level expiry checks
   3. Active TTL grants show remaining time ("Expires in 2h 14m") in the admin panel directory view
   4. Expired entries are visually distinct in the directory — grayed out or badged — so admins can see stale grants at a glance
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Schema migration, TTL-aware queries, sync cleanup, TTL API endpoint
+- [ ] 15-02-PLAN.md — Access Expires UI control, TTL badges, expired entry styling
 
 ### Phase 16: Pairing Mode and Auto-Reply
 **Goal**: Unknown contacts who DM the bot receive a canned rejection or passcode challenge — authorized contacts get temporary access automatically, and the whole flow costs zero LLM tokens
@@ -142,6 +146,6 @@ Plans:
 | 12. UI Bug Sprint | 5/5 | Complete    | 2026-03-17 | - |
 | 13. Background Directory Sync | 2/2 | Complete    | 2026-03-17 | - |
 | 14. Name Resolution | 2/2 | Complete    | 2026-03-17 | - |
-| 15. TTL Access | v1.11 | 0/TBD | Not started | - |
+| 15. TTL Access | v1.11 | 0/2 | Not started | - |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
 | 17. Modules Framework | v1.11 | 0/TBD | Not started | - |
