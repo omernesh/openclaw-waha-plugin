@@ -174,6 +174,26 @@ export class DirectoryDb {
         duration_str TEXT,
         timestamp INTEGER NOT NULL
       );
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS contacts_fts
+        USING fts5(jid, display_name, content='contacts', content_rowid='rowid');
+
+      CREATE TRIGGER IF NOT EXISTS contacts_ai AFTER INSERT ON contacts BEGIN
+        INSERT INTO contacts_fts(rowid, jid, display_name)
+          VALUES (new.rowid, new.jid, new.display_name);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS contacts_ad AFTER DELETE ON contacts BEGIN
+        INSERT INTO contacts_fts(contacts_fts, rowid, jid, display_name)
+          VALUES ('delete', old.rowid, old.jid, old.display_name);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS contacts_au AFTER UPDATE ON contacts BEGIN
+        INSERT INTO contacts_fts(contacts_fts, rowid, jid, display_name)
+          VALUES ('delete', old.rowid, old.jid, old.display_name);
+        INSERT INTO contacts_fts(rowid, jid, display_name)
+          VALUES (new.rowid, new.jid, new.display_name);
+      END;
     `);
 
     // UX-03: Add trigger_operator column to group_filter_overrides (migration-safe — ignores if column exists)
@@ -206,6 +226,20 @@ export class DirectoryDb {
       const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
       if (!msg.includes('duplicate column')) throw migrationErr;
     }
+
+    // Phase 13 (SYNC-02): One-time FTS5 rebuild for databases created before FTS5 was added.
+    // Only runs if the FTS table has fewer rows than contacts (i.e., triggers haven't populated it).
+    // Safe on WAL mode — acquires write lock briefly, readers continue on snapshot. DO NOT REMOVE.
+    try {
+      const ftsCount = (this.db.prepare("SELECT COUNT(*) as cnt FROM contacts_fts").get() as { cnt: number }).cnt;
+      const contactsCount = (this.db.prepare("SELECT COUNT(*) as cnt FROM contacts").get() as { cnt: number }).cnt;
+      if (ftsCount < contactsCount) {
+        this.db.prepare("INSERT INTO contacts_fts(contacts_fts) VALUES('rebuild')").run();
+        console.log(`[waha] FTS5 index rebuilt: ${contactsCount} contacts indexed`);
+      }
+    } catch (ftsErr: unknown) {
+      console.warn(`[waha] FTS5 rebuild skipped: ${String(ftsErr)}`);
+    }
   }
 
   upsertContact(jid: string, displayName?: string, isGroup?: boolean): void {
@@ -232,11 +266,44 @@ export class DirectoryDb {
     }
   }
 
+  /** Escape user search input for FTS5 MATCH — wrap each term in double-quotes to prevent query injection. */
+  private _fts5Quote(term: string): string {
+    return '"' + term.replace(/"/g, '""') + '"';
+  }
+
   getContacts(opts?: { search?: string; limit?: number; offset?: number; type?: ContactType }): ContactRecord[] {
     const limit = opts?.limit ?? 50;
     const offset = opts?.offset ?? 0;
     const search = opts?.search?.trim();
     const type = opts?.type;
+
+    if (search) {
+      // FTS5 MATCH — instant indexed search instead of LIKE full table scan.
+      // Phase 13 (SYNC-02, SYNC-05). DO NOT revert to LIKE — FTS5 is indexed, LIKE is O(n).
+      const ftsQuery = search.split(/\s+/).filter(Boolean).map(t => this._fts5Quote(t)).join(' ');
+      const typeCond = type === "contact"
+        ? "AND c.is_group = 0 AND c.jid NOT LIKE '%@newsletter'"
+        : type === "group"
+        ? "AND c.is_group = 1"
+        : type === "newsletter"
+        ? "AND c.jid LIKE '%@newsletter'"
+        : "";
+      const ftsSql = `
+        SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
+               d.mode, d.mention_only, d.custom_keywords, d.can_initiate, d.can_initiate_override
+        FROM contacts_fts
+        JOIN contacts c ON contacts_fts.rowid = c.rowid
+        LEFT JOIN dm_settings d ON c.jid = d.jid
+        WHERE contacts_fts MATCH ?
+          AND c.jid NOT LIKE '%@lid'
+          AND c.jid NOT LIKE '%@s.whatsapp.net'
+          ${typeCond}
+        ORDER BY rank
+        LIMIT ? OFFSET ?
+      `;
+      const rows = this.db.prepare(ftsSql).all(ftsQuery, limit, offset) as Array<Record<string, unknown>>;
+      return rows.map(this._rowToContact.bind(this));
+    }
 
     let sql = `
       SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
@@ -260,12 +327,6 @@ export class DirectoryDb {
     // DO NOT REMOVE: filtering post-query causes offset drift and duplicates on Load More (AP-02 fix).
     conditions.push("c.jid NOT LIKE '%@lid' AND c.jid NOT LIKE '%@s.whatsapp.net'");
 
-    // Search filter
-    if (search) {
-      conditions.push("(c.jid LIKE ? OR c.display_name LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
     if (conditions.length > 0) {
       sql += " WHERE " + conditions.join(" AND ");
     }
@@ -274,7 +335,7 @@ export class DirectoryDb {
     params.push(limit, offset);
 
     const rows = this.db.prepare(sql).all(...params) as Array<Record<string, unknown>>;
-    return rows.map(this._rowToContact);
+    return rows.map(this._rowToContact.bind(this));
   }
 
   getContact(jid: string): ContactRecord | null {
@@ -336,6 +397,30 @@ export class DirectoryDb {
   }
 
   getContactCount(search?: string, type?: ContactType): number {
+    if (search?.trim()) {
+      // FTS5 count — must match getContacts() FTS5 query for pagination accuracy.
+      // Phase 13 (SYNC-02). DO NOT REMOVE.
+      const ftsQuery = search.trim().split(/\s+/).filter(Boolean).map(t => this._fts5Quote(t)).join(' ');
+      const typeCond = type === "contact"
+        ? "AND c.is_group = 0 AND c.jid NOT LIKE '%@newsletter'"
+        : type === "group"
+        ? "AND c.is_group = 1"
+        : type === "newsletter"
+        ? "AND c.jid LIKE '%@newsletter'"
+        : "";
+      const ftsSql = `
+        SELECT COUNT(*) as cnt
+        FROM contacts_fts
+        JOIN contacts c ON contacts_fts.rowid = c.rowid
+        WHERE contacts_fts MATCH ?
+          AND c.jid NOT LIKE '%@lid'
+          AND c.jid NOT LIKE '%@s.whatsapp.net'
+          ${typeCond}
+      `;
+      const row = this.db.prepare(ftsSql).get(ftsQuery) as { cnt: number };
+      return row.cnt;
+    }
+
     const conditions: string[] = [];
     const params: unknown[] = [];
 
@@ -350,12 +435,6 @@ export class DirectoryDb {
     // Exclude internal/ghost JID types at SQL level so total count matches displayable entries.
     // DO NOT REMOVE: must stay in sync with getContacts() exclusion — mismatched counts break pagination (AP-02 fix).
     conditions.push("jid NOT LIKE '%@lid' AND jid NOT LIKE '%@s.whatsapp.net'");
-
-    if (search?.trim()) {
-      const s = `%${search.trim()}%`;
-      conditions.push("(jid LIKE ? OR display_name LIKE ?)");
-      params.push(s, s);
-    }
 
     let sql = "SELECT COUNT(*) as cnt FROM contacts";
     if (conditions.length > 0) {
