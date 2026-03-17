@@ -27,6 +27,8 @@ import { BOT_PROXY_PREFIX, sendWahaMediaBatch, sendWahaPresence, sendWahaText } 
 import { warnOnError } from "./http-client.js";
 import type { CoreConfig, WahaEventMessage, WahaInboundMessage, WahaPollCreationMessage } from "./types.js";
 import { extractMentionedJids } from "./mentions.js";
+import { getModuleRegistry } from "./module-registry.js";
+import type { ModuleContext } from "./module-types.js";
 // Re-export for external consumers (plan specifies extractMentionedJids in inbound.ts exports)
 export { extractMentionedJids } from "./mentions.js";
 import { preprocessInboundMessage, downloadWahaMedia } from "./media.js";
@@ -748,6 +750,41 @@ export async function handleWahaInbound(params: {
         return;
       }
       // If neither pairing nor auto-reply is enabled, fall through to existing DM policy check
+    }
+  }
+
+  // ======================================================================
+  // Phase 17: Module hooks — run registered modules for this chat.
+  // Pipeline position: after fromMe+dedup+pairing/auto-reply, before DM policy.
+  // Modules only fire for messages that passed all prior filters.
+  // Added 2026-03-17. DO NOT CHANGE.
+  // ======================================================================
+  {
+    const registry = getModuleRegistry();
+    const activeModules = registry.getModulesForChat(account.accountId, chatId);
+    for (const mod of activeModules) {
+      if (mod.onInbound) {
+        try {
+          const ctx: ModuleContext = {
+            chatId,
+            senderId,
+            text: textBody ?? "",
+            isGroup,
+            accountId: account.accountId,
+            timestamp: message.timestamp,
+            messageId: message.messageId,
+            raw: message,
+          };
+          const consumed = await mod.onInbound(ctx);
+          if (consumed === true) {
+            runtime.log?.(`[waha] [module:${mod.id}] consumed message from ${senderId} in ${chatId}`);
+            return; // Module consumed the message — stop pipeline
+          }
+        } catch (err) {
+          runtime.error?.(`[waha] [module:${mod.id}] onInbound error: ${String(err)}`);
+          // Module errors do NOT stop pipeline — log and continue
+        }
+      }
     }
   }
 
