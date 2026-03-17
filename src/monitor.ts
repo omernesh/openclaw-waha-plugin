@@ -2661,7 +2661,7 @@ function toggleBulkSelectMode() {
   bulkSelectedJids.clear();
   bulkCurrentGroupJid = null;
   updateBulkToolbar();
-  if (currentDirTab === 'groups') { loadGroupsTable(); } else { dirOffset = 0; loadDirectory(); }
+  if (currentDirTab === 'groups') { loadGroupsTable(); } else if (currentDirTab === 'contacts') { loadContactsTable(); } else { dirOffset = 0; loadDirectory(); }
 }
 function toggleBulkItem(jid, checkbox) {
   if (checkbox.checked) { bulkSelectedJids.add(jid); } else { bulkSelectedJids.delete(jid); }
@@ -2694,6 +2694,13 @@ function updateBulkToolbar() {
       '<button onclick="bulkAction(\\'allow-group\\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow Group</button>' +
       '<button onclick="bulkAction(\\'revoke-group\\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke Group</button>' +
       '<button onclick="bulkRoleAction()" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Set Role</button>';
+  } else if (currentDirTab === 'newsletters') {
+    // Channels context: Allow DM / Revoke DM / Follow / Unfollow
+    actionsEl.innerHTML =
+      '<button onclick="bulkAction(\\'allow-dm\\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow DM</button>' +
+      '<button onclick="bulkAction(\\'revoke-dm\\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke DM</button>' +
+      '<button onclick="bulkAction(\\'follow\\')" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Follow</button>' +
+      '<button onclick="bulkAction(\\'unfollow\\')" style="background:#64748b;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Unfollow</button>';
   } else {
     // Contacts context: Allow DM / Revoke DM
     actionsEl.innerHTML =
@@ -2720,7 +2727,7 @@ async function bulkAction(action) {
     updateBulkToolbar();
     if (savedGroupJid && (action === 'allow-group' || action === 'revoke-group')) {
       loadGroupParticipants(savedGroupJid, true);
-    } else if (currentDirTab === 'groups') { loadGroupsTable(); } else { dirOffset = 0; loadDirectory(); }
+    } else if (currentDirTab === 'groups') { loadGroupsTable(); } else if (currentDirTab === 'contacts') { loadContactsTable(); } else { dirOffset = 0; loadDirectory(); }
   } catch(e) { showToast('Bulk action failed: ' + e.message, true); }
 }
 async function bulkRoleAction() {
@@ -4479,7 +4486,7 @@ export function createWahaWebhookServer(opts: {
           writeJsonResponse(res, 400, { error: "all jids must be strings" });
           return;
         }
-        const validActions = ["allow-dm", "revoke-dm", "allow-group", "revoke-group", "set-role"];
+        const validActions = ["allow-dm", "revoke-dm", "allow-group", "revoke-group", "set-role", "follow", "unfollow"];
         if (!validActions.includes(action)) {
           writeJsonResponse(res, 400, { error: "action must be one of: " + validActions.join(", ") });
           return;
@@ -4527,6 +4534,25 @@ export function createWahaWebhookServer(opts: {
           } else if (action === "set-role" && groupJid && value) {
             if (value === "bot_admin" || value === "manager" || value === "participant") {
               if (db.setParticipantRole(groupJid, jid, value)) updated++;
+            }
+          }
+        }
+        // Follow/unfollow actions require WAHA API calls — handled separately outside the per-JID loop
+        if (action === "follow" || action === "unfollow") {
+          const wahaBaseUrl = account.config.baseUrl ?? "http://127.0.0.1:3004";
+          const wahaApiKey = account.apiKey;
+          const session = account.config.session ?? "default";
+          for (const jid of jids) {
+            try {
+              const channelId = encodeURIComponent(jid);
+              const followPath = action === "follow" ? "follow" : "unfollow";
+              const resp = await fetch(
+                `${wahaBaseUrl}/api/${encodeURIComponent(session)}/channels/${channelId}/${followPath}`,
+                { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": wahaApiKey }, body: "{}" }
+              );
+              if (resp.ok) updated++;
+            } catch (_) {
+              // skip individual failures — caller sees partial updated count
             }
           }
         }
