@@ -878,6 +878,24 @@ export async function handleWahaInbound(params: {
     return;
   }
 
+  // TTL-03 override: if SQLite says this contact's TTL has expired, block even if
+  // the in-memory config still has them in allowFrom (config is cached at startup and
+  // may not reflect TTL expiry until the next sync cycle removes the entry).
+  // SQLite is the source of truth for TTL. DO NOT CHANGE — this is the live TTL
+  // enforcement that doesn't depend on gateway config reload.
+  if (!isGroup && access.decision === "allow") {
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      if (dirDb.isAllowListEntryExpired(senderId)) {
+        runtime.log?.(`waha: drop DM sender ${senderId} (reason=ttl_expired_sqlite)`);
+        return;
+      }
+    } catch (err) {
+      runtime.error?.(`waha: TTL-03 check failed for ${senderId}: ${String(err)}`);
+      // On error, fall through — don't block if we can't check
+    }
+  }
+
   if (access.shouldBlockControlCommand) {
     logInboundDrop({
       log: (message) => runtime.log?.(message),

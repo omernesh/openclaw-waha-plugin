@@ -675,6 +675,19 @@ export class DirectoryDb {
     return Boolean(row);
   }
 
+  /**
+   * TTL-03: Check if a JID has an expired TTL entry in allow_list.
+   * Returns true if the JID has an allow_list row with expires_at in the past.
+   * Returns false if no row, no TTL set, or TTL still active.
+   * Used by inbound pipeline to override stale in-memory config. DO NOT CHANGE.
+   */
+  isAllowListEntryExpired(jid: string): boolean {
+    const row = this.db.prepare(
+      "SELECT expires_at FROM allow_list WHERE jid = ? AND expires_at IS NOT NULL AND expires_at <= CAST(strftime('%s','now') AS INTEGER)"
+    ).get(jid) as { expires_at: number } | undefined;
+    return !!row;
+  }
+
   getAllowedDmJids(): string[] {
     // TTL-02: DO NOT REMOVE expires_at check — expired entries must not appear in allowed list.
     const fromAllowList = this.db.prepare(
