@@ -82,7 +82,11 @@ Plans:
   2. God Mode Users tag bubbles display resolved names, and the contact picker finds contacts by searching the local SQLite directory
   3. Allow From, Group Allow From, and Allowed Groups tag bubbles display resolved names with raw JIDs available on hover
   4. Group participants list shows contact names instead of raw LID numbers
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 14-01-PLAN.md — Batch resolve endpoint, @lid fallback, tag input name resolution, dashboard dedup
+- [ ] 14-02-PLAN.md — Group participant SQL JOIN resolution, God Mode batch resolve, contact picker verification
 
 ### Phase 15: TTL Access
 **Goal**: Admins can grant time-limited access to contacts and groups — entries auto-expire without manual cleanup, and the admin panel shows how much time is left
@@ -137,7 +141,7 @@ Plans:
 | 11. Dashboard, Sessions & Log | v1.10 | 2/2 | Complete | 2026-03-16 |
 | 12. UI Bug Sprint | 5/5 | Complete    | 2026-03-17 | - |
 | 13. Background Directory Sync | 2/2 | Complete    | 2026-03-17 | - |
-| 14. Name Resolution | v1.11 | 0/TBD | Not started | - |
+| 14. Name Resolution | v1.11 | 0/2 | Not started | - |
 | 15. TTL Access | v1.11 | 0/TBD | Not started | - |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 0/TBD | Not started | - |
 | 17. Modules Framework | v1.11 | 0/TBD | Not started | - |
