@@ -103,51 +103,51 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCAF-01 | TBD | Pending |
-| SCAF-02 | TBD | Pending |
-| SCAF-03 | TBD | Pending |
-| SCAF-04 | TBD | Pending |
-| SCAF-05 | TBD | Pending |
-| LYOT-01 | TBD | Pending |
-| LYOT-02 | TBD | Pending |
-| LYOT-03 | TBD | Pending |
-| LYOT-04 | TBD | Pending |
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
-| DASH-04 | TBD | Pending |
-| DASH-05 | TBD | Pending |
-| SETT-01 | TBD | Pending |
-| SETT-02 | TBD | Pending |
-| SETT-03 | TBD | Pending |
-| SETT-04 | TBD | Pending |
-| SETT-05 | TBD | Pending |
-| DIR-01 | TBD | Pending |
-| DIR-02 | TBD | Pending |
-| DIR-03 | TBD | Pending |
-| DIR-04 | TBD | Pending |
-| DIR-05 | TBD | Pending |
-| DIR-06 | TBD | Pending |
-| DIR-07 | TBD | Pending |
-| SESS-01 | TBD | Pending |
-| SESS-02 | TBD | Pending |
-| SESS-03 | TBD | Pending |
-| MODS-01 | TBD | Pending |
-| LOGT-01 | TBD | Pending |
-| QUEU-01 | TBD | Pending |
-| PLSH-01 | TBD | Pending |
-| PLSH-02 | TBD | Pending |
-| PLSH-03 | TBD | Pending |
-| PLSH-04 | TBD | Pending |
-| CLNP-01 | TBD | Pending |
-| CLNP-02 | TBD | Pending |
-| CLNP-03 | TBD | Pending |
+| SCAF-01 | Phase 18 | Pending |
+| SCAF-02 | Phase 18 | Pending |
+| SCAF-03 | Phase 18 | Pending |
+| SCAF-04 | Phase 18 | Pending |
+| SCAF-05 | Phase 18 | Pending |
+| LYOT-01 | Phase 19 | Pending |
+| LYOT-02 | Phase 19 | Pending |
+| LYOT-03 | Phase 19 | Pending |
+| LYOT-04 | Phase 19 | Pending |
+| DASH-01 | Phase 20 | Pending |
+| DASH-02 | Phase 20 | Pending |
+| DASH-03 | Phase 20 | Pending |
+| DASH-04 | Phase 20 | Pending |
+| DASH-05 | Phase 20 | Pending |
+| SETT-01 | Phase 20 | Pending |
+| SETT-02 | Phase 20 | Pending |
+| SETT-03 | Phase 20 | Pending |
+| SETT-04 | Phase 20 | Pending |
+| SETT-05 | Phase 20 | Pending |
+| DIR-01 | Phase 21 | Pending |
+| DIR-02 | Phase 21 | Pending |
+| DIR-03 | Phase 21 | Pending |
+| DIR-04 | Phase 21 | Pending |
+| DIR-05 | Phase 21 | Pending |
+| DIR-06 | Phase 21 | Pending |
+| DIR-07 | Phase 21 | Pending |
+| SESS-01 | Phase 22 | Pending |
+| SESS-02 | Phase 22 | Pending |
+| SESS-03 | Phase 22 | Pending |
+| MODS-01 | Phase 22 | Pending |
+| LOGT-01 | Phase 22 | Pending |
+| QUEU-01 | Phase 22 | Pending |
+| PLSH-01 | Phase 23 | Pending |
+| PLSH-02 | Phase 23 | Pending |
+| PLSH-03 | Phase 23 | Pending |
+| PLSH-04 | Phase 23 | Pending |
+| CLNP-03 | Phase 23 | Pending |
+| CLNP-01 | Phase 24 | Pending |
+| CLNP-02 | Phase 24 | Pending |
 
 **Coverage:**
 - v1.12 requirements: 38 total
-- Mapped to phases: 0 (awaiting roadmap)
-- Unmapped: 38
+- Mapped to phases: 38/38
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 after initial definition*
+*Last updated: 2026-03-18 — traceability complete after roadmap creation*
