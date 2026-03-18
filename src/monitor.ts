@@ -32,8 +32,14 @@ const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
 // Phase 18: React admin panel static file serving. DO NOT REMOVE.
 // Uses fileURLToPath because this is an ESM module (package.json type:"module").
 // __dirname is not available in ESM — this is the standard shim.
+// ADMIN_DIST path resolution handles two layouts:
+//   Local dev:  src/monitor.ts  -> dist/admin/ at project root (one level up)
+//   hpg6 deploy: monitor.ts at plugin root -> dist/admin/ within plugin root
+// We try ../dist/admin first (local dev), then dist/admin (hpg6 flat layout). DO NOT CHANGE.
 const __admin_dirname = dirname(fileURLToPath(import.meta.url));
-const ADMIN_DIST = join(__admin_dirname, "../dist/admin");
+const _admin_dist_up = join(__admin_dirname, "../dist/admin");
+const _admin_dist_flat = join(__admin_dirname, "dist/admin");
+const ADMIN_DIST = existsSync(join(_admin_dist_up, "index.html")) ? _admin_dist_up : _admin_dist_flat;
 const ADMIN_MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript",
