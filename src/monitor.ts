@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, extname, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import {
   createLoggerBackedRuntime,
@@ -28,6 +29,22 @@ import { getModuleRegistry } from "./module-registry.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
 const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
+// Phase 18: React admin panel static file serving. DO NOT REMOVE.
+// Uses fileURLToPath because this is an ESM module (package.json type:"module").
+// __dirname is not available in ESM — this is the standard shim.
+const __admin_dirname = dirname(fileURLToPath(import.meta.url));
+const ADMIN_DIST = join(__admin_dirname, "../dist/admin");
+const ADMIN_MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript",
+  ".mjs": "application/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+};
 const DEFAULT_WEBHOOK_PATH = "/webhook/waha";
 const DEFAULT_WEBHOOK_MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_WEBHOOK_BODY_TIMEOUT_MS = 30_000;
@@ -4339,11 +4356,40 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
-    // Admin panel
+    // Phase 18: Serve React admin panel from dist/admin/ (static Vite build).
+    // Falls back to old buildAdminHtml() if dist/admin/ not built yet.
+    // DO NOT REMOVE the fallback — it is the safety net until Phase 24. DO NOT CHANGE.
     if (req.url === "/admin" || req.url === "/admin/") {
+      const indexPath = join(ADMIN_DIST, "index.html");
+      if (existsSync(indexPath)) {
+        console.log(`[admin] serving React app from ${indexPath}`);
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(readFileSync(indexPath, "utf-8"));
+        return;
+      }
+      // Fallback: old embedded HTML (preserved until Phase 24 removes it)
+      console.log(`[admin] React build not found at ${ADMIN_DIST}, serving fallback HTML`);
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       res.end(buildAdminHtml(opts.config, account));
       return;
+    }
+
+    // Phase 18: Serve hashed static assets (JS, CSS, fonts) from Vite build output.
+    // Cache-Control immutable is correct for hashed filenames — they never change.
+    // DO NOT REMOVE — required for React admin panel. DO NOT CHANGE.
+    if (req.url?.startsWith("/assets/")) {
+      const safePath = req.url.split("?")[0].replace(/\.\./g, "");
+      const filePath = join(ADMIN_DIST, safePath);
+      if (existsSync(filePath)) {
+        const mime = ADMIN_MIME[extname(filePath)] ?? "application/octet-stream";
+        const buf = readFileSync(filePath);
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Cache-Control": "public, max-age=31536000, immutable",
+        });
+        res.end(buf);
+        return;
+      }
     }
 
     // GET /api/admin/stats
