@@ -139,21 +139,36 @@ export interface Session {
 }
 export type SessionsResponse = Session[];
 
-// Directory entry from GET /api/admin/directory
-export interface DirectoryEntry {
-  jid: string;
-  name: string;
-  type: 'contact' | 'group' | 'newsletter';
-  pushName?: string;
-  dmAllowed?: boolean;
-  lastSeen?: string;
+// Directory contact from GET /api/admin/directory — monitor.ts line 4855
+// DO NOT CHANGE: field names match exact server response shape
+export interface DirectoryContact {
+  jid: string
+  displayName: string | null
+  firstSeenAt: number
+  lastMessageAt: number
+  messageCount: number
+  isGroup: boolean
+  dmSettings?: ContactDmSettings
+  allowedDm: boolean
+  expiresAt: number | null
+  expired: boolean
+  source: string | null
+}
+
+export interface ContactDmSettings {
+  mode: 'active' | 'listen_only'
+  mentionOnly: boolean
+  customKeywords: string       // comma-separated, e.g. "word1,word2"
+  canInitiate: boolean
+  canInitiateOverride: 'default' | 'allow' | 'block'
 }
 
 export interface DirectoryResponse {
-  items: DirectoryEntry[];
-  total: number;
-  offset: number;
-  limit: number;
+  contacts: DirectoryContact[]
+  total: number
+  dms: number
+  groups: number
+  newsletters: number
 }
 
 export interface DirectoryParams {
@@ -210,15 +225,21 @@ export interface GroupFilterResponse {
   override: Record<string, unknown> | null;
 }
 
-// Participant from GET /api/admin/directory/group/:jid/participants
-export interface Participant {
-  jid: string;
-  name?: string;
-  role?: string;
-  allowGroup?: boolean;
-  allowDm?: boolean;
+// Participant from GET /api/admin/directory/group/:jid/participants — monitor.ts line 5432
+// DO NOT CHANGE: field names match exact server response shape (participantJid NOT jid, displayName NOT name)
+export interface ParticipantEnriched {
+  groupJid: string
+  participantJid: string
+  displayName: string | null
+  isAdmin: boolean
+  allowInGroup: boolean
+  allowDm: boolean
+  participantRole: 'bot_admin' | 'manager' | 'participant'
+  globallyAllowed: boolean
+  isBotSession: boolean
 }
 
 export interface ParticipantsResponse {
-  participants: Participant[];
+  participants: ParticipantEnriched[]
+  allowAll: boolean
 }

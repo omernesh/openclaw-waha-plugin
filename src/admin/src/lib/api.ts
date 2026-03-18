@@ -15,6 +15,8 @@ import type {
   GroupFilterResponse,
   ParticipantsResponse,
 } from '@/types'
+// Note: DirectoryContact and ParticipantEnriched are now the correct types.
+// DirectoryEntry and Participant were placeholder types — removed in Phase 21.
 
 const BASE = '/api/admin'
 
@@ -117,7 +119,8 @@ export const api = {
       `/directory/group/${encodeURIComponent(groupJid)}/participants/${encodeURIComponent(participantJid)}/role`,
       { method: 'PUT', body: JSON.stringify(body) },
     ),
-  bulkAllowAll: (groupJid: string, body: { allow: boolean }) =>
+  // DO NOT CHANGE: server reads { allowed: boolean } (not { allow: boolean }) — monitor.ts line 5537
+  bulkAllowAll: (groupJid: string, body: { allowed: boolean }) =>
     request<void>(`/directory/group/${encodeURIComponent(groupJid)}/allow-all`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -158,9 +161,9 @@ export const api = {
   // Gateway
   restart: () => request<void>('/restart', { method: 'POST' }),
 
-  // Bulk directory operations
+  // Bulk directory operations — returns { ok: true, updated: number }
   bulkDirectory: (body: { action: string; jids: string[]; value?: unknown; groupJid?: string }) =>
-    request<void>('/directory/bulk', { method: 'POST', body: JSON.stringify(body) }),
+    request<{ ok: boolean; updated: number }>('/directory/bulk', { method: 'POST', body: JSON.stringify(body) }),
 
   // Pairing
   getPairingDeeplink: (jid: string) =>

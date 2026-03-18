@@ -96,7 +96,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   // Directory search for TagInput
   async function searchDirectory(query: string): Promise<Array<{ value: string; label: string }>> {
     const result = await api.getDirectory({ search: query, limit: '10' })
-    return result.items.map((item) => ({ value: item.jid, label: item.name || item.jid }))
+    return result.contacts.map((item) => ({ value: item.jid, label: item.displayName || item.jid }))
   }
 
   // Extract JIDs from godModeSuperUsers for TagInput display
