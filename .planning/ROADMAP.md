@@ -184,7 +184,7 @@ Plans:
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 19. App Layout | 2/2 | Complete    | 2026-03-18 | - |
-| 20. Dashboard and Settings Tabs | 2/2 | Complete   | 2026-03-18 | - |
+| 20. Dashboard and Settings Tabs | 2/2 | Complete    | 2026-03-18 | - |
 | 21. Directory Tab | v1.12 | 0/3 | Not started | - |
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
 | 23. Polish | v1.12 | 0/TBD | Not started | - |
