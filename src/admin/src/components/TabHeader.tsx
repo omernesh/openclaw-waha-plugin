@@ -13,6 +13,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { RefreshCw, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const TAB_TITLES: Record<TabId, string> = {
   dashboard: 'Dashboard',
@@ -89,13 +90,29 @@ export function TabHeader({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh" disabled={isRefreshing}>
-        <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh" disabled={isRefreshing}>
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       {lastRefreshed && (
-        <span className="text-xs text-muted-foreground hidden sm:inline">
-          {lastRefreshed.toLocaleTimeString()}
-        </span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-xs text-muted-foreground hidden sm:inline cursor-default">
+                {lastRefreshed.toLocaleTimeString()}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Last refreshed: {lastRefreshed.toLocaleString()}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </header>
   )
