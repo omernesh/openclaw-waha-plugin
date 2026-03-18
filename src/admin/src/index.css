@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
+@theme {
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
   --color-card: oklch(1 0 0);
@@ -81,5 +81,33 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Sidebar width utilities — Tailwind v4 JIT scanner does not detect
+   w-[--sidebar-width] from the shadcn/ui sidebar component.
+   These explicit rules ensure the sidebar spacer and fixed panel
+   get the correct width from the CSS variable. DO NOT REMOVE. */
+@layer utilities {
+  .w-\[--sidebar-width\] {
+    width: var(--sidebar-width);
+  }
+  .w-\[--sidebar-width-icon\] {
+    width: var(--sidebar-width-icon);
+  }
+  .w-\[calc\(var\(--sidebar-width-icon\)_\+_theme\(spacing\.4\)\)\] {
+    width: calc(var(--sidebar-width-icon) + 1rem);
+  }
+  .w-\[calc\(var\(--sidebar-width-icon\)_\+_theme\(spacing\.4\)_\+2px\)\] {
+    width: calc(var(--sidebar-width-icon) + 1rem + 2px);
+  }
+  .left-\[calc\(var\(--sidebar-width\)\*-1\)\] {
+    left: calc(var(--sidebar-width) * -1);
+  }
+  .right-\[calc\(var\(--sidebar-width\)\*-1\)\] {
+    right: calc(var(--sidebar-width) * -1);
+  }
+  .w-\[--sidebar-width-mobile\] {
+    width: var(--sidebar-width-mobile);
   }
 }
