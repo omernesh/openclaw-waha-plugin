@@ -47,7 +47,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 - [x] **Phase 18: React Scaffold** — Vite + React + shadcn/ui foundation and build pipeline (completed 2026-03-18)
 - [x] **Phase 19: App Layout** — Sidebar navigation, theme toggle, mobile responsiveness, shared header (completed 2026-03-18)
-- [ ] **Phase 20: Dashboard and Settings Tabs** — Dashboard cards and Settings form rebuilt in React
+- [x] **Phase 20: Dashboard and Settings Tabs** — Dashboard cards and Settings form rebuilt in React (completed 2026-03-18)
 - [ ] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet
 - [ ] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React
 - [ ] **Phase 23: Polish** — Toasts, skeletons, error boundaries, refresh timestamps
@@ -183,7 +183,7 @@ Plans:
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 19. App Layout | 2/2 | Complete    | 2026-03-18 | - |
-| 20. Dashboard and Settings Tabs | 1/2 | In Progress|  | - |
+| 20. Dashboard and Settings Tabs | 2/2 | Complete   | 2026-03-18 | - |
 | 21. Directory Tab | v1.12 | 0/TBD | Not started | - |
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
 | 23. Polish | v1.12 | 0/TBD | Not started | - |

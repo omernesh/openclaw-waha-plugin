@@ -32,11 +32,11 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 ### Settings Tab
 
-- [ ] **SETT-01**: All settings rebuilt as React form components (switches, selects, inputs)
-- [ ] **SETT-02**: Tag inputs use shadcn Command/Combobox with name search for JID fields
-- [ ] **SETT-03**: Mention patterns use tag-style input
-- [ ] **SETT-04**: Contact picker with search, clear button, and auto-close behavior
-- [ ] **SETT-05**: Save & Restart with polling overlay
+- [x] **SETT-01**: All settings rebuilt as React form components (switches, selects, inputs)
+- [x] **SETT-02**: Tag inputs use shadcn Command/Combobox with name search for JID fields
+- [x] **SETT-03**: Mention patterns use tag-style input
+- [x] **SETT-04**: Contact picker with search, clear button, and auto-close behavior
+- [x] **SETT-05**: Save & Restart with polling overlay
 
 ### Directory Tab
 
@@ -117,11 +117,11 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 | DASH-03 | Phase 20 | Complete |
 | DASH-04 | Phase 20 | Complete |
 | DASH-05 | Phase 20 | Complete |
-| SETT-01 | Phase 20 | Pending |
-| SETT-02 | Phase 20 | Pending |
-| SETT-03 | Phase 20 | Pending |
-| SETT-04 | Phase 20 | Pending |
-| SETT-05 | Phase 20 | Pending |
+| SETT-01 | Phase 20 | Complete |
+| SETT-02 | Phase 20 | Complete |
+| SETT-03 | Phase 20 | Complete |
+| SETT-04 | Phase 20 | Complete |
+| SETT-05 | Phase 20 | Complete |
 | DIR-01 | Phase 21 | Pending |
 | DIR-02 | Phase 21 | Pending |
 | DIR-03 | Phase 21 | Pending |
