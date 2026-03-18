@@ -8,7 +8,7 @@ export interface StatsResponse {
     patterns: string[]
     godModeBypass: boolean
     godModeScope: 'all' | 'dm' | 'off'
-    godModeSuperUsers: string[]
+    godModeSuperUsers: Array<string | { identifier: string }>
     tokenEstimate: number
     stats: { allowed: number; dropped: number; tokensEstimatedSaved: number }
     recentEvents: Array<{ ts: number; pass: boolean; reason: string; preview: string }>

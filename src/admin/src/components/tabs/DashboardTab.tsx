@@ -212,9 +212,10 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                 </div>
                 {dmFilter.godModeSuperUsers.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
-                    {dmFilter.godModeSuperUsers.map((u) => (
-                      <Badge key={u} variant="outline">{resolvedNames[u] ?? u}</Badge>
-                    ))}
+                    {dmFilter.godModeSuperUsers.map((u) => {
+                      const jid = typeof u === 'string' ? u : u.identifier
+                      return <Badge key={jid} variant="outline">{resolvedNames[jid] ?? jid}</Badge>
+                    })}
                   </div>
                 )}
               </div>
