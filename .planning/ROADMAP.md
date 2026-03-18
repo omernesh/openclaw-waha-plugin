@@ -67,8 +67,8 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   5. The npm package includes the built `dist/admin/` output when published
 **Plans**: 2 plans
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+- [x] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [x] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 19: App Layout
 **Goal**: The admin panel has a complete navigation shell with all 7 tabs reachable, a working dark/light theme toggle, a mobile-responsive sidebar, and a consistent per-tab header.
@@ -81,8 +81,8 @@ Plans:
   4. Each tab has a consistent header area with a session selector and a refresh button
 **Plans**: 2 plans
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+- [ ] 19-01-PLAN.md — Install shadcn/ui components, theme hook, tab placeholders
+- [ ] 19-02-PLAN.md — AppSidebar, TabHeader, App.tsx layout shell with routing
 
 ### Phase 20: Dashboard and Settings Tabs
 **Goal**: The Dashboard and Settings tabs are fully rebuilt as React components, displaying all information from the old panel with improved UX — labeled cards, collapsible sections, and accessible form controls.
@@ -182,8 +182,8 @@ Plans:
 | 15. TTL Access | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
-| 18. React Scaffold | 2/2 | Complete    | 2026-03-18 | - |
-| 19. App Layout | v1.12 | 0/TBD | Not started | - |
+| 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
+| 19. App Layout | v1.12 | 0/2 | Not started | - |
 | 20. Dashboard and Settings Tabs | v1.12 | 0/TBD | Not started | - |
 | 21. Directory Tab | v1.12 | 0/TBD | Not started | - |
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
