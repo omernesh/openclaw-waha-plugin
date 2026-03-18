@@ -40,11 +40,11 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 ### Directory Tab
 
-- [ ] **DIR-01**: Contacts, Groups, Channels sub-tabs rebuilt with shadcn DataTable + pagination
+- [x] **DIR-01**: Contacts, Groups, Channels sub-tabs rebuilt with shadcn DataTable + pagination
 - [x] **DIR-02**: Search queries local SQLite via API (FTS5) — instant results
 - [x] **DIR-03**: Contact settings panel as shadcn Sheet/Dialog — stays open after save
-- [ ] **DIR-04**: Bulk edit mode for Contacts and Channels — same pattern as Groups
-- [ ] **DIR-05**: Group participants resolve names from local DB, bot sessions shown with badge and no action buttons
+- [x] **DIR-04**: Bulk edit mode for Contacts and Channels — same pattern as Groups
+- [x] **DIR-05**: Group participants resolve names from local DB, bot sessions shown with badge and no action buttons
 - [x] **DIR-06**: Bot's own sessions filtered from contacts list
 - [x] **DIR-07**: Custom keywords and group override keywords use tag-style input
 
@@ -122,11 +122,11 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 | SETT-03 | Phase 20 | Complete |
 | SETT-04 | Phase 20 | Complete |
 | SETT-05 | Phase 20 | Complete |
-| DIR-01 | Phase 21 | Pending |
+| DIR-01 | Phase 21 | Complete |
 | DIR-02 | Phase 21 | Complete |
 | DIR-03 | Phase 21 | Complete |
-| DIR-04 | Phase 21 | Pending |
-| DIR-05 | Phase 21 | Pending |
+| DIR-04 | Phase 21 | Complete |
+| DIR-05 | Phase 21 | Complete |
 | DIR-06 | Phase 21 | Complete |
 | DIR-07 | Phase 21 | Complete |
 | SESS-01 | Phase 22 | Pending |
