@@ -18,6 +18,7 @@ interface GroupsTabProps {
   pagination: { pageIndex: number; pageSize: number }
   onPaginationChange: (p: { pageIndex: number; pageSize: number }) => void
   loading: boolean
+  onRefresh?: () => void  // trigger parent data reload after bulk/settings changes
 }
 
 // Format a timestamp (seconds since epoch) as a readable date string
@@ -85,6 +86,7 @@ export function GroupsTab({
   pagination,
   onPaginationChange,
   loading,
+  onRefresh: _onRefresh,
 }: GroupsTabProps) {
   const [expandedGroupJid, setExpandedGroupJid] = useState<string | null>(null)
 

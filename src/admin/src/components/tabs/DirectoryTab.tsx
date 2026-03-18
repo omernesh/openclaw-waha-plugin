@@ -134,6 +134,7 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
             pagination={pagination}
             onPaginationChange={setPagination}
             loading={loading}
+            onRefresh={refreshData}
           />
         </TabsContent>
         <TabsContent value="channels">
