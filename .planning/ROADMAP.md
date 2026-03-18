@@ -46,7 +46,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 **Milestone Goal:** Replace ~5500 lines of embedded HTML/JS in monitor.ts with a React SPA built on shadcn/ui + Tailwind CSS + Vite, preserving all existing admin panel functionality while gaining mobile responsiveness, accessibility, and maintainability.
 
 - [x] **Phase 18: React Scaffold** — Vite + React + shadcn/ui foundation and build pipeline (completed 2026-03-18)
-- [ ] **Phase 19: App Layout** — Sidebar navigation, theme toggle, mobile responsiveness, shared header
+- [x] **Phase 19: App Layout** — Sidebar navigation, theme toggle, mobile responsiveness, shared header (completed 2026-03-18)
 - [ ] **Phase 20: Dashboard and Settings Tabs** — Dashboard cards and Settings form rebuilt in React
 - [ ] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet
 - [ ] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React
@@ -183,7 +183,7 @@ Plans:
 | 16. Pairing Mode and Auto-Reply | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
-| 19. App Layout | 1/2 | In Progress|  | - |
+| 19. App Layout | 2/2 | Complete   | 2026-03-18 | - |
 | 20. Dashboard and Settings Tabs | v1.12 | 0/TBD | Not started | - |
 | 21. Directory Tab | v1.12 | 0/TBD | Not started | - |
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
