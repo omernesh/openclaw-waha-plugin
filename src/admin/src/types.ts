@@ -188,9 +188,14 @@ export interface HealthResponse {
 }
 
 // Queue from GET /api/admin/queue
+// DO NOT CHANGE: matches QueueStats from inbound-queue.ts getStats() — confirmed 2026-03-18
 export interface QueueResponse {
-  dm: { depth: number; processing: boolean };
-  group: { depth: number; processing: boolean };
+  dmDepth: number;
+  groupDepth: number;
+  dmOverflowDrops: number;
+  groupOverflowDrops: number;
+  totalProcessed: number;
+  totalErrors: number;
 }
 
 // Sync status from GET /api/admin/sync/status
@@ -212,11 +217,11 @@ export interface ModulesResponse {
   modules: Module[];
 }
 
-// Log entry from GET /api/admin/logs
-export interface LogEntry {
-  timestamp: string;
-  level: string;
-  message: string;
+// Log response from GET /api/admin/logs — matches monitor.ts /api/admin/logs response shape
+export interface LogResponse {
+  lines: string[];
+  source: 'journalctl' | 'file' | 'none' | 'error';
+  total: number;
 }
 
 // Filter response from GET /api/admin/directory/:jid/filter

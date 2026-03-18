@@ -14,6 +14,7 @@ import type {
   ModulesResponse,
   GroupFilterResponse,
   ParticipantsResponse,
+  LogResponse,
 } from '@/types'
 // Note: DirectoryContact and ParticipantEnriched are now the correct types.
 // DirectoryEntry and Participant were placeholder types — removed in Phase 21.
@@ -155,7 +156,7 @@ export const api = {
     const qs = params ? '?' + new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
     ).toString() : ''
-    return request<string>(`/logs${qs}`)
+    return request<LogResponse>(`/logs${qs}`)
   },
 
   // Gateway
