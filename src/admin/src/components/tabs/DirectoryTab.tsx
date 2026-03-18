@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { DirectoryResponse } from '@/types'
+import { GroupsTab } from './directory/GroupsTab'
 
 interface DirectoryTabProps {
   selectedSession: string
@@ -96,10 +97,14 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
           </p>
         </TabsContent>
         <TabsContent value="groups">
-          {/* GroupsTab will be wired in Plan 03 */}
-          <p className="text-muted-foreground p-4">
-            {loading ? 'Loading...' : data ? `${data.total} groups` : 'Groups table — Plan 03'}
-          </p>
+          {/* GroupsTab — wired in Plan 03 */}
+          <GroupsTab
+            data={data?.contacts ?? []}
+            total={data?.total ?? 0}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            loading={loading}
+          />
         </TabsContent>
         <TabsContent value="channels">
           {/* ChannelsTab will be wired in Plan 03 */}
