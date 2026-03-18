@@ -2,6 +2,40 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.15.2] - 2026-03-18
+
+### Fixed — Bug Sweep (18 bugs from human verification)
+- **BUG-01: @lid name resolution in Access Control** — Server-side `resolveLidToCus()` replaces broken string-replace approach. Dedup now queries WAHA `/lids/{lid}` API for unmapped LIDs. Resolve endpoint falls back to all account DBs. Access Control card redesigned as name pills with pagination.
+- **BUG-02: Dashboard flicker on 30s refresh** — Stat values update via `textContent` instead of rebuilding innerHTML. `_filterStatsBuilt` guard prevents DOM recreation.
+- **BUG-04: Sessions role dropdown reverts** — `saveSessionRole()` no longer calls `loadSessions()`. Updates dropdown in-place with amber "Restart required" notice.
+- **BUG-05: 502 after session restart** — Added "Save & Restart" button with polling overlay that waits for server recovery.
+- **BUG-06: Directory search misses contacts** — FTS5 prefix matching (`"term"*`), LIKE fallback, and WAHA API fallback when local DB has no results.
+- **BUG-07: Directory clear button broken** — Resets page counters before reloading.
+- **BUG-08: Tooltips clipped** — `overflow: visible` on all ancestor containers.
+- **BUG-09: Settings drawer closes on save** — `stopPropagation()` on save button click.
+- **BUG-10: God Mode Users raw numbers** — `resolveJids()` handles bare phone numbers without @c.us suffix.
+- **BUG-11: Contact picker search broken** — Same FTS5 prefix matching fix as BUG-06.
+- **BUG-12: Settings tag inputs show raw JIDs** — Batch resolve via `resolveNames: true` on tag inputs.
+- **BUG-14: Queue refresh no feedback** — Wrapped in `.refresh-wrap` for spinner animation + timestamp.
+- **BUG-15: Contacts tab missing pagination indicator** — Stats bar shows "X-Y of Z" range + "Page X/Y".
+- **BUG-16: Group participants raw LIDs** — Server-side `resolveLidToCus()` for participant names. Bot session participants marked with `isBotSession` flag server-side; action buttons suppressed for bot sessions only (human sessions keep controls).
+- **BUG-18: Channel Allow DM no toggle** — Green/gray toggle with "DM Allowed"/"Allow DM" text states.
+- **Directory initial load race** — `currentDirTab` defaulted to `undefined` on `#directory` hash load (var hoisting). Now defaults to `'contacts'`.
+- **WAHA contacts endpoint 404** — Changed `getWahaContacts()` from `/api/{session}/contacts` to `/api/contacts/all?session=` (correct WAHA API path).
+- **WAHA sessions `/me` endpoint** — Fixed `fetchBotJids()` from `/api/{session}/me` to `/api/sessions/{session}/me`.
+
+### Added
+- **Light/dark mode** — Theme toggle (☀/☽) in header. CSS custom properties for all colors. Persists in localStorage.
+- **Wildcard warning** — Access Control card detects `*` in allowFrom, shows amber warning banner and grays out other entries.
+- **Bot session exclusion** — Bot-role session JIDs excluded from Access Control display and group participant action buttons.
+- **LID mapping cross-account sync** — `sync.ts` writes LID mappings to ALL account DBs, not just the syncing account.
+- **WAHA API fallback for name resolution** — `/api/admin/directory/:jid` endpoint fetches from WAHA API when contact not in local DB, caches result.
+- **`<meta format-detection>` telephone=no** — Prevents browsers from auto-linking phone numbers in the admin panel.
+
+### Removed
+- **Trigger operator (AND/OR)** — Removed from UI (global settings + per-group override). OR is hardcoded. Backend schema kept for backwards compatibility.
+- **"Pairing" DM policy option** — Already removed in prior version; confirmed clean.
+
 ## [1.15.1] - 2026-03-17
 
 ### Fixed

@@ -8,21 +8,27 @@
 
 ## BUG-01: Access Control card doesn't resolve @lid JIDs to names
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Dashboard tab → Access Control card → allowFrom / groupAllowFrom lists
 **Issue:** The name resolver only resolves `@c.us` JIDs to contact names. `@lid` JIDs (e.g., `271862907039996@lid`) are shown raw without resolving to the same contact name. Since NOWEB uses `@lid` format, these should be merged/resolved to show the contact name just like their `@c.us` counterpart.
 **Expected:** `@lid` JIDs should either resolve to contact names or be visually paired/merged with their `@c.us` equivalent so the user sees one entry per person, not two.
+**Fix applied:** Server-side dedupLidServer() uses db.resolveLidToCus() instead of broken string replace. @lid JIDs now correctly resolve via lid_mapping table.
 
 ## BUG-02: Access Control card keeps refreshing every few seconds
 **Type:** Bug (UX)
+**Status:** FIXED — pending post-fix review
 **Location:** Dashboard tab → Access Control card
 **Issue:** The card visibly re-renders every few seconds, causing flickering/jumping. Likely the name resolver is re-fetching and re-rendering the entire card on each resolution callback, or `loadStats()` is being called on a timer that rebuilds the whole dashboard.
 **Expected:** Dashboard should load once and stay stable. Either stop the periodic refresh, or only update changed data without re-rendering the entire card.
+**Fix applied:** Added _filterStatsBuilt guard. On 30s refresh, stat values update via textContent instead of rebuilding innerHTML. No more flicker.
 
 ## BUG-03: DM Keyword Filter stats confusing — "0 allowed" but "33 dropped"
 **Type:** Bug (data/labeling)
+**Status:** FIXED — pending post-fix review
 **Location:** Dashboard tab → DM Keyword Filter card → stats
 **Issue:** Shows "0 Allowed, 33 Dropped, 85000 Tokens Saved". If 0 were allowed, what was dropped? The "allowed" counter likely only counts messages that passed the keyword filter, while "dropped" counts messages blocked by it. But the labeling is confusing — "allowed" suggests total messages received, and 0 implies nothing happened. The counter may reset on gateway restart while "dropped" persists, or the semantics are just unclear.
 **Expected:** Clarify labels. Consider "Passed" vs "Filtered" instead of "Allowed" vs "Dropped". Or show total received = passed + filtered.
+**Fix applied:** Already fixed — labels already read "Passed"/"Filtered" not "Allowed"/"Dropped". Confirmed no changes needed.
 
 ## CR-02: Make Dashboard filter cards collapsible
 **Type:** CR (UX)
@@ -54,6 +60,7 @@ DM KEYWORD FILTER
 
 ## BUG-04: Sessions tab — role change doesn't update the dropdown visually
 **Type:** Bug (UX)
+**Status:** FIXED — pending post-fix review
 **Location:** Sessions tab → role/subRole dropdowns
 **Issue:** When changing a dropdown (e.g., Omer's subRole from "full-access" to "listener"), the page flickers and the dropdown reverts back to the old value ("full-access") even though the change was saved to config. The toast says it'll take effect after restart, but the dropdown should reflect the newly saved value immediately.
 **Expected behavior:**
@@ -61,12 +68,15 @@ DM KEYWORD FILTER
 2. A bold notification appears under the dropdown: "Restart required for changes to take effect"
 3. Add "Save" and "Save & Restart" buttons at the bottom of the Sessions tab (same pattern as the Settings tab)
 4. No page flicker — the save should NOT trigger a full `loadSessions()` re-render that resets dropdowns to the running config
+**Fix applied:** saveSessionRole() no longer calls loadSessions(). Updates dropdown data-prev and adds amber "Restart required" notice.
 
 ## BUG-05: 502 Bad Gateway after saving session role change
 **Type:** Bug (may be expected)
+**Status:** FIXED — pending post-fix review
 **Location:** Sessions tab → save role change
 **Issue:** After changing Omer's subRole back to "full-access", got a 502 Bad Gateway. Gateway logs show it restarted cleanly — the 502 was during the restart window. The save likely triggered a restart (or the user clicked Save & Restart).
 **Notes:** Config persisted correctly after restart. May be expected behavior if the save triggers a restart, but the UI should handle the restart gracefully (show polling overlay like Settings tab does) rather than showing a raw 502.
+**Fix applied:** Added "Save & Restart" button with polling overlay. Shows restart overlay during gateway restart, polls every 2s until responsive.
 
 ## CR-05: Sessions tab — add labels above dropdowns and explanatory text
 **Type:** CR (UX)
@@ -94,14 +104,18 @@ DM KEYWORD FILTER
 
 ## BUG-06: Directory search doesn't find known contacts (e.g., "nadav")
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → search bar
 **Issue:** Searching for "nadav" returns no results despite having a contact named "Nadav Nesher" in WhatsApp.
 **Root cause:** Likely searching against limited data — either only locally cached contacts or only what's been loaded so far via pagination.
+**Fix applied:** getContactCount() now has LIKE fallback matching getContacts(). WAHA API fallback added when local DB search returns 0 results on first page.
 
 ## BUG-07: Directory search bar 'x' button doesn't clear the search
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → search bar → clear ('x') button
 **Issue:** Clicking the 'x' button in the search bar does not erase the search text or reset results.
+**Fix applied:** clearDirSearch() now resets dirGroupPage and dirContactPage to 1 before reloading.
 
 ## CR-08: Directory search architecture — use background sync + local SQLite, not realtime WAHA API
 **Type:** CR (architecture, high priority)
@@ -117,15 +131,19 @@ DM KEYWORD FILTER
 
 ## BUG-08: Tooltips clipped by card/container overflow
 **Type:** Bug (CSS)
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → contact settings card → tooltips (e.g., on Mode, Can Initiate)
 **Issue:** Tooltip text is cut off by the parent card's overflow boundaries. The tooltip renders behind/under the card border so the user can't read the full text. Visible in screenshot: "ot responds to this contact." and "ly: messages arrive but bot does" are clipped on the left edge.
 **Expected:** Tooltips should render above the overflow boundary (use `z-index` and `overflow: visible` on the tooltip, or position tooltips relative to the viewport rather than the card container).
+**Fix applied:** Added overflow:visible to .card, .settings-section, .field-group, .contact-settings-panel, .settings-fields, .settings-field CSS rules.
 
 ## BUG-09: Contact settings drawer closes after saving
 **Type:** Bug (UX)
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → contact card → Settings → Save button
 **Issue:** After changing a contact's setting (e.g., mode from "Active" to "Listen Only") and clicking Save, the settings drawer/panel closes. User has to reopen it to make additional changes.
 **Expected:** The settings drawer should stay open after saving. Show a success toast confirming the save, but keep the drawer expanded so the user can continue editing other fields without re-opening.
+**Fix applied:** Added event.stopPropagation() to Save button onclick to prevent click bubbling from closing the settings panel.
 
 ## CR-09: Custom Keywords field should use tag-style input (word bubbles)
 **Type:** CR (UX)
@@ -144,15 +162,19 @@ DM KEYWORD FILTER
 
 ## BUG-10: God Mode Users shows raw phone numbers instead of contact names
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Settings tab → DM Keyword Filter AND Group Keyword Filter → God Mode Users fields
 **Issue:** The tag bubbles show raw numbers (e.g., "972544329000") instead of resolved contact names. Same issue for Allowed Groups showing raw group JIDs (e.g., "120363421825201386@g.us") instead of group names. Applies to both DM and Group keyword filter sections.
 **Expected:** Tag bubbles should resolve and display contact/group names using the name resolver. Show the name with the number as a tooltip or secondary text.
+**Fix applied:** resolveJids() in directory.ts now handles bare phone numbers (no @c.us suffix) by appending @c.us as fallback. Covers God Mode Users config entries.
 
 ## BUG-11: God Mode Users contact search doesn't find contacts
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Settings tab → DM Keyword Filter AND Group Keyword Filter → God Mode Users → contact picker search
 **Issue:** Searching for "nadav" in the contact picker returns "No contacts found. Try a different name or phone number." despite having a contact named Nadav Nesher. Applies to both DM and Group keyword filter sections. Same root cause as BUG-06 — the contact picker searches the WAHA API or an incomplete local DB.
 **Expected:** Contact picker should search the local SQLite directory (same fix as CR-08 — background sync + local DB search).
+**Fix applied:** FTS5 _fts5Quote() now appends * for prefix matching. Added LIKE fallback when FTS5 returns 0 results.
 
 ## CR-11: Mention Patterns should use tag-style input
 **Type:** CR (UX)
@@ -162,15 +184,19 @@ DM KEYWORD FILTER
 
 ## BUG-12: Allow From, Group Allow From, and Allowed Groups show raw JIDs instead of names
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Settings tab → Access Control → Allow From (DMs), Group Allow From, Allowed Groups
 **Issue:** All tag bubbles show raw JIDs/numbers (e.g., "972544329000@c.us", "271862907039996@lid", "120363421825201386@g.us") instead of resolved contact/group names. Same issue as BUG-10 but in the Access Control section.
 **Expected:** Tag bubbles should display resolved names (e.g., "Omer Nesher" instead of "972544329000@c.us", "Sammie test group" instead of the group JID). Show the raw JID as a tooltip on hover. Merge @c.us and @lid entries for the same person into one bubble showing the name.
+**Fix applied:** Same root fix as BUG-10 — resolveJids() handles bare numbers. Tag input pills now show resolved names via batch resolve endpoint.
 
 ## BUG-13: DM Policy shows "pairing (not available)" as a selectable option
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Settings tab → Access Control → DM Policy dropdown
 **Issue:** "pairing" is listed as a dropdown option with "(not available)" text. If it's not supported in the current SDK integration, it shouldn't be shown as a selectable option at all. The user currently has it selected, which means it's either doing nothing or behaving unpredictably.
 **Expected:** Remove "pairing" from the dropdown entirely. If the user's config has "pairing" set, auto-migrate to "allowlist" (closest equivalent) on load and show a one-time notice explaining the change.
+**Fix applied:** Already fixed — pairing option already removed from dropdown, migration logic already converts pairing→allowlist. Confirmed no changes needed.
 
 ## FEATURE-01: Implement pairing mode — passcode-gated temporary access
 **Type:** Feature (next milestone candidate)
@@ -208,15 +234,19 @@ DM KEYWORD FILTER
 
 ## BUG-14: Queue tab Refresh button has no visual feedback
 **Type:** Bug (UX)
+**Status:** FIXED — pending post-fix review
 **Location:** Queue tab → Refresh button
 **Issue:** Same as CR-07 but calling out Queue tab specifically. Clicking Refresh gives no visual confirmation that the click registered or data was refreshed.
 **Expected:** Same fix as CR-07 — spinner/loading state on click, "Last refreshed" timestamp after completion.
+**Fix applied:** Wrapped #refresh-queue button in .refresh-wrap div for proper spinner animation and "Last refreshed" timestamp layout.
 
 ## BUG-15: Directory Contacts tab shows very limited contacts with no pagination
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → Contacts sub-tab
 **Issue:** Only a handful of contacts are loaded. No "Load More" button or pagination controls visible, despite the user having many more contacts. The Groups tab has pagination (Phase 10), but Contacts does not.
 **Expected:** Contacts should have the same pagination pattern as Groups — paginated table with "Load More" or page navigation. Ties into CR-08 (background sync) — once all contacts are synced to SQLite, pagination queries the local DB for fast results.
+**Fix applied:** Contacts stats bar now shows "Showing X-Y of Z" range and "Page X/Y" indicator. Pagination was already implemented but stats bar didn't reflect it.
 
 ## CR-12: Directory should exclude bot's own sessions from contact listing
 **Type:** CR (UX)
@@ -226,9 +256,11 @@ DM KEYWORD FILTER
 
 ## BUG-16: Group participants show raw numbers instead of names
 **Type:** Bug
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → Groups → Participants list
 **Issue:** Participants show raw LID numbers (e.g., "113348632944769", "271862907039996") instead of resolved contact names. Same name resolution issue as BUG-01, BUG-10, BUG-12.
 **Expected:** Resolve participant JIDs/LIDs to contact names from the local SQLite directory.
+**Fix applied:** Participants name resolution uses db.resolveLidToCus() instead of broken string replace. Added second resolution pass for all participant requests.
 
 ## CR-13: Group Filter Override Keywords should use tag-style input
 **Type:** CR (UX)
@@ -238,9 +270,11 @@ DM KEYWORD FILTER
 
 ## BUG-17: Per-group trigger operator exists but is hard to find
 **Type:** Bug (UX/discoverability)
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → Groups → Group Filter Override
 **Issue:** The trigger operator (AND/OR) dropdown IS present in the Group Filter Override section (visible in screenshot: "OR – match any keyword"), but the user couldn't find it initially. It's buried inside the override panel which only appears after checking "Override global filter" → "Keyword filter enabled". The per-group trigger operator was requested in Phase 9 (UX-03) and is implemented, but discoverability is poor.
 **Expected:** Make the trigger operator more visible — consider showing it even when keyword filter is inheriting global (grayed out with "inheriting global: OR" text), so the user can see the current effective value without expanding the override.
+**Fix applied:** Added opacity:0.6 to gfo-op-indicator div for visual distinction as inherited/read-only value.
 
 ## CR-14: Bot sessions should appear in group participants but without action buttons
 **Type:** CR (UX)
@@ -274,6 +308,7 @@ DM KEYWORD FILTER
 
 ## BUG-18: Channels tab — Allow DM button has no toggle/undo behavior
 **Type:** Bug (UX)
+**Status:** FIXED — pending post-fix review
 **Location:** Directory tab → Channels sub-tab → Allow DM button
 **Issue:** Multiple problems:
 1. All channels appear to have Allow DM enabled but there's no visual state indicating current on/off status
@@ -283,6 +318,7 @@ DM KEYWORD FILTER
 1. Allow DM button should be a toggle with clear visual state (green "Allowed" vs gray "Allow DM")
 2. Clicking when allowed should revoke (remove from allow list) with a confirmation toast
 3. Visual state should persist after page reload
+**Fix applied:** Button colors changed to #10b981 (green) when allowed, #334155 (gray) when not. Text changes between "DM Allowed" and "Allow DM". Both buildContactCard and toggleChannelAllowDm updated.
 
 ## CR-17: Channels tab should support bulk editing
 **Type:** CR (feature)

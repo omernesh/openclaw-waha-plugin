@@ -1134,10 +1134,13 @@ export async function getWahaGroupsCount(params: { cfg: CoreConfig; accountId?: 
 
 // ── Contacts ───────────────────────────────────────────────────
 
+// WAHA contacts list endpoint is /api/contacts/all (NOT /api/{session}/contacts which 404s). DO NOT CHANGE.
 export async function getWahaContacts(params: { cfg: CoreConfig; accountId?: string }) {
   const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId ?? DEFAULT_ACCOUNT_ID });
+  const session = encodeURIComponent(account.session ?? "default");
   return callWahaApi({ baseUrl, apiKey, method: "GET",
-    path: resolveSessionPath("/api/{session}/contacts", params.cfg, params.accountId) });
+    path: `/api/contacts/all?session=${session}` });
 }
 
 export async function getWahaContact(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {

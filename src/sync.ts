@@ -268,13 +268,25 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     }
   }
 
-  // NAME-01: Persist LID-to-@c.us mapping to SQLite so resolveJids() and getContact()
-  // can resolve @lid JIDs to their @c.us display names. The @lid number is completely
-  // different from the @c.us number — this mapping is the ONLY way to bridge them.
-  // DO NOT CHANGE — without this, @lid name resolution returns empty results.
+  // NAME-01: Persist LID-to-@c.us mapping to ALL account DBs so resolveJids() and getContact()
+  // can resolve @lid JIDs to their @c.us display names. LID mappings are global (same WAHA
+  // instance), so every account DB needs them — otherwise dashboards for non-syncing accounts
+  // show raw @lid JIDs. The @lid number is completely different from the @c.us number —
+  // this mapping is the ONLY way to bridge them. DO NOT CHANGE.
   const lidMappings = Array.from(lidToCus.entries()).map(([lid, cus]) => ({ lid, cus }));
   if (lidMappings.length > 0) {
+    // Write to current account's DB
     db.bulkUpsertLidMappings(lidMappings);
+    // Write to all OTHER active account DBs so their dashboards can resolve @lid JIDs too.
+    // LID mappings are global (same WAHA instance serves all sessions). DO NOT REMOVE.
+    for (const [otherId] of syncStates) {
+      if (otherId !== opts.accountId) {
+        try {
+          const otherDb = getDirectoryDb(otherId);
+          otherDb.bulkUpsertLidMappings(lidMappings);
+        } catch { /* non-critical — other account DB may not be ready yet */ }
+      }
+    }
   }
 
   // Build contact map from chats (primary source — always works on NOWEB)

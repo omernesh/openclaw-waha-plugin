@@ -351,8 +351,16 @@ export class DirectoryDb {
   }
 
   /** Escape user search input for FTS5 MATCH — wrap each term in double-quotes to prevent query injection. */
+  /**
+   * Build an FTS5 prefix query token for a single search term.
+   * Uses "term"* syntax — quoted prefix query — so special FTS5 characters are
+   * escaped while still enabling prefix matching (e.g., "nad"* matches "Nadav").
+   * BUG-11 fix: previous version used exact-token match ("term" without *),
+   * which required the full token to match and broke partial/typeahead search.
+   * DO NOT REMOVE the trailing * — it enables prefix matching for the contact picker.
+   */
   private _fts5Quote(term: string): string {
-    return '"' + term.replace(/"/g, '""') + '"';
+    return '"' + term.replace(/"/g, '""') + '"*';
   }
 
   /**
@@ -392,7 +400,27 @@ export class DirectoryDb {
         LIMIT ? OFFSET ?
       `;
       const rows = this.db.prepare(ftsSql).all(ftsQuery, limit, offset) as Array<Record<string, unknown>>;
-      return rows.map(this._rowToContact.bind(this));
+      if (rows.length > 0) {
+        return rows.map(this._rowToContact.bind(this));
+      }
+      // BUG-11 fallback: If FTS5 returns nothing (e.g., stale index, tokenizer mismatch),
+      // fall through to a LIKE-based search so contacts are still findable.
+      // This is O(n) but only runs when FTS5 misses — not the default path.
+      const likeTerm = `%${search}%`;
+      const likeSql = `
+        SELECT c.jid, c.display_name, c.first_seen_at, c.last_message_at, c.message_count, c.is_group,
+               d.mode, d.mention_only, d.custom_keywords, d.can_initiate, d.can_initiate_override
+        FROM contacts c
+        LEFT JOIN dm_settings d ON c.jid = d.jid
+        WHERE (c.display_name LIKE ? OR c.jid LIKE ?)
+          AND c.jid NOT LIKE '%@lid'
+          AND c.jid NOT LIKE '%@s.whatsapp.net'
+          ${typeCond}
+        ORDER BY c.display_name COLLATE NOCASE
+        LIMIT ? OFFSET ?
+      `;
+      const likeRows = this.db.prepare(likeSql).all(likeTerm, likeTerm, limit, offset) as Array<Record<string, unknown>>;
+      return likeRows.map(this._rowToContact.bind(this));
     }
 
     let sql = `
@@ -476,6 +504,7 @@ export class DirectoryDb {
     // The @lid number is completely different from the @c.us number — simple string
     // replacement (e.g., replace('@lid','@c.us')) does NOT work. DO NOT CHANGE.
     const lidToCs = new Map<string, string>(); // @lid -> real @c.us equivalent
+    const bareToCs = new Map<string, string>(); // bare number -> @c.us equivalent
     const allJidsToQuery = new Set<string>(jids);
     for (const jid of jids) {
       if (jid.endsWith("@lid")) {
@@ -484,6 +513,12 @@ export class DirectoryDb {
           lidToCs.set(jid, realCus);
           allJidsToQuery.add(realCus);
         }
+      } else if (!jid.includes("@") && /^\d+$/.test(jid)) {
+        // Bare phone number (no suffix) — try @c.us fallback for resolution.
+        // Config may store raw numbers; contacts table stores them as number@c.us. DO NOT REMOVE.
+        const cusJid = jid + "@c.us";
+        bareToCs.set(jid, cusJid);
+        allJidsToQuery.add(cusJid);
       }
     }
 
@@ -498,7 +533,7 @@ export class DirectoryDb {
       nameByJid.set(row.jid, row.display_name);
     }
 
-    // Build result: for each input JID, try direct lookup then @lid->@c.us fallback
+    // Build result: for each input JID, try direct lookup then @lid->@c.us or bare->@c.us fallback
     const result = new Map<string, string>();
     for (const jid of jids) {
       const direct = nameByJid.get(jid);
@@ -510,6 +545,11 @@ export class DirectoryDb {
           const csName = nameByJid.get(csJid);
           if (csName) result.set(jid, csName);
         }
+      } else if (bareToCs.has(jid)) {
+        // Bare phone number fallback — try the @c.us version
+        const csJid = bareToCs.get(jid)!;
+        const csName = nameByJid.get(csJid);
+        if (csName) result.set(jid, csName);
       }
     }
     return result;
@@ -656,7 +696,20 @@ export class DirectoryDb {
           ${typeCond}
       `;
       const row = this.db.prepare(ftsSql).get(ftsQuery) as { cnt: number };
-      return row.cnt;
+      if (row.cnt > 0) return row.cnt;
+      // BUG-06 fallback: match getContacts() LIKE fallback so count stays in sync when FTS5 misses.
+      // Without this, total=0 when LIKE finds results, breaking pagination. DO NOT REMOVE.
+      const likeTerm = `%${search.trim()}%`;
+      const likeCountSql = `
+        SELECT COUNT(*) as cnt
+        FROM contacts c
+        WHERE (c.display_name LIKE ? OR c.jid LIKE ?)
+          AND c.jid NOT LIKE '%@lid'
+          AND c.jid NOT LIKE '%@s.whatsapp.net'
+          ${typeCond}
+      `;
+      const likeRow = this.db.prepare(likeCountSql).get(likeTerm, likeTerm) as { cnt: number };
+      return likeRow.cnt;
     }
 
     const conditions: string[] = [];

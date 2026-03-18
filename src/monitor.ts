@@ -13,7 +13,7 @@ import {
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
-import { getWahaGroupParticipants } from "./send.js";
+import { getWahaGroupParticipants, getWahaContacts, toArr } from "./send.js";
 import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
@@ -213,94 +213,170 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no">
 <title>WAHA Plugin Admin - ${session}</title>
 <style>
+  /* ---- CSS Custom Properties for Light/Dark Theme (Change 5) ---- */
+  /* DO NOT REMOVE: All UI colors are defined as CSS variables. Dark mode is default. */
+  /* .light-mode on body overrides to light palette. Toggle via theme button in header. */
+  :root {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #0f172a;
+    --bg-hover: #1a2540;
+    --border: #334155;
+    --border-light: #334155;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-accent: #38bdf8;
+    --text-mono: #7dd3fc;
+    --nav-bg: #1e293b;
+    --nav-border: #334155;
+    --badge-bg: #1e3a5f;
+    --badge-text: #7dd3fc;
+    --stat-bg: #0f172a;
+    --tag-bg: #0ea5e9;
+    --toast-bg: #10b981;
+    --success: #10b981;
+    --error: #ef4444;
+    --warning: #f59e0b;
+    --info: #22d3ee;
+    --btn-primary: #1d4ed8;
+    --btn-primary-hover: #2563eb;
+    --slider-bg: #334155;
+    --shimmer-from: #1e293b;
+    --shimmer-mid: #334155;
+    --sub-header-color: #b0bec5;
+    --sub-header-border: #333;
+    --explainer-bg: #1a1f2e;
+    --explainer-text: #78909c;
+    --explainer-label: #90a4ae;
+  }
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --bg-hover: #f1f5f9;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --text-accent: #0284c7;
+    --text-mono: #0369a1;
+    --nav-bg: #ffffff;
+    --nav-border: #e2e8f0;
+    --badge-bg: #dbeafe;
+    --badge-text: #1d4ed8;
+    --stat-bg: #f1f5f9;
+    --tag-bg: #0284c7;
+    --toast-bg: #059669;
+    --success: #059669;
+    --error: #dc2626;
+    --warning: #d97706;
+    --info: #0891b2;
+    --btn-primary: #1d4ed8;
+    --btn-primary-hover: #2563eb;
+    --slider-bg: #cbd5e1;
+    --shimmer-from: #e2e8f0;
+    --shimmer-mid: #f1f5f9;
+    --sub-header-color: #475569;
+    --sub-header-border: #e2e8f0;
+    --explainer-bg: #f1f5f9;
+    --explainer-text: #64748b;
+    --explainer-label: #475569;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; }
+  body { font-family: system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; display: flex; flex-direction: column; }
   /* NAV */
-  header { background: #1e293b; padding: 0 24px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
-  header .brand { font-size: 1.1rem; font-weight: 700; color: #38bdf8; padding: 14px 24px 14px 0; border-right: 1px solid #334155; margin-right: 4px; white-space: nowrap; }
+  header { background: var(--nav-bg); padding: 0 24px; border-bottom: 1px solid var(--nav-border); display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
+  header .brand { font-size: 1.1rem; font-weight: 700; color: var(--text-accent); padding: 14px 24px 14px 0; border-right: 1px solid var(--nav-border); margin-right: 4px; white-space: nowrap; }
   nav { display: flex; gap: 0; flex: 1; }
-  nav button { background: none; border: none; color: #94a3b8; padding: 16px 20px; cursor: pointer; font-size: 0.9rem; border-bottom: 3px solid transparent; transition: color .15s, border-color .15s; white-space: nowrap; }
-  nav button:hover { color: #e2e8f0; }
-  nav button.active { color: #38bdf8; border-bottom-color: #38bdf8; }
-  header .badge { background: #10b981; color: #fff; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; margin-left: auto; }
+  nav button { background: none; border: none; color: var(--text-secondary); padding: 16px 20px; cursor: pointer; font-size: 0.9rem; border-bottom: 3px solid transparent; transition: color .15s, border-color .15s; white-space: nowrap; }
+  nav button:hover { color: var(--text-primary); }
+  nav button.active { color: var(--text-accent); border-bottom-color: var(--text-accent); }
+  header .badge { background: var(--success); color: #fff; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; margin-left: auto; }
+  /* THEME TOGGLE (Change 5) -- DO NOT REMOVE: switches between dark/light mode */
+  #theme-toggle { background: none; border: 1px solid var(--border); color: var(--text-secondary); font-size: 1.1rem; padding: 4px 8px; border-radius: 6px; cursor: pointer; margin-left: 10px; line-height: 1; transition: color .15s, border-color .15s; }
+  #theme-toggle:hover { color: var(--text-primary); border-color: var(--text-accent); }
   /* CONTENT */
   .tab-content { display: none; flex: 1; }
   .tab-content.active { display: block; }
   main.tab-pane { max-width: 920px; margin: 0 auto; padding: 24px; display: grid; gap: 20px; }
   /* CARDS */
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 20px; }
-  .card h2 { font-size: 0.85rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+  /* BUG-08: overflow:visible prevents tooltip clipping by card container. DO NOT REVERT. */
+  .card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 20px; overflow: visible; }
+  .card h2 { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
   .stat-row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .stat { background: #0f172a; border-radius: 8px; padding: 12px 16px; flex: 1; min-width: 120px; }
-  .stat .label { font-size: 0.75rem; color: #64748b; margin-bottom: 4px; }
-  .stat .value { font-size: 1.5rem; font-weight: 700; color: #38bdf8; }
+  .stat { background: var(--stat-bg); border-radius: 8px; padding: 12px 16px; flex: 1; min-width: 120px; }
+  .stat .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+  .stat .value { font-size: 1.5rem; font-weight: 700; color: var(--text-accent); }
   .pattern-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .pattern { background: #0ea5e9; color: #fff; font-size: 0.8rem; padding: 3px 10px; border-radius: 9999px; font-family: monospace; }
+  .pattern { background: var(--tag-bg); color: #fff; font-size: 0.8rem; padding: 3px 10px; border-radius: 9999px; font-family: monospace; }
   .event-list { margin-top: 12px; font-size: 0.8rem; }
-  .event { padding: 6px 10px; border-left: 3px solid #334155; margin-bottom: 4px; border-radius: 0 4px 4px 0; background: #0f172a; display: flex; gap: 8px; }
-  .event.pass { border-color: #10b981; }
+  .event { padding: 6px 10px; border-left: 3px solid var(--border); margin-bottom: 4px; border-radius: 0 4px 4px 0; background: var(--bg-tertiary); display: flex; gap: 8px; }
+  .event.pass { border-color: var(--success); }
   .event.fail { border-color: #f87171; }
-  .event .ts { color: #64748b; min-width: 80px; }
-  .event .reason { color: #94a3b8; min-width: 120px; }
-  .event .preview { color: #e2e8f0; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .event .ts { color: var(--text-muted); min-width: 80px; }
+  .event .reason { color: var(--text-secondary); min-width: 120px; }
+  .event .preview { color: var(--text-primary); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .kv { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; font-size: 0.85rem; }
-  .kv .k { color: #64748b; }
-  .kv .v { color: #e2e8f0; font-family: monospace; }
+  .kv .k { color: var(--text-muted); }
+  .kv .v { color: var(--text-primary); font-family: monospace; }
   .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tag { background: #1e3a5f; color: #7dd3fc; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-family: monospace; }
-  #last-refresh { color: #64748b; font-size: 0.75rem; text-align: right; margin-top: 4px; }
-  .refresh-btn { background: #1d4ed8; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-  .refresh-btn:hover { background: #2563eb; }
+  .tag { background: var(--badge-bg); color: var(--badge-text); font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+  #last-refresh { color: var(--text-muted); font-size: 0.75rem; text-align: right; margin-top: 4px; }
+  .refresh-btn { background: var(--btn-primary); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+  .refresh-btn:hover { background: var(--btn-primary-hover); }
   /* Phase 12, Plan 03 (UX-03 + UI-09): shared refresh button spinner + timestamp */
   .refresh-wrap { display:inline-flex; flex-direction:column; align-items:center; gap:2px; }
-  .refresh-ts { font-size:0.7rem; color:#78909c; }
+  .refresh-ts { font-size:0.7rem; color:var(--explainer-text); }
   @keyframes pulse-refresh { 0%,100%{opacity:1} 50%{opacity:0.5} }
   .refreshing { animation: pulse-refresh 1s ease-in-out infinite; pointer-events:none; }
   /* SETTINGS */
-  .settings-section { margin-bottom: 8px; }
-  .settings-section summary { cursor: pointer; font-weight: 600; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
-  .settings-section summary::before { content: '▶'; font-size: 0.7rem; transition: transform .15s; }
+  .settings-section { margin-bottom: 8px; overflow: visible; }
+  .settings-section summary { cursor: pointer; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
+  .settings-section summary::before { content: '\\25B6'; font-size: 0.7rem; transition: transform .15s; }
   .settings-section[open] summary::before { transform: rotate(90deg); }
-  .field-group { display: grid; gap: 12px; padding: 4px 0 16px 0; }
+  .field-group { display: grid; gap: 12px; padding: 4px 0 16px 0; overflow: visible; }
   .field { display: grid; gap: 4px; }
-  .field label { font-size: 0.82rem; color: #94a3b8; display: flex; align-items: center; gap: 6px; }
+  .field label { font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
   .field input[type=text], .field input[type=number], .field textarea, .field select {
-    background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px;
+    background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px;
     padding: 8px 10px; font-size: 0.88rem; width: 100%; font-family: inherit;
     transition: border-color .15s;
   }
-  .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: #38bdf8; }
-  .field input[readonly] { color: #64748b; }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--text-accent); }
+  .field input[readonly] { color: var(--text-muted); }
   .field textarea { resize: vertical; min-height: 70px; }
   .range-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   /* TOGGLE */
   .toggle-wrap { display: flex; align-items: center; gap: 10px; }
   .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
   .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
-  .slider { position: absolute; inset: 0; background: #334155; border-radius: 99px; cursor: pointer; transition: background .2s; }
+  .slider { position: absolute; inset: 0; background: var(--slider-bg); border-radius: 99px; cursor: pointer; transition: background .2s; }
   .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
-  .toggle input:checked + .slider { background: #0ea5e9; }
+  .toggle input:checked + .slider { background: var(--tag-bg); }
   .toggle input:checked + .slider::before { transform: translateX(18px); }
   /* TOOLTIP */
   /* Phase 12, Plan 03 (UI-06): z-index raised to 1000 so tooltips render above card containers. DO NOT LOWER. */
-  .tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; background: #334155; border-radius: 50%; font-size: 0.7rem; color: #94a3b8; cursor: help; flex-shrink: 0; }
-  .tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1e3a5f; color: #e2e8f0; font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; width: 220px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 1000; white-space: normal; line-height: 1.4; border: 1px solid #334155; }
+  .tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; background: var(--border); border-radius: 50%; font-size: 0.7rem; color: var(--text-secondary); cursor: help; flex-shrink: 0; }
+  .tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: var(--badge-bg); color: var(--text-primary); font-size: 0.75rem; padding: 6px 10px; border-radius: 6px; width: 220px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 1000; white-space: normal; line-height: 1.4; border: 1px solid var(--border); }
   .tip:hover::after { opacity: 1; }
-  .save-btn { background: #10b981; color: #fff; border: none; padding: 10px 28px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; margin-top: 8px; transition: background .15s; }
+  .save-btn { background: var(--success); color: #fff; border: none; padding: 10px 28px; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; margin-top: 8px; transition: background .15s; }
   .save-btn:hover { background: #059669; }
   /* TOAST */
-  #toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%) translateY(20px); background: #10b981; color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 0.9rem; opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none; z-index: 999; }
+  #toast { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--toast-bg); color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 0.9rem; opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none; z-index: 999; }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  #toast.error { background: #ef4444; }
+  #toast.error { background: var(--error); }
   /* DIRECTORY */
   .dir-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .dir-search { min-width: 200px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 8px 12px; font-size: 0.88rem; }
-  .dir-search:focus { outline: none; border-color: #38bdf8; }
+  .dir-search { min-width: 200px; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); border-radius: 6px; padding: 8px 12px; font-size: 0.88rem; }
+  .dir-search:focus { outline: none; border-color: var(--text-accent); }
   .dir-stats { display: flex; gap: 16px; }
-  .dir-stat { font-size: 0.8rem; color: #64748b; }
-  .dir-stat span { color: #38bdf8; font-weight: 600; }
+  .dir-stat { font-size: 0.8rem; color: var(--text-muted); }
+  .dir-stat span { color: var(--text-accent); font-weight: 600; }
   .contact-list { display: grid; gap: 8px; }
   /* Phase 15 (TTL-01/TTL-04/TTL-05): TTL badge classes for time-limited access grants. DO NOT REMOVE. */
   .ttl-badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:0.7rem; font-weight:600; margin-left:6px; }
@@ -310,66 +386,67 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .ttl-expired { background:#374151; color:#9ca3af; }
   .contact-card.expired-card { opacity:0.5; border-left:3px solid #4b5563 !important; }
   /* Phase 12, Plan 03 (UI-06): overflow changed from hidden to visible so .tip::after tooltips are not clipped. DO NOT REVERT. */
-  .contact-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; overflow: visible; }
+  .contact-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; overflow: visible; }
   .contact-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: background .1s; }
-  .contact-header:hover { background: #1a2540; }
+  .contact-header:hover { background: var(--bg-hover); }
   .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
   .contact-info { flex: 1; min-width: 0; }
   .contact-name { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .contact-jid { font-size: 0.75rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace; }
+  .contact-jid { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: monospace; }
   .contact-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .badge-count { background: #1e3a5f; color: #7dd3fc; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; }
+  .badge-count { background: var(--badge-bg); color: var(--badge-text); font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; }
   /* DIR-02 (12-05): Bot session badge — shown on group participants that are the bot's own sessions. DO NOT REMOVE. */
   .bot-badge { background: #1565c0; color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; display: inline-block; vertical-align: middle; }
-  .contact-time { font-size: 0.75rem; color: #64748b; }
-  .settings-toggle-btn { background: #1d4ed8; color: #fff; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
-  .contact-settings-panel { display: none; padding: 16px; border-top: 1px solid #334155; background: #1a2540; }
+  .contact-time { font-size: 0.75rem; color: var(--text-muted); }
+  .settings-toggle-btn { background: var(--btn-primary); color: #fff; border: none; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
+  /* BUG-08: overflow:visible so .tip::after tooltips are not clipped inside contact cards. DO NOT REVERT. */
+  .contact-settings-panel { display: none; padding: 16px; border-top: 1px solid var(--border); background: var(--bg-hover); overflow: visible; }
   .contact-settings-panel.open { display: block; }
-  .settings-fields { display: grid; gap: 10px; }
-  .settings-field { display: grid; gap: 4px; }
-  .settings-field label { font-size: 0.8rem; color: #94a3b8; }
+  .settings-fields { display: grid; gap: 10px; overflow: visible; }
+  .settings-field { display: grid; gap: 4px; overflow: visible; }
+  .settings-field label { font-size: 0.8rem; color: var(--text-secondary); }
   .settings-field select, .settings-field input[type=text] {
-    background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 5px; padding: 6px 10px; font-size: 0.85rem; width: 100%;
+    background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); border-radius: 5px; padding: 6px 10px; font-size: 0.85rem; width: 100%;
   }
-  .save-contact-btn { background: #10b981; color: #fff; border: none; padding: 6px 18px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; font-weight: 600; margin-top: 6px; }
-  .load-more-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 8px 24px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-top: 12px; width: 100%; transition: background .1s; }
-  .load-more-btn:hover { background: #334155; }
+  .save-contact-btn { background: var(--success); color: #fff; border: none; padding: 6px 18px; border-radius: 5px; cursor: pointer; font-size: 0.82rem; font-weight: 600; margin-top: 6px; }
+  .load-more-btn { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); padding: 8px 24px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-top: 12px; width: 100%; transition: background .1s; }
+  .load-more-btn:hover { background: var(--border); }
   /* DIR TABS */
-  .dir-tab { background: none; border: none; color: #94a3b8; padding: 10px 16px; cursor: pointer; font-size: 0.85rem; border-bottom: 2px solid transparent; transition: color .15s; }
-  .dir-tab:hover { color: #e2e8f0; }
-  .dir-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+  .dir-tab { background: none; border: none; color: var(--text-secondary); padding: 10px 16px; cursor: pointer; font-size: 0.85rem; border-bottom: 2px solid transparent; transition: color .15s; }
+  .dir-tab:hover { color: var(--text-primary); }
+  .dir-tab.active { color: var(--text-accent); border-bottom-color: var(--text-accent); }
   /* DIR-01: Groups paginated table */
   .groups-table { width:100%; border-collapse:collapse; }
-  .groups-table th, .groups-table td { padding:8px 12px; text-align:left; border-bottom:1px solid #1e293b; }
-  .groups-table th { color:#94a3b8; font-size:0.75rem; text-transform:uppercase; }
-  .groups-table tr:hover { background:#1e293b; cursor:pointer; }
+  .groups-table th, .groups-table td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--border-light); }
+  .groups-table th { color:var(--text-secondary); font-size:0.75rem; text-transform:uppercase; }
+  .groups-table tr:hover { background:var(--bg-secondary); cursor:pointer; }
   .page-nav { display:flex; align-items:center; justify-content:center; gap:4px; padding:8px 0; }
-  .page-size-select { background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:4px; padding:4px 8px; font-size:0.8rem; }
+  .page-size-select { background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--border); border-radius:4px; padding:4px 8px; font-size:0.8rem; }
   /* DOCS */
   .docs-section { margin-bottom: 4px; }
-  .docs-section summary { cursor: pointer; font-size: 1rem; font-weight: 600; color: #e2e8f0; padding: 12px 0; list-style: none; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #334155; }
-  .docs-section summary::before { content: '▶'; font-size: 0.7rem; transition: transform .15s; color: #64748b; }
+  .docs-section summary { cursor: pointer; font-size: 1rem; font-weight: 600; color: var(--text-primary); padding: 12px 0; list-style: none; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+  .docs-section summary::before { content: '\\25B6'; font-size: 0.7rem; transition: transform .15s; color: var(--text-muted); }
   .docs-section[open] summary::before { transform: rotate(90deg); }
-  .docs-body { padding: 14px 0; color: #94a3b8; font-size: 0.88rem; line-height: 1.6; }
+  .docs-body { padding: 14px 0; color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6; }
   .docs-body p { margin-bottom: 10px; }
-  .docs-body code { background: #0f172a; color: #38bdf8; padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; }
+  .docs-body code { background: var(--bg-tertiary); color: var(--text-accent); padding: 1px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; }
   .docs-body ul { margin-left: 20px; margin-bottom: 10px; }
   .docs-body li { margin-bottom: 4px; }
   /* FOOTER */
-  footer { background: #1e293b; border-top: 1px solid #334155; padding: 12px 24px; text-align: center; font-size: 0.8rem; color: #64748b; margin-top: auto; }
-  footer a { color: #38bdf8; text-decoration: none; }
+  footer { background: var(--nav-bg); border-top: 1px solid var(--border); padding: 12px 24px; text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: auto; }
+  footer a { color: var(--text-accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
-  .log-level-btn { padding:4px 10px; border-radius:5px; border:1px solid #334155; cursor:pointer; font-size:0.75rem; background:#334155; color:#94a3b8; transition: background .1s; }
+  .log-level-btn { padding:4px 10px; border-radius:5px; border:1px solid var(--border); cursor:pointer; font-size:0.75rem; background:var(--border); color:var(--text-secondary); transition: background .1s; }
   .log-level-btn.active { background:#3b82f6; color:#fff; }
-  .log-entry { display:flex; gap:8px; padding:3px 0; border-bottom:1px solid #1e293b; font-family:monospace; font-size:0.78rem; }
+  .log-entry { display:flex; gap:8px; padding:3px 0; border-bottom:1px solid var(--border-light); font-family:monospace; font-size:0.78rem; }
   .log-entry:last-child { border-bottom:none; }
-  .log-ts { color:#64748b; flex-shrink:0; width:130px; }
+  .log-ts { color:var(--text-muted); flex-shrink:0; width:130px; }
   .log-level { flex-shrink:0; width:50px; font-weight:600; text-transform:uppercase; }
-  .log-level-error { color:#ef4444; }
-  .log-level-warn { color:#f59e0b; }
-  .log-level-info { color:#22d3ee; }
-  .log-level-debug { color:#94a3b8; }
-  .log-msg { color:#e2e8f0; white-space:pre-wrap; word-break:break-all; flex:1; }
+  .log-level-error { color:var(--error); }
+  .log-level-warn { color:var(--warning); }
+  .log-level-info { color:var(--info); }
+  .log-level-debug { color:var(--text-secondary); }
+  .log-msg { color:var(--text-primary); white-space:pre-wrap; word-break:break-all; flex:1; }
   @media (max-width: 640px) {
     main.tab-pane { padding: 16px; }
     nav button { padding: 14px 12px; font-size: 0.8rem; }
@@ -380,44 +457,54 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   .nr-wrap { display: inline-flex; align-items: center; gap: 8px; }
   .nr-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; color: #fff; }
   .nr-info { display: flex; flex-direction: column; gap: 2px; }
-  .nr-name { color: #e2e8f0; font-size: 0.88rem; }
-  .nr-jid { color: #64748b; font-family: monospace; font-size: 0.75rem; }
-  .nr-skeleton { display: inline-block; width: 80px; height: 14px; background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); background-size: 400px 100%; animation: nr-shimmer 1.2s ease-in-out infinite; border-radius: 4px; }
+  .nr-name { color: var(--text-primary); font-size: 0.88rem; }
+  .nr-jid { color: var(--text-muted); font-family: monospace; font-size: 0.75rem; }
+  .nr-skeleton { display: inline-block; width: 80px; height: 14px; background: linear-gradient(90deg, var(--shimmer-from) 25%, var(--shimmer-mid) 50%, var(--shimmer-from) 75%); background-size: 400px 100%; animation: nr-shimmer 1.2s ease-in-out infinite; border-radius: 4px; }
   /* TAG INPUT (Phase 8, UI-02) -- DO NOT CHANGE: pill bubble input replacing JID-list textareas */
-  .ti-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px; min-height: 42px; cursor: text; }
-  .ti-wrap.ti-focused { border-color: #38bdf8; }
-  .ti-tag { background: #0ea5e9; color: #fff; font-size: 0.8rem; padding: 3px 10px; border-radius: 9999px; font-family: monospace; display: inline-flex; align-items: center; gap: 4px; }
+  .ti-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; padding: 8px; min-height: 42px; cursor: text; }
+  .ti-wrap.ti-focused { border-color: var(--text-accent); }
+  .ti-tag { background: var(--tag-bg); color: #fff; font-size: 0.8rem; padding: 3px 10px; border-radius: 9999px; font-family: monospace; display: inline-flex; align-items: center; gap: 4px; }
   .ti-tag .ti-remove { cursor: pointer; color: rgba(255,255,255,0.7); font-size: 0.9rem; line-height: 1; padding: 0 2px; }
   .ti-tag .ti-remove:hover { color: #fff; }
-  .ti-input { background: none; border: none; color: #e2e8f0; font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; flex: 1; min-width: 120px; }
-  .ti-input::placeholder { color: #64748b; }
+  .ti-input { background: none; border: none; color: var(--text-primary); font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; flex: 1; min-width: 120px; }
+  .ti-input::placeholder { color: var(--text-muted); }
   /* CONTACT PICKER (Phase 8, UI-03) -- DO NOT CHANGE: searchable contact selector with multi-select */
   .cp-wrap { position: relative; }
   .cp-selected { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-  .cp-chip { background: #1e3a5f; color: #7dd3fc; font-size: 0.75rem; padding: 4px 12px; border-radius: 4px; font-family: monospace; display: inline-flex; align-items: center; gap: 6px; }
-  .cp-chip .cp-chip-remove { cursor: pointer; color: #7dd3fc; font-size: 0.85rem; line-height: 1; padding: 0 2px; }
-  .cp-chip .cp-chip-remove:hover { color: #ef4444; }
-  .cp-search { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; color: #e2e8f0; font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; box-sizing: border-box; }
-  .cp-search:focus { border-color: #38bdf8; }
-  .cp-search::placeholder { color: #64748b; }
-  .cp-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-height: 240px; overflow-y: auto; z-index: 300; display: none; }
+  .cp-chip { background: var(--badge-bg); color: var(--badge-text); font-size: 0.75rem; padding: 4px 12px; border-radius: 4px; font-family: monospace; display: inline-flex; align-items: center; gap: 6px; }
+  .cp-chip .cp-chip-remove { cursor: pointer; color: var(--badge-text); font-size: 0.85rem; line-height: 1; padding: 0 2px; }
+  .cp-chip .cp-chip-remove:hover { color: var(--error); }
+  .cp-search { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: var(--text-primary); font-size: 0.88rem; font-family: system-ui, sans-serif; outline: none; box-sizing: border-box; }
+  .cp-search:focus { border-color: var(--text-accent); }
+  .cp-search::placeholder { color: var(--text-muted); }
+  .cp-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-height: 240px; overflow-y: auto; z-index: 300; display: none; }
   .cp-dropdown.cp-open { display: block; }
   .cp-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; transition: background .1s; }
-  .cp-row:hover { background: #0f172a; }
+  .cp-row:hover { background: var(--bg-tertiary); }
   .cp-row .cp-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; color: #fff; }
   .cp-row .cp-row-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-  .cp-row .cp-row-name { color: #e2e8f0; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cp-row .cp-row-jid { color: #64748b; font-family: monospace; font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cp-row .cp-check { color: #10b981; font-size: 0.85rem; flex-shrink: 0; width: 20px; text-align: center; }
-  .cp-empty { color: #64748b; text-align: center; padding: 16px; font-size: 0.85rem; }
+  .cp-row .cp-row-name { color: var(--text-primary); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cp-row .cp-row-jid { color: var(--text-muted); font-family: monospace; font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cp-row .cp-check { color: var(--success); font-size: 0.85rem; flex-shrink: 0; width: 20px; text-align: center; }
+  .cp-empty { color: var(--text-muted); text-align: center; padding: 16px; font-size: 0.85rem; }
   .cp-loading { padding: 10px 12px; }
   /* SESSION ROW (Phase 11, Plan 01 - DASH-01) -- DO NOT CHANGE: compact multi-session row in Dashboard card */
-  .session-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #1e293b; font-size:0.82rem; }
+  .session-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-light); font-size:0.82rem; }
   .session-row:last-child { border-bottom:none; }
   /* SESSION-SUB-HEADER (12-01, DASH-04) -- per-session name header inside stat cards */
-  .session-sub-header { font-weight:600; font-size:0.85rem; margin:8px 0 4px; color:#b0bec5; border-bottom:1px solid #333; padding-bottom:2px; }
+  .session-sub-header { font-weight:600; font-size:0.85rem; margin:8px 0 4px; color:var(--sub-header-color); border-bottom:1px solid var(--sub-header-border); padding-bottom:2px; }
   /* SESSION-HEALTH-DETAIL (12-01, DASH-01) -- health detail rows inside session rows */
-  .session-health-detail { font-size:0.75rem; color:#64748b; padding:2px 0 2px 16px; }
+  .session-health-detail { font-size:0.75rem; color:var(--text-muted); padding:2px 0 2px 16px; }
+  /* ACCESS CONTROL SECTIONS (Change 1) -- stacked vertically below kv grid. DO NOT CHANGE. */
+  .access-sections { display:block; margin-top:12px; }
+  .access-section { margin-bottom:12px; }
+  .access-section-header { font-size:0.82rem; color:var(--text-secondary); font-weight:600; padding:6px 0; display:flex; align-items:center; gap:6px; }
+  .access-section-count { background:var(--badge-bg); color:var(--badge-text); font-size:0.72rem; padding:1px 7px; border-radius:9999px; }
+  /* ACCESS CONTROL PAGINATION (Change 4) -- proper page-number pagination. DO NOT CHANGE. */
+  .ac-page-nav { display:flex; align-items:center; justify-content:center; gap:2px; padding:6px 0; font-size:0.78rem; }
+  .ac-page-btn { background:var(--border); color:var(--text-primary); border:none; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem; min-width:28px; }
+  .ac-page-btn:disabled { opacity:0.4; cursor:default; }
+  .ac-page-btn.ac-current { background:var(--tag-bg); color:#fff; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -433,14 +520,15 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <button onclick="switchTab('logs', this)" id="tab-logs">Log</button>
   </nav>
   <span class="badge" id="status-badge">Loading...</span>
+  <button id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">☀</button>
 </header>
 
 <!-- TOAST -->
 <div id="toast"></div>
 
 <!-- DIR-04: Bulk action toolbar — fixed at bottom, shown only when bulk items are selected -->
-<div id="bulk-toolbar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;border-top:2px solid #1d4ed8;padding:12px 24px;z-index:1000;align-items:center;gap:16px;">
-  <span id="bulk-count" style="color:#94a3b8;font-size:0.88rem;font-weight:600;"></span>
+<div id="bulk-toolbar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg-primary);border-top:2px solid var(--btn-primary);padding:12px 24px;z-index:1000;align-items:center;gap:16px;">
+  <span id="bulk-count" style="color:var(--text-secondary);font-size:0.88rem;font-weight:600;"></span>
   <div id="bulk-actions" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
 </div>
 
@@ -472,13 +560,14 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <div class="card" id="access-card">
     <h2>Access Control</h2>
     <div class="kv" id="access-kv"></div>
+    <div class="access-sections" id="access-sections"></div>
   </div>
   <div class="card" id="session-card">
-    <h2>Sessions <span id="health-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:8px;vertical-align:middle;background:#94a3b8;" title="Loading..."></span></h2>
+    <h2>Sessions <span id="health-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:8px;vertical-align:middle;background:var(--text-secondary);" title="Loading..."></span></h2>
     <!-- Phase 11, Plan 01 (DASH-01): multi-session rows rendered by loadDashboardSessions(). DO NOT REMOVE. -->
     <div id="dashboard-sessions" style="margin-bottom:12px;"></div>
     <div class="kv" id="session-kv"></div>
-    <div class="kv" id="health-kv" style="margin-top:8px;border-top:1px solid #334155;padding-top:8px;"></div>
+    <div class="kv" id="health-kv" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
       <div id="last-refresh"></div>
       <button class="refresh-btn" id="refresh-dashboard" onclick="_accessKvBuilt=false;loadStats()">Refresh</button>
@@ -616,7 +705,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
               <button type="button" id="generateDeepLink" class="btn btn-sm">Generate</button>
             </div>
             <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-              <input type="text" id="pairingDeepLink" readonly style="flex:1;font-family:monospace;font-size:0.85em;background:#0f172a;border-color:#334155">
+              <input type="text" id="pairingDeepLink" readonly style="flex:1;font-family:monospace;font-size:0.85em;background:var(--bg-tertiary);border-color:var(--border)">
               <button type="button" id="copyDeepLink" class="btn btn-sm">Copy</button>
             </div>
             <small style="color:#666">Share this link for zero-friction authorization (JID-specific HMAC token)</small>
@@ -836,7 +925,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
             <label class="toggle" style="margin-left:auto"><input type="checkbox" id="s-mediaEnabled" name="mediaEnabled" onchange="toggleMediaSubToggles()"><span class="slider"></span></label>
           </label>
         </div>
-        <div id="media-sub-toggles" style="display:none;padding-left:16px;border-left:2px solid #334155;gap:10px;">
+        <div id="media-sub-toggles" style="display:none;padding-left:16px;border-left:2px solid var(--border);gap:10px;">
           <div class="field">
             <label class="toggle-wrap">
               <span>Audio Transcription <span class="tip" data-tip="Transcribe voice messages to text using Whisper before sending to AI.">?</span></span>
@@ -875,10 +964,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
           </div>
         </div>
         <div class="field" style="margin-top:4px;">
-          <label style="color:#64748b;font-size:0.82rem;">Poll Handling &nbsp;<span style="background:#10b981;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">Automatic (built-in)</span></label>
+          <label style="color:var(--text-muted);font-size:0.82rem;">Poll Handling &nbsp;<span style="background:#10b981;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">Automatic (built-in)</span></label>
         </div>
         <div class="field">
-          <label style="color:#64748b;font-size:0.82rem;">Event Handling &nbsp;<span style="background:#10b981;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">Automatic (built-in)</span></label>
+          <label style="color:var(--text-muted);font-size:0.82rem;">Event Handling &nbsp;<span style="background:#10b981;color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;">Automatic (built-in)</span></label>
         </div>
       </div>
     </details>
@@ -886,10 +975,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div style="padding-top:8px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
       <button type="submit" class="save-btn">Save Settings</button>
       <button type="button" class="save-btn" style="background:#f59e0b;" onclick="saveAndRestart()">Save &amp; Restart</button>
-      <div id="save-note" style="font-size:0.78rem;color:#64748b;margin-top:6px;display:none;width:100%;">Some settings require a gateway restart to take effect.</div>
+      <div id="save-note" style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;display:none;width:100%;">Some settings require a gateway restart to take effect.</div>
     </div>
   </form>
-<!-- Multi-Session Filtering Guide — collapsible reference for admin panel users -->  <details class="settings-section" style="margin-top:20px;border-top:1px solid #334155;padding-top:12px;">    <summary style="color:#38bdf8;">Multi-Session Filtering Guide</summary>    <div style="font-size:0.82rem;color:#cbd5e1;line-height:1.7;padding:8px 0 16px 0;">      <p style="color:#94a3b8;margin-bottom:12px;font-style:italic;">How messages flow through the guardrails:</p>      <ol style="padding-left:20px;margin-bottom:16px;display:grid;gap:4px;">        <li><strong style="color:#f8fafc;">Group allowlist</strong> — Is this group allowed? If not → dropped (zero tokens)</li>        <li><strong style="color:#f8fafc;">Sender allowlist</strong> — Is this sender allowed? If not → dropped</li>        <li><strong style="color:#f8fafc;">Cross-session dedup</strong> — Bot session claims first (200ms priority). If bot already claimed → human session drops the duplicate</li>        <li><strong style="color:#f8fafc;">Trigger prefix</strong> — Does the message start with the trigger operator (e.g., "!")? If required and missing → dropped</li>        <li><strong style="color:#f8fafc;">Keyword filter</strong> — Does the message match a keyword pattern? If not → dropped</li>        <li><strong style="color:#10b981;">Only then</strong> → Bot processes the message</li>      </ol>      <p style="color:#94a3b8;font-weight:600;margin-bottom:8px;text-transform:uppercase;font-size:0.78rem;letter-spacing:0.06em;">Scenarios</p>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot + Human session in same group</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message from anyone → Bot session handles it, human session drops the dupe</li>          <li>"hey bot, what's the weather?" → Bot session handles (keyword match), human drops dupe</li>          <li>"!what's the weather?" → Bot session handles (trigger match), human drops dupe</li>          <li>Your message to a friend (no keyword) → Filtered on both sessions. God mode only bypasses DM filter, not group filter. The bot stays quiet.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Only human session in group (bot not a member)</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message → Filtered (no keyword/trigger match). The bot stays quiet.</li>          <li>"!what's the weather?" → Trigger activates on human session. The bot responds with 🤖 prefix via your session.</li>          <li>Your message (superuser, no keyword) → Filtered. God mode scope is "dm" so groups still require keyword/trigger.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">DMs</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>You (superuser) DM the bot → God mode bypasses DM filter. The bot responds normally.</li>          <li>Someone else DMs → Must match keyword pattern or trigger prefix to reach the bot.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Bot prefix</p>        <p>When the bot responds through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not you.</p>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">God Mode Scope</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li><strong style="color:#f8fafc;">"all"</strong> — Superusers bypass ALL filters (DM + group). Use with caution.</li>          <li><strong style="color:#f8fafc;">"dm"</strong> <span style="color:#10b981;">(recommended)</span> — Superusers bypass DM filter only. Groups always require keyword/trigger.</li>          <li><strong style="color:#f8fafc;">"off"</strong> — Superusers never bypass filters. Must always use keyword/trigger.</li>        </ul>      </div>      <div style="background:#0f172a;border-radius:8px;padding:12px 14px;">        <p style="color:#38bdf8;font-weight:600;margin-bottom:6px;">Per-Group Filter Overrides</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Per-group overrides take <strong style="color:#f8fafc;">priority over the global filter</strong>. When a group has an override, global settings are ignored for that group.</li>          <li>Override with <strong style="color:#f8fafc;">filterEnabled=false</strong> → ALL messages in that group reach the bot (no keyword/trigger required).</li>          <li>Override with <strong style="color:#f8fafc;">custom keywords</strong> → those keywords are used instead of the global keyword list.</li>          <li>Groups <strong style="color:#f8fafc;">without overrides</strong> continue using the global filter as usual.</li>          <li>Configure per-group overrides in the <strong style="color:#38bdf8;">Directory</strong> tab — click on a group to manage its settings.</li>        </ul>      </div>    </div>  </details>
+<!-- Multi-Session Filtering Guide — collapsible reference for admin panel users -->  <details class="settings-section" style="margin-top:20px;border-top:1px solid var(--border);padding-top:12px;">    <summary style="color:var(--text-accent);">Multi-Session Filtering Guide</summary>    <div style="font-size:0.82rem;color:var(--text-primary);line-height:1.7;padding:8px 0 16px 0;">      <p style="color:var(--text-secondary);margin-bottom:12px;font-style:italic;">How messages flow through the guardrails:</p>      <ol style="padding-left:20px;margin-bottom:16px;display:grid;gap:4px;">        <li><strong style="color:var(--text-primary);">Group allowlist</strong> — Is this group allowed? If not → dropped (zero tokens)</li>        <li><strong style="color:var(--text-primary);">Sender allowlist</strong> — Is this sender allowed? If not → dropped</li>        <li><strong style="color:var(--text-primary);">Cross-session dedup</strong> — Bot session claims first (200ms priority). If bot already claimed → human session drops the duplicate</li>        <li><strong style="color:var(--text-primary);">Trigger prefix</strong> — Does the message start with the trigger operator (e.g., "!")? If required and missing → dropped</li>        <li><strong style="color:var(--text-primary);">Keyword filter</strong> — Does the message match a keyword pattern? If not → dropped</li>        <li><strong style="color:var(--success);">Only then</strong> → Bot processes the message</li>      </ol>      <p style="color:var(--text-secondary);font-weight:600;margin-bottom:8px;text-transform:uppercase;font-size:0.78rem;letter-spacing:0.06em;">Scenarios</p>      <div style="background:var(--bg-tertiary);border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:var(--text-accent);font-weight:600;margin-bottom:6px;">Bot + Human session in same group</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message from anyone → Bot session handles it, human session drops the dupe</li>          <li>"hey bot, what's the weather?" → Bot session handles (keyword match), human drops dupe</li>          <li>"!what's the weather?" → Bot session handles (trigger match), human drops dupe</li>          <li>Your message to a friend (no keyword) → Filtered on both sessions. God mode only bypasses DM filter, not group filter. The bot stays quiet.</li>        </ul>      </div>      <div style="background:var(--bg-tertiary);border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:var(--text-accent);font-weight:600;margin-bottom:6px;">Only human session in group (bot not a member)</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Normal message → Filtered (no keyword/trigger match). The bot stays quiet.</li>          <li>"!what's the weather?" → Trigger activates on human session. The bot responds with 🤖 prefix via your session.</li>          <li>Your message (superuser, no keyword) → Filtered. God mode scope is "dm" so groups still require keyword/trigger.</li>        </ul>      </div>      <div style="background:var(--bg-tertiary);border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:var(--text-accent);font-weight:600;margin-bottom:6px;">DMs</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>You (superuser) DM the bot → God mode bypasses DM filter. The bot responds normally.</li>          <li>Someone else DMs → Must match keyword pattern or trigger prefix to reach the bot.</li>        </ul>      </div>      <div style="background:var(--bg-tertiary);border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:var(--text-accent);font-weight:600;margin-bottom:6px;">Bot prefix</p>        <p>When the bot responds through a human session (cross-session routing), messages are prefixed with 🤖 so recipients know it's the bot, not you.</p>      </div>      <div style="background:var(--bg-tertiary);border-radius:8px;padding:12px 14px;margin-bottom:10px;">        <p style="color:var(--text-accent);font-weight:600;margin-bottom:6px;">God Mode Scope</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li><strong style="color:var(--text-primary);">"all"</strong> — Superusers bypass ALL filters (DM + group). Use with caution.</li>          <li><strong style="color:var(--text-primary);">"dm"</strong> <span style="color:var(--success);">(recommended)</span> — Superusers bypass DM filter only. Groups always require keyword/trigger.</li>          <li><strong style="color:var(--text-primary);">"off"</strong> — Superusers never bypass filters. Must always use keyword/trigger.</li>        </ul>      </div>      <div style="background:var(--bg-tertiary);border-radius:8px;padding:12px 14px;">        <p style="color:var(--text-accent);font-weight:600;margin-bottom:6px;">Per-Group Filter Overrides</p>        <ul style="padding-left:16px;display:grid;gap:3px;">          <li>Per-group overrides take <strong style="color:var(--text-primary);">priority over the global filter</strong>. When a group has an override, global settings are ignored for that group.</li>          <li>Override with <strong style="color:var(--text-primary);">filterEnabled=false</strong> → ALL messages in that group reach the bot (no keyword/trigger required).</li>          <li>Override with <strong style="color:var(--text-primary);">custom keywords</strong> → those keywords are used instead of the global keyword list.</li>          <li>Groups <strong style="color:var(--text-primary);">without overrides</strong> continue using the global filter as usual.</li>          <li>Configure per-group overrides in the <strong style="color:var(--text-accent);">Directory</strong> tab — click on a group to manage its settings.</li>        </ul>      </div>    </div>  </details>
 </div>
 </main>
 </div>
@@ -899,19 +988,19 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <main class="tab-pane">
 <div class="card">
   <h2>Contact Directory</h2>
-  <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid #334155;">
+  <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border);">
     <button class="dir-tab active" onclick="switchDirTab('contacts',this)" id="dtab-contacts">Contacts</button>
     <button class="dir-tab" onclick="switchDirTab('groups',this)" id="dtab-groups">Groups</button>
     <button class="dir-tab" onclick="switchDirTab('newsletters',this)" id="dtab-newsletters">Channels</button>
   </div>
-  <div id="syncStatusBar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:8px;background:#0f172a;border:1px solid #334155;border-radius:6px;font-size:13px;color:#94a3b8;">
+  <div id="syncStatusBar" style="display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:8px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text-secondary);">
     <span id="syncStatusIcon"></span>
     <span id="syncStatusText">Checking sync status...</span>
   </div>
   <div class="dir-header">
     <div style="position:relative;flex:1;">
       <input type="text" class="dir-search" id="dir-search" placeholder="Search by name or JID..." oninput="debouncedDirSearch()" style="width:100%;padding-right:28px;">
-      <button id="dir-search-clear" onclick="clearDirSearch()" aria-label="Clear search" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;display:none;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#94a3b8'">&#x2715;</button>
+      <button id="dir-search-clear" onclick="clearDirSearch()" aria-label="Clear search" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 4px;display:none;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-secondary)'">&#x2715;</button>
     </div>
     <button class="refresh-btn" id="dir-refresh-btn" onclick="refreshDirectory()" title="Refresh current tab from WAHA API">Refresh</button>
     <button class="refresh-btn" style="background:#7c3aed;" id="dir-refresh-all-btn" onclick="refreshDirectory()" title="Import all contacts, groups and newsletters from WAHA API">Refresh All</button>
@@ -932,7 +1021,7 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
     <div class="stat-row" id="queue-stats"></div>
     <div class="kv" id="queue-kv" style="margin-top:12px;"></div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;">
-      <button class="refresh-btn" id="refresh-queue" onclick="loadQueue()">Refresh</button>
+      <div class="refresh-wrap"><button class="refresh-btn" id="refresh-queue" onclick="loadQueue()">Refresh</button></div>
     </div>
   </div>
 </main>
@@ -944,9 +1033,10 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <div class="card">
     <h2>Registered Sessions</h2>
     <div id="sessions-list" style="display:grid;gap:12px;margin-top:4px;"></div>
-    <p style="margin-top:16px;font-size:0.78rem;color:#64748b;border-top:1px solid #334155;padding-top:12px;">Changes take effect after gateway restart.</p>
-    <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+    <p style="margin-top:16px;font-size:0.78rem;color:var(--text-muted);border-top:1px solid var(--border);padding-top:12px;">Changes take effect after gateway restart.</p>
+    <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:8px;">
       <button class="refresh-btn" id="refresh-sessions" onclick="loadSessions()">Refresh</button>
+      <button class="save-btn" style="background:#f59e0b;" onclick="sessionsSaveAndRestart()">Save &amp; Restart</button>
     </div>
   </div>
 </main>
@@ -957,11 +1047,11 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
 <main class="tab-pane">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h2 style="margin:0;font-size:1.1rem;color:#e2e8f0;">Registered Modules</h2>
+      <h2 style="margin:0;font-size:1.1rem;color:var(--text-primary);">Registered Modules</h2>
       <button class="refresh-btn" id="refresh-modules">Refresh</button>
     </div>
     <div id="modules-list"></div>
-    <div id="modules-empty" style="display:none;color:#64748b;text-align:center;padding:32px 0;">
+    <div id="modules-empty" style="display:none;color:var(--text-muted);text-align:center;padding:32px 0;">
       No modules registered. Modules are loaded at gateway startup.
     </div>
   </div>
@@ -975,18 +1065,18 @@ function buildAdminHtml(config: CoreConfig, account: ReturnType<typeof resolveWa
   <h2>Gateway Log</h2>
   <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
     <div style="position:relative;flex:1;display:flex;align-items:center;min-width:180px;">
-      <input type="text" id="log-search" placeholder="Filter logs..." oninput="debouncedLogSearch()" style="width:100%;padding:6px 30px 6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">
-      <button id="log-search-clear" onclick="clearLogSearch()" aria-label="Clear log filter" style="position:absolute;right:8px;background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;display:none;" onmouseover="this.style.color='#e2e8f0'" onmouseout="this.style.color='#94a3b8'">&#x2715;</button>
+      <input type="text" id="log-search" placeholder="Filter logs..." oninput="debouncedLogSearch()" style="width:100%;padding:6px 30px 6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;">
+      <button id="log-search-clear" onclick="clearLogSearch()" aria-label="Clear log filter" style="position:absolute;right:8px;background:none;border:none;color:#94a3b8;cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;display:none;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-secondary)'">&#x2715;</button>
     </div>
     <button onclick="setLogLevel('all')" id="log-level-all" class="log-level-btn active">All</button>
     <button onclick="setLogLevel('error')" id="log-level-error" class="log-level-btn">Error</button>
     <button onclick="setLogLevel('warn')" id="log-level-warn" class="log-level-btn">Warn</button>
     <button onclick="setLogLevel('info')" id="log-level-info" class="log-level-btn">Info</button>
-    <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:#94a3b8;cursor:pointer;"><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
-    <button id="refresh-log" onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid #334155;cursor:pointer;font-size:0.75rem;background:#1e293b;color:#e2e8f0;">Refresh</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" id="log-autoscroll" checked> Auto-scroll</label>
+    <button id="refresh-log" onclick="loadLogs()" style="padding:4px 12px;border-radius:5px;border:1px solid var(--border);cursor:pointer;font-size:0.75rem;background:var(--bg-secondary);color:var(--text-primary);">Refresh</button>
   </div>
-  <div id="log-source" style="font-size:0.72rem;color:#64748b;margin-bottom:6px;"></div>
-  <div id="log-output" style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;max-height:70vh;overflow-y:auto;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;line-height:1.4;margin:0;"></div>
+  <div id="log-source" style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;"></div>
+  <div id="log-output" style="background:var(--bg-tertiary);color:var(--text-primary);padding:16px;border-radius:8px;max-height:70vh;overflow-y:auto;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;line-height:1.4;margin:0;"></div>
 </div>
 </main>
 </div>
@@ -1028,13 +1118,29 @@ function switchTab(name, btn) {
   switchTab(hash, btn);
 })();
 
+// ---- Theme Toggle (Change 5) -- DO NOT REMOVE: persists dark/light mode in localStorage ----
+function toggleTheme() {
+  document.body.classList.toggle('light-mode');
+  var isLight = document.body.classList.contains('light-mode');
+  localStorage.setItem('waha-theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isLight ? '☽' : '☀';
+}
+(function() {
+  var savedTheme = localStorage.getItem('waha-theme');
+  if (savedTheme === 'light') {
+    document.body.classList.add('light-mode');
+    var btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = '☽';
+  }
+})();
+
 // ---- Helpers ----
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
-function stat(label, value, color) {
-  return '<div class="stat"><div class="label">' + esc(label) + '</div><div class="value" style="color:' + color + '">' + esc(String(value)) + '</div></div>';
+function stat(label, value, color, id) {
+  return '<div class="stat"><div class="label">' + esc(label) + '</div><div class="value"' + (id ? ' id="' + id + '"' : '') + ' style="color:' + color + '">' + esc(String(value)) + '</div></div>';
 }
 function kvRow(k, v) { return '<div class="k">' + esc(k) + '</div><div class="v">' + esc(String(v != null ? v : '')) + '</div>'; }
-function tags(arr) { return (arr || []).map(function(t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') || '<span style="color:#64748b">none</span>'; }
+function tags(arr) { return (arr || []).map(function(t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('') || '<span style="color:var(--text-muted)">none</span>'; }
 function relTime(ts) {
   var diff = Math.floor((Date.now() - ts) / 1000);
   if (diff < 60) return 'just now';
@@ -1572,6 +1678,10 @@ function labelFor(key) { return LABEL_MAP[key] || key; }
 // doing so triggers new async fetches and causes visible flicker on the Access Control card.
 // Set to false only when the page first loads. DO NOT REMOVE (12-01, UI-01).
 var _accessKvBuilt = false;
+// _filterStatsBuilt: guards DM and Group filter stat cards. On first load, builds full innerHTML
+// with IDs on stat value elements. On 30s auto-refresh, updates values in-place via textContent
+// to prevent visible flicker. DO NOT REMOVE (BUG-02).
+var _filterStatsBuilt = false;
 
 // ---- Tag Input instance variables (Phase 8, UI-02) -- initialized lazily in loadConfig() ----
 var tagInputAllowFrom = null;
@@ -1587,8 +1697,7 @@ var gfoTagInputs = {};
 // ---- God Mode Users Field instance variables (Phase 8, UI-04) -- initialized lazily in loadConfig() ----
 var godModePickerDm = null;
 var godModePickerGroup = null;
-// ---- UI-10 (12-05): Global trigger operator stored on loadConfig() for use in per-group indicator ----
-// DO NOT REMOVE — per-group "inheriting global" indicator reads this to show effective operator when not overriding.
+// triggerOperator UI removed — backend hardcodes OR. Variable kept for safety but unused.
 var globalTriggerOperator = 'OR';
 
 // ---- Dashboard ----
@@ -1606,49 +1715,66 @@ async function loadStats() {
       return '<div class="session-sub-header">' + esc(sess.name || sess.sessionId) + '</div>';
     }).join('');
     // 12-01, UI-02: labels changed from Allowed/Dropped to Passed/Filtered (BUG-03)
-    document.getElementById('filter-stats').innerHTML = sessionSubHtml + [
-      stat('Passed', s.allowed, '#10b981'),
-      stat('Filtered', s.dropped, '#f87171'),
-      stat('Tokens Saved (est)', (s.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8'),
-    ].join('');
+    // BUG-02: On refresh, update stat values in-place via textContent to prevent flicker.
+    // Only rebuild full content on first load. DO NOT CHANGE.
+    if (_filterStatsBuilt && document.getElementById('dm-stat-passed')) {
+      document.getElementById('dm-stat-passed').textContent = String(s.allowed);
+      document.getElementById('dm-stat-filtered').textContent = String(s.dropped);
+      document.getElementById('dm-stat-tokens').textContent = (s.tokensEstimatedSaved || 0).toLocaleString();
+    } else {
+      document.getElementById('filter-stats').innerHTML = sessionSubHtml + [
+        stat('Passed', s.allowed, '#10b981', 'dm-stat-passed'),
+        stat('Filtered', s.dropped, '#f87171', 'dm-stat-filtered'),
+        stat('Tokens Saved (est)', (s.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8', 'dm-stat-tokens'),
+      ].join('');
+    }
     var pats = d.dmFilter.patterns;
-    document.getElementById('filter-patterns').innerHTML = '<div style="color:#94a3b8;font-size:.8rem;margin-bottom:6px;">Patterns</div><div class="pattern-list">' +
-      (pats.length ? pats.map(function(p) { return '<span class="pattern">' + esc(p) + '</span>'; }).join('') : '<span style="color:#64748b">none</span>') + '</div>';
+    document.getElementById('filter-patterns').innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;margin-bottom:6px;">Patterns</div><div class="pattern-list">' +
+      (pats.length ? pats.map(function(p) { return '<span class="pattern">' + esc(p) + '</span>'; }).join('') : '<span style="color:var(--text-muted)">none</span>') + '</div>';
     var events = d.dmFilter.recentEvents || [];
     document.getElementById('filter-events').innerHTML = events.length
-      ? '<div style="color:#94a3b8;font-size:.8rem;margin:10px 0 6px;">Recent Events (last ' + events.length + ')</div>' +
+      ? '<div style="color:var(--text-secondary);font-size:.8rem;margin:10px 0 6px;">Recent Events (last ' + events.length + ')</div>' +
         events.slice(0,20).map(function(e) { return '<div class="event ' + (e.pass ? 'pass' : 'fail') + '">' +
           '<span class="ts">' + new Date(e.ts).toLocaleTimeString() + '</span>' +
           '<span class="reason">' + esc(e.reason) + '</span>' +
           '<span class="preview">' + esc(e.preview) + '</span>' +
         '</div>'; }).join('')
-      : '<div style="color:#64748b;margin-top:8px;font-size:.8rem">No events yet</div>';
+      : '<div style="color:var(--text-muted);margin-top:8px;font-size:.8rem">No events yet</div>';
     // Group filter card
     if (d.groupFilter) {
       var gf = d.groupFilter;
       var gs = gf.stats || {allowed:0,dropped:0,tokensEstimatedSaved:0};
       // 12-01, UI-02: Group filter also uses Passed/Filtered labels; per-session sub-headers (DASH-04)
-      document.getElementById('group-filter-stats').innerHTML = sessionSubHtml + [
-        stat('Passed', gs.allowed, '#10b981'),
-        stat('Filtered', gs.dropped, '#f87171'),
-        stat('Tokens Saved (est)', (gs.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8'),
-      ].join('');
+      // BUG-02: On refresh, update group stat values in-place via textContent. DO NOT CHANGE.
+      if (_filterStatsBuilt && document.getElementById('grp-stat-passed')) {
+        document.getElementById('grp-stat-passed').textContent = String(gs.allowed);
+        document.getElementById('grp-stat-filtered').textContent = String(gs.dropped);
+        document.getElementById('grp-stat-tokens').textContent = (gs.tokensEstimatedSaved || 0).toLocaleString();
+      } else {
+        document.getElementById('group-filter-stats').innerHTML = sessionSubHtml + [
+          stat('Passed', gs.allowed, '#10b981', 'grp-stat-passed'),
+          stat('Filtered', gs.dropped, '#f87171', 'grp-stat-filtered'),
+          stat('Tokens Saved (est)', (gs.tokensEstimatedSaved || 0).toLocaleString(), '#38bdf8', 'grp-stat-tokens'),
+        ].join('');
+      }
       var gpats = gf.patterns || [];
-      document.getElementById('group-filter-patterns').innerHTML = '<div style="color:#94a3b8;font-size:.8rem;margin-bottom:6px;">Patterns</div><div class="pattern-list">' +
-        (gpats.length ? gpats.map(function(p) { return '<span class="pattern">' + esc(p) + '</span>'; }).join('') : '<span style="color:#64748b">none</span>') + '</div>';
+      document.getElementById('group-filter-patterns').innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;margin-bottom:6px;">Patterns</div><div class="pattern-list">' +
+        (gpats.length ? gpats.map(function(p) { return '<span class="pattern">' + esc(p) + '</span>'; }).join('') : '<span style="color:var(--text-muted)">none</span>') + '</div>';
       var gevents = gf.recentEvents || [];
       document.getElementById('group-filter-events').innerHTML = gevents.length
-        ? '<div style="color:#94a3b8;font-size:.8rem;margin:10px 0 6px;">Recent Events (last ' + gevents.length + ')</div>' +
+        ? '<div style="color:var(--text-secondary);font-size:.8rem;margin:10px 0 6px;">Recent Events (last ' + gevents.length + ')</div>' +
           gevents.slice(0,20).map(function(e) { return '<div class="event ' + (e.pass ? 'pass' : 'fail') + '">' +
             '<span class="ts">' + new Date(e.ts).toLocaleTimeString() + '</span>' +
             '<span class="reason">' + esc(e.reason) + '</span>' +
             '<span class="preview">' + esc(e.preview) + '</span>' +
           '</div>'; }).join('')
-        : '<div style="color:#64748b;margin-top:8px;font-size:.8rem">No events yet</div>';
+        : '<div style="color:var(--text-muted);margin-top:8px;font-size:.8rem">No events yet</div>';
       document.getElementById('group-filter-card').style.display = '';
     } else {
       document.getElementById('group-filter-card').style.display = 'none';
     }
+    // BUG-02: Mark filter stats as built so subsequent refreshes use in-place textContent updates.
+    _filterStatsBuilt = true;
     var pr = d.presence;
     // 12-01, DASH-03: use labelFor() to convert raw config keys to human-readable labels
     document.getElementById('presence-kv').innerHTML = kvRow(labelFor('enabled'), pr.enabled !== false) +
@@ -1663,6 +1789,7 @@ async function loadStats() {
     var accessKv = document.getElementById('access-kv');
     if (!_accessKvBuilt) {
       _accessKvBuilt = true;
+      // Change 1: dmPolicy and groupPolicy stay in the .kv grid
       accessKv.innerHTML = kvRow(labelFor('dmPolicy'), ac.dmPolicy) + kvRow(labelFor('groupPolicy'), ac.groupPolicy);
       // Phase 14 (NAME-01): dedupLidCus removes @lid entries when the equivalent @c.us JID is also present.
       // NOWEB puts both @lid and @c.us in groupAllowFrom — same person should appear once. DO NOT REMOVE.
@@ -1673,6 +1800,11 @@ async function loadStats() {
         }
         return arr.filter(function(j) { return !(j.endsWith('@lid') && cusSet[j.replace('@lid', '')]); });
       }
+      // Changes 1-4: Access Control tables — always-visible sections in separate stacked container.
+      // Paginated with proper << < 1 2 3 > >> navigation. JID text uses readable colors. DO NOT REVERT to tag-list.
+      var PAGE_SIZE_AC = 10;
+      var accessSections = document.getElementById('access-sections');
+      accessSections.innerHTML = '';
       var jidGroups = [
         { key: 'allowFrom', arr: ac.allowFrom || [] },
         { key: 'groupAllowFrom', arr: ac.groupAllowFrom || [] },
@@ -1680,27 +1812,106 @@ async function loadStats() {
       ];
       for (var gi = 0; gi < jidGroups.length; gi++) {
         (function(grp) {
-          var keyEl = document.createElement('div');
-          keyEl.className = 'k';
-          keyEl.style.marginTop = '8px';
-          keyEl.textContent = labelFor(grp.key);
-          var valEl = document.createElement('div');
-          valEl.className = 'tag-list';
-          valEl.style.padding = '4px 0';
-          valEl.id = 'nr-' + grp.key;
-          accessKv.appendChild(keyEl);
-          accessKv.appendChild(valEl);
           var dedupedArr = dedupLidCus(grp.arr);
-          if (!dedupedArr.length) {
+          var total = dedupedArr.length;
+          // Change 1+3: Always-visible section (no <details> collapsing), stacked vertically in access-sections
+          var section = document.createElement('div');
+          section.className = 'access-section';
+          var headerEl = document.createElement('div');
+          headerEl.className = 'access-section-header';
+          var labelSpan = document.createElement('span');
+          labelSpan.textContent = labelFor(grp.key);
+          headerEl.appendChild(labelSpan);
+          var countBadge = document.createElement('span');
+          countBadge.className = 'access-section-count';
+          countBadge.textContent = String(total);
+          headerEl.appendChild(countBadge);
+          section.appendChild(headerEl);
+          accessSections.appendChild(section);
+          if (!total) {
             var noneEl = document.createElement('span');
-            noneEl.style.color = '#64748b';
+            noneEl.style.cssText = 'color:var(--text-muted);font-size:0.82rem;padding:4px 0;display:block;';
             noneEl.textContent = 'none';
-            valEl.appendChild(noneEl);
-          } else {
-            for (var ji = 0; ji < dedupedArr.length; ji++) {
-              createNameResolver(valEl, dedupedArr[ji]);
-            }
+            section.appendChild(noneEl);
+            return;
           }
+          // Wildcard check: if '*' is in the list, show warning and gray out other contacts. DO NOT REMOVE.
+          var hasWildcard = dedupedArr.indexOf('*') !== -1;
+          // Sort: put '*' first if present, then the rest
+          if (hasWildcard) {
+            dedupedArr = ['*'].concat(dedupedArr.filter(function(j) { return j !== '*'; }));
+          }
+          if (hasWildcard) {
+            var warnEl = document.createElement('div');
+            warnEl.style.cssText = 'background:var(--warning-bg, #713f12);color:var(--warning-text, #fde68a);font-size:0.82rem;padding:8px 12px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:6px;';
+            warnEl.innerHTML = '<span style="font-size:1.1rem;">⚠</span> Wildcard (*) is active — all contacts are allowed. Other entries below have no effect.';
+            section.appendChild(warnEl);
+          }
+          // Simple list — names only, JID shown as tooltip on hover. DO NOT add JID column back.
+          var listEl = document.createElement('div');
+          listEl.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:4px 0;';
+          section.appendChild(listEl);
+          // Change 4: Proper pagination nav container
+          var navEl = document.createElement('div');
+          navEl.className = 'ac-page-nav';
+          section.appendChild(navEl);
+          var currentPage = 1;
+          var totalPages = Math.ceil(total / PAGE_SIZE_AC);
+          function renderPage(page) {
+            currentPage = page;
+            listEl.innerHTML = '';
+            var start = (page - 1) * PAGE_SIZE_AC;
+            var end = Math.min(start + PAGE_SIZE_AC, total);
+            var pageSlice = dedupedArr.slice(start, end);
+            for (var ji = 0; ji < pageSlice.length; ji++) {
+              (function(jid) {
+                var pill = document.createElement('span');
+                var isWc = jid === '*';
+                var isGrayed = hasWildcard && !isWc;
+                if (isWc) {
+                  pill.style.cssText = 'background:var(--warning-bg, #713f12);color:var(--warning-text, #fde68a);font-size:0.82rem;padding:4px 12px;border-radius:6px;cursor:default;font-weight:600;';
+                  pill.textContent = '* (everyone)';
+                  pill.title = 'Wildcard — allows all contacts';
+                } else {
+                  pill.style.cssText = 'background:var(--stat-bg);color:var(--text-primary);font-size:0.82rem;padding:4px 12px;border-radius:6px;cursor:default;border:1px solid var(--border);text-decoration:none;' + (isGrayed ? 'opacity:0.4;' : '');
+                  pill.title = jid;
+                  pill.textContent = jid;
+                }
+                listEl.appendChild(pill);
+                if (!isWc) {
+                  fetch('/api/admin/directory/' + encodeURIComponent(jid)).then(function(r) {
+                    return r.ok ? r.json() : null;
+                  }).then(function(data) {
+                    if (data && data.displayName) {
+                      pill.textContent = data.displayName;
+                    }
+                  }).catch(function() { /* keep raw JID as fallback */ });
+                }
+              })(pageSlice[ji]);
+            }
+            // Change 4: Proper pagination with << < 1 2 3 > >>
+            navEl.innerHTML = '';
+            if (totalPages <= 1) return;
+            function mkPageBtn(label, pg, disabled, isCurrent) {
+              var b = document.createElement('button');
+              b.textContent = label;
+              b.disabled = disabled;
+              b.className = 'ac-page-btn' + (isCurrent ? ' ac-current' : '');
+              if (!disabled && !isCurrent) b.onclick = function() { renderPage(pg); };
+              return b;
+            }
+            navEl.appendChild(mkPageBtn('«', 1, currentPage <= 1, false));
+            navEl.appendChild(mkPageBtn('‹', currentPage - 1, currentPage <= 1, false));
+            var pgStart = Math.max(1, currentPage - 2);
+            var pgEnd = Math.min(totalPages, pgStart + 4);
+            pgStart = Math.max(1, pgEnd - 4);
+            for (var pg = pgStart; pg <= pgEnd; pg++) {
+              navEl.appendChild(mkPageBtn(String(pg), pg, false, pg === currentPage));
+            }
+            navEl.appendChild(mkPageBtn('›', currentPage + 1, currentPage >= totalPages, false));
+            navEl.appendChild(mkPageBtn('»', totalPages, currentPage >= totalPages, false));
+          }
+          renderPage(1);
         })(jidGroups[gi]);
       }
     } // end if (!_accessKvBuilt)
@@ -1907,7 +2118,7 @@ async function loadDashboardSessions() {
     if (!container) return;
     if (!r.ok) {
       var errEl = document.createElement('div');
-      errEl.style.cssText = 'color:#ef4444;font-size:0.82rem;padding:4px 0;';
+      errEl.style.cssText = 'color:var(--error);font-size:0.82rem;padding:4px 0;';
       errEl.textContent = 'Could not load sessions (HTTP ' + r.status + ')';
       while (container.firstChild) container.removeChild(container.firstChild);
       container.appendChild(errEl);
@@ -1917,7 +2128,7 @@ async function loadDashboardSessions() {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!Array.isArray(sessions) || sessions.length === 0) {
       var emptyEl = document.createElement('div');
-      emptyEl.style.cssText = 'color:#64748b;font-size:0.82rem;padding:4px 0;';
+      emptyEl.style.cssText = 'color:var(--text-muted);font-size:0.82rem;padding:4px 0;';
       emptyEl.textContent = 'No sessions configured.';
       container.appendChild(emptyEl);
       return;
@@ -1935,7 +2146,7 @@ async function loadDashboardSessions() {
         var row = document.createElement('div');
         row.className = 'session-row';
         var nameEl = document.createElement('span');
-        nameEl.style.cssText = 'flex:1;font-weight:500;color:#e2e8f0;';
+        nameEl.style.cssText = 'flex:1;font-weight:500;color:var(--text-primary);';
         nameEl.textContent = s.name || s.sessionId;
         var roleEl = document.createElement('span');
         roleEl.style.cssText = 'background:' + roleBadgeColor(s.role) + ';color:#fff;font-size:0.72rem;padding:2px 8px;border-radius:9999px;';
@@ -1947,7 +2158,7 @@ async function loadDashboardSessions() {
         dotEl.style.cssText = 'width:8px;height:8px;border-radius:50%;display:inline-block;background:' + healthDotColor(s.healthy, s.healthStatus) + ';flex-shrink:0;';
         dotEl.setAttribute('title', 'Health: ' + (s.healthStatus || 'unknown'));
         var wahaEl = document.createElement('span');
-        wahaEl.style.cssText = 'font-family:monospace;font-size:0.75rem;color:#94a3b8;';
+        wahaEl.style.cssText = 'font-family:monospace;font-size:0.75rem;color:var(--text-secondary);';
         wahaEl.textContent = s.wahaStatus || 'UNKNOWN';
         row.appendChild(nameEl);
         row.appendChild(roleEl);
@@ -1993,7 +2204,27 @@ async function saveSessionRole(sessionId, role, subRole, selectEl, prevVal) {
       return;
     }
     if (r.ok) {
-      // Optimistic UI: dropdown already shows the new value — just toast, do NOT call loadSessions()
+      // BUG-04 fix: Update data-prev to new value so future changes have correct revert target.
+      // Update dropdown background color to match new value. Show amber "restart required" notice.
+      // DO NOT call loadSessions() here — it re-renders everything and resets dropdowns. DO NOT CHANGE.
+      if (selectEl) {
+        selectEl.dataset.prev = selectEl.value;
+        // Update background color to match new selection
+        if (role !== null) selectEl.style.background = roleBadgeColor(role);
+        if (subRole !== null) selectEl.style.background = subRoleBadgeColor(subRole);
+        // Show amber "restart required" notice under the dropdown's parent container
+        var parentDiv = selectEl.parentElement;
+        if (parentDiv) {
+          var existingNotice = parentDiv.querySelector('.restart-notice');
+          if (!existingNotice) {
+            var notice = document.createElement('div');
+            notice.className = 'restart-notice';
+            notice.style.cssText = 'color:var(--warning);font-weight:600;font-size:0.7rem;margin-top:3px;white-space:nowrap;';
+            notice.textContent = 'Restart required';
+            parentDiv.appendChild(notice);
+          }
+        }
+      }
       showToast('Saved. Restart required for changes to take effect.');
     } else {
       var errData = await r.json().catch(function() { return {}; });
@@ -2074,6 +2305,18 @@ function pollSessionsUntilReady(startedAt) {
   }, 2000);
 }
 
+// BUG-04/BUG-05: "Save & Restart" button for the Sessions tab.
+// Triggers gateway restart and shows polling overlay (reuses showSessionRestartOverlay).
+// DO NOT REMOVE — this is the only way for session role changes to take effect without manual restart.
+async function sessionsSaveAndRestart() {
+  if (!confirm('This will restart the gateway to apply session role changes. Continue?')) return;
+  try {
+    await fetch('/api/admin/restart', { method: 'POST' });
+  } catch(e) { /* expected — server drops connection during restart */ }
+  // Show polling overlay — same as 502 handler
+  showSessionRestartOverlay();
+}
+
 // fetchWithRetry: wraps fetch with a timeout (8s) and one automatic retry on network failure.
 // Handles transient "Failed to fetch" errors caused by gateway restarts or proxy hiccups.
 // DO NOT REMOVE — without this, any tab that fetches data will show a permanent error if the
@@ -2105,7 +2348,7 @@ async function loadSessions() {
   if (!container) return;
   while (container.firstChild) container.removeChild(container.firstChild);
   var loadingEl = document.createElement('div');
-  loadingEl.style.cssText = 'color:#64748b;font-size:0.85rem;';
+  loadingEl.style.cssText = 'color:var(--text-muted);font-size:0.85rem;';
   loadingEl.textContent = 'Loading...';
   container.appendChild(loadingEl);
   try {
@@ -2115,7 +2358,7 @@ async function loadSessions() {
     while (container.firstChild) container.removeChild(container.firstChild);
     if (!Array.isArray(sessions) || sessions.length === 0) {
       var noneEl = document.createElement('div');
-      noneEl.style.cssText = 'color:#64748b;font-size:0.85rem;';
+      noneEl.style.cssText = 'color:var(--text-muted);font-size:0.85rem;';
       noneEl.textContent = 'No sessions configured.';
       container.appendChild(noneEl);
       return;
@@ -2147,7 +2390,7 @@ async function loadSessions() {
             '<option value="listener"' + (s.subRole === 'listener' ? ' selected' : '') + '>listener</option>' +
           '</select>' +
         '</div>';
-      return '<div class="contact-card" style="background:#0f172a;">' +
+      return '<div class="contact-card">' +
         '<div class="contact-header" style="cursor:default;">' +
           '<div class="avatar" style="background:' + roleBadgeColor(s.role) + ';font-size:0.85rem;">' + esc((s.name || s.sessionId || '?').substring(0, 2).toUpperCase()) + '</div>' +
           '<div class="contact-info">' +
@@ -2157,25 +2400,25 @@ async function loadSessions() {
           '<div class="contact-meta">' +
             roleSelect +
             subRoleSelect +
-            '<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:0.78rem;color:#94a3b8;" title="' + dotTitle + '">' +
+            '<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:0.78rem;color:var(--text-secondary);" title="' + dotTitle + '">' +
               '<span style="width:10px;height:10px;border-radius:50%;background:' + dotColor + ';flex-shrink:0;display:inline-block;"></span>' +
               esc(s.healthStatus || 'unknown') +
             '</span>' +
           '</div>' +
         '</div>' +
-        '<div style="padding:8px 16px 12px;border-top:1px solid #334155;font-size:0.78rem;display:grid;grid-template-columns:130px 1fr;gap:4px 12px;background:#1a2540;">' +
-          '<span style="color:#64748b;">WAHA Status</span><span style="font-family:monospace;color:#e2e8f0;">' + wahaStatus + '</span>' +
-          '<span style="color:#64748b;">Failures</span><span style="color:#e2e8f0;">' + esc(String(s.consecutiveFailures ?? 0)) + '</span>' +
-          '<span style="color:#64748b;">Last Check</span><span style="color:#e2e8f0;">' + esc(lastCheckStr) + '</span>' +
+        '<div style="padding:8px 16px 12px;border-top:1px solid var(--border);font-size:0.78rem;display:grid;grid-template-columns:130px 1fr;gap:4px 12px;background:var(--bg-hover);">' +
+          '<span style="color:var(--text-muted);">WAHA Status</span><span style="font-family:monospace;color:var(--text-primary);">' + wahaStatus + '</span>' +
+          '<span style="color:var(--text-muted);">Failures</span><span style="color:var(--text-primary);">' + esc(String(s.consecutiveFailures ?? 0)) + '</span>' +
+          '<span style="color:var(--text-muted);">Last Check</span><span style="color:var(--text-primary);">' + esc(lastCheckStr) + '</span>' +
         '</div>' +
       '</div>';
     }).join('');
     // Phase 12, Plan 02 (UX-01): Append explanatory text box after session rows. DO NOT REMOVE.
-    html += '<div class="sessions-explainer" style="font-size:0.78rem;color:#78909c;background:#1a1f2e;padding:10px 12px;border-radius:6px;margin-top:12px;line-height:1.6;">' +
-      '<strong style="display:block;margin-bottom:4px;color:#90a4ae;">Role Options:</strong>' +
+    html += '<div class="sessions-explainer" style="font-size:0.78rem;color:var(--explainer-text);background:var(--explainer-bg);padding:10px 12px;border-radius:6px;margin-top:12px;line-height:1.6;">' +
+      '<strong style="display:block;margin-bottom:4px;color:var(--explainer-label);">Role Options:</strong>' +
       'bot — AI-controlled session, processes messages automatically<br>' +
       'human — User-controlled session, messages monitored but not auto-responded to<br>' +
-      '<strong style="display:block;margin-top:8px;margin-bottom:4px;color:#90a4ae;">Sub-Role Options:</strong>' +
+      '<strong style="display:block;margin-top:8px;margin-bottom:4px;color:var(--explainer-label);">Sub-Role Options:</strong>' +
       'full-access — Can send and receive messages<br>' +
       'listener — Can only receive/monitor messages, outgoing sends are blocked' +
     '</div>';
@@ -2183,7 +2426,7 @@ async function loadSessions() {
   } catch(e) {
     while (container.firstChild) container.removeChild(container.firstChild);
     var errEl = document.createElement('div');
-    errEl.style.cssText = 'color:#ef4444;font-size:0.85rem;';
+    errEl.style.cssText = 'color:var(--error);font-size:0.85rem;';
     errEl.textContent = 'Failed to load sessions: ' + (e.message || String(e));
     container.appendChild(errEl);
   }
@@ -2195,7 +2438,7 @@ async function loadModules() {
   var listEl = document.getElementById('modules-list');
   var emptyEl = document.getElementById('modules-empty');
   if (!listEl || !emptyEl) return;
-  listEl.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Loading...</div>';
+  listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">Loading...</div>';
   emptyEl.style.display = 'none';
   try {
     var r = await fetchWithRetry('/api/admin/modules');
@@ -2209,16 +2452,16 @@ async function loadModules() {
     }
     modules.forEach(function(mod) {
       var card = document.createElement('div');
-      card.style.cssText = 'background:#0f172a;border-radius:10px;margin-bottom:14px;overflow:hidden;border:1px solid #1e293b;';
+      card.style.cssText = 'background:var(--bg-tertiary);border-radius:10px;margin-bottom:14px;overflow:hidden;border:1px solid var(--border-light);';
       var toggleId = 'mod-toggle-' + mod.id;
       var assignSectionId = 'mod-assign-' + mod.id;
       var assignListId = 'mod-assign-list-' + mod.id;
       var headerHtml =
         '<div style="padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;">' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:0.95rem;font-weight:600;color:#e2e8f0;">' + esc(mod.name) + '</div>' +
-            '<div style="font-size:0.78rem;color:#94a3b8;margin-top:2px;">' + esc(mod.description || '') + '</div>' +
-            '<div style="font-size:0.72rem;color:#64748b;margin-top:4px;">v' + esc(mod.version || '') +
+            '<div style="font-size:0.95rem;font-weight:600;color:var(--text-primary);">' + esc(mod.name) + '</div>' +
+            '<div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">' + esc(mod.description || '') + '</div>' +
+            '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">v' + esc(mod.version || '') +
               ' &bull; <span id="mod-count-' + esc(mod.id) + '">' + esc(String(mod.assignmentCount || 0)) + '</span> chat(s) assigned</div>' +
           '</div>' +
           '<div style="display:flex;align-items:center;gap:10px;margin-left:12px;">' +
@@ -2230,15 +2473,15 @@ async function loadModules() {
           '</div>' +
         '</div>';
       var assignHtml =
-        '<details style="border-top:1px solid #1e293b;" id="' + esc(assignSectionId) + '">' +
-          '<summary style="padding:10px 16px;cursor:pointer;font-size:0.82rem;color:#94a3b8;list-style:none;display:flex;align-items:center;gap:6px;">' +
+        '<details style="border-top:1px solid var(--border-light);" id="' + esc(assignSectionId) + '">' +
+          '<summary style="padding:10px 16px;cursor:pointer;font-size:0.82rem;color:var(--text-secondary);list-style:none;display:flex;align-items:center;gap:6px;">' +
             '<span style="font-size:0.7rem;">&#9654;</span> Chat Assignments' +
           '</summary>' +
-          '<div style="padding:12px 16px 16px;background:#0a1120;">' +
+          '<div style="padding:12px 16px 16px;background:var(--bg-primary);">' +
             '<div id="' + esc(assignListId) + '" style="margin-bottom:10px;"></div>' +
             '<div style="display:flex;gap:8px;align-items:center;">' +
-              '<input type="text" id="mod-jid-input-' + esc(mod.id) + '" placeholder="Chat JID (e.g. 123@c.us)" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.82rem;">' +
-              '<button onclick="addModuleAssignment(' + "'" + esc(mod.id) + "'" + ')" style="padding:5px 12px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.78rem;cursor:pointer;">Add</button>' +
+              '<input type="text" id="mod-jid-input-' + esc(mod.id) + '" placeholder="Chat JID (e.g. 123@c.us)" style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;">' +
+              '<button onclick="addModuleAssignment(' + "'" + esc(mod.id) + "'" + ')" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:0.78rem;cursor:pointer;">Add</button>' +
             '</div>' +
           '</div>' +
         '</details>';
@@ -2255,7 +2498,7 @@ async function loadModules() {
       }
     });
   } catch(e) {
-    listEl.innerHTML = '<div style="color:#ef4444;font-size:0.85rem;">Failed to load modules: ' + esc(e.message || String(e)) + '</div>';
+    listEl.innerHTML = '<div style="color:var(--error);font-size:0.85rem;">Failed to load modules: ' + esc(e.message || String(e)) + '</div>';
   }
 }
 
@@ -2263,7 +2506,7 @@ async function loadModuleAssignments(moduleId) {
   var listEl = document.getElementById('mod-assign-list-' + moduleId);
   var countEl = document.getElementById('mod-count-' + moduleId);
   if (!listEl) return;
-  listEl.innerHTML = '<span style="color:#64748b;font-size:0.78rem;">Loading...</span>';
+  listEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.78rem;">Loading...</span>';
   try {
     var r = await fetch('/api/admin/modules/' + encodeURIComponent(moduleId) + '/assignments');
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -2271,17 +2514,17 @@ async function loadModuleAssignments(moduleId) {
     var assignments = data.assignments || [];
     if (countEl) countEl.textContent = String(assignments.length);
     if (assignments.length === 0) {
-      listEl.innerHTML = '<div style="color:#64748b;font-size:0.78rem;">No chats assigned.</div>';
+      listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;">No chats assigned.</div>';
       return;
     }
     listEl.innerHTML = assignments.map(function(jid) {
-      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1e293b;">' +
-        '<span style="font-size:0.8rem;color:#e2e8f0;font-family:monospace;">' + esc(jid) + '</span>' +
-        '<button onclick="removeModuleAssignment(' + "'" + esc(moduleId) + "','" + esc(jid) + "'" + ')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.85rem;padding:2px 6px;" title="Remove">&times;</button>' +
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light);">' +
+        '<span style="font-size:0.8rem;color:var(--text-primary);font-family:monospace;">' + esc(jid) + '</span>' +
+        '<button onclick="removeModuleAssignment(' + "'" + esc(moduleId) + "','" + esc(jid) + "'" + ')" style="background:none;border:none;color:var(--error);cursor:pointer;font-size:0.85rem;padding:2px 6px;" title="Remove">&times;</button>' +
       '</div>';
     }).join('');
   } catch(e) {
-    listEl.innerHTML = '<div style="color:#ef4444;font-size:0.78rem;">Failed to load assignments.</div>';
+    listEl.innerHTML = '<div style="color:var(--error);font-size:0.78rem;">Failed to load assignments.</div>';
   }
 }
 
@@ -2402,9 +2645,8 @@ async function loadConfig() {
     setVal('s-tokenEstimate', dm.tokenEstimate || 2500);
     var gf = w.groupFilter || {};
     setChk('s-groupFilterEnabled', gf.enabled);
-    // UI-10 (12-05): Store global trigger operator so per-group indicator can read the effective value.
-    // DO NOT REMOVE — loadGroupFilter indicator reads globalTriggerOperator to show "inheriting global" text.
-    globalTriggerOperator = gf.triggerOperator || 'OR';
+    // triggerOperator UI removed — backend hardcodes OR.
+    globalTriggerOperator = 'OR';
     // Phase 12, UX-05 -- Group Mention Patterns tag input replaces textarea. DO NOT REVERT to setVal/splitLines.
     if (!groupMentionPatternsInput) groupMentionPatternsInput = createTagInput('group-mention-patterns', { placeholder: 'Add pattern and press Enter...' });
     if (groupMentionPatternsInput) groupMentionPatternsInput.setValue(gf.mentionPatterns || []);
@@ -2720,7 +2962,10 @@ function clearDirSearch() {
   if (el) el.value = '';
   var clearBtn = document.getElementById('dir-search-clear');
   if (clearBtn) clearBtn.style.display = 'none';
+  // BUG-07: Reset all pagination state when clearing search so results reload from page 1. DO NOT REMOVE.
   dirOffset = 0;
+  dirGroupPage = 1;
+  dirContactPage = 1;
   loadDirectory();
 }
 // ---- Sync status bar (Phase 13, SYNC-03) ----
@@ -2736,15 +2981,15 @@ async function updateSyncStatus() {
     var text = document.getElementById('syncStatusText');
     if (!icon || !text) return;
     if (s.status === 'running') {
-      icon.textContent = '\\u27f3';
+      icon.textContent = '⟳';
       icon.style.animation = 'spin 1s linear infinite';
       text.textContent = 'Syncing' + (s.currentPhase ? ' ' + s.currentPhase + '...' : '...');
     } else if (s.status === 'error') {
-      icon.textContent = '\\u26a0';
+      icon.textContent = '⚠';
       icon.style.animation = '';
       text.textContent = 'Sync error: ' + (s.lastError || 'unknown');
     } else {
-      icon.textContent = '\\u2713';
+      icon.textContent = '✓';
       icon.style.animation = '';
       if (s.lastSyncAt) {
         var ago = Math.round((Date.now() - s.lastSyncAt) / 60000);
@@ -2828,7 +3073,7 @@ function updateBulkToolbar() {
       '<button onclick="bulkAction(\\'allow-dm\\')" style="background:#10b981;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Allow DM</button>' +
       '<button onclick="bulkAction(\\'revoke-dm\\')" style="background:#ef4444;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Revoke DM</button>' +
       '<button onclick="bulkAction(\\'follow\\')" style="background:#1d4ed8;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Follow</button>' +
-      '<button onclick="bulkAction(\\'unfollow\\')" style="background:#64748b;color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Unfollow</button>';
+      '<button onclick="bulkAction(\\'unfollow\\')" style="background:var(--text-muted);color:#fff;border:none;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:0.85rem;">Unfollow</button>';
   } else {
     // Contacts context: Allow DM / Revoke DM
     actionsEl.innerHTML =
@@ -2902,6 +3147,9 @@ function debouncedDirSearch() {
   dirSearchTimeout = setTimeout(function() { dirOffset = 0; dirGroupPage = 1; dirContactPage = 1; loadDirectory(); }, 300);
 }
 async function loadDirectory() {
+  // Default to 'contacts' if currentDirTab not yet initialized (e.g., initial page load with #directory hash).
+  // var hoisting means currentDirTab is undefined until its assignment line executes. DO NOT REMOVE.
+  if (!currentDirTab) currentDirTab = 'contacts';
   // DIR-01: groups tab uses a separate paginated table renderer — do not use infinite-scroll path
   if (currentDirTab === 'groups') { return loadGroupsTable(); }
   // Phase 13: contacts tab uses paginated renderer matching groups tab
@@ -2913,6 +3161,8 @@ async function loadDirectory() {
     var r = await fetchWithRetry(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     var d = await r.json();
+    // Stale render guard — if tab switched to contacts/groups while newsletter fetch was in flight, discard.
+    if (currentDirTab !== 'newsletters') return;
     document.getElementById('dir-stats').innerHTML =
       '<div class="dir-stat">Contacts <span>' + d.dms + '</span></div>' +
       '<div class="dir-stat">Groups <span>' + d.groups + '</span></div>' +
@@ -2927,7 +3177,7 @@ async function loadDirectory() {
       return;
     }
     if (!d.contacts || d.contacts.length === 0) {
-      if (dirOffset === 0) list.innerHTML = '<div style="color:#64748b;text-align:center;padding:32px;">No entries found.</div>';
+      if (dirOffset === 0) list.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:32px;">No entries found.</div>';
       document.getElementById('load-more-btn').style.display = 'none';
       return;
     }
@@ -2971,17 +3221,17 @@ function buildPageNav(currentPage, totalPages, goFn) {
   var start = Math.max(1, currentPage - 2);
   var end = Math.min(totalPages, start + 4);
   start = Math.max(1, end - 4); // re-anchor if end hit the wall
-  var sBase = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;cursor:pointer;font-size:0.8rem;';
-  var sDis  = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:0.8rem;opacity:0.5;pointer-events:none;';
-  var sCur  = 'padding:4px 10px;border-radius:4px;border:1px solid #334155;background:#1d4ed8;color:#fff;cursor:pointer;font-size:0.8rem;font-weight:bold;';
+  var sBase = 'padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;font-size:0.8rem;';
+  var sDis  = 'padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:0.8rem;opacity:0.5;pointer-events:none;';
+  var sCur  = 'padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:var(--btn-primary);color:#fff;cursor:pointer;font-size:0.8rem;font-weight:bold;';
   var nav = '<div class="page-nav">';
-  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="' + goFn + '(1)">First</button>';
-  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="' + goFn + '(' + (currentPage - 1) + ')">Prev</button>';
+  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="' + goFn + '(1)">\\u00AB</button>';
+  nav += '<button style="' + (currentPage <= 1 ? sDis : sBase) + '" onclick="' + goFn + '(' + (currentPage - 1) + ')">\\u2039</button>';
   for (var pg = start; pg <= end; pg++) {
     nav += '<button style="' + (pg === currentPage ? sCur : sBase) + '" onclick="' + goFn + '(' + pg + ')">' + pg + '</button>';
   }
-  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="' + goFn + '(' + (currentPage + 1) + ')">Next</button>';
-  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="' + goFn + '(' + totalPages + ')">Last</button>';
+  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="' + goFn + '(' + (currentPage + 1) + ')">\\u203A</button>';
+  nav += '<button style="' + (currentPage >= totalPages ? sDis : sBase) + '" onclick="' + goFn + '(' + totalPages + ')">\\u00BB</button>';
   nav += '</div>';
   return nav;
 }
@@ -3013,7 +3263,7 @@ async function loadGroupsTable() {
     while (list.firstChild) { list.removeChild(list.firstChild); }
     if (!d.contacts || d.contacts.length === 0) {
       var emptyEl = document.createElement('div');
-      emptyEl.style.cssText = 'color:#64748b;text-align:center;padding:32px;';
+      emptyEl.style.cssText = 'color:var(--text-muted);text-align:center;padding:32px;';
       emptyEl.textContent = 'No groups found.';
       list.appendChild(emptyEl);
       return;
@@ -3022,7 +3272,7 @@ async function loadGroupsTable() {
     var sizeRow = document.createElement('div');
     sizeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
     var sizeLabel = document.createElement('label');
-    sizeLabel.style.cssText = 'font-size:0.8rem;color:#94a3b8;';
+    sizeLabel.style.cssText = 'font-size:0.8rem;color:var(--text-secondary);';
     sizeLabel.textContent = 'Groups per page:';
     var sizeSelect = document.createElement('select');
     sizeSelect.className = 'page-size-select';
@@ -3071,7 +3321,7 @@ async function loadGroupsTable() {
       var tdName = document.createElement('td');
       tdName.textContent = c.displayName || c.jid; // textContent safe — no HTML injection
       var tdJid = document.createElement('td');
-      tdJid.style.cssText = 'font-family:monospace;font-size:0.78rem;color:#64748b;';
+      tdJid.style.cssText = 'font-family:monospace;font-size:0.78rem;color:var(--text-muted);';
       tdJid.textContent = c.jid; // textContent safe
       var tdMem = document.createElement('td');
       tdMem.textContent = c.messageCount > 0 ? String(c.messageCount) : '-';
@@ -3079,7 +3329,7 @@ async function loadGroupsTable() {
       tdTime.textContent = relTime(c.lastMessageAt);
       var tdAct = document.createElement('td');
       var expandBtn = document.createElement('button');
-      expandBtn.style.cssText = 'background:#1e293b;color:#e2e8f0;border:1px solid #334155;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;';
+      expandBtn.style.cssText = 'background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);padding:3px 10px;border-radius:4px;cursor:pointer;font-size:0.78rem;';
       expandBtn.textContent = 'Participants';
       expandBtn.setAttribute('onclick', 'event.stopPropagation();loadGroupParticipants(\\'' + esc(c.jid) + '\\')');
       tdAct.appendChild(expandBtn);
@@ -3106,7 +3356,7 @@ async function loadGroupsTable() {
   } catch(err) {
     while (list.firstChild) { list.removeChild(list.firstChild); }
     var errEl = document.createElement('div');
-    errEl.style.cssText = 'color:#ef4444;padding:16px;';
+    errEl.style.cssText = 'color:var(--error);padding:16px;';
     errEl.textContent = 'Error loading groups: ' + (err instanceof Error ? err.message : String(err));
     list.appendChild(errEl);
   }
@@ -3129,11 +3379,15 @@ async function loadContactsTable() {
     }
     var d = await r.json();
     var totalPages = Math.ceil((d.total || 0) / dirContactPageSize) || 1;
+    // BUG-15: Show "X-Y of Z" range and page indicator so user knows pagination is active. DO NOT REMOVE.
+    var pageStart = offset + 1;
+    var pageEnd = Math.min(offset + (d.contacts ? d.contacts.length : 0), d.total);
     document.getElementById('dir-stats').innerHTML =
       '<div class="dir-stat">Contacts <span>' + d.dms + '</span></div>' +
       '<div class="dir-stat">Groups <span>' + d.groups + '</span></div>' +
       '<div class="dir-stat">Newsletters <span>' + (d.newsletters || 0) + '</span></div>' +
-      '<div class="dir-stat">Showing <span>' + d.total + '</span></div>';
+      '<div class="dir-stat">Showing <span>' + (d.total > 0 ? pageStart + '-' + pageEnd + ' of ' : '') + d.total + '</span></div>' +
+      (totalPages > 1 ? '<div class="dir-stat">Page <span>' + dirContactPage + '/' + totalPages + '</span></div>' : '');
     document.getElementById('load-more-btn').style.display = 'none';
     // Clear list
     while (list.firstChild) { list.removeChild(list.firstChild); }
@@ -3145,7 +3399,7 @@ async function loadContactsTable() {
     }
     if (!d.contacts || d.contacts.length === 0) {
       var emptyEl = document.createElement('div');
-      emptyEl.style.cssText = 'color:#64748b;text-align:center;padding:32px;';
+      emptyEl.style.cssText = 'color:var(--text-muted);text-align:center;padding:32px;';
       emptyEl.textContent = 'No contacts found.';
       list.appendChild(emptyEl);
       return;
@@ -3154,7 +3408,7 @@ async function loadContactsTable() {
     var sizeRow = document.createElement('div');
     sizeRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
     var sizeLabel = document.createElement('label');
-    sizeLabel.style.cssText = 'font-size:0.8rem;color:#94a3b8;';
+    sizeLabel.style.cssText = 'font-size:0.8rem;color:var(--text-secondary);';
     sizeLabel.textContent = 'Contacts per page:';
     var sizeSelect = document.createElement('select');
     sizeSelect.className = 'page-size-select';
@@ -3191,7 +3445,7 @@ async function loadContactsTable() {
   } catch(err) {
     while (list.firstChild) { list.removeChild(list.firstChild); }
     var errEl = document.createElement('div');
-    errEl.style.cssText = 'color:#ef4444;padding:16px;';
+    errEl.style.cssText = 'color:var(--error);padding:16px;';
     errEl.textContent = 'Error loading contacts: ' + (err instanceof Error ? err.message : String(err));
     list.appendChild(errEl);
   }
@@ -3241,10 +3495,10 @@ function buildContactCard(c) {
       // UI-11 (12-05): Channels tab Allow DM — inline toggle button, no full directory reload.
       // State persists across page reload because it reads from API response data (allowedDm).
       // DO NOT REMOVE — newsletter allow-dm uses inline toggle to avoid full-directory reload on each click.
-      var nlBtnBg = c.allowedDm ? '#2e7d32' : 'transparent';
-      var nlBtnColor = c.allowedDm ? '#fff' : '#78909c';
-      var nlBtnBorder = c.allowedDm ? 'none' : '1px solid #546e7a';
-      var nlBtnText = c.allowedDm ? 'Allowed' : 'Allow DM';
+      var nlBtnBg = c.allowedDm ? '#10b981' : '#334155';
+      var nlBtnColor = '#fff';
+      var nlBtnBorder = 'none';
+      var nlBtnText = c.allowedDm ? 'DM Allowed' : 'Allow DM';
       var nlBtnId = 'allow-btn-' + id;
       allowBtn = '<button id="' + nlBtnId + '" style="background:' + nlBtnBg + ';color:' + nlBtnColor + ';border:' + nlBtnBorder + ';padding:4px 10px;border-radius:5px;cursor:pointer;font-size:0.75rem;" onclick="event.stopPropagation();toggleChannelAllowDm(\\'' + esc(c.jid) + '\\',\\'' + nlBtnId + '\\',' + (c.allowedDm ? 'true' : 'false') + ')">' + nlBtnText + '</button>';
     } else {
@@ -3263,7 +3517,7 @@ function buildContactCard(c) {
   var panelContent = '';
   if (isGroup) {
     panelContent = '<div class="contact-settings-panel" id="panel-' + id + '">' +
-      '<div style="color:#64748b;padding:8px">Click to load participants...</div>' +
+      '<div style="color:var(--text-muted);padding:8px">Click to load participants...</div>' +
     '</div>';
   } else {
     panelContent = '<div class="contact-settings-panel" id="panel-' + id + '">' +
@@ -3301,12 +3555,12 @@ function buildContactCard(c) {
               '<option value="custom"' + (ttlSelected==='custom'?' selected':'') + '>Custom...</option>' +
             '</select>' +
             '<div id="ttl-custom-' + id + '" style="display:' + (ttlSelected==='custom'?'flex':'none') + ';margin-top:6px;gap:6px;align-items:center;">' +
-              '<input type="datetime-local" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:6px 8px;font-size:0.85rem;">' +
+              '<input type="datetime-local" style="background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:6px 8px;font-size:0.85rem;">' +
               '<button onclick="ttlCustomApply(\\'' + esc(c.jid) + '\\',\\'ttl-' + id + '\\')" style="background:#1d4ed8;color:#fff;border:none;padding:6px 12px;border-radius:5px;cursor:pointer;font-size:0.8rem;">Apply</button>' +
             '</div>' +
           '</div>';
         })() +
-        '<button class="save-contact-btn" onclick="saveContactSettings(\\'' + esc(c.jid) + '\\', \\'' + id + '\\')">Save</button>' +
+        '<button class="save-contact-btn" onclick="event.stopPropagation();saveContactSettings(\\'' + esc(c.jid) + '\\', \\'' + id + '\\')">Save</button>' +
       '</div>' +
     '</div>';
   }
@@ -3482,10 +3736,10 @@ async function toggleChannelAllowDm(jid, btnId, currentlyAllowed) {
     // Update button visual state inline
     var btn = document.getElementById(btnId);
     if (btn) {
-      btn.textContent = newState ? 'Allowed' : 'Allow DM';
-      btn.style.background = newState ? '#2e7d32' : 'transparent';
-      btn.style.color = newState ? '#fff' : '#78909c';
-      btn.style.border = newState ? 'none' : '1px solid #546e7a';
+      btn.textContent = newState ? 'DM Allowed' : 'Allow DM';
+      btn.style.background = newState ? '#10b981' : '#334155';
+      btn.style.color = '#fff';
+      btn.style.border = 'none';
       // Update onclick to reflect new current state
       btn.setAttribute('onclick', 'event.stopPropagation();toggleChannelAllowDm(\\'' + jid.replace(/'/g, "\\'") + '\\',\\'' + btnId + '\\',' + (newState ? 'true' : 'false') + ')');
     }
@@ -3509,7 +3763,7 @@ async function loadGroupParticipants(groupJid, forceOpen) {
   } else {
     panel.classList.add('open');
   }
-  panel.innerHTML = '<div style="color:#64748b;padding:8px">Loading participants...</div>';
+  panel.innerHTML = '<div style="color:var(--text-muted);padding:8px">Loading participants...</div>';
   try {
     var r = await fetch('/api/admin/directory/group/' + encodeURIComponent(groupJid) + '/participants');
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -3520,11 +3774,11 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     if (bulkSelectMode) { bulkCurrentGroupJid = groupJid; updateBulkToolbar(); }
     var html = '<div style="padding:12px;">';
     html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">';
-    html += '<span style="font-size:0.85rem;color:#94a3b8;font-weight:600;">' + parts.length + ' participants</span>';
+    html += '<span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">' + parts.length + ' participants</span>';
     html += '<button style="background:' + (allowAll ? '#10b981' : '#1d4ed8') + ';color:#fff;border:none;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;margin-left:auto;" onclick="toggleGroupAllowAll(\\'' + esc(groupJid) + '\\',' + (allowAll ? 'true' : 'false') + ')">' + (allowAll ? 'Revoke All' : 'Allow All') + '</button>';
     html += '</div>';
     if (parts.length === 0) {
-      html += '<div style="color:#64748b;font-size:0.85rem;">No participants found. Try refreshing from WAHA first.</div>';
+      html += '<div style="color:var(--text-muted);font-size:0.85rem;">No participants found. Try refreshing from WAHA first.</div>';
     } else {
       parts.forEach(function(p) {
         // DIR-02: For @lid JIDs with no display name, strip domain for a cleaner fallback than the full raw JID
@@ -3537,9 +3791,9 @@ async function loadGroupParticipants(groupJid, forceOpen) {
         // DIR-02 (12-05): Check if this participant is a bot session. BOT_SESSION_IDS is injected server-side.
         // Bot sessions show a 'bot' badge and have no action controls — allow/dm toggles and role dropdown are suppressed.
         // DO NOT REMOVE — isBotSession check powers the bot badge and control suppression for bot session participants.
-        var isBotSession = typeof BOT_SESSION_IDS !== 'undefined' && Array.isArray(BOT_SESSION_IDS) &&
-          BOT_SESSION_IDS.some(function(sid) { return p.participantJid && p.participantJid.indexOf(sid) !== -1; });
-        html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1e293b;">';
+        // Uses server-side flag (enriched in participants API) instead of client-side session name matching.
+        var isBotSession = !!p.isBotSession;
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-light);">';
         // DIR-04: Checkbox in bulk select mode — use JSON.stringify to safely embed JID in onclick
         if (bulkSelectMode && !isBotSession) {
           var pChecked = bulkSelectedJids.has(p.participantJid);
@@ -3549,13 +3803,13 @@ async function loadGroupParticipants(groupJid, forceOpen) {
         html += '<div style="flex:1;min-width:0;">';
         // DIR-02 (12-05): Bot badge next to participant name — indicates this is the bot's own session
         html += '<div style="font-size:0.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(pName) + (p.isAdmin ? ' <span style="color:#f59e0b;font-size:0.7rem;">ADMIN</span>' : '') + (isBotSession ? ' <span class="bot-badge">bot</span>' : '') + '</div>';
-        html += '<div style="font-size:0.72rem;color:#64748b;font-family:monospace;">' + esc(p.participantJid) + '</div>';
+        html += '<div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">' + esc(p.participantJid) + '</div>';
         html += '</div>';
         if (!isBotSession) {
           // DIR-03: Role dropdown — role values are static strings (no user data), safe as HTML template
           // DIR-04 (12-05): onmousedown captures prev value; onchange fires setParticipantRole with auto-grant
           var pRole = p.participantRole || 'participant';
-          html += '<select style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:0.75rem;" data-prev="' + esc(pRole) + '" onmousedown="this.dataset.prev=this.value" onchange="setParticipantRole(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',this.value,this.dataset.prev,this)">';
+          html += '<select style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" data-prev="' + esc(pRole) + '" onmousedown="this.dataset.prev=this.value" onchange="setParticipantRole(\\'' + esc(groupJid) + '\\',\\'' + esc(p.participantJid) + '\\',this.value,this.dataset.prev,this)">';
           html += '<option value="bot_admin"' + (pRole === 'bot_admin' ? ' selected' : '') + '>Bot Admin</option>';
           html += '<option value="manager"' + (pRole === 'manager' ? ' selected' : '') + '>Manager</option>';
           html += '<option value="participant"' + (pRole === 'participant' ? ' selected' : '') + '>Participant</option>';
@@ -3569,12 +3823,9 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     html += '</div>';
     // ---- Group filter override section ----
     // DO NOT CHANGE — per-group filter override UI allows admin to set custom keyword filter settings per group.
-    html += '<div class="group-filter-override" style="margin-top:12px;padding:12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;">';
+    html += '<div class="group-filter-override" style="margin-top:12px;padding:12px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border-light);">';
     var sfx = esc(groupJid).replace(/[^a-zA-Z0-9]/g,'_');
-    html += '<h4 style="margin:0 0 8px;color:#94a3b8;font-size:13px;text-transform:uppercase;">Group Filter Override</h4>';
-    // UI-10 (12-05): Show effective trigger operator when not overriding. Hidden when override is active (override panel has its own dropdown).
-    // DO NOT REMOVE — this indicator makes the inherited global operator visible to the admin without needing to expand override settings.
-    html += '<div id="gfo-op-indicator-' + sfx + '" style="font-size:0.78rem;color:#546e7a;margin:0 0 6px;font-style:italic;">Trigger Operator: ' + (globalTriggerOperator || 'OR').toUpperCase() + ' (inheriting global)</div>';
+    html += '<h4 style="margin:0 0 8px;color:var(--text-secondary);font-size:13px;text-transform:uppercase;">Group Filter Override</h4>';
     html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
     html += '<input type="checkbox" id="gfo-enabled-' + sfx + '">';
     html += ' <span>Override global filter</span></label>';
@@ -3582,16 +3833,11 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     html += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
     html += '<input type="checkbox" id="gfo-filter-enabled-' + sfx + '" checked>';
     html += ' <span>Keyword filter enabled</span></label>';
-    // UX-03: Trigger operator select — directly below keyword filter enabled checkbox, above keywords tag input
-    html += '<div class="settings-field" style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">Trigger Operator <span class="tip" data-tip="OR: message matches if it contains any keyword. AND: message must contain all keywords.">?</span></label>';
-    html += '<select id="gfo-operator-' + sfx + '" style="background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:5px;padding:6px 10px;font-size:0.85rem;width:100%;">';
-    html += '<option value="OR">OR &ndash; match any keyword</option>';
-    html += '<option value="AND">AND &ndash; match all keywords</option></select></div>';
     // UX-03: Tag input container replaces plain text input for keywords
-    html += '<div style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">Keywords (empty = inherit global)</label>';
+    html += '<div style="margin-bottom:8px;"><label style="display:block;margin-bottom:4px;color:var(--text-secondary);font-size:12px;">Keywords (empty = inherit global)</label>';
     html += '<div id="gfo-patterns-cp-' + sfx + '"></div></div>';
-    html += '<div><label style="display:block;margin-bottom:4px;color:#94a3b8;font-size:12px;">God Mode Scope</label>';
-    html += '<select id="gfo-god-mode-' + sfx + '" style="padding:6px 8px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;">';
+    html += '<div><label style="display:block;margin-bottom:4px;color:var(--text-secondary);font-size:12px;">God Mode Scope</label>';
+    html += '<select id="gfo-god-mode-' + sfx + '" style="padding:6px 8px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">';
     html += '<option value="">Inherit global</option><option value="all">All (DM + Groups)</option><option value="dm">DM Only</option><option value="off">Off</option></select></div>';
     html += '</div></div>';
     panel.innerHTML = html;
@@ -3604,7 +3850,7 @@ async function loadGroupParticipants(groupJid, forceOpen) {
     });
     // Load existing filter override data for this group (async, non-blocking)
     loadGroupFilter(groupJid);
-  } catch(e) { panel.innerHTML = '<div style="color:#ef4444;padding:8px">' + esc(e.message) + '</div>'; }
+  } catch(e) { panel.innerHTML = '<div style="color:var(--error);padding:8px">' + esc(e.message) + '</div>'; }
 }
 
 async function toggleParticipantAllow(groupJid, participantJid, type, currentlyAllowed) {
@@ -3710,41 +3956,27 @@ async function loadGroupFilter(groupJid) {
     var elSettings = document.getElementById('gfo-settings-' + sfx);
     var elFilterEnabled = document.getElementById('gfo-filter-enabled-' + sfx);
     var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
-    // UX-03: Trigger operator select element
-    var elOperator = document.getElementById('gfo-operator-' + sfx);
-    // UI-10 (12-05): Indicator shown when NOT overriding. Hidden when override is active.
-    var elOpIndicator = document.getElementById('gfo-op-indicator-' + sfx);
     if (!elEnabled) return;
     if (ov && ov.enabled) {
       elEnabled.checked = true;
       if (elSettings) elSettings.style.display = '';
-      // UI-10 (12-05): Hide the "inheriting global" indicator when override is active
-      if (elOpIndicator) elOpIndicator.style.display = 'none';
       if (elFilterEnabled) elFilterEnabled.checked = ov.filterEnabled !== false;
       // UX-03: Load keywords into tag input instance instead of plain text input
       if (gfoTagInputs[sfx] && ov.mentionPatterns) {
         gfoTagInputs[sfx].setValue(ov.mentionPatterns);
       }
-      // UX-03: Load trigger operator
-      if (elOperator) elOperator.value = ov.triggerOperator || 'OR';
       if (elGodMode && ov.godModeScope) elGodMode.value = ov.godModeScope;
     } else {
       elEnabled.checked = false;
       if (elSettings) elSettings.style.display = 'none';
-      // UI-10 (12-05): Show the "inheriting global" indicator when NOT overriding
-      if (elOpIndicator) elOpIndicator.style.display = '';
     }
     // Wire toggle for settings visibility + save on change
     elEnabled.onchange = function() {
       var isOverriding = elEnabled.checked;
       if (elSettings) elSettings.style.display = isOverriding ? '' : 'none';
-      // UI-10 (12-05): Toggle indicator visibility when override state changes
-      if (elOpIndicator) elOpIndicator.style.display = isOverriding ? 'none' : '';
       saveGroupFilter(groupJid);
     };
     if (elFilterEnabled) elFilterEnabled.onchange = function() { saveGroupFilter(groupJid); };
-    // UX-03: Auto-save when trigger operator changes
-    if (elOperator) elOperator.onchange = function() { saveGroupFilter(groupJid); };
   } catch(e) { console.warn('[waha] loadGroupFilter failed:', e); }
 }
 // DO NOT CHANGE — saveGroupFilter uses AbortController for 10s timeout to prevent 502 from hung requests (AP-03 fix).
@@ -3755,9 +3987,6 @@ async function saveGroupFilter(groupJid) {
   var elGodMode = document.getElementById('gfo-god-mode-' + sfx);
   // UX-03: Read keywords from tag input instance (returns array) instead of plain text input
   var patternsArr = gfoTagInputs[sfx] ? gfoTagInputs[sfx].getValue() : [];
-  // UX-03: Read trigger operator from select element
-  var elOperator = document.getElementById('gfo-operator-' + sfx);
-  var triggerOperator = elOperator ? elOperator.value : 'OR';
   if (!elEnabled) return;
   var enabled = elEnabled.checked;
   var filterEnabled = elFilterEnabled ? elFilterEnabled.checked : true;
@@ -3771,7 +4000,7 @@ async function saveGroupFilter(groupJid) {
   try {
     var r = await fetch('/api/admin/directory/' + encodeURIComponent(groupJid) + '/filter', {
       method: 'PUT', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope, triggerOperator: triggerOperator }),
+      body: JSON.stringify({ enabled: enabled, filterEnabled: filterEnabled, mentionPatterns: mentionPatterns, godModeScope: godModeScope }),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -3900,17 +4129,20 @@ function syncAllowList(configPath: string, field: "allowFrom" | "groupAllowFrom"
 const botJidCache: Map<string, { jid: string; fetchedAt: number }> = new Map();
 const BOT_JID_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// Returns JIDs of bot-role sessions ONLY. Human-role sessions are NOT bots. DO NOT CHANGE.
 async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>): Promise<Set<string>> {
   const now = Date.now();
   const result = new Set<string>();
   for (const acc of accounts) {
+    // Only include sessions with role "bot" — human sessions are not bots. DO NOT REMOVE.
+    if (acc.role !== "bot") continue;
     const cached = botJidCache.get(acc.session);
     if (cached && (now - cached.fetchedAt) < BOT_JID_CACHE_TTL_MS) {
       result.add(cached.jid);
       continue;
     }
     try {
-      const r = await fetch(`${acc.config.baseUrl}/api/${encodeURIComponent(acc.session)}/me`, {
+      const r = await fetch(`${acc.config.baseUrl}/api/sessions/${encodeURIComponent(acc.session)}/me`, {
         headers: { "x-api-key": acc.apiKey },
       });
       if (r.ok) {
@@ -4120,6 +4352,71 @@ export function createWahaWebhookServer(opts: {
       const dmCfg = account.config.dmFilter ?? {};
       const groupFilter = getGroupFilterForAdmin(opts.config, opts.accountId);
       const groupFilterCfg = (account.config.groupFilter ?? {}) as Record<string, unknown>;
+      // Build access block — resolve unknown @lid JIDs from WAHA before dedup.
+      // This is async because WAHA API calls are needed for LIDs not in the local DB.
+      // All numbers in allowFrom ARE on WhatsApp — WAHA just hasn't mapped them yet. DO NOT REMOVE.
+      const db = getDirectoryDb(opts.accountId);
+      async function resolveLidAcrossAccountsOrWaha(lid: string): Promise<string | null> {
+        // 1. Try local DBs first (fast, sync)
+        const primary = db.resolveLidToCus(lid);
+        if (primary) return primary;
+        try {
+          for (const acct of listEnabledWahaAccounts(opts.config)) {
+            if (acct.accountId === opts.accountId) continue;
+            const result = getDirectoryDb(acct.accountId).resolveLidToCus(lid);
+            if (result) return result;
+          }
+        } catch { /* non-critical */ }
+        // 2. Fall back to WAHA API — fetch the mapping and cache it
+        try {
+          const { findWahaPhoneByLid } = await import("./send.js");
+          const lidResult = await findWahaPhoneByLid({ cfg: opts.config, lid, accountId: opts.accountId });
+          if (lidResult && typeof lidResult === "object") {
+            const pn = (lidResult as Record<string, unknown>).pn ?? (lidResult as Record<string, unknown>).phone;
+            if (typeof pn === "string" && pn) {
+              const cusJid = pn.includes("@") ? pn : pn + "@c.us";
+              db.upsertLidMapping(lid, cusJid);
+              return cusJid;
+            }
+          }
+        } catch { /* WAHA fallback is best-effort */ }
+        return null;
+      }
+      async function dedupLidServerAsync(arr: string[]): Promise<string[]> {
+        const cusSet = new Set(arr.filter(j => j.endsWith("@c.us")));
+        const results: string[] = [];
+        for (const j of arr) {
+          if (!j.endsWith("@lid")) { results.push(j); continue; }
+          const realCus = await resolveLidAcrossAccountsOrWaha(j);
+          if (!(realCus && cusSet.has(realCus))) results.push(j);
+        }
+        return results;
+      }
+      // Fetch bot session JIDs so we can exclude them from the display.
+      // Bot's own sessions should not appear in allowFrom/groupAllowFrom — they're noise. DO NOT REMOVE.
+      const botJids = await fetchBotJids(listEnabledWahaAccounts(opts.config));
+      // Also resolve bot JIDs' LIDs so we can filter both @c.us and @lid variants
+      const botJidSet = new Set<string>(botJids);
+      // Also add @lid equivalents of bot JIDs so we filter both formats.
+      // Use resolveLidToCus in reverse: for each @lid in the allowFrom lists, if it resolves
+      // to a bot JID, add it to the exclusion set. DO NOT REMOVE.
+      const allLists = [...(account.config.allowFrom ?? []), ...(account.config.groupAllowFrom ?? [])];
+      for (const j of allLists) {
+        if (j.endsWith("@lid")) {
+          const cus = db.resolveLidToCus(j);
+          if (cus && botJidSet.has(cus)) botJidSet.add(j);
+        }
+      }
+      function excludeBotJids(arr: string[]): string[] {
+        return arr.filter(j => !botJidSet.has(j));
+      }
+      const accessData = {
+        allowFrom: excludeBotJids(await dedupLidServerAsync(account.config.allowFrom ?? [])),
+        groupAllowFrom: excludeBotJids(await dedupLidServerAsync(account.config.groupAllowFrom ?? [])),
+        allowedGroups: account.config.allowedGroups ?? [],
+        dmPolicy: account.config.dmPolicy ?? "allowlist",
+        groupPolicy: account.config.groupPolicy ?? "allowlist",
+      };
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         dmFilter: {
@@ -4142,13 +4439,7 @@ export function createWahaWebhookServer(opts: {
           recentEvents: groupFilter.recentEvents,
         },
         presence: account.config.presence ?? {},
-        access: {
-          allowFrom: account.config.allowFrom ?? [],
-          groupAllowFrom: account.config.groupAllowFrom ?? [],
-          allowedGroups: account.config.allowedGroups ?? [],
-          dmPolicy: account.config.dmPolicy ?? "allowlist",
-          groupPolicy: account.config.groupPolicy ?? "allowlist",
-        },
+        access: accessData,
         session: account.config.session ?? "unknown",
         baseUrl: account.config.baseUrl ?? "",
         webhookPort: account.config.webhookPort ?? 8050,
@@ -4325,16 +4616,37 @@ export function createWahaWebhookServer(opts: {
       // GET /api/admin/directory/resolve — batch JID->name resolution with @lid->@c.us fallback.
       // Phase 14 (NAME-01): Must be placed BEFORE the /:jid handler so "resolve" isn't treated as a JID.
       // Accepts ?jids=jid1,jid2,... (URL-encoded comma-separated). Returns { resolved: { jid: name } }.
-      // JIDs with no resolved name are omitted from the response. DO NOT REMOVE.
+      // Tries current account DB first, then falls back to ALL other account DBs for unresolved JIDs.
+      // This is needed because lid_mapping and contacts may be populated in one account's DB but not
+      // another's (e.g., bot DB has 102 LID mappings, human/default DBs have 0). DO NOT REMOVE.
       if (pathParts.length === 1 && pathParts[0] === "resolve") {
         try {
           const jidsParam = url.searchParams.get("jids") ?? "";
-          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean).slice(0, 500); // cap at 500 to prevent oversized SQL queries
+          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean).slice(0, 500);
           const db = getDirectoryDb(opts.accountId);
           const resolvedMap = db.resolveJids(jidArray);
           const resolved: Record<string, string> = {};
           for (const [jid, name] of resolvedMap) {
             resolved[jid] = name;
+          }
+          // Fallback: try other account DBs for any JIDs that didn't resolve.
+          // All accounts share the same WAHA instance, so contacts/LID mappings may
+          // exist in one DB but not another. DO NOT REMOVE.
+          const unresolved = jidArray.filter(j => !resolved[j]);
+          if (unresolved.length > 0) {
+            try {
+              const allAccounts = listEnabledWahaAccounts(opts.config);
+              for (const acct of allAccounts) {
+                if (acct.accountId === opts.accountId) continue;
+                const still = unresolved.filter(j => !resolved[j]);
+                if (still.length === 0) break;
+                const otherDb = getDirectoryDb(acct.accountId);
+                const otherResolved = otherDb.resolveJids(still);
+                for (const [jid, name] of otherResolved) {
+                  resolved[jid] = name;
+                }
+              }
+            } catch { /* non-critical — fallback resolution is best-effort */ }
           }
           writeJsonResponse(res, 200, { resolved });
         } catch (err) {
@@ -4351,14 +4663,50 @@ export function createWahaWebhookServer(opts: {
           const db = getDirectoryDb(opts.accountId);
           let contact = db.getContact(jid);
           // Phase 14 (NAME-01): @lid->@c.us fallback — if no direct match and JID ends with @lid,
-          // try the @c.us equivalent. Return the contact's data with the original @lid JID preserved.
-          // This lets the frontend show contact info for @lid entries even when stored as @c.us. DO NOT REMOVE.
+          // use lid_mapping table to find the REAL @c.us JID. The @lid number is completely different
+          // from the @c.us number — simple string replacement does NOT work. DO NOT REMOVE.
           if (!contact && jid.endsWith("@lid")) {
-            const csJid = jid.replace("@lid", "@c.us");
-            const csContact = db.getContact(csJid);
-            if (csContact) {
-              contact = { ...csContact, jid };
+            const csJid = db.resolveLidToCus(jid);
+            if (csJid) {
+              const csContact = db.getContact(csJid);
+              if (csContact) {
+                contact = { ...csContact, jid };
+              }
             }
+          }
+          // WAHA API fallback: if not in local DB, try fetching from WAHA and cache the result.
+          // Covers contacts in allowFrom that never chatted with the bot. DO NOT REMOVE.
+          if (!contact) {
+            try {
+              let lookupJid = jid;
+              // For @lid JIDs without a mapping, try the single-LID WAHA endpoint first
+              if (jid.endsWith("@lid")) {
+                const { findWahaPhoneByLid } = await import("./send.js");
+                const lidResult = await findWahaPhoneByLid({ cfg: opts.config, lid: jid, accountId: opts.accountId });
+                if (lidResult && typeof lidResult === "object") {
+                  const pn = (lidResult as Record<string, unknown>).pn ?? (lidResult as Record<string, unknown>).phone;
+                  if (typeof pn === "string" && pn) {
+                    const cusJid = pn.includes("@") ? pn : pn + "@c.us";
+                    db.upsertLidMapping(jid, cusJid);
+                    lookupJid = cusJid;
+                    // Try local DB again with the resolved @c.us
+                    contact = db.getContact(cusJid);
+                  }
+                }
+              }
+              if (!contact && (lookupJid.endsWith("@c.us") || lookupJid.endsWith("@g.us"))) {
+                const { getWahaContact } = await import("./send.js");
+                const wahaContact = await getWahaContact({ cfg: opts.config, contactId: lookupJid, accountId: opts.accountId });
+                if (wahaContact && typeof wahaContact === "object") {
+                  const rec = wahaContact as Record<string, unknown>;
+                  const name = String(rec.pushName ?? rec.name ?? rec.displayName ?? "");
+                  if (name) {
+                    db.upsertContact(lookupJid, name, lookupJid.endsWith("@g.us"));
+                    contact = { jid: jid, displayName: name, type: lookupJid.endsWith("@g.us") ? "group" : "contact" };
+                  }
+                }
+              }
+            } catch { /* WAHA fallback is best-effort — don't fail the request */ }
           }
           if (!contact) {
             res.writeHead(404, { "Content-Type": "application/json" });
@@ -4405,6 +4753,41 @@ export function createWahaWebhookServer(opts: {
         }
         // @lid and @s.whatsapp.net entries are now filtered at SQL level in directory.ts
         // to fix pagination offset/count mismatches. DO NOT re-add post-query filtering here.
+
+        // BUG-06: WAHA API fallback — when local DB search returns no results, query WAHA contacts API
+        // and merge any matches not already in the local DB. Only runs on first page of search results
+        // to avoid slow API calls on every pagination request. DO NOT REMOVE.
+        if (search && contacts.length === 0 && offset === 0) {
+          try {
+            const rawContacts = await getWahaContacts({ cfg: opts.config, accountId: opts.accountId });
+            // WAHA /contacts returns dict keyed by JID, not array — use toArr(). DO NOT CHANGE.
+            const wahaContacts = toArr(rawContacts) as Array<Record<string, unknown>>;
+            const searchLower = search.toLowerCase();
+            const apiMatches = wahaContacts
+              .filter((wc: { id?: string; name?: string; pushName?: string }) => {
+                const name = (wc.name || wc.pushName || "").toLowerCase();
+                const jid = (wc.id || "").toLowerCase();
+                return (name.includes(searchLower) || jid.includes(searchLower))
+                  && !jid.endsWith("@lid") && !jid.endsWith("@s.whatsapp.net");
+              })
+              .slice(0, limit);
+            // Upsert API matches into local DB so they appear in future searches
+            for (const wc of apiMatches) {
+              const jid = wc.id || "";
+              if (jid) {
+                db.upsertContact(jid, wc.name || wc.pushName || undefined, jid.endsWith("@g.us"));
+              }
+            }
+            // Re-query local DB to get enriched results with consistent format
+            if (apiMatches.length > 0) {
+              contacts = db.getContacts({ search, limit, offset, type });
+              total = db.getContactCount(search, type);
+            }
+          } catch (apiErr) {
+            console.warn(`[waha] BUG-06: WAHA API fallback search failed: ${String(apiErr)}`);
+          }
+        }
+
         const enriched = contacts.map((c) => {
           const ttl = db.getContactTtl(c.jid);
           return {
@@ -4922,14 +5305,25 @@ export function createWahaWebhookServer(opts: {
               if (mapped.length > 0) {
                 db.bulkUpsertGroupParticipants(groupJid, mapped);
                 participants = db.getGroupParticipants(groupJid);
-                // DIR-02: Name resolution pass — for @lid JIDs with no display name, attempt
-                // to find the matching @c.us contact in the directory (NOWEB sends @lid JIDs).
+                // DIR-02: Name resolution pass — for @lid JIDs with no display name, use
+                // lid_mapping table to find the REAL @c.us contact (NOWEB sends @lid JIDs).
+                // The @lid number is completely different from @c.us — simple string replacement
+                // does NOT work. Must use resolveLidToCus(). DO NOT CHANGE.
                 const noName = participants.filter((p) => !p.displayName);
                 for (const p of noName) {
-                  const altJid = p.participantJid.replace("@lid", "@c.us");
-                  const contact = db.getContact(altJid);
-                  if (contact?.displayName) {
-                    db.updateParticipantDisplayName(groupJid, p.participantJid, contact.displayName);
+                  if (p.participantJid.endsWith("@lid")) {
+                    const realCus = db.resolveLidToCus(p.participantJid);
+                    if (realCus) {
+                      const contact = db.getContact(realCus);
+                      if (contact?.displayName) {
+                        db.updateParticipantDisplayName(groupJid, p.participantJid, contact.displayName);
+                      }
+                    }
+                  } else if (p.participantJid.endsWith("@c.us")) {
+                    const contact = db.getContact(p.participantJid);
+                    if (contact?.displayName) {
+                      db.updateParticipantDisplayName(groupJid, p.participantJid, contact.displayName);
+                    }
                   }
                 }
                 // Re-read after name resolution so enriched names are returned in response
@@ -4940,12 +5334,53 @@ export function createWahaWebhookServer(opts: {
             }
           }
 
+          // Name resolution pass for existing participants that still have no display name.
+          // This covers cases where participants were stored before lid_mapping was populated,
+          // or where @c.us contacts gained a display_name after initial participant insert.
+          // Only runs when there are nameless participants — no-op otherwise. DO NOT REMOVE.
+          {
+            const noName = participants.filter((p) => !p.displayName);
+            if (noName.length > 0) {
+              let updated = false;
+              for (const p of noName) {
+                if (p.participantJid.endsWith("@lid")) {
+                  const realCus = db.resolveLidToCus(p.participantJid);
+                  if (realCus) {
+                    const contact = db.getContact(realCus);
+                    if (contact?.displayName) {
+                      db.updateParticipantDisplayName(groupJid, p.participantJid, contact.displayName);
+                      updated = true;
+                    }
+                  }
+                } else if (p.participantJid.endsWith("@c.us")) {
+                  const contact = db.getContact(p.participantJid);
+                  if (contact?.displayName) {
+                    db.updateParticipantDisplayName(groupJid, p.participantJid, contact.displayName);
+                    updated = true;
+                  }
+                }
+              }
+              if (updated) participants = db.getGroupParticipants(groupJid);
+            }
+          }
+
           // DIR-02: Enrich participants with global allowlist state from config.groupAllowFrom
           // This shows green buttons for participants already in the global allowlist (not just per-group DB)
           const groupAllowFrom: string[] = account.config.groupAllowFrom ?? [];
+          // Fetch bot session JIDs to mark bot participants server-side. DO NOT REMOVE.
+          const botJidSet = await fetchBotJids(listEnabledWahaAccounts(opts.config));
+          // Also resolve LID→@c.us for bot JIDs so we match both formats
+          const botJidFull = new Set<string>(botJidSet);
+          for (const p of participants) {
+            if (p.participantJid.endsWith("@lid")) {
+              const cus = db.resolveLidToCus(p.participantJid);
+              if (cus && botJidFull.has(cus)) botJidFull.add(p.participantJid);
+            }
+          }
           const enrichedParticipants = participants.map((p) => ({
             ...p,
             globallyAllowed: groupAllowFrom.includes(p.participantJid),
+            isBotSession: botJidFull.has(p.participantJid),
           }));
 
           const allowAll = db.getGroupAllowAllStatus(groupJid);
