@@ -1,7 +1,8 @@
 // DirectoryTab — 3 sub-tabs (Contacts, Groups, Channels) with centralized data fetching,
 // debounced search, and server-side pagination.
-// Sub-tab content will be filled in Plans 02 and 03.
 // DO NOT CHANGE: debounce is 300ms to match TagInput pattern; pageIndex resets on search change.
+// DO NOT CHANGE: refreshCounter increments to trigger re-fetch from sub-tab onRefresh callbacks.
+// ContactsTab and ChannelsTab wired in Plan 02. GroupsTab wired in Plan 03.
 
 import { useState, useRef, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -10,6 +11,8 @@ import { Search } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { DirectoryResponse } from '@/types'
 import { GroupsTab } from './directory/GroupsTab'
+import { ContactsTab } from './directory/ContactsTab'
+import { ChannelsTab } from './directory/ChannelsTab'
 
 interface DirectoryTabProps {
   selectedSession: string
@@ -24,6 +27,8 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
   const [data, setData] = useState<DirectoryResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  // DO NOT CHANGE: refreshCounter triggers re-fetch when sub-tabs call onRefresh after bulk/settings changes
+  const [refreshCounter, setRefreshCounter] = useState(0)
 
   // Debounced search — 300ms (matches TagInput pattern)
   function handleSearchChange(val: string) {
@@ -39,7 +44,7 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
   // Map sub-tab to API type parameter
   const typeMap: Record<string, string> = { contacts: 'contact', groups: 'group', channels: 'newsletter' }
 
-  // Fetch directory data on tab/search/pagination/refresh change
+  // DO NOT CHANGE: refreshCounter added to deps so sub-tab onRefresh callbacks trigger re-fetch
   useEffect(() => {
     setLoading(true)
     const offset = pagination.pageIndex * pagination.pageSize
@@ -53,7 +58,12 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
       setLoading(false)
     }).catch(() => setLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSubTab, searchQuery, pagination.pageIndex, pagination.pageSize, refreshKey])
+  }, [activeSubTab, searchQuery, pagination.pageIndex, pagination.pageSize, refreshKey, refreshCounter])
+
+  // DO NOT CHANGE: refreshData increments refreshCounter to trigger useEffect re-fetch
+  function refreshData() {
+    setRefreshCounter(c => c + 1)
+  }
 
   // Reset pagination and search on sub-tab change
   function handleSubTabChange(tab: string) {
@@ -91,10 +101,15 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
         </TabsList>
 
         <TabsContent value="contacts">
-          {/* ContactsTab will be wired in Plan 02 */}
-          <p className="text-muted-foreground p-4">
-            {loading ? 'Loading...' : data ? `${data.total} contacts` : 'Contacts table — Plan 02'}
-          </p>
+          {/* ContactsTab — wired in Plan 02 */}
+          <ContactsTab
+            data={data?.contacts ?? []}
+            total={data?.total ?? 0}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            loading={loading}
+            onRefresh={refreshData}
+          />
         </TabsContent>
         <TabsContent value="groups">
           {/* GroupsTab — wired in Plan 03 */}
@@ -107,10 +122,15 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
           />
         </TabsContent>
         <TabsContent value="channels">
-          {/* ChannelsTab will be wired in Plan 03 */}
-          <p className="text-muted-foreground p-4">
-            {loading ? 'Loading...' : data ? `${data.total} channels` : 'Channels table — Plan 03'}
-          </p>
+          {/* ChannelsTab — wired in Plan 02 */}
+          <ChannelsTab
+            data={data?.contacts ?? []}
+            total={data?.total ?? 0}
+            pagination={pagination}
+            onPaginationChange={setPagination}
+            loading={loading}
+            onRefresh={refreshData}
+          />
         </TabsContent>
       </Tabs>
     </div>
