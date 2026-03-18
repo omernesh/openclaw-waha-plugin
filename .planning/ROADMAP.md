@@ -187,4 +187,4 @@ Plans:
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
 | 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete    | 2026-03-18 | - |
 | 23. Polish | 2/2 | Complete    | 2026-03-18 | - |
-| 24. Cleanup and Deploy | 1/1 | Complete   | 2026-03-18 | - |
+| 24. Cleanup and Deploy | 1/1 | Complete    | 2026-03-18 | - |
