@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface LogTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 type LogLevel = 'all' | 'info' | 'warn' | 'error'
@@ -27,11 +28,14 @@ function getLineClass(line: string): string {
   return 'text-muted-foreground'
 }
 
-export default function LogTab({ selectedSession: _selectedSession, refreshKey }: LogTabProps) {
+export default function LogTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: LogTabProps) {
   const [activeLevel, setActiveLevel] = useState<LogLevel>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [logData, setLogData] = useState<LogResponse | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Report loading state to parent (drives TabHeader spinner)
+  useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const userScrolledUpRef = useRef(false)

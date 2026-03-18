@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface ModulesTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 interface ModuleCardState {
@@ -30,10 +31,13 @@ interface ModuleCardState {
   toggleError: string | null
 }
 
-export default function ModulesTab({ selectedSession: _selectedSession, refreshKey }: ModulesTabProps) {
+export default function ModulesTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: ModulesTabProps) {
   const [cards, setCards] = useState<ModuleCardState[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Report loading state to parent (drives TabHeader spinner)
+  useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
 
   useEffect(() => {
     const controller = new AbortController()

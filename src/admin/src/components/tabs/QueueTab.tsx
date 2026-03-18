@@ -8,11 +8,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface QueueTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export default function QueueTab({ selectedSession: _selectedSession, refreshKey }: QueueTabProps) {
+export default function QueueTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: QueueTabProps) {
   const [data, setData] = useState<QueueResponse | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Report loading state to parent (drives TabHeader spinner)
+  useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
 
   useEffect(() => {
     const controller = new AbortController()

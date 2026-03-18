@@ -22,6 +22,7 @@ import { RestartOverlay } from '@/components/shared/RestartOverlay'
 interface SettingsTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 // Immutably set a nested path like "dmFilter.enabled" in a WahaConfig
@@ -38,10 +39,13 @@ function setNestedValue(obj: WahaConfig, path: string, value: unknown): WahaConf
   }
 }
 
-export default function SettingsTab({ selectedSession: _selectedSession, refreshKey }: SettingsTabProps) {
+export default function SettingsTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: SettingsTabProps) {
   const [config, setConfig] = React.useState<WahaConfig | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+
+  // Report loading state to parent (drives TabHeader spinner)
+  React.useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
   const [restarting, setRestarting] = React.useState(false)
   const [dirty, setDirty] = React.useState(false)
   const [resolvedNames, setResolvedNames] = React.useState<Record<string, string>>({})

@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface DashboardTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 function formatRange(val: [number, number] | undefined): string {
@@ -38,12 +39,15 @@ function healthBadgeVariant(status: string): 'default' | 'destructive' | 'second
 // DO NOT CHANGE: DashboardTab fetches stats + config in parallel, resolves JIDs
 // for access control once per mount (guarded by resolvedJidsRef to avoid re-fetch
 // flicker on every refreshKey tick). Pattern confirmed from RESEARCH.md anti-patterns.
-export default function DashboardTab({ selectedSession, refreshKey }: DashboardTabProps) {
+export default function DashboardTab({ selectedSession, refreshKey, onLoadingChange }: DashboardTabProps) {
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [config, setConfig] = useState<ConfigResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({})
   const resolvedJidsRef = useRef<Set<string>>(new Set())
+
+  // Report loading state to parent (drives TabHeader spinner)
+  useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
 
   // Fetch stats + config in parallel
   useEffect(() => {

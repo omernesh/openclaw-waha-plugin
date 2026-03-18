@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar, type TabId } from '@/components/AppSidebar'
 import { TabHeader } from '@/components/TabHeader'
@@ -13,17 +13,27 @@ import ModulesTab from '@/components/tabs/ModulesTab'
 import LogTab from '@/components/tabs/LogTab'
 import QueueTab from '@/components/tabs/QueueTab'
 
-// DO NOT CHANGE: All state (activeTab, selectedSession, refreshKey) is lifted to App.tsx.
-// This is intentional — it ensures tab switches don't reset session selection or refresh state.
-// SidebarProvider must remain the outermost wrapper — only ONE SidebarProvider in the app.
-// AppSidebar must be a direct child of SidebarProvider so useSidebar() works inside it.
+// DO NOT CHANGE: All state (activeTab, selectedSession, refreshKey, isRefreshing, lastRefreshed)
+// is lifted to App.tsx. This is intentional — it ensures tab switches don't reset session
+// selection or refresh state. SidebarProvider must remain the outermost wrapper — only ONE
+// SidebarProvider in the app. AppSidebar must be a direct child of SidebarProvider so
+// useSidebar() works inside it.
+// DO NOT CHANGE: handleTabLoadingChange is the single callback passed to all 7 tabs via
+// onLoadingChange. It drives the TabHeader spinner (isRefreshing) and timestamp (lastRefreshed).
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [selectedSession, setSelectedSession] = useState<string>('all')
   const [refreshKey, setRefreshKey] = useState<number>(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+
+  const handleTabLoadingChange = useCallback((loading: boolean) => {
+    setIsRefreshing(loading)
+    if (!loading) setLastRefreshed(new Date())
+  }, [])
 
   function renderActiveTab() {
-    const props = { selectedSession, refreshKey }
+    const props = { selectedSession, refreshKey, onLoadingChange: handleTabLoadingChange }
     switch (activeTab) {
       case 'dashboard': return <TabErrorBoundary key={refreshKey} tabName="dashboard"><DashboardTab {...props} /></TabErrorBoundary>
       case 'settings':  return <TabErrorBoundary key={refreshKey} tabName="settings"><SettingsTab {...props} /></TabErrorBoundary>
@@ -44,6 +54,8 @@ export default function App() {
           selectedSession={selectedSession}
           onSessionChange={setSelectedSession}
           onRefresh={() => setRefreshKey((k) => k + 1)}
+          isRefreshing={isRefreshing}
+          lastRefreshed={lastRefreshed}
         />
         <main className="flex flex-1 flex-col overflow-auto p-4">
           {renderActiveTab()}

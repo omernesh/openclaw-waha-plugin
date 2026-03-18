@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface SessionsTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
 type RoleOverrides = Record<string, { role: string; subRole: string }>
@@ -46,10 +47,13 @@ function roleDescription(role: string, subRole: string): string {
   return base + listener
 }
 
-export default function SessionsTab({ selectedSession: _selectedSession, refreshKey }: SessionsTabProps) {
+export default function SessionsTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: SessionsTabProps) {
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  // Report loading state to parent (drives TabHeader spinner)
+  useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
   // Local role overrides keyed by sessionId
   const [overrides, setOverrides] = useState<RoleOverrides>({})
   // Snapshot of fetched roles — used to detect pending changes

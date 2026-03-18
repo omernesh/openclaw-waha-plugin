@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { RefreshCw, ChevronDown } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const TAB_TITLES: Record<TabId, string> = {
   dashboard: 'Dashboard',
@@ -28,17 +29,23 @@ interface TabHeaderProps {
   selectedSession: string
   onSessionChange: (session: string) => void
   onRefresh: () => void
+  isRefreshing?: boolean
+  lastRefreshed?: Date | null
 }
 
 // DO NOT CHANGE: Session state (selectedSession) is lifted to App.tsx and threaded
 // through TabHeader + active tab. Do not move session state into TabHeader.
 // TabHeader is a pure display/interaction component — it fetches the session list
 // once on mount but delegates selection state upward via onSessionChange.
+// DO NOT CHANGE: isRefreshing/lastRefreshed are passed from App.tsx via onLoadingChange
+// callback. The spinner and timestamp are driven by the active tab's loading state.
 export function TabHeader({
   activeTab,
   selectedSession,
   onSessionChange,
   onRefresh,
+  isRefreshing,
+  lastRefreshed,
 }: TabHeaderProps) {
   const [sessions, setSessions] = useState<Session[]>([])
 
@@ -82,9 +89,14 @@ export function TabHeader({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh">
-        <RefreshCw className="h-4 w-4" />
+      <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh" disabled={isRefreshing}>
+        <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
       </Button>
+      {lastRefreshed && (
+        <span className="text-xs text-muted-foreground hidden sm:inline">
+          {lastRefreshed.toLocaleTimeString()}
+        </span>
+      )}
     </header>
   )
 }

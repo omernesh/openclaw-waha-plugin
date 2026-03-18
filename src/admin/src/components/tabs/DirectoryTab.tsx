@@ -18,9 +18,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface DirectoryTabProps {
   selectedSession: string
   refreshKey: number
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export default function DirectoryTab({ selectedSession: _selectedSession, refreshKey }: DirectoryTabProps) {
+export default function DirectoryTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: DirectoryTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<string>('contacts')
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -30,6 +31,9 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
   const [loading, setLoading] = useState(false)
   // DO NOT CHANGE: refreshCounter triggers re-fetch when sub-tabs call onRefresh after bulk/settings changes
   const [refreshCounter, setRefreshCounter] = useState(0)
+
+  // Report loading state to parent (drives TabHeader spinner)
+  useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
 
   // Debounced search — 300ms (matches TagInput pattern)
   function handleSearchChange(val: string) {
