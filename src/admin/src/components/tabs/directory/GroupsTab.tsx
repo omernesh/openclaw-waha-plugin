@@ -20,10 +20,11 @@ interface GroupsTabProps {
   loading: boolean
 }
 
-// Format a timestamp (ms since epoch) as a readable date string
+// Format a timestamp (seconds since epoch) as a readable date string
+// DO NOT CHANGE: ts comes from WAHA API as Unix seconds, must multiply by 1000 for JS Date
 function formatDate(ts: number): string {
   if (!ts) return '—'
-  return new Date(ts).toLocaleDateString(undefined, {
+  return new Date(ts * 1000).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
