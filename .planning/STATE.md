@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.12
-milestone_name: UI Overhaul
+milestone_name: UI Overhaul & Feature Polish
 status: active
-stopped_at: null
-last_updated: "2026-03-18"
-last_activity: "2026-03-18 — Roadmap created, Phase 18 ready to plan"
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-18T15:12:33.761Z"
+last_activity: 2026-03-18 — Roadmap created (7 phases, 38 requirements mapped)
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** v1.12 UI Overhaul — Phase 18 (React Scaffold) ready to plan
+**Current focus:** v1.12 UI Overhaul — Phase 18 Plan 1 complete, Plan 2 (Static File Serving) is next
 
 ## Current Position
 
-Phase: 18 — React Scaffold (Not started)
-Plan: —
-Status: Roadmap complete, ready for `/gsd:plan-phase 18`
-Last activity: 2026-03-18 — Roadmap created (7 phases, 38 requirements mapped)
+Phase: 18 — React Scaffold (In Progress — 1/2 plans complete)
+Plan: 18-02 next
+Status: 18-01 complete, ready for 18-02
+Last activity: 2026-03-18 — 18-01 executed: Vite+React+Tailwind scaffold + typed API client
 
 ```
-Progress: [░░░░░░░░░░░░░░░░░░░░] 0% — Phase 18 of 24 total (milestone phases 18-24)
+Progress: [█████░░░░░] 50% — Phase 18 Plan 1/2 complete
 ```
 
 ## Accumulated Context
@@ -46,6 +46,9 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0% — 
 - Modules are WhatsApp-specific (2026-03-17): No cross-platform abstraction.
 - monitor.ts API routes remain unchanged throughout — only the HTML/JS serving logic changes
 - CLNP-03 (tooltip portals) assigned to Phase 23 (Polish) — it is a cross-cutting fix affecting multiple tabs, not a single-tab concern
+- [Phase 18-01]: Used --legacy-peer-deps for npm install (vite@8/vitest peer conflict)
+- [Phase 18-01]: dist/ added to .gitignore; npm publish uses files allowlist to include dist/admin/
+- [Phase 18-01]: All 30+ api.ts methods are live (none commented out) — route audit confirmed all exist in monitor.ts
 
 ### Pending Todos
 
@@ -59,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18
-Stopped at: Roadmap created — Phase 18 ready
+Last session: 2026-03-18T15:12:33.755Z
+Stopped at: Completed 18-01-PLAN.md
 Resume file: None
