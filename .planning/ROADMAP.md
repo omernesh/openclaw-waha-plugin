@@ -51,7 +51,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet (completed 2026-03-18)
 - [x] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React (completed 2026-03-18)
 - [x] **Phase 23: Polish** — Toasts, skeletons, error boundaries, refresh timestamps (completed 2026-03-18)
-- [ ] **Phase 24: Cleanup and Deploy** — Remove legacy HTML/JS from monitor.ts, update build pipeline
+- [x] **Phase 24: Cleanup and Deploy** — Remove legacy HTML/JS from monitor.ts, update build pipeline (completed 2026-03-18)
 
 ## Phase Details
 
@@ -187,4 +187,4 @@ Plans:
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
 | 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete    | 2026-03-18 | - |
 | 23. Polish | 2/2 | Complete    | 2026-03-18 | - |
-| 24. Cleanup and Deploy | v1.12 | 0/1 | Not started | - |
+| 24. Cleanup and Deploy | 1/1 | Complete   | 2026-03-18 | - |

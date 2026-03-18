@@ -71,12 +71,12 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 - [x] **PLSH-01**: Toast notifications via Sonner (replace custom toast system)
 - [x] **PLSH-02**: Loading states with Skeleton components on all data-fetching tabs
 - [x] **PLSH-03**: Error boundaries per tab (graceful failure isolation)
-- [ ] **PLSH-04**: Refresh buttons show spinner + "Last refreshed" timestamp
+- [x] **PLSH-04**: Refresh buttons show spinner + "Last refreshed" timestamp
 
 ### Cleanup
 
-- [ ] **CLNP-01**: Remove all embedded HTML/JS/CSS from monitor.ts (~4000+ lines)
-- [ ] **CLNP-02**: Deploy pipeline updated — build:admin + scp to both hpg6 locations
+- [x] **CLNP-01**: Remove all embedded HTML/JS/CSS from monitor.ts (~4000+ lines)
+- [x] **CLNP-02**: Deploy pipeline updated — build:admin + scp to both hpg6 locations
 - [x] **CLNP-03**: Tooltips render above overflow boundaries via proper React portals
 
 ## Future Requirements
@@ -138,10 +138,10 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 | PLSH-01 | Phase 23 | Complete |
 | PLSH-02 | Phase 23 | Complete |
 | PLSH-03 | Phase 23 | Complete |
-| PLSH-04 | Phase 23 | Pending |
+| PLSH-04 | Phase 23 | Complete |
 | CLNP-03 | Phase 23 | Complete |
-| CLNP-01 | Phase 24 | Pending |
-| CLNP-02 | Phase 24 | Pending |
+| CLNP-01 | Phase 24 | Complete |
+| CLNP-02 | Phase 24 | Complete |
 
 **Coverage:**
 - v1.12 requirements: 38 total
