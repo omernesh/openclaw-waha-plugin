@@ -43,7 +43,13 @@ export function TabHeader({
   const [sessions, setSessions] = useState<Session[]>([])
 
   useEffect(() => {
-    api.getSessions().then(setSessions).catch(() => {})
+    const controller = new AbortController()
+    api.getSessions()
+      .then((data) => {
+        if (!controller.signal.aborted) setSessions(data)
+      })
+      .catch(() => {})
+    return () => controller.abort()
   }, [])
 
   const selectedLabel =

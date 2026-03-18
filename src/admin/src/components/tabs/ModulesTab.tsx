@@ -3,7 +3,7 @@ interface ModulesTabProps {
   refreshKey: number
 }
 
-export default function ModulesTab({ selectedSession, refreshKey }: ModulesTabProps) {
+export default function ModulesTab({ selectedSession: _selectedSession, refreshKey: _refreshKey }: ModulesTabProps) {
   return (
     <div className="flex flex-1 items-center justify-center text-muted-foreground">
       <p>Modules tab — coming in Phase 22</p>

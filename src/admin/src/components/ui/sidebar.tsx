@@ -677,6 +677,9 @@ const SidebarMenuSubButton = React.forwardRef<
 })
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 
+// Note: SidebarMenuSeparator is an alias for SidebarSeparator used in menu contexts
+const SidebarMenuSeparator = SidebarSeparator
+
 // Hook to detect mobile breakpoint
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(
@@ -723,6 +726,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-// Note: SidebarMenuSeparator is an alias for SidebarSeparator used in menu contexts
-const SidebarMenuSeparator = SidebarSeparator

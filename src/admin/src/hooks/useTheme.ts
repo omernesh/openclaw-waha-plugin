@@ -4,7 +4,8 @@ const STORAGE_KEY = 'waha-admin-theme'
 
 export function useTheme() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem(STORAGE_KEY) as 'dark' | 'light') ?? 'dark'
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored === 'light' ? 'light' : 'dark'
   })
 
   useEffect(() => {
