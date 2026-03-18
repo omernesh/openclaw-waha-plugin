@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
 status: completed
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-03-18T17:34:38.961Z"
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-03-18T17:42:28.385Z"
 last_activity: "2026-03-18 — 19-02 executed: AppSidebar 7 nav items + theme toggle + TabHeader session selector + App.tsx shell"
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 75
 ---
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 75% — Phase 19 complete (2/2 plans)
 - [Phase 20]: TagInput stores raw JIDs, displays resolved names (display-only; resolvedNames prop is display mapping)
 - [Phase 20]: Session type uses sessionId not id; TabHeader fixed to match actual API response
 - [Phase 20]: SettingsTab: buildPayload sends explicit [] for empty arrays; godModeSuperUsers always Array<{identifier}>; Combined Tasks 1+2 into one atomic commit
+- [Phase 21-directory-tab]: DirectoryTab fetches data centrally and passes contacts/total/loading down to sub-tab components — avoids duplicate fetches
 
 ### Pending Todos
 
@@ -69,6 +70,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T17:18:02.073Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-03-18T17:42:28.380Z
+Stopped at: Completed 21-01-PLAN.md
 Resume file: None
