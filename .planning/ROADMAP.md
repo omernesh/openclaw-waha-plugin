@@ -49,7 +49,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 19: App Layout** — Sidebar navigation, theme toggle, mobile responsiveness, shared header (completed 2026-03-18)
 - [x] **Phase 20: Dashboard and Settings Tabs** — Dashboard cards and Settings form rebuilt in React (completed 2026-03-18)
 - [x] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet (completed 2026-03-18)
-- [ ] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React
+- [x] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React (completed 2026-03-18)
 - [ ] **Phase 23: Polish** — Toasts, skeletons, error boundaries, refresh timestamps
 - [ ] **Phase 24: Cleanup and Deploy** — Remove legacy HTML/JS from monitor.ts, update build pipeline
 
@@ -186,6 +186,6 @@ Plans:
 | 19. App Layout | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 20. Dashboard and Settings Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
-| 22. Sessions, Modules, Log, and Queue Tabs | 1/2 | In Progress|  | - |
+| 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete   | 2026-03-18 | - |
 | 23. Polish | v1.12 | 0/TBD | Not started | - |
 | 24. Cleanup and Deploy | v1.12 | 0/TBD | Not started | - |

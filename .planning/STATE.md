@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
 status: completed
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-03-18T18:08:55.268Z"
-last_activity: "2026-03-18 — 22-01 executed: SessionsTab role management, QueueTab stats, QueueResponse/LogResponse type fixes"
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-03-18T18:15:20.494Z"
+last_activity: "2026-03-18 — 22-02 executed: ModulesTab Switch toggles + TagInput assignments, LogTab level filter + search + auto-scroll"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 11
-  completed_plans: 10
-  percent: 91
+  completed_plans: 11
+  percent: 100
 ---
 
 # Project State
@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 
 ## Current Position
 
-Phase: 22 — Sessions/Modules/Log/Queue Tabs (In Progress — 1/2 plans done)
-Plan: 22-02 next (ModulesTab + LogTab)
-Status: 22-01 complete (SessionsTab + QueueTab + type fixes)
-Last activity: 2026-03-18 — 22-01 executed: SessionsTab role management, QueueTab stats, QueueResponse type fix
+Phase: 22 — Sessions/Modules/Log/Queue Tabs (Complete — 2/2 plans done)
+Plan: All Phase 22 plans complete
+Status: 22-02 complete (ModulesTab + LogTab)
+Last activity: 2026-03-18 — 22-02 executed: ModulesTab with Switch toggles + assignment management, LogTab with level filtering + search + auto-scroll
 
 ```
-Progress: [█████████░] 91% — 10/11 plans complete
+Progress: [██████████] 100% — 11/11 plans complete
 ```
 
 ## Accumulated Context
@@ -62,6 +62,8 @@ Progress: [█████████░] 91% — 10/11 plans complete
 - [Phase 21-02]: refreshCounter in DirectoryTab drives sub-tab data re-fetch after bulk/settings changes
 - [Phase 22]: QueueResponse uses flat fields matching inbound-queue.ts getStats() — not nested dm/group objects
 - [Phase 22]: Processing state in QueueTab derived from depths only (idle when both 0) — no server-side Paused concept
+- [Phase 22]: No module config form — no server endpoint exists; TagInput assignment management is the only inline action
+- [Phase 22]: LogTab uses server-side level filtering only — no DEBUG chip, no @tanstack/react-virtual (300-line cap sufficient)
 
 ### Pending Todos
 
@@ -75,6 +77,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T18:08:55.262Z
-Stopped at: Completed 22-01-PLAN.md
+Last session: 2026-03-18T18:15:20.488Z
+Stopped at: Completed 22-02-PLAN.md
 Resume file: None
