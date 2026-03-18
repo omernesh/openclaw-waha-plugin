@@ -12,6 +12,7 @@ import {
 import { TagInput } from '@/components/shared/TagInput'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface DashboardTabProps {
   selectedSession: string
@@ -83,8 +84,14 @@ export default function DashboardTab({ selectedSession, refreshKey }: DashboardT
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <p>Loading...</p>
+      <div className="flex flex-col gap-4 p-4">
+        <Skeleton className="h-[120px] w-full" />
+        <div className="flex gap-4">
+          <Skeleton className="h-[80px] flex-1" />
+          <Skeleton className="h-[80px] flex-1" />
+        </div>
+        <Skeleton className="h-[100px] w-full" />
+        <Skeleton className="h-[100px] w-full" />
       </div>
     )
   }

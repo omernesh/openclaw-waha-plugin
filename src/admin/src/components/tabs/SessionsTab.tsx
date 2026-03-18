@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RestartOverlay } from '@/components/shared/RestartOverlay'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface SessionsTabProps {
   selectedSession: string
@@ -134,8 +135,11 @@ export default function SessionsTab({ selectedSession: _selectedSession, refresh
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <p>Loading sessions...</p>
+      <div className="flex flex-col gap-4 p-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Skeleton className="h-[140px] w-full" />
+          <Skeleton className="h-[140px] w-full" />
+        </div>
       </div>
     )
   }

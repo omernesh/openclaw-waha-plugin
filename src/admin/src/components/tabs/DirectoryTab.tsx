@@ -13,6 +13,7 @@ import type { DirectoryResponse } from '@/types'
 import { GroupsTab } from './directory/GroupsTab'
 import { ContactsTab } from './directory/ContactsTab'
 import { ChannelsTab } from './directory/ChannelsTab'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface DirectoryTabProps {
   selectedSession: string
@@ -71,6 +72,16 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
     setSearchInput('')
     setSearchQuery('')
     setPagination({ pageIndex: 0, pageSize: 50 })
+  }
+
+  // Show skeleton on initial load (no data yet)
+  if (loading && data === null) {
+    return (
+      <div className="flex flex-col gap-4 p-1">
+        <Skeleton className="h-[40px] w-full" />
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    )
   }
 
   return (

@@ -1,7 +1,9 @@
 import * as React from 'react'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { WahaConfig } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -227,8 +229,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     try {
       await api.updateConfig(buildPayload())
       setDirty(false)
+      toast.success('Settings saved')
     } catch (err) {
-      alert(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSaving(false)
     }
@@ -236,6 +239,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
 
   async function handleSaveAndRestart() {
     setSaving(true)
+    toast.success('Restarting gateway...')
     try {
       await api.updateConfig(buildPayload())
       setDirty(false)
@@ -244,14 +248,16 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       setRestarting(true)
     } catch (err) {
       setSaving(false)
-      alert(`Save & Restart failed: ${err instanceof Error ? err.message : String(err)}`)
+      toast.error(`Save & Restart failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <p>Loading settings...</p>
+      <div className="flex flex-col gap-4 p-6">
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
       </div>
     )
   }
@@ -271,7 +277,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
         onComplete={() => window.location.reload()}
         onTimeout={() => {
           setRestarting(false)
-          alert('Gateway did not respond after 60s. Check logs.')
+          toast.error('Gateway did not respond after 60s. Check logs.')
         }}
       />
 

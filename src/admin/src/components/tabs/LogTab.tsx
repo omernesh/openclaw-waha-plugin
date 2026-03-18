@@ -5,6 +5,7 @@ import type { LogResponse } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface LogTabProps {
   selectedSession: string
@@ -180,7 +181,13 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey }
           className="h-[calc(100vh-280px)] overflow-y-auto rounded-md border bg-muted/30 p-3"
         >
           {loading ? (
-            <p className="text-xs text-muted-foreground">Loading logs...</p>
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/6" />
+              <Skeleton className="h-4 w-full" />
+            </div>
           ) : lines.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No log entries found

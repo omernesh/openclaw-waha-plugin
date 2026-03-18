@@ -13,6 +13,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { TagInput } from '@/components/shared/TagInput'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface ModulesTabProps {
   selectedSession: string
@@ -236,8 +237,9 @@ export default function ModulesTab({ selectedSession: _selectedSession, refreshK
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <p>Loading modules...</p>
+      <div className="mx-auto max-w-2xl space-y-4 p-4">
+        <Skeleton className="h-[100px] w-full" />
+        <Skeleton className="h-[100px] w-full" />
       </div>
     )
   }

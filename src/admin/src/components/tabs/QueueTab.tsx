@@ -3,6 +3,7 @@ import { api } from '@/lib/api'
 import type { QueueResponse } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface QueueTabProps {
   selectedSession: string
@@ -31,8 +32,12 @@ export default function QueueTab({ selectedSession: _selectedSession, refreshKey
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        <p>Loading queue status...</p>
+      <div className="flex flex-col gap-4 p-4">
+        <div className="grid grid-cols-3 gap-4">
+          <Skeleton className="h-[80px] w-full" />
+          <Skeleton className="h-[80px] w-full" />
+          <Skeleton className="h-[80px] w-full" />
+        </div>
       </div>
     )
   }

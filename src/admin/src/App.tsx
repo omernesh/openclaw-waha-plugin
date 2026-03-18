@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar, type TabId } from '@/components/AppSidebar'
 import { TabHeader } from '@/components/TabHeader'
+import { TabErrorBoundary } from '@/components/shared/TabErrorBoundary'
 
 // Import all 7 tab placeholder components
 import DashboardTab from '@/components/tabs/DashboardTab'
@@ -24,13 +25,13 @@ export default function App() {
   function renderActiveTab() {
     const props = { selectedSession, refreshKey }
     switch (activeTab) {
-      case 'dashboard': return <DashboardTab {...props} />
-      case 'settings':  return <SettingsTab {...props} />
-      case 'directory': return <DirectoryTab {...props} />
-      case 'sessions':  return <SessionsTab {...props} />
-      case 'modules':   return <ModulesTab {...props} />
-      case 'log':       return <LogTab {...props} />
-      case 'queue':     return <QueueTab {...props} />
+      case 'dashboard': return <TabErrorBoundary key={refreshKey} tabName="dashboard"><DashboardTab {...props} /></TabErrorBoundary>
+      case 'settings':  return <TabErrorBoundary key={refreshKey} tabName="settings"><SettingsTab {...props} /></TabErrorBoundary>
+      case 'directory': return <TabErrorBoundary key={refreshKey} tabName="directory"><DirectoryTab {...props} /></TabErrorBoundary>
+      case 'sessions':  return <TabErrorBoundary key={refreshKey} tabName="sessions"><SessionsTab {...props} /></TabErrorBoundary>
+      case 'modules':   return <TabErrorBoundary key={refreshKey} tabName="modules"><ModulesTab {...props} /></TabErrorBoundary>
+      case 'log':       return <TabErrorBoundary key={refreshKey} tabName="log"><LogTab {...props} /></TabErrorBoundary>
+      case 'queue':     return <TabErrorBoundary key={refreshKey} tabName="queue"><QueueTab {...props} /></TabErrorBoundary>
     }
   }
 
