@@ -26,7 +26,7 @@ export default function QueueTab({ selectedSession: _selectedSession, refreshKey
         if (controller.signal.aborted) return
         setData(d)
       })
-      .catch(() => {})
+      .catch((err) => console.error('Queue data fetch failed:', err))
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })

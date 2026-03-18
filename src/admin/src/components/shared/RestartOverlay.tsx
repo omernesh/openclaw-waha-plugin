@@ -3,10 +3,13 @@ import { api } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
+const RESTART_TIMEOUT_MS = 60_000;
+const POLL_INTERVAL_MS = 2_000;
+
 interface RestartOverlayProps {
   active: boolean  // When true, shows full-screen blocking overlay
   onComplete: () => void  // Called when gateway responds to poll
-  onTimeout: () => void   // Called after 60s with no response
+  onTimeout: () => void   // Called after timeout with no response
 }
 
 // DO NOT CHANGE: Restart overlay polls api.getStats() every 2s using recursive
@@ -19,6 +22,33 @@ export function RestartOverlay({ active, onComplete, onTimeout }: RestartOverlay
   const startTimeRef = React.useRef<number>(0)
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const elapsedTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Shared poll logic — recursively calls api.getStats() until success or timeout.
+  // Uses recursive setTimeout (not setInterval) to avoid stacking requests.
+  function pollUntilReady() {
+    if (abortRef.current?.signal.aborted) return
+
+    const ms = Date.now() - startTimeRef.current
+    if (ms >= RESTART_TIMEOUT_MS) {
+      setTimedOut(true)
+      onTimeout()
+      return
+    }
+
+    api.getStats()
+      .then(() => {
+        if (!abortRef.current?.signal.aborted) {
+          cleanup()
+          onComplete()
+        }
+      })
+      .catch(() => {
+        // Gateway not up yet — schedule next attempt
+        if (!abortRef.current?.signal.aborted) {
+          timerRef.current = setTimeout(pollUntilReady, POLL_INTERVAL_MS)
+        }
+      })
+  }
 
   React.useEffect(() => {
     if (!active) {
@@ -38,34 +68,8 @@ export function RestartOverlay({ active, onComplete, onTimeout }: RestartOverlay
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000))
     }, 1000)
 
-    // Recursive polling — measure interval from response, not start
-    function poll() {
-      if (abortRef.current?.signal.aborted) return
-
-      const elapsed = Date.now() - startTimeRef.current
-      if (elapsed >= 60000) {
-        setTimedOut(true)
-        onTimeout()
-        return
-      }
-
-      api.getStats()
-        .then(() => {
-          if (!abortRef.current?.signal.aborted) {
-            cleanup()
-            onComplete()
-          }
-        })
-        .catch(() => {
-          // Gateway not up yet — schedule next attempt
-          if (!abortRef.current?.signal.aborted) {
-            timerRef.current = setTimeout(poll, 2000)
-          }
-        })
-    }
-
-    // Initial poll after 2s (give the gateway time to start shutting down)
-    timerRef.current = setTimeout(poll, 2000)
+    // Initial poll after POLL_INTERVAL_MS (give the gateway time to start shutting down)
+    timerRef.current = setTimeout(pollUntilReady, POLL_INTERVAL_MS)
 
     return cleanup
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,29 +100,7 @@ export function RestartOverlay({ active, onComplete, onTimeout }: RestartOverlay
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000))
     }, 1000)
 
-    function poll() {
-      if (abortRef.current?.signal.aborted) return
-      const elapsed = Date.now() - startTimeRef.current
-      if (elapsed >= 60000) {
-        setTimedOut(true)
-        onTimeout()
-        return
-      }
-      api.getStats()
-        .then(() => {
-          if (!abortRef.current?.signal.aborted) {
-            cleanup()
-            onComplete()
-          }
-        })
-        .catch(() => {
-          if (!abortRef.current?.signal.aborted) {
-            timerRef.current = setTimeout(poll, 2000)
-          }
-        })
-    }
-
-    timerRef.current = setTimeout(poll, 2000)
+    timerRef.current = setTimeout(pollUntilReady, POLL_INTERVAL_MS)
   }
 
   if (!active) return null
@@ -135,7 +117,7 @@ export function RestartOverlay({ active, onComplete, onTimeout }: RestartOverlay
           {timedOut ? (
             <>
               <p className="text-sm text-muted-foreground">
-                The gateway did not respond within 60 seconds.
+                The gateway did not respond within {RESTART_TIMEOUT_MS / 1000} seconds.
               </p>
               <Button onClick={retry} variant="outline" className="w-full">
                 Retry

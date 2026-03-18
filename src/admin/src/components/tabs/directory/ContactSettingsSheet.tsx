@@ -28,6 +28,8 @@ import { TagInput } from '@/components/shared/TagInput'
 import { api } from '@/lib/api'
 import type { ContactDmSettings } from '@/types'
 
+const SECONDS_PER_DAY = 86_400
+
 interface ContactSettingsSheetProps {
   jid: string | null            // null = closed
   displayName: string | null
@@ -210,14 +212,14 @@ export function ContactSettingsSheet({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleSetTtl(Math.floor(Date.now() / 1000) + 86400)}
+                onClick={() => handleSetTtl(Math.floor(Date.now() / 1000) + SECONDS_PER_DAY)}
               >
                 Grant 24h
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleSetTtl(Math.floor(Date.now() / 1000) + 7 * 86400)}
+                onClick={() => handleSetTtl(Math.floor(Date.now() / 1000) + 7 * SECONDS_PER_DAY)}
               >
                 Grant 7d
               </Button>

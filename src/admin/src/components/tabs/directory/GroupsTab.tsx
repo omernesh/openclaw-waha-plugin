@@ -18,7 +18,7 @@ interface GroupsTabProps {
   pagination: { pageIndex: number; pageSize: number }
   onPaginationChange: (p: { pageIndex: number; pageSize: number }) => void
   loading: boolean
-  onRefresh?: () => void  // trigger parent data reload after bulk/settings changes
+  onRefresh?: () => void  // reserved — trigger parent data reload after bulk/settings changes (wired but not yet consumed)
 }
 
 // Format a timestamp (seconds since epoch) as a readable date string
@@ -36,8 +36,8 @@ const columns: ColumnDef<DirectoryContact, unknown>[] = [
   {
     id: 'expand',
     header: '',
-    cell: ({ row, table }) => {
-      const expandedRowId = (table.options.meta as { expandedRowId?: string | null } | undefined)?.expandedRowId
+    cell: ({ row, column }) => {
+      const expandedRowId = (column.columnDef.meta as { expandedRowId?: string | null } | undefined)?.expandedRowId
       const isExpanded = expandedRowId === row.original.jid
       return (
         <ChevronDown

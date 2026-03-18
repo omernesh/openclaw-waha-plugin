@@ -51,7 +51,7 @@ export function TagInput({
     }
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      searchFn(inputValue).then(setSearchResults).catch(() => setSearchResults([]))
+      searchFn(inputValue).then(setSearchResults).catch((err) => { console.error('TagInput search failed:', err); setSearchResults([]) })
     }, 300)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)

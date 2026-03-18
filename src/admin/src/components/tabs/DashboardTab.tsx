@@ -29,7 +29,7 @@ function formatTs(ts: number): string {
   return new Date(ts).toLocaleTimeString()
 }
 
-function healthBadgeVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
+function statusBadgeVariant(status: string): 'default' | 'destructive' | 'secondary' | 'outline' {
   const s = status?.toLowerCase() ?? ''
   if (s === 'healthy' || s === 'ok') return 'default'
   if (s === 'unhealthy' || s === 'error' || s === 'disconnected') return 'destructive'
@@ -75,10 +75,10 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
               deduped.forEach((j) => resolvedJidsRef.current.add(j))
               setResolvedNames((prev) => ({ ...prev, ...r.resolved }))
             })
-            .catch(() => {})
+            .catch((err) => console.error('Name resolution failed:', err))
         }
       })
-      .catch(() => {})
+      .catch((err) => console.error('Dashboard data fetch failed:', err))
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
@@ -139,7 +139,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                   <span className="font-medium min-w-[120px]">
                     {session.name || session.sessionId}
                   </span>
-                  <Badge variant={healthBadgeVariant(session.healthStatus)}>
+                  <Badge variant={statusBadgeVariant(session.healthStatus)}>
                     {session.healthStatus || 'unknown'}
                   </Badge>
                   {session.consecutiveFailures > 0 && (

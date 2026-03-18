@@ -125,7 +125,7 @@ export interface WahaConfig {
 }
 
 // Session from GET /api/admin/sessions — DO NOT CHANGE: API returns sessionId (not id)
-// TabHeader.tsx uses sessionId throughout. Confirmed from monitor.ts lines 4914-4963.
+// TabHeader.tsx uses sessionId throughout. Matches GET /api/admin/sessions response shape.
 export interface Session {
   sessionId: string  // API returns sessionId, NOT id
   name: string
@@ -172,7 +172,7 @@ export interface DirectoryResponse {
 }
 
 export interface DirectoryParams {
-  type?: string;
+  type?: 'contact' | 'group' | 'newsletter';
   search?: string;
   limit?: string;
   offset?: string;

@@ -13,6 +13,10 @@ interface LogTabProps {
   onLoadingChange?: (loading: boolean) => void
 }
 
+const LOG_LINE_LIMIT = 300
+const SCROLL_THRESHOLD_PX = 50
+const SEARCH_DEBOUNCE_MS = 300 // normalized to match DirectoryTab/TagInput
+
 type LogLevel = 'all' | 'info' | 'warn' | 'error'
 
 const LEVEL_LABELS: { value: LogLevel; label: string }[] = [
@@ -49,7 +53,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     (level: LogLevel, search: string, abortSignal?: AbortSignal) => {
       setLoading(true)
       api.getLogs({
-        lines: 300,
+        lines: LOG_LINE_LIMIT,
         level: level === 'all' ? undefined : level,
         search: search.trim() || undefined,
       })
@@ -81,7 +85,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       fetchLogs(activeLevel, pendingSearchRef.current)
-    }, 400)
+    }, SEARCH_DEBOUNCE_MS)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
@@ -107,7 +111,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
   function handleScroll() {
     const el = scrollRef.current
     if (!el) return
-    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 50
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_THRESHOLD_PX
     if (atBottom) {
       userScrolledUpRef.current = false
       setShowScrollToBottom(false)

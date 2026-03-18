@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { Session } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -77,8 +78,11 @@ export default function SessionsTab({ selectedSession: _selectedSession, refresh
         setOverrides(initial)
         setFetchedRoles(initial)
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setError(true)
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          console.error('Sessions fetch failed:', err)
+          setError(true)
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
@@ -116,6 +120,8 @@ export default function SessionsTab({ selectedSession: _selectedSession, refresh
       )
       await api.restart()
       setRestarting(true)
+    } catch (err) {
+      toast.error(`Save & Restart failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSaving(false)
     }

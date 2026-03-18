@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, extname, dirname } from "node:path";
+import { join, extname, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import {
@@ -288,6 +288,8 @@ async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>
           botJidCache.set(acc.session, { jid: me.id, fetchedAt: now });
           result.add(me.id);
         }
+      } else {
+        console.warn(`fetchBotJids: ${acc.session} returned ${r.status}`);
       }
     } catch (err) {
       console.warn(`[waha] fetchBotJids: failed to fetch me for ${acc.session}: ${String(err)}`);
@@ -497,6 +499,12 @@ export function createWahaWebhookServer(opts: {
     if (req.url?.startsWith("/assets/")) {
       const safePath = req.url.split("?")[0].replace(/\.\./g, "");
       const filePath = join(ADMIN_DIST, safePath);
+      const resolved = resolve(filePath);
+      if (!resolved.startsWith(resolve(ADMIN_DIST))) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
       if (existsSync(filePath)) {
         const mime = ADMIN_MIME[extname(filePath)] ?? "application/octet-stream";
         const buf = readFileSync(filePath);
@@ -511,6 +519,7 @@ export function createWahaWebhookServer(opts: {
 
     // GET /api/admin/stats
     if (req.url === "/api/admin/stats" && req.method === "GET") {
+      try {
       const dmFilter = getDmFilterForAdmin(opts.config, opts.accountId);
       const dmCfg = account.config.dmFilter ?? {};
       const groupFilter = getGroupFilterForAdmin(opts.config, opts.accountId);
@@ -529,7 +538,7 @@ export function createWahaWebhookServer(opts: {
             const result = getDirectoryDb(acct.accountId).resolveLidToCus(lid);
             if (result) return result;
           }
-        } catch { /* non-critical */ }
+        } catch (err) { console.warn('Cross-account LID resolution failed:', err); }
         // 2. Fall back to WAHA API — fetch the mapping and cache it
         try {
           const { findWahaPhoneByLid } = await import("./send.js");
@@ -542,7 +551,7 @@ export function createWahaWebhookServer(opts: {
               return cusJid;
             }
           }
-        } catch { /* WAHA fallback is best-effort */ }
+        } catch (err) { console.warn('WAHA LID fallback failed:', err); }
         return null;
       }
       async function dedupLidServerAsync(arr: string[]): Promise<string[]> {
@@ -619,6 +628,10 @@ export function createWahaWebhookServer(opts: {
           };
         }),
       }));
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/stats failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
       return;
     }
 
@@ -809,7 +822,7 @@ export function createWahaWebhookServer(opts: {
                   resolved[jid] = name;
                 }
               }
-            } catch { /* non-critical — fallback resolution is best-effort */ }
+            } catch (err) { console.warn('Cross-account name resolution failed:', err); }
           }
           writeJsonResponse(res, 200, { resolved });
         } catch (err) {
@@ -869,7 +882,7 @@ export function createWahaWebhookServer(opts: {
                   }
                 }
               }
-            } catch { /* WAHA fallback is best-effort — don't fail the request */ }
+            } catch (err) { console.warn('WAHA contact fallback failed:', err); }
           }
           if (!contact) {
             res.writeHead(404, { "Content-Type": "application/json" });
@@ -1345,8 +1358,8 @@ export function createWahaWebhookServer(opts: {
                 { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": wahaApiKey }, body: "{}" }
               );
               if (resp.ok) updated++;
-            } catch (_) {
-              // skip individual failures — caller sees partial updated count
+            } catch (err) {
+              console.warn('Bulk follow/unfollow failed for channel:', err);
             }
           }
         }

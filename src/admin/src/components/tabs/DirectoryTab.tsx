@@ -15,6 +15,9 @@ import { ContactsTab } from './directory/ContactsTab'
 import { ChannelsTab } from './directory/ChannelsTab'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// Map sub-tab name to API type parameter — hoisted to module scope to avoid recreating on every render
+const typeMap: Record<string, string> = { contacts: 'contact', groups: 'group', channels: 'newsletter' }
+
 interface DirectoryTabProps {
   selectedSession: string
   refreshKey: number
@@ -29,6 +32,7 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
   const [data, setData] = useState<DirectoryResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   // DO NOT CHANGE: refreshCounter triggers re-fetch when sub-tabs call onRefresh after bulk/settings changes
   const [refreshCounter, setRefreshCounter] = useState(0)
 
@@ -46,12 +50,13 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
     }, 300)
   }
 
-  // Map sub-tab to API type parameter
-  const typeMap: Record<string, string> = { contacts: 'contact', groups: 'group', channels: 'newsletter' }
+  // typeMap hoisted to module scope (see top of file)
 
   // DO NOT CHANGE: refreshCounter added to deps so sub-tab onRefresh callbacks trigger re-fetch
   useEffect(() => {
+    const controller = new AbortController()
     setLoading(true)
+    setError(null)
     const offset = pagination.pageIndex * pagination.pageSize
     api.getDirectory({
       type: typeMap[activeSubTab],
@@ -59,9 +64,16 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
       limit: String(pagination.pageSize),
       offset: String(offset),
     }).then(r => {
+      if (controller.signal.aborted) return
       setData(r)
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch((err) => {
+      if (controller.signal.aborted) return
+      console.error('Directory data fetch failed:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load directory')
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false)
+    })
+    return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSubTab, searchQuery, pagination.pageIndex, pagination.pageSize, refreshKey, refreshCounter])
 
@@ -84,6 +96,14 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
       <div className="flex flex-col gap-4 p-1">
         <Skeleton className="h-[40px] w-full" />
         <Skeleton className="h-[400px] w-full" />
+      </div>
+    )
+  }
+
+  if (error && data === null) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <p>Failed to load directory: {error}</p>
       </div>
     )
   }

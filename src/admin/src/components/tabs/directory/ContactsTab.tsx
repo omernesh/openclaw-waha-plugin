@@ -109,7 +109,7 @@ export function ContactsTab({
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 
-  async function handleBulkAction(action: string) {
+  async function handleBulkAction(action: 'allow-dm' | 'revoke-dm') {
     if (selectedJids.length === 0) return
     try {
       const result = await api.bulkDirectory({ action, jids: selectedJids })

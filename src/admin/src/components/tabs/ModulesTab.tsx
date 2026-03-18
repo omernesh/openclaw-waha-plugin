@@ -134,8 +134,9 @@ export default function ModulesTab({ selectedSession: _selectedSession, refreshK
         try {
           const nameRes = await api.resolveNames(jids)
           resolvedNames = nameRes.resolved
-        } catch {
+        } catch (err) {
           // Name resolution failure is non-fatal
+          console.warn('Module name resolution failed:', err)
         }
       }
 

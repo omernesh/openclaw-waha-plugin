@@ -56,7 +56,7 @@ export function TabHeader({
       .then((data) => {
         if (!controller.signal.aborted) setSessions(data)
       })
-      .catch(() => {})
+      .catch((err) => console.error('Failed to load sessions:', err))
     return () => controller.abort()
   }, [])
 

@@ -92,7 +92,7 @@ export function ChannelsTab({
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 
-  async function handleBulkAction(action: 'follow' | 'unfollow' | string) {
+  async function handleBulkAction(action: 'follow' | 'unfollow') {
     if (selectedJids.length === 0) return
     try {
       const result = await api.bulkDirectory({ action, jids: selectedJids })

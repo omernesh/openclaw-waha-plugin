@@ -39,7 +39,8 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
         setAllowAll(r.allowAll)
         setLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Failed to load participants:', err)
         toast.error('Failed to load participants')
         setLoading(false)
       })
@@ -55,7 +56,8 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
       const r = await api.getGroupParticipants(groupJid)
       setParticipants(r.participants)
       setAllowAll(r.allowAll)
-    } catch {
+    } catch (err) {
+      console.error('handleAllowAll failed:', err)
       toast.error('Failed to update participants')
     }
   }
@@ -69,7 +71,8 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
         prev.map(x => x.participantJid === p.participantJid ? { ...x, allowInGroup: newValue } : x)
       )
       toast.success(`${p.displayName ?? p.participantJid} ${newValue ? 'allowed in group' : 'blocked in group'}`)
-    } catch {
+    } catch (err) {
+      console.error('handleAllowInGroup failed:', err)
       toast.error('Failed to update participant')
     }
   }
@@ -81,7 +84,8 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
         prev.map(x => x.participantJid === p.participantJid ? { ...x, allowDm: newValue } : x)
       )
       toast.success(`${p.displayName ?? p.participantJid} DM ${newValue ? 'allowed' : 'blocked'}`)
-    } catch {
+    } catch (err) {
+      console.error('handleAllowDm failed:', err)
       toast.error('Failed to update participant')
     }
   }
@@ -97,7 +101,8 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
         )
       )
       toast.success(`Role updated to ${newRole}`)
-    } catch {
+    } catch (err) {
+      console.error('handleRoleChange failed:', err)
       toast.error('Failed to update participant role')
     }
   }

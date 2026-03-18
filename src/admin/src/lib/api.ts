@@ -7,6 +7,7 @@ import type {
   ConfigResponse,
   SessionsResponse,
   DirectoryResponse,
+  DirectoryContact,
   DirectoryParams,
   HealthResponse,
   QueueResponse,
@@ -15,9 +16,8 @@ import type {
   GroupFilterResponse,
   ParticipantsResponse,
   LogResponse,
+  WahaConfig,
 } from '@/types'
-// Note: DirectoryContact and ParticipantEnriched are now the correct types.
-// DirectoryEntry and Participant were placeholder types — removed in Phase 21.
 
 const BASE = '/api/admin'
 
@@ -52,7 +52,7 @@ export const api = {
 
   // Config
   getConfig: () => request<ConfigResponse>('/config'),
-  updateConfig: (body: { waha: Record<string, unknown> }) =>
+  updateConfig: (body: { waha: Partial<WahaConfig> }) =>
     request<void>('/config', { method: 'POST', body: JSON.stringify(body) }),
 
   // Sessions
@@ -69,7 +69,7 @@ export const api = {
     return request<DirectoryResponse>(`/directory${qs}`)
   },
   getDirectoryEntry: (jid: string) =>
-    request<unknown>(`/directory/${encodeURIComponent(jid)}`),
+    request<DirectoryContact>(`/directory/${encodeURIComponent(jid)}`),
   updateDirectorySettings: (jid: string, body: Record<string, unknown>) =>
     request<void>(`/directory/${encodeURIComponent(jid)}/settings`, {
       method: 'PUT',
@@ -163,7 +163,7 @@ export const api = {
   restart: () => request<void>('/restart', { method: 'POST' }),
 
   // Bulk directory operations — returns { ok: true, updated: number }
-  bulkDirectory: (body: { action: string; jids: string[]; value?: unknown; groupJid?: string }) =>
+  bulkDirectory: (body: { action: 'allow-dm' | 'revoke-dm' | 'set-role' | 'follow' | 'unfollow'; jids: string[]; value?: unknown; groupJid?: string }) =>
     request<{ ok: boolean; updated: number }>('/directory/bulk', { method: 'POST', body: JSON.stringify(body) }),
 
   // Pairing

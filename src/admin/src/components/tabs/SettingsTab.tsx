@@ -61,7 +61,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
         setConfig(resp.waha)
         setDirty(false)
       })
-      .catch(() => {})
+      .catch((err) => console.error('Settings config fetch failed:', err))
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
@@ -69,26 +69,32 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     return () => controller.abort()
   }, [refreshKey])
 
-  // Resolve JID names whenever config changes
-  React.useEffect(() => {
-    if (!config) return
-
+  // Stable key derived from JIDs in config — avoids re-firing on every keystroke
+  const jidKey = React.useMemo(() => {
+    if (!config) return ''
     const allJids: string[] = [
       ...(config.allowFrom ?? []),
       ...(config.groupAllowFrom ?? []),
       ...(config.allowedGroups ?? []),
-      ...(config.dmFilter?.godModeSuperUsers ?? []).map((u) => u.identifier),
-      ...(config.groupFilter?.godModeSuperUsers ?? []).map((u) => u.identifier),
-    ].filter((jid) => jid && jid !== '*')
+      ...(config.dmFilter?.godModeSuperUsers?.map(u => typeof u === 'string' ? u : u.identifier) ?? []),
+      ...(config.groupFilter?.godModeSuperUsers?.map(u => typeof u === 'string' ? u : u.identifier) ?? []),
+    ]
+    return allJids.sort().join(',')
+  }, [config])
 
+  // Resolve JID names whenever the JID list changes (not on every config keystroke)
+  React.useEffect(() => {
+    if (!jidKey) return
+
+    const allJids = jidKey.split(',').filter((jid) => jid && jid !== '*')
     if (allJids.length === 0) return
 
     api.resolveNames(allJids)
       .then((resp) => {
         setResolvedNames((prev) => ({ ...prev, ...resp.resolved }))
       })
-      .catch(() => {})
-  }, [config])
+      .catch((err) => console.error('Settings name resolution failed:', err))
+  }, [jidKey])
 
   // Immutable nested config update — sets dirty flag
   function updateConfig(path: string, value: unknown) {
@@ -243,10 +249,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
 
   async function handleSaveAndRestart() {
     setSaving(true)
-    toast.success('Restarting gateway...')
     try {
       await api.updateConfig(buildPayload())
       setDirty(false)
+      toast.success('Restarting gateway...')
       setSaving(false)
       await api.restart()
       setRestarting(true)

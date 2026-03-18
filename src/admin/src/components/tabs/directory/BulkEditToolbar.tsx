@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 interface BulkEditToolbarProps {
   selectedCount: number
   entityType: 'contact' | 'newsletter'  // determines available actions
-  onAction: (action: string) => void
+  onAction: (action: 'allow-dm' | 'revoke-dm' | 'follow' | 'unfollow') => void
   onCancel: () => void
 }
 
