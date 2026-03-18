@@ -84,8 +84,9 @@ export const api = {
     }),
   refreshDirectory: () =>
     request<void>('/directory/refresh', { method: 'POST' }),
+  // Server returns { resolved: Record<string, string> } — use response.resolved to access names.
   resolveNames: (jids: string[]) =>
-    request<Record<string, string>>(`/directory/resolve?jids=${encodeURIComponent(jids.join(','))}`),
+    request<{ resolved: Record<string, string> }>(`/directory/resolve?jids=${encodeURIComponent(jids.join(','))}`),
 
   // Per-group filter overrides
   getGroupFilter: (groupJid: string) =>
@@ -99,15 +100,17 @@ export const api = {
   // Group participants
   getGroupParticipants: (groupJid: string) =>
     request<ParticipantsResponse>(`/directory/group/${encodeURIComponent(groupJid)}/participants`),
-  toggleParticipantAllowGroup: (groupJid: string, participantJid: string) =>
+  // allowed: the NEW desired state (true = allow, false = revoke). Server is a set operation, not a toggle.
+  toggleParticipantAllowGroup: (groupJid: string, participantJid: string, allowed: boolean) =>
     request<void>(
       `/directory/group/${encodeURIComponent(groupJid)}/participants/${encodeURIComponent(participantJid)}/allow-group`,
-      { method: 'POST' },
+      { method: 'POST', body: JSON.stringify({ allowed }) },
     ),
-  toggleParticipantAllowDm: (groupJid: string, participantJid: string) =>
+  // allowed: the NEW desired state (true = allow, false = revoke). Server is a set operation, not a toggle.
+  toggleParticipantAllowDm: (groupJid: string, participantJid: string, allowed: boolean) =>
     request<void>(
       `/directory/group/${encodeURIComponent(groupJid)}/participants/${encodeURIComponent(participantJid)}/allow-dm`,
-      { method: 'POST' },
+      { method: 'POST', body: JSON.stringify({ allowed }) },
     ),
   updateParticipantRole: (groupJid: string, participantJid: string, body: { role: string }) =>
     request<void>(
