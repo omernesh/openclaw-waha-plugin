@@ -96,9 +96,8 @@ Plans:
   5. Save & Restart shows a blocking overlay while the gateway restarts and polling confirms it is back up
 **Plans**: 2 plans
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
-
+- [ ] 20-01-PLAN.md — Radix primitives, shadcn components, types fix, labels, TagInput, RestartOverlay, DashboardTab
+- [ ] 20-02-PLAN.md — SettingsTab with config form, tag inputs, contact picker, Save & Restart
 ### Phase 21: Directory Tab
 **Goal**: The Directory tab is rebuilt as a full-featured data table with instant FTS search, a persistent contact settings sheet, bulk edit for all entity types, and correctly resolved participant names.
 **Depends on**: Phase 19
@@ -184,7 +183,7 @@ Plans:
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 19. App Layout | 2/2 | Complete    | 2026-03-18 | - |
-| 20. Dashboard and Settings Tabs | v1.12 | 0/TBD | Not started | - |
+| 20. Dashboard and Settings Tabs | v1.12 | 0/2 | Not started | - |
 | 21. Directory Tab | v1.12 | 0/TBD | Not started | - |
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
 | 23. Polish | v1.12 | 0/TBD | Not started | - |
