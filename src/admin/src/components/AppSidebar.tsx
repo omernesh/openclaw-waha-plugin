@@ -1,0 +1,111 @@
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarGroup,
+  SidebarGroupContent,
+  useSidebar,
+} from '@/components/ui/sidebar'
+import {
+  LayoutDashboard,
+  Settings,
+  BookUser,
+  MonitorSmartphone,
+  Puzzle,
+  FileText,
+  ListOrdered,
+  Sun,
+  Moon,
+} from 'lucide-react'
+import { useTheme } from '@/hooks/useTheme'
+import { Button } from '@/components/ui/button'
+
+// TabId exported for use in App.tsx and TabHeader.tsx
+export type TabId =
+  | 'dashboard'
+  | 'settings'
+  | 'directory'
+  | 'sessions'
+  | 'modules'
+  | 'log'
+  | 'queue'
+
+const NAV_ITEMS = [
+  { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'settings' as const,  label: 'Settings',  icon: Settings },
+  { id: 'directory' as const, label: 'Directory', icon: BookUser },
+  { id: 'sessions' as const,  label: 'Sessions',  icon: MonitorSmartphone },
+  { id: 'modules' as const,   label: 'Modules',   icon: Puzzle },
+  { id: 'log' as const,       label: 'Log',       icon: FileText },
+  { id: 'queue' as const,     label: 'Queue',     icon: ListOrdered },
+]
+
+interface AppSidebarProps {
+  activeTab: TabId
+  onTabChange: (tab: TabId) => void
+}
+
+// DO NOT CHANGE: useSidebar() must be called inside AppSidebar which is a child of SidebarProvider.
+// Never add a second SidebarProvider inside this component — it will break the context chain.
+// setOpenMobile(false) is required for Sheet auto-close on mobile tab selection (verified 2026-03-18).
+export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
+  const { isMobile, setOpenMobile } = useSidebar()
+  const { theme, toggle } = useTheme()
+
+  function handleTabClick(tabId: TabId) {
+    onTabChange(tabId)
+    // Close the Sheet drawer on mobile when a tab is selected
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
+  return (
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-1">
+          <span className="text-sm font-semibold tracking-tight">WAHA Admin</span>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {NAV_ITEMS.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    isActive={activeTab === item.id}
+                    tooltip={item.label}
+                    onClick={() => handleTabClick(item.id)}
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <div className="flex items-center justify-between px-2 py-1">
+          <span className="text-xs text-muted-foreground">Theme</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggle}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+        </div>
+      </SidebarFooter>
+    </Sidebar>
+  )
+}
