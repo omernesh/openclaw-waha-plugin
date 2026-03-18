@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
-status: active
-stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-03-18T15:12:33.761Z"
-last_activity: 2026-03-18 — Roadmap created (7 phases, 38 requirements mapped)
+status: completed
+stopped_at: Completed 18-02-PLAN.md
+last_updated: "2026-03-18T15:23:44.121Z"
+last_activity: "2026-03-18 — 18-01 executed: Vite+React+Tailwind scaffold + typed API client"
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -49,6 +49,8 @@ Progress: [█████░░░░░] 50% — Phase 18 Plan 1/2 complete
 - [Phase 18-01]: Used --legacy-peer-deps for npm install (vite@8/vitest peer conflict)
 - [Phase 18-01]: dist/ added to .gitignore; npm publish uses files allowlist to include dist/admin/
 - [Phase 18-01]: All 30+ api.ts methods are live (none commented out) — route audit confirmed all exist in monitor.ts
+- [Phase 18-react-scaffold]: ADMIN_DIST dual-path probing at startup automatically adapts to local dev vs hpg6 flat deploy layout
+- [Phase 18-react-scaffold]: dist/admin/ deployed to plugin_root/dist/admin/ (adjacent to src/) on both hpg6 locations
 
 ### Pending Todos
 
@@ -62,6 +64,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T15:12:33.755Z
-Stopped at: Completed 18-01-PLAN.md
+Last session: 2026-03-18T15:23:44.117Z
+Stopped at: Completed 18-02-PLAN.md
 Resume file: None

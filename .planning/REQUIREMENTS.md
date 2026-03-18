@@ -9,11 +9,11 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 ### Scaffold
 
-- [ ] **SCAF-01**: Vite + React + TypeScript project initialized in `src/admin/` with build output to `dist/admin/`
-- [ ] **SCAF-02**: shadcn/ui initialized with Tailwind CSS, dark/light theme via CSS variables
-- [ ] **SCAF-03**: monitor.ts serves static files from `dist/admin/` instead of embedded HTML strings
-- [ ] **SCAF-04**: API client utility wraps all `/api/admin/*` calls with error handling
-- [ ] **SCAF-05**: npm package updated to include Vite build output, `build` script chains `tsc` + `vite build`
+- [x] **SCAF-01**: Vite + React + TypeScript project initialized in `src/admin/` with build output to `dist/admin/`
+- [x] **SCAF-02**: shadcn/ui initialized with Tailwind CSS, dark/light theme via CSS variables
+- [x] **SCAF-03**: monitor.ts serves static files from `dist/admin/` instead of embedded HTML strings
+- [x] **SCAF-04**: API client utility wraps all `/api/admin/*` calls with error handling
+- [x] **SCAF-05**: npm package updated to include Vite build output, `build` script chains `tsc` + `vite build`
 
 ### Layout
 
@@ -103,11 +103,11 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCAF-01 | Phase 18 | Pending |
-| SCAF-02 | Phase 18 | Pending |
-| SCAF-03 | Phase 18 | Pending |
-| SCAF-04 | Phase 18 | Pending |
-| SCAF-05 | Phase 18 | Pending |
+| SCAF-01 | Phase 18 | Complete |
+| SCAF-02 | Phase 18 | Complete |
+| SCAF-03 | Phase 18 | Complete |
+| SCAF-04 | Phase 18 | Complete |
+| SCAF-05 | Phase 18 | Complete |
 | LYOT-01 | Phase 19 | Pending |
 | LYOT-02 | Phase 19 | Pending |
 | LYOT-03 | Phase 19 | Pending |
