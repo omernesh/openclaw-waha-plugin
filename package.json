@@ -8,6 +8,7 @@
     "index.ts",
     "src/",
     "!src/**/*.bak*",
+    "dist/admin/",
     "docs/",
     "!docs/extra phase/",
     "SKILL.md",
