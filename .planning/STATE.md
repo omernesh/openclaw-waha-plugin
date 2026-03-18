@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
 status: completed
-stopped_at: Completed 18-02-PLAN.md
-last_updated: "2026-03-18T16:08:19.366Z"
+stopped_at: Completed 19-01-PLAN.md
+last_updated: "2026-03-18T16:31:21.042Z"
 last_activity: "2026-03-18 — 18-01 executed: Vite+React+Tailwind scaffold + typed API client"
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 50
 ---
 
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-18)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** v1.12 UI Overhaul — Phase 18 Plan 1 complete, Plan 2 (Static File Serving) is next
+**Current focus:** v1.12 UI Overhaul — Phase 19 Plan 1 complete, Plan 2 (App Layout Wiring) is next
 
 ## Current Position
 
-Phase: 18 — React Scaffold (In Progress — 1/2 plans complete)
-Plan: 18-02 next
-Status: 18-01 complete, ready for 18-02
-Last activity: 2026-03-18 — 18-01 executed: Vite+React+Tailwind scaffold + typed API client
+Phase: 19 — App Layout (In Progress — 1/2 plans complete)
+Plan: 19-02 next
+Status: 19-01 complete (shadcn/ui components + useTheme + 7 tab placeholders), ready for 19-02
+Last activity: 2026-03-18 — 19-01 executed: shadcn/ui components + Tailwind v4 dark mode + tab placeholders
 
 ```
-Progress: [█████░░░░░] 50% — Phase 18 Plan 1/2 complete
+Progress: [████████░░] 75% — Phase 19 Plan 1/2 complete
 ```
 
 ## Accumulated Context
@@ -51,6 +51,7 @@ Progress: [█████░░░░░] 50% — Phase 18 Plan 1/2 complete
 - [Phase 18-01]: All 30+ api.ts methods are live (none commented out) — route audit confirmed all exist in monitor.ts
 - [Phase 18-react-scaffold]: ADMIN_DIST dual-path probing at startup automatically adapts to local dev vs hpg6 flat deploy layout
 - [Phase 18-react-scaffold]: dist/admin/ deployed to plugin_root/dist/admin/ (adjacent to src/) on both hpg6 locations
+- [Phase 19-app-layout]: shadcn components written manually (CLI incompatible with monorepo layout; no package.json in src/admin/)
 
 ### Pending Todos
 
@@ -64,6 +65,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T15:23:44.117Z
-Stopped at: Completed 18-02-PLAN.md
+Last session: 2026-03-18T16:31:21.037Z
+Stopped at: Completed 19-01-PLAN.md
 Resume file: None
