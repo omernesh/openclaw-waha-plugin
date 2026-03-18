@@ -65,7 +65,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. The API client utility can call any `/api/admin/*` endpoint and surface errors (not silently swallow them)
   4. Dark and light CSS variables are present in the Tailwind theme configuration
   5. The npm package includes the built `dist/admin/` output when published
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 19: App Layout
 **Goal**: The admin panel has a complete navigation shell with all 7 tabs reachable, a working dark/light theme toggle, a mobile-responsive sidebar, and a consistent per-tab header.
@@ -76,7 +79,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. Clicking the theme toggle switches between dark and light mode; reopening the browser tab restores the last-chosen theme
   3. On a mobile viewport (under 768px), the sidebar is hidden and accessible via a hamburger/sheet drawer
   4. Each tab has a consistent header area with a session selector and a refresh button
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 20: Dashboard and Settings Tabs
 **Goal**: The Dashboard and Settings tabs are fully rebuilt as React components, displaying all information from the old panel with improved UX — labeled cards, collapsible sections, and accessible form controls.
@@ -88,7 +94,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. All Settings controls (switches, selects, text inputs) render as proper React form components and submit changes to the backend
   4. JID fields in Settings use a tag-style input with name search (Combobox/Command); mention patterns use tag-style input
   5. Save & Restart shows a blocking overlay while the gateway restarts and polling confirms it is back up
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 21: Directory Tab
 **Goal**: The Directory tab is rebuilt as a full-featured data table with instant FTS search, a persistent contact settings sheet, bulk edit for all entity types, and correctly resolved participant names.
@@ -101,7 +110,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   4. Bulk edit mode is available on Contacts and Channels tabs (matching the existing Groups pattern) with a multi-select toolbar
   5. Group participant rows resolve names from the local DB; bot session rows show a badge and have no allow/block action buttons
   6. The bot's own session JIDs do not appear in the contacts list
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 22: Sessions, Modules, Log, and Queue Tabs
 **Goal**: The four remaining tabs — Sessions, Modules, Log, and Queue — are fully rebuilt as React components with all existing functionality intact.
@@ -113,7 +125,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. Modules tab lists all registered modules with enable/disable toggles, inline config forms, and group/contact assignment pickers
   4. Log tab displays log entries with virtual scrolling (no browser freeze on large logs), level filter chips, and a search box with a clear button
   5. Queue tab displays current queue status (DM queue depth, group queue depth, processing state) as React components
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 23: Polish
 **Goal**: The React admin panel has consistent loading states, graceful error handling, actionable toast notifications, and visible refresh timestamps across all tabs.
@@ -125,7 +140,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. If one tab's API call fails completely, that tab shows an error state without crashing the rest of the panel
   4. Refresh buttons show a spinner while fetching and display a "Last refreshed HH:MM:SS" timestamp after completion
   5. Tooltips in the Directory and Settings tabs render correctly above table overflow boundaries (via React portals, no clipping)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ### Phase 24: Cleanup and Deploy
 **Goal**: The old embedded HTML/JS/CSS is removed from monitor.ts, the build and deploy pipeline is updated to include the Vite build, and the panel is verified end-to-end on hpg6.
@@ -136,7 +154,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. Running `npm run build` chains `tsc` and `vite build` in one command and the output is ready to publish
   3. The deploy script (or documented workflow) copies `dist/admin/` to both hpg6 locations alongside the TypeScript build output
   4. The admin panel on hpg6 loads the React build and all 7 tabs function correctly after deployment
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
+- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
 
 ## Progress
 
@@ -161,7 +182,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 | 15. TTL Access | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 16. Pairing Mode and Auto-Reply | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
-| 18. React Scaffold | v1.12 | 0/TBD | Not started | - |
+| 18. React Scaffold | v1.12 | 0/2 | Not started | - |
 | 19. App Layout | v1.12 | 0/TBD | Not started | - |
 | 20. Dashboard and Settings Tabs | v1.12 | 0/TBD | Not started | - |
 | 21. Directory Tab | v1.12 | 0/TBD | Not started | - |
