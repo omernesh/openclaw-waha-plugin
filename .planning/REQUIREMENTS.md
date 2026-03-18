@@ -1,206 +1,153 @@
 # Requirements: WAHA OpenClaw Plugin
 
-**Defined:** 2026-03-17
+**Defined:** 2026-03-18
 **Core Value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
 
-## v1.11 Requirements
+## v1.12 Requirements
 
-Requirements for v1.11 milestone. Each maps to roadmap phases.
+Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
-### UI Bug Fixes
+### Scaffold
 
-- [x] **UI-01**: Dashboard Access Control card stops flickering/re-rendering every few seconds (BUG-02)
-- [x] **UI-02**: DM Keyword Filter stats use clear labels — "Passed" vs "Filtered" instead of "Allowed" vs "Dropped" (BUG-03)
-- [x] **UI-03**: Sessions tab role/subRole dropdown updates visually immediately after save without page flicker (BUG-04)
-- [x] **UI-04**: Sessions tab handles 502 during restart gracefully with polling overlay instead of raw error (BUG-05)
-- [x] **UI-05**: Directory search bar 'x' button clears search text and resets results (BUG-07)
-- [x] **UI-06**: Tooltips render above container overflow boundaries and are fully readable (BUG-08)
-- [x] **UI-07**: Contact settings drawer stays open after saving, shows success toast (BUG-09)
-- [x] **UI-08**: DM Policy dropdown removes "pairing (not available)" option; auto-migrates config if set (BUG-13)
-- [x] **UI-09**: Queue tab Refresh button shows spinner and "Last refreshed" timestamp (BUG-14)
-- [x] **UI-10**: Per-group trigger operator visible even when inheriting global (grayed out with effective value) (BUG-17)
-- [x] **UI-11**: Channels tab Allow DM button is a toggle with clear visual state and undo capability (BUG-18)
+- [ ] **SCAF-01**: Vite + React + TypeScript project initialized in `src/admin/` with build output to `dist/admin/`
+- [ ] **SCAF-02**: shadcn/ui initialized with Tailwind CSS, dark/light theme via CSS variables
+- [ ] **SCAF-03**: monitor.ts serves static files from `dist/admin/` instead of embedded HTML strings
+- [ ] **SCAF-04**: API client utility wraps all `/api/admin/*` calls with error handling
+- [ ] **SCAF-05**: npm package updated to include Vite build output, `build` script chains `tsc` + `vite build`
 
-### Dashboard Polish
+### Layout
 
-- [x] **DASH-01**: Dashboard health section shows per-session health details (CR-01)
-- [x] **DASH-02**: Dashboard filter cards (DM Keyword, Group Keyword) are collapsible (CR-02)
-- [x] **DASH-03**: Dashboard labels use human-readable text — "wpm" → "Words Per Minute", etc. (CR-03)
-- [x] **DASH-04**: Dashboard stats show per-session breakdowns with session name sub-headers (CR-04)
+- [ ] **LYOT-01**: Sidebar navigation with all 7 tabs (Dashboard, Settings, Directory, Sessions, Modules, Log, Queue)
+- [ ] **LYOT-02**: Dark/light theme toggle persisted to localStorage
+- [ ] **LYOT-03**: Mobile-responsive layout (sidebar collapses to sheet/drawer on small screens)
+- [ ] **LYOT-04**: Consistent header with session selector and refresh button per tab
 
-### Sessions & Settings UX
+### Dashboard Tab
 
-- [x] **UX-01**: Sessions tab has labels above role/subRole dropdowns with explanatory text box (CR-05)
-- [x] **UX-02**: Log tab search bar has 'x' clear button (CR-06)
-- [x] **UX-03**: All Refresh buttons across all tabs show spinner + "Last refreshed" timestamp on click (CR-07)
-- [x] **UX-04**: Custom Keywords field in contact settings uses tag-style input with pill bubbles (CR-09)
-- [x] **UX-05**: Mention Patterns field uses tag-style input with pill bubbles (CR-11)
-- [x] **UX-06**: Group Filter Override Keywords field uses tag-style input with pill bubbles (CR-13)
+- [ ] **DASH-01**: Dashboard cards rebuilt as React Card components with per-session stats
+- [ ] **DASH-02**: Health section shows per-session health details
+- [ ] **DASH-03**: Human-readable labels throughout — no raw config keys
+- [ ] **DASH-04**: Filter cards are collapsible
+- [ ] **DASH-05**: Access Control resolves all JID formats (@c.us, @lid, bare numbers) to names
 
-### Background Sync & Directory
+### Settings Tab
 
-- [x] **SYNC-01**: Background WAHA→SQLite sync continuously pulls contacts/groups/newsletters with rate limiting (CR-08)
-- [x] **SYNC-02**: Directory search queries local SQLite DB, not WAHA API — instant results (CR-08)
-- [x] **SYNC-03**: Sync status indicator shows "Last synced" timestamp and sync progress in Directory tab (CR-08)
-- [x] **SYNC-04**: Contacts tab has pagination matching Groups tab pattern (BUG-15)
-- [x] **SYNC-05**: Directory search finds contacts by name from locally synced data (BUG-06)
+- [ ] **SETT-01**: All settings rebuilt as React form components (switches, selects, inputs)
+- [ ] **SETT-02**: Tag inputs use shadcn Command/Combobox with name search for JID fields
+- [ ] **SETT-03**: Mention patterns use tag-style input
+- [ ] **SETT-04**: Contact picker with search, clear button, and auto-close behavior
+- [ ] **SETT-05**: Save & Restart with polling overlay
 
-### Name Resolution
+### Directory Tab
 
-- [x] **NAME-01**: Dashboard Access Control card resolves @lid JIDs to contact names, merges with @c.us equivalents (BUG-01)
-- [x] **NAME-02**: God Mode Users tag bubbles in Settings display resolved contact/group names (BUG-10)
-- [x] **NAME-03**: God Mode Users contact picker searches local SQLite directory successfully (BUG-11)
-- [x] **NAME-04**: Allow From, Group Allow From, Allowed Groups tag bubbles display resolved names with JID tooltips (BUG-12)
-- [x] **NAME-05**: Group participants display resolved contact names instead of raw LID numbers (BUG-16)
+- [ ] **DIR-01**: Contacts, Groups, Channels sub-tabs rebuilt with shadcn DataTable + pagination
+- [ ] **DIR-02**: Search queries local SQLite via API (FTS5) — instant results
+- [ ] **DIR-03**: Contact settings panel as shadcn Sheet/Dialog — stays open after save
+- [ ] **DIR-04**: Bulk edit mode for Contacts and Channels — same pattern as Groups
+- [ ] **DIR-05**: Group participants resolve names from local DB, bot sessions shown with badge and no action buttons
+- [ ] **DIR-06**: Bot's own sessions filtered from contacts list
+- [ ] **DIR-07**: Custom keywords and group override keywords use tag-style input
 
-### Directory UX
+### Sessions Tab
 
-- [x] **DIR-01**: Directory excludes bot's own session JIDs from contact listing (CR-12)
-- [x] **DIR-02**: Bot session participants shown in groups with "bot" badge but without action buttons (CR-14)
-- [x] **DIR-03**: Contacts tab supports bulk select with checkboxes and bulk action toolbar (Allow DM, Revoke DM, Set Mode) (CR-15)
-- [x] **DIR-04**: Promoting participant to Bot Admin/Manager auto-enables Allow and Allow DM (CR-16)
-- [x] **DIR-05**: Channels tab supports bulk select with checkboxes and bulk action toolbar (CR-17)
+- [ ] **SESS-01**: Session cards rebuilt with labeled role/subRole dropdowns
+- [ ] **SESS-02**: Explanatory text for role options (bot/human, full-access/listener)
+- [ ] **SESS-03**: Optimistic role save with "Restart required" notice, Save & Restart with overlay
 
-### Can Initiate Global Setting
+### Modules Tab
 
-- [x] **INIT-01**: Global "Can Initiate" toggle in Settings tab with default for all contacts (CR-10)
-- [x] **INIT-02**: Per-contact "Can Initiate" becomes override: "Default (use global)" / "Allow" / "Block" (CR-10)
+- [ ] **MODS-01**: Modules list with enable/disable toggles, config forms, group/contact assignment pickers
 
-### Pairing Mode
+### Log Tab
 
-- [x] **PAIR-01**: Unknown contact DMs bot → bot replies with scripted passcode challenge (zero LLM tokens) (FEATURE-01)
-- [x] **PAIR-02**: Correct passcode grants temporary allowlist entry with configurable TTL (FEATURE-01)
-- [x] **PAIR-03**: wa.me deep link with obfuscated passcode parameter enables zero-friction auto-authorization (FEATURE-01)
-- [x] **PAIR-04**: Passcode is configurable per-session in admin panel (FEATURE-01)
-- [x] **PAIR-05**: Admin panel shows active temporary grants with remaining TTL and manual revoke (FEATURE-01)
-- [x] **PAIR-06**: Passcode attempts are rate-limited to prevent brute force (FEATURE-01)
+- [ ] **LOGT-01**: Log viewer rebuilt with virtual scrolling, level filtering, search with clear button
 
-### TTL Access
+### Queue Tab
 
-- [x] **TTL-01**: Contact/group settings card has "Access Expires" field with Never/datetime/duration options (FEATURE-02)
-- [x] **TTL-02**: SQLite allow_list table has expires_at column with automatic expiry enforcement (FEATURE-02)
-- [x] **TTL-03**: Inbound filter checks expires_at before granting access — expired entries treated as blocked (FEATURE-02)
-- [x] **TTL-04**: Admin panel shows remaining time on active TTL grants (FEATURE-02)
-- [x] **TTL-05**: Expired entries visually marked in Directory (grayed out or badge) (FEATURE-02)
+- [ ] **QUEU-01**: Queue status display rebuilt as React components
 
-### Auto-Reply
+### Polish
 
-- [x] **REPLY-01**: Unauthorized DMs receive a configurable canned rejection message (zero LLM tokens) (FEATURE-03)
-- [x] **REPLY-02**: Rejection message supports template variables (e.g., bot admin name) (FEATURE-03)
-- [x] **REPLY-03**: Auto-reply is rate-limited per contact (once per configurable interval, default 24h) (FEATURE-03)
-- [x] **REPLY-04**: "Send rejection message" toggle in Settings (on/off, some admins prefer silent drop) (FEATURE-03)
+- [ ] **PLSH-01**: Toast notifications via Sonner (replace custom toast system)
+- [ ] **PLSH-02**: Loading states with Skeleton components on all data-fetching tabs
+- [ ] **PLSH-03**: Error boundaries per tab (graceful failure isolation)
+- [ ] **PLSH-04**: Refresh buttons show spinner + "Last refreshed" timestamp
 
-### Modules System
+### Cleanup
 
-- [x] **MOD-01**: Module interface defined (init, config schema, inbound hook, outbound hook) (FEATURE-04)
-- [x] **MOD-02**: Module registry for registering and discovering modules at init time (FEATURE-04)
-- [x] **MOD-03**: Modules admin tab between Sessions and Log with enable/disable toggles (FEATURE-04)
-- [x] **MOD-04**: Module assignment UI — which groups/contacts/newsletters each module applies to (FEATURE-04)
-- [x] **MOD-05**: Inbound pipeline checks active modules for incoming chat and routes accordingly (FEATURE-04)
-- [x] **MOD-06**: Modules are WhatsApp-specific — no cross-platform abstraction (FEATURE-04)
+- [ ] **CLNP-01**: Remove all embedded HTML/JS/CSS from monitor.ts (~4000+ lines)
+- [ ] **CLNP-02**: Deploy pipeline updated — build:admin + scp to both hpg6 locations
+- [ ] **CLNP-03**: Tooltips render above overflow boundaries via proper React portals
 
-## v2 Requirements
+## Future Requirements
 
-Deferred to future release.
+### v1.13+ Candidates
 
-### Group Events
-
-- **GRP-01**: Inbound group events (join/leave/promote/demote) detection and handling
-
-### Media Multi-Send
-
-- **MEDIA-01**: Media support for sendMulti (images, videos, files in multi-recipient sends)
-
-### First-Party Modules
-
-- **MODS-01**: Channel moderator module
-- **MODS-02**: Event planner module
+- **MOD-01**: Channel moderator module (content moderation, auto-warnings)
+- **MOD-02**: Event planner module (scheduling, RSVPs, reminders)
+- **PERF-01**: Code-splitting per tab (lazy-load heavy tabs like Directory)
+- **A11Y-01**: Full WCAG 2.1 AA audit and remediation
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Cross-platform module abstraction | Modules are WhatsApp-specific by design decision (2026-03-17) |
-| Claude Code / Cursor adapter | Deferred to future milestone |
-| Scheduled messages | WAHA doesn't support |
-| WhatsApp Business templates | Not applicable for personal assistant |
-| Broadcast lists | WAHA limitation |
-| Call initiation | WAHA limitation |
-| Disappearing messages | Low priority |
-| Hot-reload | Gateway requires restart, not worth engineering around |
-| First-party modules (channel moderator, event planner) | Ship framework only in v1.11, modules in v1.12 |
+| Next.js / SSR framework | Vite SPA is sufficient — no SEO needs for admin panel |
+| React Aria migration | shadcn/ui on Radix provides sufficient accessibility |
+| Backend API changes | API routes stay unchanged — frontend-only rewrite |
+| New backend features | v1.12 is UI-only — no new WhatsApp capabilities |
+| Cross-platform module abstraction | Modules are WhatsApp-specific per decision |
+| Real-time WebSocket updates | Polling is sufficient for admin panel refresh rates |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-01 | Phase 12 | Complete |
-| UI-02 | Phase 12 | Complete |
-| UI-03 | Phase 12 | Complete |
-| UI-04 | Phase 12 | Complete |
-| UI-05 | Phase 12 | Complete |
-| UI-06 | Phase 12 | Complete |
-| UI-07 | Phase 12 | Complete |
-| UI-08 | Phase 12 | Complete |
-| UI-09 | Phase 12 | Complete |
-| UI-10 | Phase 12 | Complete |
-| UI-11 | Phase 12 | Complete |
-| DASH-01 | Phase 12 | Complete |
-| DASH-02 | Phase 12 | Complete |
-| DASH-03 | Phase 12 | Complete |
-| DASH-04 | Phase 12 | Complete |
-| UX-01 | Phase 12 | Complete |
-| UX-02 | Phase 12 | Complete |
-| UX-03 | Phase 12 | Complete |
-| UX-04 | Phase 12 | Complete |
-| UX-05 | Phase 12 | Complete |
-| UX-06 | Phase 12 | Complete |
-| DIR-01 | Phase 12 | Complete |
-| DIR-02 | Phase 12 | Complete |
-| DIR-04 | Phase 12 | Complete |
-| INIT-01 | Phase 12 | Complete |
-| INIT-02 | Phase 12 | Complete |
-| SYNC-01 | Phase 13 | Complete |
-| SYNC-02 | Phase 13 | Complete |
-| SYNC-03 | Phase 13 | Complete |
-| SYNC-04 | Phase 13 | Complete |
-| SYNC-05 | Phase 13 | Complete |
-| NAME-01 | Phase 14 | Complete |
-| NAME-02 | Phase 14 | Complete |
-| NAME-03 | Phase 14 | Complete |
-| NAME-04 | Phase 14 | Complete |
-| NAME-05 | Phase 14 | Complete |
-| TTL-01 | Phase 15 | Complete |
-| TTL-02 | Phase 15 | Complete |
-| TTL-03 | Phase 15 | Complete |
-| TTL-04 | Phase 15 | Complete |
-| TTL-05 | Phase 15 | Complete |
-| PAIR-01 | Phase 16 | Complete |
-| PAIR-02 | Phase 16 | Complete |
-| PAIR-03 | Phase 16 | Complete |
-| PAIR-04 | Phase 16 | Complete |
-| PAIR-05 | Phase 16 | Complete |
-| PAIR-06 | Phase 16 | Complete |
-| REPLY-01 | Phase 16 | Complete |
-| REPLY-02 | Phase 16 | Complete |
-| REPLY-03 | Phase 16 | Complete |
-| REPLY-04 | Phase 16 | Complete |
-| DIR-03 | Phase 17 | Complete |
-| DIR-05 | Phase 17 | Complete |
-| MOD-01 | Phase 17 | Complete |
-| MOD-02 | Phase 17 | Complete |
-| MOD-03 | Phase 17 | Complete |
-| MOD-04 | Phase 17 | Complete |
-| MOD-05 | Phase 17 | Complete |
-| MOD-06 | Phase 17 | Complete |
+| SCAF-01 | TBD | Pending |
+| SCAF-02 | TBD | Pending |
+| SCAF-03 | TBD | Pending |
+| SCAF-04 | TBD | Pending |
+| SCAF-05 | TBD | Pending |
+| LYOT-01 | TBD | Pending |
+| LYOT-02 | TBD | Pending |
+| LYOT-03 | TBD | Pending |
+| LYOT-04 | TBD | Pending |
+| DASH-01 | TBD | Pending |
+| DASH-02 | TBD | Pending |
+| DASH-03 | TBD | Pending |
+| DASH-04 | TBD | Pending |
+| DASH-05 | TBD | Pending |
+| SETT-01 | TBD | Pending |
+| SETT-02 | TBD | Pending |
+| SETT-03 | TBD | Pending |
+| SETT-04 | TBD | Pending |
+| SETT-05 | TBD | Pending |
+| DIR-01 | TBD | Pending |
+| DIR-02 | TBD | Pending |
+| DIR-03 | TBD | Pending |
+| DIR-04 | TBD | Pending |
+| DIR-05 | TBD | Pending |
+| DIR-06 | TBD | Pending |
+| DIR-07 | TBD | Pending |
+| SESS-01 | TBD | Pending |
+| SESS-02 | TBD | Pending |
+| SESS-03 | TBD | Pending |
+| MODS-01 | TBD | Pending |
+| LOGT-01 | TBD | Pending |
+| QUEU-01 | TBD | Pending |
+| PLSH-01 | TBD | Pending |
+| PLSH-02 | TBD | Pending |
+| PLSH-03 | TBD | Pending |
+| PLSH-04 | TBD | Pending |
+| CLNP-01 | TBD | Pending |
+| CLNP-02 | TBD | Pending |
+| CLNP-03 | TBD | Pending |
 
 **Coverage:**
-- v1.11 requirements: 59 total
-- Mapped to phases: 59
-- Unmapped: 0
+- v1.12 requirements: 38 total
+- Mapped to phases: 0 (awaiting roadmap)
+- Unmapped: 38
 
 ---
-*Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 — traceability populated after roadmap creation*
+*Requirements defined: 2026-03-18*
+*Last updated: 2026-03-18 after initial definition*
