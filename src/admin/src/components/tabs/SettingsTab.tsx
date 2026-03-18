@@ -134,7 +134,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       filter === 'dm'
         ? config?.dmFilter?.godModeSuperUsers
         : config?.groupFilter?.godModeSuperUsers
-    return (users ?? []).map((u) => u.identifier)
+    return (users ?? []).map((u) => typeof u === 'string' ? u : u.identifier)
   }
 
   // Convert TagInput string[] back to API format

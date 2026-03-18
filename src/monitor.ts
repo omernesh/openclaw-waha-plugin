@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, extname, dirname, resolve } from "node:path";
+import { join, extname, dirname, resolve as pathResolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import {
@@ -499,8 +499,8 @@ export function createWahaWebhookServer(opts: {
     if (req.url?.startsWith("/assets/")) {
       const safePath = req.url.split("?")[0].replace(/\.\./g, "");
       const filePath = join(ADMIN_DIST, safePath);
-      const resolved = resolve(filePath);
-      if (!resolved.startsWith(resolve(ADMIN_DIST))) {
+      const resolved = pathResolve(filePath);
+      if (!resolved.startsWith(pathResolve(ADMIN_DIST))) {
         res.writeHead(403);
         res.end('Forbidden');
         return;

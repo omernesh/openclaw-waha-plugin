@@ -10,9 +10,25 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { TagInput } from '@/components/shared/TagInput'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, CircleHelp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+
+function Tip({ text }: { text: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <CircleHelp className="inline h-3.5 w-3.5 ml-1 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[260px]">
+          <p className="text-xs">{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 interface DashboardTabProps {
   selectedSession: string
@@ -59,11 +75,14 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
         setStats(s)
         setConfig(c)
 
-        // Batch-resolve JIDs from access control — only ones not already resolved
+        // Batch-resolve JIDs from access control + god mode — only ones not already resolved
+        const extractJid = (u: string | { identifier: string }) => typeof u === 'string' ? u : u.identifier
         const jids = [
           ...(s.access?.allowFrom ?? []),
           ...(s.access?.groupAllowFrom ?? []),
           ...(s.access?.allowedGroups ?? []),
+          ...(s.dmFilter?.godModeSuperUsers ?? []).map(extractJid),
+          ...(s.groupFilter?.godModeSuperUsers ?? []).map(extractJid),
         ]
           .filter((j) => j !== '*' && !resolvedJidsRef.current.has(j))
 
@@ -124,7 +143,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
       {/* Section 1: Session Health */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Session Health</CardTitle>
+          <CardTitle>Session Health<Tip text="Real-time connection status for all WAHA sessions. 'healthy' = connected and responsive." /></CardTitle>
         </CardHeader>
         <CardContent>
           {visibleSessions.length === 0 ? (
@@ -165,7 +184,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
           <CollapsibleTrigger className="w-full">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle>DM Keyword Filter</CardTitle>
+                <CardTitle>DM Keyword Filter<Tip text="Filters incoming DMs by mention patterns. Messages not matching any pattern are dropped to save tokens." /></CardTitle>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
                     {dmFilter.stats.allowed} allowed / {dmFilter.stats.dropped} dropped
@@ -276,7 +295,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
           <CollapsibleTrigger className="w-full">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle>Group Keyword Filter</CardTitle>
+                <CardTitle>Group Keyword Filter<Tip text="Filters incoming group messages by mention patterns. Same logic as DM filter but for groups." /></CardTitle>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
                     {groupFilter.stats.allowed} allowed / {groupFilter.stats.dropped} dropped
@@ -321,6 +340,14 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                     Scope: <span className="text-foreground">{groupFilter.godModeScope}</span>
                   </span>
                 </div>
+                {groupFilter.godModeSuperUsers?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {groupFilter.godModeSuperUsers.map((u) => {
+                      const jid = typeof u === 'string' ? u : u.identifier
+                      return <Badge key={jid} variant="outline">{resolvedNames[jid] ?? jid}</Badge>
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -377,7 +404,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle>Presence System</CardTitle>
+            <CardTitle>Presence System<Tip text="Simulates human behavior — typing indicators, read delays, and pauses to make responses feel natural." /></CardTitle>
             <Badge variant={presence?.enabled ? 'default' : 'secondary'}>
               {presence?.enabled ? 'Enabled' : 'Disabled'}
             </Badge>
@@ -386,14 +413,14 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
         <CardContent>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             {[
-              { key: 'wpm', value: presence?.wpm != null ? String(presence.wpm) : '—' },
-              { key: 'readDelayMs', value: formatRange(presence?.readDelayMs) },
-              { key: 'typingDurationMs', value: formatRange(presence?.typingDurationMs) },
-              { key: 'pauseChance', value: presence?.pauseChance != null ? `${Math.round(presence.pauseChance * 100)}%` : '—' },
-              { key: 'jitter', value: formatRange(presence?.jitter) },
-            ].map(({ key, value }) => (
+              { key: 'wpm', value: presence?.wpm != null ? String(presence.wpm) : '—', tip: 'Typing speed used to calculate how long the typing indicator shows. Default: 42.' },
+              { key: 'readDelayMs', value: formatRange(presence?.readDelayMs), tip: 'Simulated reading time range [min, max] before the bot starts typing.' },
+              { key: 'typingDurationMs', value: formatRange(presence?.typingDurationMs), tip: 'Min/max range for typing indicator duration, derived from WPM and message length.' },
+              { key: 'pauseChance', value: presence?.pauseChance != null ? `${Math.round(presence.pauseChance * 100)}%` : '—', tip: 'Probability of a mid-typing pause. 0% = never pauses, 100% = always pauses.' },
+              { key: 'jitter', value: formatRange(presence?.jitter), tip: 'Random timing variation range. 1.0 = no variation. [0.7, 1.3] = ±30% randomness.' },
+            ].map(({ key, value, tip }) => (
               <div key={key} className="rounded border px-3 py-2">
-                <div className="text-xs text-muted-foreground">{labelFor(key)}</div>
+                <div className="text-xs text-muted-foreground">{labelFor(key)}<Tip text={tip} /></div>
                 <div className="font-medium mt-0.5">{value}</div>
               </div>
             ))}
@@ -404,16 +431,16 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
       {/* Section 5: Access Control */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Access Control</CardTitle>
+          <CardTitle>Access Control<Tip text="Who can message the bot. Policies control DM and group access independently." /></CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3 text-sm">
             <div>
-              <span className="text-muted-foreground">{labelFor('dmPolicy')}: </span>
+              <span className="text-muted-foreground">{labelFor('dmPolicy')}<Tip text="How DMs from unknown contacts are handled. allowlist = only approved contacts." />: </span>
               <Badge variant="outline">{access.dmPolicy || '—'}</Badge>
             </div>
             <div>
-              <span className="text-muted-foreground">{labelFor('groupPolicy')}: </span>
+              <span className="text-muted-foreground">{labelFor('groupPolicy')}<Tip text="How group messages are handled. allowlist = only approved groups." />: </span>
               <Badge variant="outline">{access.groupPolicy || '—'}</Badge>
             </div>
           </div>
@@ -438,8 +465,8 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
 
       {/* Server info footer */}
       <div className={cn('text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 px-1')}>
-        <span>{labelFor('baseUrl')}: {stats.baseUrl}</span>
-        <span>{labelFor('webhookPort')}: {stats.webhookPort}</span>
+        <span>{labelFor('baseUrl')}<Tip text="WAHA server address used for API calls." />: {stats.baseUrl}</span>
+        <span>{labelFor('webhookPort')}<Tip text="Port the admin panel and webhook server listen on." />: {stats.webhookPort}</span>
         <span>{labelFor('serverTime')}: {stats.serverTime}</span>
         {config && (
           <span className="opacity-60">Config loaded</span>
