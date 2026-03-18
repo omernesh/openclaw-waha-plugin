@@ -31,7 +31,10 @@
   "author": "Omer Nesher",
   "license": "CC-BY-NC-4.0",
   "scripts": {
-    "test": "vitest run --reporter=verbose"
+    "test": "vitest run --reporter=verbose",
+    "build:admin": "vite build --config vite.admin.config.ts",
+    "dev:admin": "vite --config vite.admin.config.ts",
+    "build": "npm run build:admin"
   },
   "openclaw": {
     "extensions": [
@@ -59,12 +62,24 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lru-cache": "^11.2.6",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0",
     "yaml": "^2.8.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
+    "vite": "^8.0.0",
     "vitest": "^4.0.18"
   }
 }
