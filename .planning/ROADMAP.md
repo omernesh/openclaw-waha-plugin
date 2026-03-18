@@ -142,8 +142,8 @@ Plans:
   5. Tooltips in the Directory and Settings tabs render correctly above table overflow boundaries (via React portals, no clipping)
 **Plans**: 2 plans
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+- [ ] 23-01-PLAN.md — Error boundaries, skeleton loading, toast notifications, tooltip portals
+- [ ] 23-02-PLAN.md — Refresh button spinner and "Last refreshed" timestamp
 
 ### Phase 24: Cleanup and Deploy
 **Goal**: The old embedded HTML/JS/CSS is removed from monitor.ts, the build and deploy pipeline is updated to include the Vite build, and the panel is verified end-to-end on hpg6.
@@ -187,5 +187,5 @@ Plans:
 | 20. Dashboard and Settings Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
 | 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete   | 2026-03-18 | - |
-| 23. Polish | v1.12 | 0/TBD | Not started | - |
+| 23. Polish | v1.12 | 0/2 | Not started | - |
 | 24. Cleanup and Deploy | v1.12 | 0/TBD | Not started | - |
