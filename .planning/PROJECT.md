@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with an embedded admin panel for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies. v1.11 adds background directory sync with FTS5 full-text search, name resolution for @lid JIDs across all admin panel surfaces, TTL-based auto-expiring access for contacts and groups, passcode-gated pairing mode with wa.me deep links, an auto-reply system for unauthorized DMs, and a modules framework with admin panel integration.
+A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with an embedded admin panel for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies. v1.11 adds background directory sync with FTS5 full-text search, name resolution for @lid JIDs across all admin panel surfaces, TTL-based auto-expiring access for contacts and groups, passcode-gated pairing mode with wa.me deep links, an auto-reply system for unauthorized DMs, and a modules framework with admin panel integration. v1.12 replaces the embedded HTML/JS admin panel with a modern React SPA built on shadcn/ui, Tailwind CSS, and Vite.
 
 ## Core Value
 
@@ -64,7 +64,9 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 
 ### Active
 
-- [ ] F2: Inbound group events (join/leave/promote/demote)
+- [ ] Full admin panel UI rewrite with React + shadcn/ui + Tailwind CSS + Vite
+- [ ] Mobile-responsive admin panel layout
+- [ ] All existing admin panel functionality preserved in new UI framework
 
 ### Out of Scope
 
@@ -76,6 +78,18 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Disappearing messages — low priority
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
+
+## Current Milestone: v1.12 UI Overhaul
+
+**Goal:** Replace the ~5500-line embedded HTML/JS admin panel with a modern React SPA using shadcn/ui, Tailwind CSS, and Vite — preserving all existing functionality while gaining mobile responsiveness, accessibility, and maintainability.
+
+**Target features:**
+- Vite + React + Tailwind + shadcn/ui scaffold with build pipeline
+- All 7 admin panel tabs rebuilt as React components
+- Dark/light theme via shadcn ThemeProvider
+- Mobile-responsive layout with Tailwind utilities
+- monitor.ts simplified to API routes + static file serving
+- npm publish workflow updated to include Vite build output
 
 ## Context
 
@@ -126,6 +140,9 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | HMAC-SHA256 deep link tokens (one-use, verifiable without DB) | Stateless token verification for pairing mode, no token table needed | ✓ Good |
 | Module hooks after fromMe+dedup+pairing (pipeline ordering) | Modules only see validated, deduplicated, authorized messages | ✓ Good |
 | Can Initiate enforcement via message_count check | Distinguishes first contact (initiation) from ongoing replies | ✓ Good |
+| shadcn/ui over React Aria for admin panel UI | React Aria is headless (must design everything from scratch), shadcn/ui is pre-styled on Radix primitives with Tailwind — better fit for internal dashboard | — Pending |
+| Vite for admin panel build | First-class React support, HMR for dev, optimized builds, shadcn/ui official integration | — Pending |
+| Full UI rewrite (not incremental) | Current code is concatenated HTML strings — no component structure to migrate incrementally | — Pending |
 
 ---
-*Last updated: 2026-03-17 after v1.11 milestone*
+*Last updated: 2026-03-18 after v1.12 milestone start*
