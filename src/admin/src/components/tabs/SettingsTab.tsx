@@ -18,6 +18,23 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { TagInput } from '@/components/shared/TagInput'
 import { RestartOverlay } from '@/components/shared/RestartOverlay'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CircleHelp } from 'lucide-react'
+
+function Tip({ text }: { text: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <CircleHelp className="inline h-3.5 w-3.5 ml-1 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[260px]">
+          <p className="text-xs">{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 interface SettingsTabProps {
   selectedSession: string
@@ -301,7 +318,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="baseUrl">Base URL</Label>
+                <Label htmlFor="baseUrl">Base URL<Tip text="WAHA server URL. Must be accessible from this host. Example: http://127.0.0.1:3004" /></Label>
                 <Input
                   id="baseUrl"
                   value={config.baseUrl ?? ''}
@@ -310,7 +327,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="webhookPort">Webhook Port</Label>
+                <Label htmlFor="webhookPort">Webhook Port<Tip text="Port the webhook HTTP server listens on. Default: 8050. Restart required after change." /></Label>
                 <Input
                   id="webhookPort"
                   type="number"
@@ -319,7 +336,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="webhookPath">Webhook Path</Label>
+                <Label htmlFor="webhookPath">Webhook Path<Tip text="URL path WAHA sends events to. Default: /webhook/waha" /></Label>
                 <Input
                   id="webhookPath"
                   value={config.webhookPath ?? ''}
@@ -328,7 +345,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="triggerWord">Trigger Word</Label>
+                <Label htmlFor="triggerWord">Trigger Word<Tip text="Prefix that activates the bot (e.g. '!' or '!bot'). Messages must start with this to pass through filters. Used for human sessions where all messages are filtered by default. Leave empty to disable trigger-based filtering." /></Label>
                 <Input
                   id="triggerWord"
                   value={config.triggerWord ?? ''}
@@ -336,7 +353,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="triggerResponseMode">Trigger Response Mode</Label>
+                <Label htmlFor="triggerResponseMode">Trigger Response Mode<Tip text="Where the bot responds when triggered in a group. 'dm' = respond via DM to the sender. 'reply-in-chat' = respond in the same group. For DM triggers, the bot always responds in the same DM." /></Label>
                 <Select
                   value={config.triggerResponseMode ?? ''}
                   onValueChange={(v) => updateConfig('triggerResponseMode', v)}
@@ -360,7 +377,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                   checked={config.canInitiateGlobal ?? false}
                   onCheckedChange={(v) => updateConfig('canInitiateGlobal', v)}
                 />
-                <Label htmlFor="canInitiateGlobal">Can Initiate Global</Label>
+                <Label htmlFor="canInitiateGlobal">Can Initiate (Global Default)<Tip text="When enabled, the bot can start new conversations with any contact. When disabled, the bot can only respond to incoming messages unless a per-contact override allows initiation." /></Label>
               </div>
               <div className="flex items-center gap-3">
                 <Switch
@@ -368,7 +385,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                   checked={config.blockStreaming ?? false}
                   onCheckedChange={(v) => updateConfig('blockStreaming', v)}
                 />
-                <Label htmlFor="blockStreaming">Block Streaming</Label>
+                <Label htmlFor="blockStreaming">Single Message Mode<Tip text="Send responses as a single message instead of streaming chunks. Reduces message spam for long responses." /></Label>
               </div>
             </div>
           </CardContent>
@@ -382,7 +399,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="dmPolicy">DM Policy</Label>
+                <Label htmlFor="dmPolicy">DM Policy<Tip text="How to handle DMs from unknown senders. open: accept all. closed: block all. allowlist: only contacts in Allow From list." /></Label>
                 <Select
                   value={config.dmPolicy ?? ''}
                   onValueChange={(v) => updateConfig('dmPolicy', v)}
@@ -398,7 +415,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="groupPolicy">Group Policy</Label>
+                <Label htmlFor="groupPolicy">Group Policy<Tip text="How to handle group messages. allowlist=only allowedGroups, open=all groups, closed=no groups." /></Label>
                 <Select
                   value={config.groupPolicy ?? ''}
                   onValueChange={(v) => updateConfig('groupPolicy', v)}
@@ -416,7 +433,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Allow From</Label>
+              <Label>Allow From (DMs)<Tip text="JIDs allowed to send DMs. Press Enter or comma to add. Supports @c.us and @lid formats." /></Label>
               <TagInput
                 values={config.allowFrom ?? []}
                 onChange={(v) => updateConfig('allowFrom', v)}
@@ -427,7 +444,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Group Allow From</Label>
+              <Label>Group Allow From<Tip text="JIDs allowed to trigger the bot in groups. Press Enter or comma to add. Include both @c.us and @lid for the same person (NOWEB sends @lid)." /></Label>
               <TagInput
                 values={config.groupAllowFrom ?? []}
                 onChange={(v) => updateConfig('groupAllowFrom', v)}
@@ -438,7 +455,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Allowed Groups</Label>
+              <Label>Allowed Groups<Tip text="Group JIDs the bot will respond in. Press Enter or comma to add. Leave empty to allow all groups (with open policy)." /></Label>
               <TagInput
                 values={config.allowedGroups ?? []}
                 onChange={(v) => updateConfig('allowedGroups', v)}
@@ -462,11 +479,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.dmFilter?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('dmFilter.enabled', v)}
               />
-              <Label htmlFor="dmFilter.enabled">Enabled</Label>
+              <Label htmlFor="dmFilter.enabled">Enabled<Tip text="When on, DMs must contain at least one mention pattern to get a response. Reduces noise and token usage." /></Label>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Mention Patterns</Label>
+              <Label>Mention Patterns<Tip text="Regex patterns (case-insensitive). DMs must match at least one. Press Enter or comma to add each pattern." /></Label>
               <TagInput
                 values={config.dmFilter?.mentionPatterns ?? []}
                 onChange={(v) => updateConfig('dmFilter.mentionPatterns', v)}
@@ -481,11 +498,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.dmFilter?.godModeBypass ?? false}
                 onCheckedChange={(v) => updateConfig('dmFilter.godModeBypass', v)}
               />
-              <Label htmlFor="dmFilter.godModeBypass">God Mode Bypass</Label>
+              <Label htmlFor="dmFilter.godModeBypass">God Mode Bypass<Tip text="When on, super-users bypass the keyword filter entirely (their messages always get a response)." /></Label>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="dmFilter.godModeScope">God Mode Scope</Label>
+              <Label htmlFor="dmFilter.godModeScope">God Mode Scope<Tip text="Controls which filters god mode bypass applies to. 'All' = bypass both DM and group filters. 'DM Only' = bypass DM filter only, NOT group filter. 'Off' = never bypass." /></Label>
               <Select
                 value={config.dmFilter?.godModeScope ?? 'off'}
                 onValueChange={(v) => updateConfig('dmFilter.godModeScope', v)}
@@ -502,7 +519,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>God Mode Super Users</Label>
+              <Label>God Mode Users<Tip text="JIDs that bypass the DM keyword filter entirely. Search and select contacts. Include both @c.us and @lid formats for NOWEB compatibility." /></Label>
               <TagInput
                 values={godModeJids('dm')}
                 onChange={(v) => updateGodModeUsers('dm', v)}
@@ -514,7 +531,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="dmFilter.tokenEstimate">Token Estimate</Label>
+              <Label htmlFor="dmFilter.tokenEstimate">Token Estimate<Tip text="Estimated tokens saved per dropped DM. Used for stats display only. Default: 2500." /></Label>
               <Input
                 id="dmFilter.tokenEstimate"
                 type="number"
@@ -538,11 +555,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.groupFilter?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('groupFilter.enabled', v)}
               />
-              <Label htmlFor="groupFilter.enabled">Enabled</Label>
+              <Label htmlFor="groupFilter.enabled">Enabled<Tip text="When on, group messages must contain at least one mention pattern to get a response. Saves tokens by filtering irrelevant group chatter." /></Label>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Mention Patterns</Label>
+              <Label>Mention Patterns<Tip text="Regex patterns (case-insensitive). Group messages must match at least one. Press Enter or comma to add each pattern." /></Label>
               <TagInput
                 values={config.groupFilter?.mentionPatterns ?? []}
                 onChange={(v) => updateConfig('groupFilter.mentionPatterns', v)}
@@ -557,11 +574,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.groupFilter?.godModeBypass ?? false}
                 onCheckedChange={(v) => updateConfig('groupFilter.godModeBypass', v)}
               />
-              <Label htmlFor="groupFilter.godModeBypass">God Mode Bypass</Label>
+              <Label htmlFor="groupFilter.godModeBypass">God Mode Bypass<Tip text="When on, super-users bypass the group keyword filter entirely." /></Label>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="groupFilter.godModeScope">God Mode Scope</Label>
+              <Label htmlFor="groupFilter.godModeScope">God Mode Scope<Tip text="Controls which filters god mode bypass applies to. 'All' = bypass both DM and group filters. 'DM Only' = bypass DM filter only. 'Off' = never bypass." /></Label>
               <Select
                 value={config.groupFilter?.godModeScope ?? 'off'}
                 onValueChange={(v) => updateConfig('groupFilter.godModeScope', v)}
@@ -578,7 +595,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>God Mode Super Users</Label>
+              <Label>God Mode Users<Tip text="JIDs that bypass the group keyword filter entirely. Search and select contacts. Supports @c.us and @lid formats." /></Label>
               <TagInput
                 values={godModeJids('group')}
                 onChange={(v) => updateGodModeUsers('group', v)}
@@ -590,7 +607,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="groupFilter.tokenEstimate">Token Estimate</Label>
+              <Label htmlFor="groupFilter.tokenEstimate">Token Estimate<Tip text="Estimated tokens saved per dropped group message. Default: 2500." /></Label>
               <Input
                 id="groupFilter.tokenEstimate"
                 type="number"
@@ -614,7 +631,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.presence?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('presence.enabled', v)}
               />
-              <Label htmlFor="presence.enabled">Enabled</Label>
+              <Label htmlFor="presence.enabled">Enabled<Tip text="Simulate human typing: read delays, typing indicators, pause breaks. Makes responses feel natural." /></Label>
             </div>
             <div className="flex items-center gap-3">
               <Switch
@@ -622,12 +639,12 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.presence?.sendSeen ?? false}
                 onCheckedChange={(v) => updateConfig('presence.sendSeen', v)}
               />
-              <Label htmlFor="presence.sendSeen">Send Seen</Label>
+              <Label htmlFor="presence.sendSeen">Read Receipts<Tip text="Send read receipts (blue ticks) when reading incoming messages." /></Label>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="presence.wpm">Words Per Minute</Label>
+                <Label htmlFor="presence.wpm">Words Per Minute<Tip text="Typing speed for calculating typing duration. Default: 42. Range: 20-120." /></Label>
                 <Input
                   id="presence.wpm"
                   type="number"
@@ -636,7 +653,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="presence.msPerReadChar">Ms Per Read Char</Label>
+                <Label htmlFor="presence.msPerReadChar">Read Delay Per Char<Tip text="Extra read delay per character in the message. Longer messages = longer read time. Default: 30." /></Label>
                 <Input
                   id="presence.msPerReadChar"
                   type="number"
@@ -647,7 +664,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Read Delay (ms) [min, max]</Label>
+              <Label>Read Delay (ms)<Tip text="Simulated message reading time range [min, max] before starting to type. Default: [500, 4000]." /></Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -671,7 +688,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Typing Duration (ms) [min, max]</Label>
+              <Label>Typing Duration (ms)<Tip text="Min/max clamp for typing indicator duration. Actual duration is derived from WPM + message length. Default: [1500, 15000]." /></Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -695,7 +712,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="presence.pauseChance">Pause Chance (0–1)</Label>
+              <Label htmlFor="presence.pauseChance">Pause Chance<Tip text="Probability of a mid-typing pause (0.0 = never, 1.0 = always). Default: 0.3 (30% chance)." /></Label>
               <Input
                 id="presence.pauseChance"
                 type="number"
@@ -709,7 +726,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Pause Duration (ms) [min, max]</Label>
+              <Label>Pause Duration (ms)<Tip text="Duration of a typing pause [min, max]. Default: [500, 2000]." /></Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -733,7 +750,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Pause Interval (ms) [min, max]</Label>
+              <Label>Pause Interval (ms)<Tip text="How often pauses can occur [min, max interval]. Default: [2000, 5000]." /></Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -757,7 +774,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
 
             <div className="space-y-1.5">
-              <Label>Jitter [min, max]</Label>
+              <Label>Jitter<Tip text="Random timing multiplier range. 1.0 = no jitter. Default: [0.7, 1.3] = ±30% variation." /></Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -794,10 +811,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.pairingMode?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('pairingMode.enabled', v)}
               />
-              <Label htmlFor="pairingMode.enabled">Enabled</Label>
+              <Label htmlFor="pairingMode.enabled">Enable Pairing Mode<Tip text="When enabled, unknown DM senders can enter a passcode to get added to the allow list automatically." /></Label>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.passcode">Passcode</Label>
+              <Label htmlFor="pairingMode.passcode">Passcode<Tip text="The 6-digit code contacts must enter to get DM access. Click Generate to create a random one." /></Label>
               <Input
                 id="pairingMode.passcode"
                 value={config.pairingMode?.passcode ?? ''}
@@ -805,7 +822,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.grantTtlMinutes">Grant TTL (minutes)</Label>
+              <Label htmlFor="pairingMode.grantTtlMinutes">Grant TTL<Tip text="How long pairing-granted access lasts. After this period, access is automatically revoked." /></Label>
               <Input
                 id="pairingMode.grantTtlMinutes"
                 type="number"
@@ -815,7 +832,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.challengeMessage">Challenge Message</Label>
+              <Label htmlFor="pairingMode.challengeMessage">Challenge Message<Tip text="The message sent to unknown DMs asking them to enter the passcode." /></Label>
               <textarea
                 id="pairingMode.challengeMessage"
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -838,10 +855,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.autoReply?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('autoReply.enabled', v)}
               />
-              <Label htmlFor="autoReply.enabled">Enabled</Label>
+              <Label htmlFor="autoReply.enabled">Send rejection message<Tip text="When enabled, contacts whose DMs are blocked will receive an automatic reply explaining they are not authorized." /></Label>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="autoReply.message">Message</Label>
+              <Label htmlFor="autoReply.message">Rejection Message<Tip text="Message sent to blocked DMs. Use {admin_name} to insert the bot owner's name." /></Label>
               <textarea
                 id="autoReply.message"
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -851,7 +868,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="autoReply.intervalMinutes">Interval (minutes)</Label>
+              <Label htmlFor="autoReply.intervalMinutes">Rate Limit<Tip text="Minimum minutes between auto-replies to the same contact to prevent spam." /></Label>
               <Input
                 id="autoReply.intervalMinutes"
                 type="number"
@@ -875,29 +892,29 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.mediaPreprocessing?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('mediaPreprocessing.enabled', v)}
               />
-              <Label htmlFor="mediaPreprocessing.enabled">Enabled</Label>
+              <Label htmlFor="mediaPreprocessing.enabled">Enabled (master)<Tip text="Master toggle. When enabled, inbound media messages are preprocessed before being sent to the AI." /></Label>
             </div>
 
             <div className="space-y-3">
               {(
                 [
-                  ['audioTranscription', 'Audio Transcription'],
-                  ['imageAnalysis', 'Image Analysis'],
-                  ['videoAnalysis', 'Video Analysis'],
-                  ['locationResolution', 'Location Resolution'],
-                  ['vcardParsing', 'vCard Parsing'],
-                  ['documentAnalysis', 'Document Analysis'],
-                ] as const
-              ).map(([key, label]) => (
+                  ['audioTranscription', 'Transcribe Audio', 'Transcribe voice messages to text using Whisper before sending to AI.'],
+                  ['imageAnalysis', 'Analyze Images', 'Analyze image content and generate descriptions before sending to AI.'],
+                  ['videoAnalysis', 'Analyze Video', 'Analyze video content (extracts key frames) before sending to AI.'],
+                  ['locationResolution', 'Resolve Locations', 'Resolve GPS coordinates to human-readable addresses via OpenStreetMap Nominatim.'],
+                  ['vcardParsing', 'Parse vCards', 'Parse vCard contact attachments and extract contact info as structured text.'],
+                  ['documentAnalysis', 'Extract Documents', 'Extract text content from PDF and document attachments before sending to AI.'],
+                ] as [string, string, string][]
+              ).map(([key, label, tip]) => (
                 <div key={key} className="flex items-center gap-3">
                   <Checkbox
                     id={`mediaPreprocessing.${key}`}
-                    checked={config.mediaPreprocessing?.[key] ?? false}
+                    checked={config.mediaPreprocessing?.[key as keyof NonNullable<WahaConfig['mediaPreprocessing']>] ?? false}
                     onCheckedChange={(checked) =>
                       updateConfig(`mediaPreprocessing.${key}`, checked === true)
                     }
                   />
-                  <Label htmlFor={`mediaPreprocessing.${key}`}>{label}</Label>
+                  <Label htmlFor={`mediaPreprocessing.${key}`}>{label}<Tip text={tip} /></Label>
                 </div>
               ))}
             </div>
@@ -916,10 +933,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.markdown?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('markdown.enabled', v)}
               />
-              <Label htmlFor="markdown.enabled">Enabled</Label>
+              <Label htmlFor="markdown.enabled">Process Markdown<Tip text="Process markdown in outbound messages (bold, italic, code). WhatsApp uses its own formatting syntax." /></Label>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="markdown.tables">Tables</Label>
+              <Label htmlFor="markdown.tables">Table Format<Tip text="How to render markdown tables. auto=detect client capability, markdown=always markdown, text=always plain text." /></Label>
               <Select
                 value={config.markdown?.tables ?? ''}
                 onValueChange={(v) => updateConfig('markdown.tables', v)}
@@ -949,7 +966,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.actions?.reactions ?? false}
                 onCheckedChange={(v) => updateConfig('actions.reactions', v)}
               />
-              <Label htmlFor="actions.reactions">Reactions</Label>
+              <Label htmlFor="actions.reactions">Reactions<Tip text="Enable emoji reaction support. When on, the bot can receive and process message reactions." /></Label>
             </div>
           </CardContent>
         </Card>

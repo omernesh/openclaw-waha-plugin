@@ -24,9 +24,26 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { CircleHelp } from 'lucide-react'
 import { TagInput } from '@/components/shared/TagInput'
 import { api } from '@/lib/api'
 import type { ContactDmSettings } from '@/types'
+
+function Tip({ text }: { text: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <CircleHelp className="inline h-3.5 w-3.5 ml-1 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[260px]">
+          <p className="text-xs">{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 const SECONDS_PER_DAY = 86_400
 
@@ -150,7 +167,7 @@ export function ContactSettingsSheet({
 
           {/* Mode */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Mode</Label>
+            <Label className="text-sm font-medium">Mode <Tip text="Active: bot responds to this contact. Listen Only: messages arrive but bot does not reply." /></Label>
             <Select value={mode} onValueChange={(v) => setMode(v as 'active' | 'listen_only')}>
               <SelectTrigger>
                 <SelectValue />
@@ -165,7 +182,7 @@ export function ContactSettingsSheet({
           {/* Mention Only */}
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Mention Only</Label>
+              <Label className="text-sm font-medium">Mention Only <Tip text="When checked, bot only responds if it is explicitly @mentioned in the message." /></Label>
               <p className="text-xs text-muted-foreground">Only respond when mentioned</p>
             </div>
             <Switch
@@ -176,7 +193,7 @@ export function ContactSettingsSheet({
 
           {/* Can Initiate Override */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Can Initiate Override</Label>
+            <Label className="text-sm font-medium">Can Initiate <Tip text="Override the global Can Initiate setting for this contact. Default: follow the global toggle in Settings. Allow: always allow initiation. Block: never initiate." /></Label>
             <Select
               value={canInitiateOverride}
               onValueChange={(v) => setCanInitiateOverride(v as 'default' | 'allow' | 'block')}
@@ -194,8 +211,7 @@ export function ContactSettingsSheet({
 
           {/* Custom Keywords — freeform TagInput */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Custom Keywords</Label>
-            <p className="text-xs text-muted-foreground">Type a keyword and press Enter to add</p>
+            <Label className="text-sm font-medium">Custom Keywords <Tip text="Regex patterns. Bot responds only if the message matches one. Overrides global keyword filter for this contact. Press Enter to add each keyword." /></Label>
             {/* DO NOT CHANGE: freeform={true} — arbitrary keyword strings, not JID search */}
             <TagInput
               values={keywords}
@@ -207,7 +223,7 @@ export function ContactSettingsSheet({
 
           {/* TTL / Access Expiry */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Access Expiry</Label>
+            <Label className="text-sm font-medium">Access Expiry <Tip text="Set how long this contact's DM access lasts. After expiry, access is automatically revoked." /></Label>
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
