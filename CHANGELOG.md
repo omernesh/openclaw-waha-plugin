@@ -2,6 +2,28 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.15.3] - 2026-03-18
+
+### Fixed — Code Review & Production Fixes
+- **Security: path traversal** — Static file serving now validates resolved path stays within admin dist directory.
+- **Bug: GroupsTab expand chevron** — Chevron indicator now reads meta from column (was reading from table, always undefined).
+- **Bug: godModeSuperUsers crash** — Dashboard and Settings crashed with React error #31 when API returned `{identifier}` objects instead of strings. Now handles both formats.
+- **Bug: gateway crash on startup** — `path.resolve` import shadowed Promise `resolve` callbacks in log handler, preventing webhook server from starting.
+- **Bug: SettingsTab name resolution** — Fired on every keystroke due to unstable `[config]` dependency. Now uses memoized JID key.
+- **Bug: premature success toast** — SettingsTab showed "Restarting..." before config save completed.
+- **Bug: SessionsTab missing error feedback** — Added catch block with toast.error to handleSaveAndRestart.
+- **Error handling** — Replaced 12 empty `.catch(() => {})` blocks with `console.error`/`console.warn` logging across all tabs.
+- **DirectoryTab** — Added AbortController for fetch cleanup and error state UI.
+
+### Added
+- **Mission Control theme** — Indigo/navy color palette matching sammie.nesher.co branding. Inter font. Both light and dark variants.
+- **Dark mode fix** — Changed `@theme inline` to `@theme` so CSS variable references work at runtime.
+- **Sidebar layout fix** — Added explicit `@layer utilities` rules for `w-[--sidebar-width]` (Tailwind v4 JIT scanner issue).
+- **55 help tooltips restored** — All legacy admin panel tooltips recreated as React Tooltip components across Settings, Dashboard, and Contact Settings.
+- **14 Dashboard tooltips** — Session Health, Keyword Filters, Presence System, Access Control sections.
+- **Type improvements** — Narrowed union types in api.ts, BulkEditToolbar, ContactsTab, ChannelsTab, DirectoryParams.
+- **localStorage safety** — useTheme wrapped in try/catch for Safari private browsing.
+
 ## [1.15.2] - 2026-03-18
 
 ### Fixed — Bug Sweep (18 bugs from human verification)
