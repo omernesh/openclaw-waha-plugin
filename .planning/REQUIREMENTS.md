@@ -50,34 +50,34 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 ### Sessions Tab
 
-- [ ] **SESS-01**: Session cards rebuilt with labeled role/subRole dropdowns
-- [ ] **SESS-02**: Explanatory text for role options (bot/human, full-access/listener)
-- [ ] **SESS-03**: Optimistic role save with "Restart required" notice, Save & Restart with overlay
+- [x] **SESS-01**: Session cards rebuilt with labeled role/subRole dropdowns
+- [x] **SESS-02**: Explanatory text for role options (bot/human, full-access/listener)
+- [x] **SESS-03**: Optimistic role save with "Restart required" notice, Save & Restart with overlay
 
 ### Modules Tab
 
-- [ ] **MODS-01**: Modules list with enable/disable toggles, config forms, group/contact assignment pickers
+- [x] **MODS-01**: Modules list with enable/disable toggles, config forms, group/contact assignment pickers
 
 ### Log Tab
 
-- [ ] **LOGT-01**: Log viewer rebuilt with virtual scrolling, level filtering, search with clear button
+- [x] **LOGT-01**: Log viewer rebuilt with virtual scrolling, level filtering, search with clear button
 
 ### Queue Tab
 
-- [ ] **QUEU-01**: Queue status display rebuilt as React components
+- [x] **QUEU-01**: Queue status display rebuilt as React components
 
 ### Polish
 
-- [ ] **PLSH-01**: Toast notifications via Sonner (replace custom toast system)
-- [ ] **PLSH-02**: Loading states with Skeleton components on all data-fetching tabs
-- [ ] **PLSH-03**: Error boundaries per tab (graceful failure isolation)
+- [x] **PLSH-01**: Toast notifications via Sonner (replace custom toast system)
+- [x] **PLSH-02**: Loading states with Skeleton components on all data-fetching tabs
+- [x] **PLSH-03**: Error boundaries per tab (graceful failure isolation)
 - [ ] **PLSH-04**: Refresh buttons show spinner + "Last refreshed" timestamp
 
 ### Cleanup
 
 - [ ] **CLNP-01**: Remove all embedded HTML/JS/CSS from monitor.ts (~4000+ lines)
 - [ ] **CLNP-02**: Deploy pipeline updated — build:admin + scp to both hpg6 locations
-- [ ] **CLNP-03**: Tooltips render above overflow boundaries via proper React portals
+- [x] **CLNP-03**: Tooltips render above overflow boundaries via proper React portals
 
 ## Future Requirements
 
@@ -129,17 +129,17 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 | DIR-05 | Phase 21 | Complete |
 | DIR-06 | Phase 21 | Complete |
 | DIR-07 | Phase 21 | Complete |
-| SESS-01 | Phase 22 | Pending |
-| SESS-02 | Phase 22 | Pending |
-| SESS-03 | Phase 22 | Pending |
-| MODS-01 | Phase 22 | Pending |
-| LOGT-01 | Phase 22 | Pending |
-| QUEU-01 | Phase 22 | Pending |
-| PLSH-01 | Phase 23 | Pending |
-| PLSH-02 | Phase 23 | Pending |
-| PLSH-03 | Phase 23 | Pending |
+| SESS-01 | Phase 22 | Complete |
+| SESS-02 | Phase 22 | Complete |
+| SESS-03 | Phase 22 | Complete |
+| MODS-01 | Phase 22 | Complete |
+| LOGT-01 | Phase 22 | Complete |
+| QUEU-01 | Phase 22 | Complete |
+| PLSH-01 | Phase 23 | Complete |
+| PLSH-02 | Phase 23 | Complete |
+| PLSH-03 | Phase 23 | Complete |
 | PLSH-04 | Phase 23 | Pending |
-| CLNP-03 | Phase 23 | Pending |
+| CLNP-03 | Phase 23 | Complete |
 | CLNP-01 | Phase 24 | Pending |
 | CLNP-02 | Phase 24 | Pending |
 

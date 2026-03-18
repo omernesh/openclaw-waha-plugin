@@ -187,5 +187,5 @@ Plans:
 | 20. Dashboard and Settings Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
 | 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete    | 2026-03-18 | - |
-| 23. Polish | v1.12 | 0/2 | Not started | - |
+| 23. Polish | 1/2 | In Progress|  | - |
 | 24. Cleanup and Deploy | v1.12 | 0/TBD | Not started | - |
