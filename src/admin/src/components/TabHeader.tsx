@@ -55,7 +55,7 @@ export function TabHeader({
   const selectedLabel =
     selectedSession === 'all'
       ? 'All sessions'
-      : (sessions.find((s) => s.id === selectedSession)?.name ?? selectedSession)
+      : (sessions.find((s) => s.sessionId === selectedSession)?.name ?? selectedSession)
 
   return (
     <header className="flex h-14 items-center gap-2 border-b px-4">
@@ -75,8 +75,8 @@ export function TabHeader({
             All sessions
           </DropdownMenuItem>
           {sessions.map((s) => (
-            <DropdownMenuItem key={s.id} onClick={() => onSessionChange(s.id)}>
-              {s.name ?? s.id}
+            <DropdownMenuItem key={s.sessionId} onClick={() => onSessionChange(s.sessionId)}>
+              {s.name ?? s.sessionId}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

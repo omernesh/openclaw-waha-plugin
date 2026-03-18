@@ -1,35 +1,141 @@
-// Phase 18 scaffold — types are initial approximations, refine when wiring actual tabs
+// Refined types — updated in Phase 20 to match exact API response shapes
+// from monitor.ts route handlers (confirmed 2026-03-18)
 
 // Stats response from GET /api/admin/stats
 export interface StatsResponse {
-  dmFilter: Record<string, unknown>;
-  groupFilter: Record<string, unknown>;
+  dmFilter: {
+    enabled: boolean
+    patterns: string[]
+    godModeBypass: boolean
+    godModeScope: 'all' | 'dm' | 'off'
+    godModeSuperUsers: string[]
+    tokenEstimate: number
+    stats: { allowed: number; dropped: number; tokensEstimatedSaved: number }
+    recentEvents: Array<{ ts: number; pass: boolean; reason: string; preview: string }>
+  }
+  groupFilter: {
+    enabled: boolean
+    patterns: string[]
+    godModeBypass: boolean
+    godModeScope: 'all' | 'dm' | 'off'
+    tokenEstimate: number
+    stats: { allowed: number; dropped: number; tokensEstimatedSaved: number }
+    recentEvents: Array<{ ts: number; pass: boolean; reason: string; preview: string }>
+  }
+  presence: {
+    enabled?: boolean
+    wpm?: number
+    readDelayMs?: [number, number]
+    typingDurationMs?: [number, number]
+    pauseChance?: number
+    jitter?: [number, number]
+    sendSeen?: boolean
+    msPerReadChar?: number
+    pauseDurationMs?: [number, number]
+    pauseIntervalMs?: [number, number]
+  }
   access: {
-    groupAllowFrom: Array<{ jid: string; name?: string }>;
-    dmAllowFrom: Array<{ jid: string; name?: string }>;
-    globalBlock: Array<{ jid: string; name?: string }>;
-  };
-  messageCounts: Record<string, number>;
-  webhookCounts: Record<string, number>;
+    allowFrom: string[]
+    groupAllowFrom: string[]
+    allowedGroups: string[]
+    dmPolicy: string
+    groupPolicy: string
+  }
+  session: string
+  baseUrl: string
+  webhookPort: number
+  serverTime: string
+  sessions: Array<{
+    sessionId: string
+    name: string
+    healthStatus: string
+    consecutiveFailures: number
+    lastCheck: string | null
+  }>
 }
 
 // Config response from GET /api/admin/config
 export interface ConfigResponse {
-  waha: Record<string, unknown>;
+  waha: WahaConfig
 }
 
-// Session from GET /api/admin/sessions
+export interface WahaConfig {
+  baseUrl?: string
+  webhookPort?: number
+  webhookPath?: string
+  triggerWord?: string
+  triggerResponseMode?: string
+  dmPolicy?: string
+  groupPolicy?: string
+  allowFrom?: string[]
+  groupAllowFrom?: string[]
+  allowedGroups?: string[]
+  dmFilter?: {
+    enabled: boolean
+    mentionPatterns: string[]
+    godModeBypass: boolean
+    godModeScope: string
+    godModeSuperUsers: Array<{ identifier: string }>
+    tokenEstimate: number
+  }
+  groupFilter?: {
+    enabled: boolean
+    mentionPatterns: string[]
+    godModeBypass: boolean
+    godModeScope: string
+    godModeSuperUsers: Array<{ identifier: string }>
+    tokenEstimate: number
+  }
+  presence?: {
+    enabled: boolean
+    sendSeen: boolean
+    wpm: number
+    readDelayMs: [number, number]
+    msPerReadChar: number
+    typingDurationMs: [number, number]
+    pauseChance: number
+    pauseDurationMs: [number, number]
+    pauseIntervalMs: [number, number]
+    jitter: [number, number]
+  }
+  markdown?: { enabled: boolean; tables: string }
+  canInitiateGlobal?: boolean
+  pairingMode?: {
+    enabled: boolean
+    passcode?: string
+    grantTtlMinutes: number
+    challengeMessage?: string
+  }
+  autoReply?: {
+    enabled: boolean
+    message?: string
+    intervalMinutes: number
+  }
+  actions?: { reactions: boolean }
+  blockStreaming?: boolean
+  mediaPreprocessing?: {
+    enabled: boolean
+    audioTranscription: boolean
+    imageAnalysis: boolean
+    videoAnalysis: boolean
+    locationResolution: boolean
+    vcardParsing: boolean
+    documentAnalysis: boolean
+  }
+}
+
+// Session from GET /api/admin/sessions — DO NOT CHANGE: API returns sessionId (not id)
+// TabHeader.tsx uses sessionId throughout. Confirmed from monitor.ts lines 4914-4963.
 export interface Session {
-  id: string;
-  name: string;
-  status: string;
-  role?: string;
-  subRole?: string;
-  health?: {
-    status: string;
-    lastSuccessAt: string | null;
-    lastCheckAt: string | null;
-  };
+  sessionId: string  // API returns sessionId, NOT id
+  name: string
+  role: string
+  subRole: string
+  healthy: boolean | null
+  healthStatus: string
+  consecutiveFailures: number
+  lastCheck: string | null
+  wahaStatus: string
 }
 export type SessionsResponse = Session[];
 
