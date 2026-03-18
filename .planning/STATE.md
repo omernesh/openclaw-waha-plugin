@@ -4,7 +4,7 @@ milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
 status: completed
 stopped_at: Completed 24-01-PLAN.md
-last_updated: "2026-03-18T18:47:02.594Z"
+last_updated: "2026-03-18T19:09:25.606Z"
 last_activity: "2026-03-18 — 22-02 executed: ModulesTab with Switch toggles + assignment management, LogTab with level filtering + search + auto-scroll"
 progress:
   total_phases: 7

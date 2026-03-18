@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with an embedded admin panel for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies. v1.11 adds background directory sync with FTS5 full-text search, name resolution for @lid JIDs across all admin panel surfaces, TTL-based auto-expiring access for contacts and groups, passcode-gated pairing mode with wa.me deep links, an auto-reply system for unauthorized DMs, and a modules framework with admin panel integration. v1.12 replaces the embedded HTML/JS admin panel with a modern React SPA built on shadcn/ui, Tailwind CSS, and Vite.
+A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with a React admin panel (shadcn/ui, Tailwind CSS, Vite) for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies. v1.11 added background directory sync with FTS5 full-text search, name resolution for @lid JIDs across all admin panel surfaces, TTL-based auto-expiring access for contacts and groups, passcode-gated pairing mode with wa.me deep links, an auto-reply system for unauthorized DMs, and a modules framework with admin panel integration. v1.12 replaced the legacy embedded HTML/JS admin panel with a modern React SPA built on shadcn/ui, Tailwind CSS, and Vite.
 
 ## Core Value
 
@@ -61,12 +61,9 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Pairing mode (passcode-gated temporary access with wa.me deep links) — v1.11
 - ✓ Auto-reply canned message to unauthorized DMs — v1.11
 - ✓ Modules system with admin panel tab and module framework — v1.11
-
-### Active
-
-- [ ] Full admin panel UI rewrite with React + shadcn/ui + Tailwind CSS + Vite
-- [ ] Mobile-responsive admin panel layout
-- [ ] All existing admin panel functionality preserved in new UI framework
+- ✓ Full admin panel UI rewrite with React + shadcn/ui + Tailwind CSS + Vite — v1.12
+- ✓ Mobile-responsive admin panel layout — v1.12
+- ✓ All existing admin panel functionality preserved in new UI framework — v1.12
 
 ### Out of Scope
 
@@ -79,22 +76,14 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone: v1.12 UI Overhaul
+## Current Milestone
 
-**Goal:** Replace the ~5500-line embedded HTML/JS admin panel with a modern React SPA using shadcn/ui, Tailwind CSS, and Vite — preserving all existing functionality while gaining mobile responsiveness, accessibility, and maintainability.
-
-**Target features:**
-- Vite + React + Tailwind + shadcn/ui scaffold with build pipeline
-- All 7 admin panel tabs rebuilt as React components
-- Dark/light theme via shadcn ThemeProvider
-- Mobile-responsive layout with Tailwind utilities
-- monitor.ts simplified to API routes + static file serving
-- npm publish workflow updated to include Vite build output
+v1.12 shipped. Next milestone is TBD.
 
 ## Context
 
 - **Runtime**: TypeScript on Node.js, deployed to hpg6 Linux server
-- **Codebase**: 13,026+ LOC TypeScript (38+ source files including v1.11 additions: sync.ts, pairing.ts, auto-reply.ts, module-registry.ts, module-types.ts), 5,619+ LOC tests, 313+ passing tests
+- **Codebase**: 13,026+ LOC TypeScript (38+ source files including v1.11 additions: sync.ts, pairing.ts, auto-reply.ts, module-registry.ts, module-types.ts; v1.12: src/admin/ React SPA ~3000+ lines TSX), 5,619+ LOC tests, 313+ passing tests; monitor.ts reduced from ~5500 lines to ~1960 lines after v1.12
 - **WAHA Engine**: NOWEB (has known limitations — poll.vote <5% capture, contacts API needs store.enabled)
 - **Gateway**: OpenClaw at `/usr/lib/node_modules/openclaw/dist/` — READ-ONLY, not ours
 - **Sessions**: `3cf11776_logan` (bot), `3cf11776_omer` (Omer/human)
@@ -140,9 +129,9 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | HMAC-SHA256 deep link tokens (one-use, verifiable without DB) | Stateless token verification for pairing mode, no token table needed | ✓ Good |
 | Module hooks after fromMe+dedup+pairing (pipeline ordering) | Modules only see validated, deduplicated, authorized messages | ✓ Good |
 | Can Initiate enforcement via message_count check | Distinguishes first contact (initiation) from ongoing replies | ✓ Good |
-| shadcn/ui over React Aria for admin panel UI | React Aria is headless (must design everything from scratch), shadcn/ui is pre-styled on Radix primitives with Tailwind — better fit for internal dashboard | — Pending |
-| Vite for admin panel build | First-class React support, HMR for dev, optimized builds, shadcn/ui official integration | — Pending |
-| Full UI rewrite (not incremental) | Current code is concatenated HTML strings — no component structure to migrate incrementally | — Pending |
+| shadcn/ui over React Aria for admin panel UI | React Aria is headless (must design everything from scratch), shadcn/ui is pre-styled on Radix primitives with Tailwind — better fit for internal dashboard | ✓ Good |
+| Vite for admin panel build | First-class React support, HMR for dev, optimized builds, shadcn/ui official integration | ✓ Good |
+| Full UI rewrite (not incremental) | Current code was concatenated HTML strings — no component structure to migrate incrementally | ✓ Good |
 
 ---
-*Last updated: 2026-03-18 after v1.12 milestone start*
+*Last updated: 2026-03-18 after v1.12 milestone*
