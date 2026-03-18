@@ -109,10 +109,11 @@ Plans:
   4. Bulk edit mode is available on Contacts and Channels tabs (matching the existing Groups pattern) with a multi-select toolbar
   5. Group participant rows resolve names from the local DB; bot session rows show a badge and have no allow/block action buttons
   6. The bot's own session JIDs do not appear in the contacts list
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+- [ ] 21-01-PLAN.md — Foundation: fix types, install deps, shadcn primitives, DataTable wrapper, DirectoryTab shell
+- [ ] 21-02-PLAN.md — ContactsTab, ContactSettingsSheet, ChannelsTab, BulkEditToolbar
+- [ ] 21-03-PLAN.md — GroupsTab with expandable ParticipantRow, bot badges, role management
 
 ### Phase 22: Sessions, Modules, Log, and Queue Tabs
 **Goal**: The four remaining tabs — Sessions, Modules, Log, and Queue — are fully rebuilt as React components with all existing functionality intact.
@@ -184,7 +185,7 @@ Plans:
 | 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 19. App Layout | 2/2 | Complete    | 2026-03-18 | - |
 | 20. Dashboard and Settings Tabs | 2/2 | Complete   | 2026-03-18 | - |
-| 21. Directory Tab | v1.12 | 0/TBD | Not started | - |
+| 21. Directory Tab | v1.12 | 0/3 | Not started | - |
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
 | 23. Polish | v1.12 | 0/TBD | Not started | - |
 | 24. Cleanup and Deploy | v1.12 | 0/TBD | Not started | - |
