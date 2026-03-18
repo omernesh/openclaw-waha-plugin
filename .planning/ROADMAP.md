@@ -41,14 +41,14 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 </details>
 
-### 🚧 v1.12 UI Overhaul & Feature Polish (Phases 18-24)
+### v1.12 UI Overhaul & Feature Polish (Phases 18-24)
 
 **Milestone Goal:** Replace ~5500 lines of embedded HTML/JS in monitor.ts with a React SPA built on shadcn/ui + Tailwind CSS + Vite, preserving all existing admin panel functionality while gaining mobile responsiveness, accessibility, and maintainability.
 
 - [x] **Phase 18: React Scaffold** — Vite + React + shadcn/ui foundation and build pipeline (completed 2026-03-18)
 - [x] **Phase 19: App Layout** — Sidebar navigation, theme toggle, mobile responsiveness, shared header (completed 2026-03-18)
 - [x] **Phase 20: Dashboard and Settings Tabs** — Dashboard cards and Settings form rebuilt in React (completed 2026-03-18)
-- [x] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet (completed 2026-03-18)
+- [x] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet (completed 2026-03-18)
 - [ ] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React
 - [ ] **Phase 23: Polish** — Toasts, skeletons, error boundaries, refresh timestamps
 - [ ] **Phase 24: Cleanup and Deploy** — Remove legacy HTML/JS from monitor.ts, update build pipeline
@@ -81,8 +81,8 @@ Plans:
   4. Each tab has a consistent header area with a session selector and a refresh button
 **Plans**: 2 plans
 Plans:
-- [ ] 19-01-PLAN.md — Install shadcn/ui components, theme hook, tab placeholders
-- [ ] 19-02-PLAN.md — AppSidebar, TabHeader, App.tsx layout shell with routing
+- [x] 19-01-PLAN.md — Install shadcn/ui components, theme hook, tab placeholders
+- [x] 19-02-PLAN.md — AppSidebar, TabHeader, App.tsx layout shell with routing
 
 ### Phase 20: Dashboard and Settings Tabs
 **Goal**: The Dashboard and Settings tabs are fully rebuilt as React components, displaying all information from the old panel with improved UX — labeled cards, collapsible sections, and accessible form controls.
@@ -96,8 +96,8 @@ Plans:
   5. Save & Restart shows a blocking overlay while the gateway restarts and polling confirms it is back up
 **Plans**: 2 plans
 Plans:
-- [ ] 20-01-PLAN.md — Radix primitives, shadcn components, types fix, labels, TagInput, RestartOverlay, DashboardTab
-- [ ] 20-02-PLAN.md — SettingsTab with config form, tag inputs, contact picker, Save & Restart
+- [x] 20-01-PLAN.md — Radix primitives, shadcn components, types fix, labels, TagInput, RestartOverlay, DashboardTab
+- [x] 20-02-PLAN.md — SettingsTab with config form, tag inputs, contact picker, Save & Restart
 ### Phase 21: Directory Tab
 **Goal**: The Directory tab is rebuilt as a full-featured data table with instant FTS search, a persistent contact settings sheet, bulk edit for all entity types, and correctly resolved participant names.
 **Depends on**: Phase 19
@@ -111,9 +111,9 @@ Plans:
   6. The bot's own session JIDs do not appear in the contacts list
 **Plans**: 3 plans
 Plans:
-- [ ] 21-01-PLAN.md — Foundation: fix types, install deps, shadcn primitives, DataTable wrapper, DirectoryTab shell
-- [ ] 21-02-PLAN.md — ContactsTab, ContactSettingsSheet, ChannelsTab, BulkEditToolbar
-- [ ] 21-03-PLAN.md — GroupsTab with expandable ParticipantRow, bot badges, role management
+- [x] 21-01-PLAN.md — Foundation: fix types, install deps, shadcn primitives, DataTable wrapper, DirectoryTab shell
+- [x] 21-02-PLAN.md — ContactsTab, ContactSettingsSheet, ChannelsTab, BulkEditToolbar
+- [x] 21-03-PLAN.md — GroupsTab with expandable ParticipantRow, bot badges, role management
 
 ### Phase 22: Sessions, Modules, Log, and Queue Tabs
 **Goal**: The four remaining tabs — Sessions, Modules, Log, and Queue — are fully rebuilt as React components with all existing functionality intact.
@@ -127,8 +127,8 @@ Plans:
   5. Queue tab displays current queue status (DM queue depth, group queue depth, processing state) as React components
 **Plans**: 2 plans
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+- [ ] 22-01-PLAN.md — Fix types (QueueResponse, LogResponse), SessionsTab with role management + RestartOverlay, QueueTab
+- [ ] 22-02-PLAN.md — ModulesTab with enable/disable toggles + assignment management, LogTab with filtering + search + auto-scroll
 
 ### Phase 23: Polish
 **Goal**: The React admin panel has consistent loading states, graceful error handling, actionable toast notifications, and visible refresh timestamps across all tabs.
@@ -183,9 +183,9 @@ Plans:
 | 16. Pairing Mode and Auto-Reply | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 17. Modules Framework | v1.11 | 3/3 | Complete | 2026-03-17 |
 | 18. React Scaffold | v1.12 | 2/2 | Complete | 2026-03-18 |
-| 19. App Layout | 2/2 | Complete    | 2026-03-18 | - |
-| 20. Dashboard and Settings Tabs | 2/2 | Complete    | 2026-03-18 | - |
-| 21. Directory Tab | 3/3 | Complete    | 2026-03-18 | - |
-| 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/TBD | Not started | - |
+| 19. App Layout | v1.12 | 2/2 | Complete | 2026-03-18 |
+| 20. Dashboard and Settings Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
+| 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
+| 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 0/2 | Not started | - |
 | 23. Polish | v1.12 | 0/TBD | Not started | - |
 | 24. Cleanup and Deploy | v1.12 | 0/TBD | Not started | - |
