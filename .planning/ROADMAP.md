@@ -154,10 +154,9 @@ Plans:
   2. Running `npm run build` chains `tsc` and `vite build` in one command and the output is ready to publish
   3. The deploy script (or documented workflow) copies `dist/admin/` to both hpg6 locations alongside the TypeScript build output
   4. The admin panel on hpg6 loads the React build and all 7 tabs function correctly after deployment
-**Plans**: 2 plans
+**Plans**: 1 plan
 Plans:
-- [ ] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [ ] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+- [ ] 24-01-PLAN.md — Remove legacy HTML/JS from monitor.ts, verify build pipeline
 
 ## Progress
 
@@ -188,4 +187,4 @@ Plans:
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
 | 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete    | 2026-03-18 | - |
 | 23. Polish | 2/2 | Complete    | 2026-03-18 | - |
-| 24. Cleanup and Deploy | v1.12 | 0/TBD | Not started | - |
+| 24. Cleanup and Deploy | v1.12 | 0/1 | Not started | - |
