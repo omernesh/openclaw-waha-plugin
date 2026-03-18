@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
 status: completed
-stopped_at: Completed 21-02-PLAN.md
-last_updated: "2026-03-18T17:55:50.525Z"
-last_activity: "2026-03-18 — 19-02 executed: AppSidebar 7 nav items + theme toggle + TabHeader session selector + App.tsx shell"
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-03-18T18:08:55.268Z"
+last_activity: "2026-03-18 — 22-01 executed: SessionsTab role management, QueueTab stats, QueueResponse/LogResponse type fixes"
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
-  percent: 75
+  total_plans: 11
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-03-18)
 
 ## Current Position
 
-Phase: 19 — App Layout (Complete — 2/2 plans)
-Plan: Phase 20/21/22 next (can run in parallel)
-Status: 19-02 complete (AppSidebar + TabHeader + App.tsx layout shell wired)
-Last activity: 2026-03-18 — 19-02 executed: AppSidebar 7 nav items + theme toggle + TabHeader session selector + App.tsx shell
+Phase: 22 — Sessions/Modules/Log/Queue Tabs (In Progress — 1/2 plans done)
+Plan: 22-02 next (ModulesTab + LogTab)
+Status: 22-01 complete (SessionsTab + QueueTab + type fixes)
+Last activity: 2026-03-18 — 22-01 executed: SessionsTab role management, QueueTab stats, QueueResponse type fix
 
 ```
-Progress: [████████░░] 75% — Phase 19 complete (2/2 plans), 3 phases remain
+Progress: [█████████░] 91% — 10/11 plans complete
 ```
 
 ## Accumulated Context
@@ -60,6 +60,8 @@ Progress: [████████░░] 75% — Phase 19 complete (2/2 plans)
 - [Phase 21-directory-tab]: ChevronDown expand indicator reads expandedRowId from table meta to avoid extra prop threading
 - [Phase 21-02]: ContactSettingsSheet stays open after save — onSaved() triggers parent refresh only
 - [Phase 21-02]: refreshCounter in DirectoryTab drives sub-tab data re-fetch after bulk/settings changes
+- [Phase 22]: QueueResponse uses flat fields matching inbound-queue.ts getStats() — not nested dm/group objects
+- [Phase 22]: Processing state in QueueTab derived from depths only (idle when both 0) — no server-side Paused concept
 
 ### Pending Todos
 
@@ -73,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T17:49:07.958Z
-Stopped at: Completed 21-02-PLAN.md
+Last session: 2026-03-18T18:08:55.262Z
+Stopped at: Completed 22-01-PLAN.md
 Resume file: None
