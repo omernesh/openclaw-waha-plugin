@@ -1,17 +1,31 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, lazy, Suspense } from 'react'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar, type TabId } from '@/components/AppSidebar'
 import { TabHeader } from '@/components/TabHeader'
 import { TabErrorBoundary } from '@/components/shared/TabErrorBoundary'
+import { Skeleton } from '@/components/ui/skeleton'
 
-// Import all 7 tab placeholder components
-import DashboardTab from '@/components/tabs/DashboardTab'
-import SettingsTab from '@/components/tabs/SettingsTab'
-import DirectoryTab from '@/components/tabs/DirectoryTab'
-import SessionsTab from '@/components/tabs/SessionsTab'
-import ModulesTab from '@/components/tabs/ModulesTab'
+// Heavy tabs — code-split with React.lazy() to reduce initial bundle size.
+// LogTab and QueueTab are left eager (small, frequently needed).
+const DashboardTab = lazy(() => import('@/components/tabs/DashboardTab'))
+const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
+const DirectoryTab = lazy(() => import('@/components/tabs/DirectoryTab'))
+const SessionsTab = lazy(() => import('@/components/tabs/SessionsTab'))
+const ModulesTab = lazy(() => import('@/components/tabs/ModulesTab'))
+
+// Small tabs — keep eager (fast, lightweight)
 import LogTab from '@/components/tabs/LogTab'
 import QueueTab from '@/components/tabs/QueueTab'
+
+// Fallback shown while a lazy tab chunk is loading
+function TabSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 p-1">
+      <Skeleton className="h-[40px] w-full" />
+      <Skeleton className="h-[400px] w-full" />
+    </div>
+  )
+}
 
 // DO NOT CHANGE: All state (activeTab, selectedSession, refreshKey, isRefreshing, lastRefreshed)
 // is lifted to App.tsx. This is intentional — it ensures tab switches don't reset session
@@ -35,11 +49,11 @@ export default function App() {
   function renderActiveTab() {
     const props = { selectedSession, refreshKey, onLoadingChange: handleTabLoadingChange }
     switch (activeTab) {
-      case 'dashboard': return <TabErrorBoundary key={refreshKey} tabName="dashboard"><DashboardTab {...props} /></TabErrorBoundary>
-      case 'settings':  return <TabErrorBoundary key={refreshKey} tabName="settings"><SettingsTab {...props} /></TabErrorBoundary>
-      case 'directory': return <TabErrorBoundary key={refreshKey} tabName="directory"><DirectoryTab {...props} /></TabErrorBoundary>
-      case 'sessions':  return <TabErrorBoundary key={refreshKey} tabName="sessions"><SessionsTab {...props} /></TabErrorBoundary>
-      case 'modules':   return <TabErrorBoundary key={refreshKey} tabName="modules"><ModulesTab {...props} /></TabErrorBoundary>
+      case 'dashboard': return <TabErrorBoundary key={refreshKey} tabName="dashboard"><Suspense fallback={<TabSkeleton />}><DashboardTab {...props} /></Suspense></TabErrorBoundary>
+      case 'settings':  return <TabErrorBoundary key={refreshKey} tabName="settings"><Suspense fallback={<TabSkeleton />}><SettingsTab {...props} /></Suspense></TabErrorBoundary>
+      case 'directory': return <TabErrorBoundary key={refreshKey} tabName="directory"><Suspense fallback={<TabSkeleton />}><DirectoryTab {...props} /></Suspense></TabErrorBoundary>
+      case 'sessions':  return <TabErrorBoundary key={refreshKey} tabName="sessions"><Suspense fallback={<TabSkeleton />}><SessionsTab {...props} /></Suspense></TabErrorBoundary>
+      case 'modules':   return <TabErrorBoundary key={refreshKey} tabName="modules"><Suspense fallback={<TabSkeleton />}><ModulesTab {...props} /></Suspense></TabErrorBoundary>
       case 'log':       return <TabErrorBoundary key={refreshKey} tabName="log"><LogTab {...props} /></TabErrorBoundary>
       case 'queue':     return <TabErrorBoundary key={refreshKey} tabName="queue"><QueueTab {...props} /></TabErrorBoundary>
     }
