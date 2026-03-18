@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.12
 milestone_name: UI Overhaul & Feature Polish
 status: completed
-stopped_at: Completed 19-02-PLAN.md
-last_updated: "2026-03-18T16:40:25.775Z"
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-03-18T17:11:56.230Z"
 last_activity: "2026-03-18 — 19-02 executed: AppSidebar 7 nav items + theme toggle + TabHeader session selector + App.tsx shell"
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 75
 ---
 
@@ -53,6 +53,8 @@ Progress: [████████░░] 75% — Phase 19 complete (2/2 plans)
 - [Phase 18-react-scaffold]: dist/admin/ deployed to plugin_root/dist/admin/ (adjacent to src/) on both hpg6 locations
 - [Phase 19-app-layout]: shadcn components written manually (CLI incompatible with monorepo layout; no package.json in src/admin/)
 - [Phase 19]: All layout state (activeTab, selectedSession, refreshKey) lifted to App.tsx root — prevents session reset on tab switch
+- [Phase 20]: TagInput stores raw JIDs, displays resolved names (display-only; resolvedNames prop is display mapping)
+- [Phase 20]: Session type uses sessionId not id; TabHeader fixed to match actual API response
 
 ### Pending Todos
 
@@ -66,6 +68,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-18T16:35:39.013Z
-Stopped at: Completed 19-02-PLAN.md
+Last session: 2026-03-18T17:11:56.226Z
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None

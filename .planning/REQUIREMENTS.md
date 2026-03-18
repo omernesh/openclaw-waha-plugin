@@ -17,18 +17,18 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 
 ### Layout
 
-- [ ] **LYOT-01**: Sidebar navigation with all 7 tabs (Dashboard, Settings, Directory, Sessions, Modules, Log, Queue)
-- [ ] **LYOT-02**: Dark/light theme toggle persisted to localStorage
-- [ ] **LYOT-03**: Mobile-responsive layout (sidebar collapses to sheet/drawer on small screens)
-- [ ] **LYOT-04**: Consistent header with session selector and refresh button per tab
+- [x] **LYOT-01**: Sidebar navigation with all 7 tabs (Dashboard, Settings, Directory, Sessions, Modules, Log, Queue)
+- [x] **LYOT-02**: Dark/light theme toggle persisted to localStorage
+- [x] **LYOT-03**: Mobile-responsive layout (sidebar collapses to sheet/drawer on small screens)
+- [x] **LYOT-04**: Consistent header with session selector and refresh button per tab
 
 ### Dashboard Tab
 
-- [ ] **DASH-01**: Dashboard cards rebuilt as React Card components with per-session stats
-- [ ] **DASH-02**: Health section shows per-session health details
-- [ ] **DASH-03**: Human-readable labels throughout — no raw config keys
-- [ ] **DASH-04**: Filter cards are collapsible
-- [ ] **DASH-05**: Access Control resolves all JID formats (@c.us, @lid, bare numbers) to names
+- [x] **DASH-01**: Dashboard cards rebuilt as React Card components with per-session stats
+- [x] **DASH-02**: Health section shows per-session health details
+- [x] **DASH-03**: Human-readable labels throughout — no raw config keys
+- [x] **DASH-04**: Filter cards are collapsible
+- [x] **DASH-05**: Access Control resolves all JID formats (@c.us, @lid, bare numbers) to names
 
 ### Settings Tab
 
@@ -108,15 +108,15 @@ Requirements for the UI Overhaul milestone. Each maps to roadmap phases.
 | SCAF-03 | Phase 18 | Complete |
 | SCAF-04 | Phase 18 | Complete |
 | SCAF-05 | Phase 18 | Complete |
-| LYOT-01 | Phase 19 | Pending |
-| LYOT-02 | Phase 19 | Pending |
-| LYOT-03 | Phase 19 | Pending |
-| LYOT-04 | Phase 19 | Pending |
-| DASH-01 | Phase 20 | Pending |
-| DASH-02 | Phase 20 | Pending |
-| DASH-03 | Phase 20 | Pending |
-| DASH-04 | Phase 20 | Pending |
-| DASH-05 | Phase 20 | Pending |
+| LYOT-01 | Phase 19 | Complete |
+| LYOT-02 | Phase 19 | Complete |
+| LYOT-03 | Phase 19 | Complete |
+| LYOT-04 | Phase 19 | Complete |
+| DASH-01 | Phase 20 | Complete |
+| DASH-02 | Phase 20 | Complete |
+| DASH-03 | Phase 20 | Complete |
+| DASH-04 | Phase 20 | Complete |
+| DASH-05 | Phase 20 | Complete |
 | SETT-01 | Phase 20 | Pending |
 | SETT-02 | Phase 20 | Pending |
 | SETT-03 | Phase 20 | Pending |
