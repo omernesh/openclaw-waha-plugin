@@ -347,3 +347,33 @@ DM KEYWORD FILTER
    - Inbound pipeline checks which modules are active for the incoming chat and routes accordingly
 4. First candidate modules: channel moderator, event planner
 5. WhatsApp-specific — no cross-platform abstraction
+
+## CR-18: Settings Access Control tag inputs need name search and validation
+**Type:** CR (UX, high priority)
+**Location:** Settings tab → Access Control → Allow From, Group Allow From, Allowed Groups tag inputs
+**Issue:** Multiple problems:
+1. Placeholder text says "972544329000@c.us" / "Phone or JID, press Enter" — should say "Search by name..."
+2. No name search — typing a name doesn't find contacts like the God Mode Users picker does
+3. No input validation — entering "gaya" and pressing space adds "gaya" as a raw string tag, which is not a valid JID
+**Expected:**
+1. Change placeholder to "Search by name or phone..."
+2. Add contact search dropdown (same as God Mode Users contact picker pattern)
+3. Validate input: only accept valid JIDs (@c.us, @lid, @g.us, @newsletter) or phone numbers (digits only). Reject everything else with a toast error.
+
+## CR-19: Contact picker missing clear button and auto-close
+**Type:** CR (UX)
+**Location:** Settings tab → God Mode Users contact picker search (and any future contact pickers)
+**Issue:**
+1. No 'x' button to clear the search bar inside the contact picker
+2. After selecting a contact, the lookup dropdown stays open (fine for multi-select, but should close after a brief delay or when clicking outside)
+3. Clearing the search bar manually closes the dropdown (inconsistent — should stay open if there are results)
+**Expected:** Add clear button, consistent open/close behavior
+
+## CR-20: Large group participants show raw LID numbers
+**Type:** CR (architecture, medium priority)
+**Location:** Directory tab → Groups → large groups (100+ members)
+**Issue:** Groups with many participants (e.g., GenAI Israel 3 with 720 members) show all participants as raw LID numbers because their LID mappings aren't in the local database. The background sync only fetches LIDs from the bulk `/api/{session}/lids` endpoint, which may not include all group members.
+**Expected:**
+1. Background sync should also fetch LID mappings for group participants
+2. When expanding a group, queue an async LID resolution batch for any unresolved @lid participants
+3. Rate-limit WAHA API calls to avoid overwhelming the server
