@@ -4,7 +4,8 @@
 
 - ✅ **v1.10 Admin Panel & Multi-Session** — Phases 1-11 (shipped 2026-03-16)
 - ✅ **v1.11 Polish, Sync & Features** — Phases 12-17 (shipped 2026-03-18)
-- 🚧 **v1.12 UI Overhaul & Feature Polish** — Phases 18-24 (Active)
+- ✅ **v1.12 UI Overhaul & Feature Polish** — Phases 18-24 (shipped 2026-03-18)
+- 🚧 **v1.13 Close All Gaps** — Phases 25-32 (in progress)
 
 ## Phases
 
@@ -41,126 +42,128 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 </details>
 
-### v1.12 UI Overhaul & Feature Polish (Phases 18-24)
+<details>
+<summary>✅ v1.12 UI Overhaul & Feature Polish (Phases 18-24) — SHIPPED 2026-03-18</summary>
 
-**Milestone Goal:** Replace ~5500 lines of embedded HTML/JS in monitor.ts with a React SPA built on shadcn/ui + Tailwind CSS + Vite, preserving all existing admin panel functionality while gaining mobile responsiveness, accessibility, and maintainability.
+- [x] Phase 18: React Scaffold (2/2 plans) — completed 2026-03-18
+- [x] Phase 19: App Layout (2/2 plans) — completed 2026-03-18
+- [x] Phase 20: Dashboard and Settings Tabs (2/2 plans) — completed 2026-03-18
+- [x] Phase 21: Directory Tab (3/3 plans) — completed 2026-03-18
+- [x] Phase 22: Sessions, Modules, Log, and Queue Tabs (2/2 plans) — completed 2026-03-18
+- [x] Phase 23: Polish (2/2 plans) — completed 2026-03-18
+- [x] Phase 24: Cleanup and Deploy (1/1 plans) — completed 2026-03-18
 
-- [x] **Phase 18: React Scaffold** — Vite + React + shadcn/ui foundation and build pipeline (completed 2026-03-18)
-- [x] **Phase 19: App Layout** — Sidebar navigation, theme toggle, mobile responsiveness, shared header (completed 2026-03-18)
-- [x] **Phase 20: Dashboard and Settings Tabs** — Dashboard cards and Settings form rebuilt in React (completed 2026-03-18)
-- [x] **Phase 21: Directory Tab** — DataTable with search, participants, bulk edit, contact sheet (completed 2026-03-18)
-- [x] **Phase 22: Sessions, Modules, Log, and Queue Tabs** — Remaining four tabs rebuilt in React (completed 2026-03-18)
-- [x] **Phase 23: Polish** — Toasts, skeletons, error boundaries, refresh timestamps (completed 2026-03-18)
-- [x] **Phase 24: Cleanup and Deploy** — Remove legacy HTML/JS from monitor.ts, update build pipeline (completed 2026-03-18)
+</details>
+
+### v1.13 Close All Gaps (Phases 25-32)
+
+**Milestone Goal:** Close every remaining operational, API coverage, test coverage, and code quality gap. Ship session auto-recovery, config safety, pairing cleanup, full WAHA API coverage, real-time admin panel, analytics, comprehensive test coverage, and platform abstraction groundwork.
+
+- [ ] **Phase 25: Session Auto-Recovery** — Auto-restart unhealthy sessions, cooldown, alerting (REC-01 through REC-04)
+- [ ] **Phase 26: Config Safety** — Zod validation, structured errors, backup/rotate, export/import (CFG-01 through CFG-05)
+- [ ] **Phase 27: Pairing Cleanup and Code Quality** — Dead code removal, bot echo fix, deploy guard, and 5 CQ fixes (PAIR-01 through PAIR-03, CQ-01 through CQ-05)
+- [ ] **Phase 28: API Coverage Completion** — Channel search, bulk presence, group join-info/refresh/events, API keys, presence verification (API-01 through API-07, PRES-01, PRES-02)
+- [ ] **Phase 29: Real-Time Admin Panel** — SSE endpoint, live dashboard, log auto-scroll, connection indicator (RT-01 through RT-04)
+- [ ] **Phase 30: Analytics** — SQLite events table, analytics API, Analytics tab with charts (ANL-01 through ANL-03)
+- [ ] **Phase 31: Test Coverage Sprint** — monitor.ts, inbound.ts, directory.ts, shutup.ts, React component tests (TST-01 through TST-05)
+- [ ] **Phase 32: Platform Abstraction** — WahaClient extraction, adapter interface, multi-tenant groundwork (PLAT-01 through PLAT-03)
 
 ## Phase Details
 
-### Phase 18: React Scaffold
-**Goal**: A working Vite + React + shadcn/ui project is initialized, builds successfully, and the admin panel URL serves the React app instead of the embedded HTML string.
+### Phase 25: Session Auto-Recovery
+**Goal**: Unhealthy sessions recover automatically without operator intervention, with cooldown to prevent restart storms and visible recovery history in the admin panel.
 **Depends on**: Nothing (first phase of milestone)
-**Requirements**: SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05
+**Requirements**: REC-01, REC-02, REC-03, REC-04
 **Success Criteria** (what must be TRUE):
-  1. Navigating to the admin panel URL in a browser shows a React app (not the old HTML string), even if the content is a blank/placeholder page
-  2. Running `npm run build` completes without errors, producing output in `dist/admin/`
-  3. The API client utility can call any `/api/admin/*` endpoint and surface errors (not silently swallow them)
-  4. Dark and light CSS variables are present in the Tailwind theme configuration
-  5. The npm package includes the built `dist/admin/` output when published
-**Plans**: 2 plans
-Plans:
-- [x] 18-01-PLAN.md — Vite + React + Tailwind scaffold, API client, package.json updates
-- [x] 18-02-PLAN.md — Static file serving in monitor.ts + browser verification
+  1. After 5 consecutive health check failures, WAHA session restart is attempted automatically — operator does not need to manually trigger recovery
+  2. A second restart attempt cannot fire within 5 minutes of the previous one — a second failure within the cooldown window is logged but no restart is triggered
+  3. The Dashboard health card for the affected session shows attempt count, last recovery timestamp, and whether the last attempt succeeded or failed
+  4. When a session goes unhealthy and a healthy session is available, a WhatsApp alert message is delivered to all god mode users via the healthy session
+**Plans**: TBD
 
-### Phase 19: App Layout
-**Goal**: The admin panel has a complete navigation shell with all 7 tabs reachable, a working dark/light theme toggle, a mobile-responsive sidebar, and a consistent per-tab header.
-**Depends on**: Phase 18
-**Requirements**: LYOT-01, LYOT-02, LYOT-03, LYOT-04
+### Phase 26: Config Safety
+**Goal**: Config saves from the admin panel are validated before hitting disk, corrupt configs are rejected with actionable errors, and operators can export/import/restore configs without touching the server.
+**Depends on**: Nothing
+**Requirements**: CFG-01, CFG-02, CFG-03, CFG-04, CFG-05
 **Success Criteria** (what must be TRUE):
-  1. All 7 tab names (Dashboard, Settings, Directory, Sessions, Modules, Log, Queue) are visible in the sidebar and clicking each navigates to that tab's content area
-  2. Clicking the theme toggle switches between dark and light mode; reopening the browser tab restores the last-chosen theme
-  3. On a mobile viewport (under 768px), the sidebar is hidden and accessible via a hamburger/sheet drawer
-  4. Each tab has a consistent header area with a session selector and a refresh button
-**Plans**: 2 plans
-Plans:
-- [x] 19-01-PLAN.md — Install shadcn/ui components, theme hook, tab placeholders
-- [x] 19-02-PLAN.md — AppSidebar, TabHeader, App.tsx layout shell with routing
+  1. Submitting an invalid config value via the admin Settings tab returns a field-level error message pinned to the offending field — the config file on disk is not modified
+  2. Every successful config save rotates backups, preserving the 3 most recent previous versions alongside the current config
+  3. Clicking "Export Config" in the admin panel downloads the full current config as a JSON file
+  4. Uploading a valid JSON file via "Import Config" applies it and shows a success toast; uploading an invalid file shows a structured validation error without touching the live config
+**Plans**: TBD
 
-### Phase 20: Dashboard and Settings Tabs
-**Goal**: The Dashboard and Settings tabs are fully rebuilt as React components, displaying all information from the old panel with improved UX — labeled cards, collapsible sections, and accessible form controls.
-**Depends on**: Phase 19
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05, SETT-01, SETT-02, SETT-03, SETT-04, SETT-05
+### Phase 27: Pairing Cleanup and Code Quality
+**Goal**: Dead pairing code is removed, bot echo no longer triggers pairing challenges for itself, pairing.ts ships reliably in deploy artifacts, and five lingering code quality issues are resolved.
+**Depends on**: Nothing
+**Requirements**: PAIR-01, PAIR-02, PAIR-03, CQ-01, CQ-02, CQ-03, CQ-04, CQ-05
 **Success Criteria** (what must be TRUE):
-  1. Dashboard shows per-session stat cards with human-readable labels (no raw config keys); health section shows per-session connection state
-  2. Filter cards on Dashboard can be collapsed and expanded; Access Control section resolves @c.us, @lid, and bare numbers to human names
-  3. All Settings controls (switches, selects, text inputs) render as proper React form components and submit changes to the backend
-  4. JID fields in Settings use a tag-style input with name search (Combobox/Command); mention patterns use tag-style input
-  5. Save & Restart shows a blocking overlay while the gateway restarts and polling confirms it is back up
-**Plans**: 2 plans
-Plans:
-- [x] 20-01-PLAN.md — Radix primitives, shadcn components, types fix, labels, TagInput, RestartOverlay, DashboardTab
-- [x] 20-02-PLAN.md — SettingsTab with config form, tag inputs, contact picker, Save & Restart
-### Phase 21: Directory Tab
-**Goal**: The Directory tab is rebuilt as a full-featured data table with instant FTS search, a persistent contact settings sheet, bulk edit for all entity types, and correctly resolved participant names.
-**Depends on**: Phase 19
-**Requirements**: DIR-01, DIR-02, DIR-03, DIR-04, DIR-05, DIR-06, DIR-07
-**Success Criteria** (what must be TRUE):
-  1. Contacts, Groups, and Channels each have a sub-tab with a paginated DataTable showing all entries from the local SQLite database
-  2. Typing in the search box returns results instantly (FTS5 via API) without a full page reload
-  3. Opening a contact's settings panel (sheet/dialog) stays open after saving settings — the user does not need to re-open it
-  4. Bulk edit mode is available on Contacts and Channels tabs (matching the existing Groups pattern) with a multi-select toolbar
-  5. Group participant rows resolve names from the local DB; bot session rows show a badge and have no allow/block action buttons
-  6. The bot's own session JIDs do not appear in the contacts list
-**Plans**: 3 plans
-Plans:
-- [x] 21-01-PLAN.md — Foundation: fix types, install deps, shadcn primitives, DataTable wrapper, DirectoryTab shell
-- [x] 21-02-PLAN.md — ContactsTab, ContactSettingsSheet, ChannelsTab, BulkEditToolbar
-- [x] 21-03-PLAN.md — GroupsTab with expandable ParticipantRow, bot badges, role management
+  1. The plugin PairingEngine class is removed (or integrated) — no dead code path remains that creates pairing challenges from the plugin side
+  2. Sending a message from the bot session to itself no longer triggers a pairing challenge in the bot's inbound pipeline
+  3. pairing.ts is present in both hpg6 deploy locations after a standard deploy — absence is detected at startup and logged as an error
+  4. The remaining `.catch(() => {})` in shutup.ts:239 is replaced with `warnOnError()` — mute confirmation failures are visible in logs
+  5. Admin panel theme toggle respects `prefers-color-scheme` on first load (no manual toggle required on a fresh browser session)
+**Plans**: TBD
 
-### Phase 22: Sessions, Modules, Log, and Queue Tabs
-**Goal**: The four remaining tabs — Sessions, Modules, Log, and Queue — are fully rebuilt as React components with all existing functionality intact.
-**Depends on**: Phase 19
-**Requirements**: SESS-01, SESS-02, SESS-03, MODS-01, LOGT-01, QUEU-01
+### Phase 28: API Coverage Completion
+**Goal**: All identified WAHA API gaps are closed — channel search metadata, bulk presence, group join-info, group refresh, group webhook events, API keys CRUD, and all four presence endpoints verified end-to-end.
+**Depends on**: Nothing
+**Requirements**: API-01, API-02, API-03, API-04, API-05, API-06, API-07, PRES-01, PRES-02
 **Success Criteria** (what must be TRUE):
-  1. Sessions tab shows each session as a card with labeled role and subRole dropdowns accompanied by explanatory text; saving a role change shows an optimistic update followed by a "Restart required" notice
-  2. Save & Restart on the Sessions tab shows a blocking overlay identical in behavior to the one in Settings
-  3. Modules tab lists all registered modules with enable/disable toggles, inline config forms, and group/contact assignment pickers
-  4. Log tab displays log entries with virtual scrolling (no browser freeze on large logs), level filter chips, and a search box with a clear button
-  5. Queue tab displays current queue status (DM queue depth, group queue depth, processing state) as React components
-**Plans**: 2 plans
-Plans:
-- [ ] 22-01-PLAN.md — Fix types (QueueResponse, LogResponse), SessionsTab with role management + RestartOverlay, QueueTab
-- [ ] 22-02-PLAN.md — ModulesTab with enable/disable toggles + assignment management, LogTab with filtering + search + auto-scroll
+  1. The OpenClaw agent can search WhatsApp channels by view category and retrieve channel metadata (views, countries, categories) via plugin actions
+  2. A single plugin action returns presence status for all currently subscribed contacts (bulk GET)
+  3. The agent can preview group details (name, participants count, description) before joining via join-info endpoint
+  4. Group join/leave/participant-change webhook events are handled and delivered to the OpenClaw agent as inbound messages
+  5. The agent can create, list, update, and delete WAHA API keys via plugin actions
+  6. Contact online/offline presence status is visible in the admin panel Directory tab (with last-seen timestamp where available)
+**Plans**: TBD
 
-### Phase 23: Polish
-**Goal**: The React admin panel has consistent loading states, graceful error handling, actionable toast notifications, and visible refresh timestamps across all tabs.
-**Depends on**: Phase 20, Phase 21, Phase 22
-**Requirements**: PLSH-01, PLSH-02, PLSH-03, PLSH-04, CLNP-03
+### Phase 29: Real-Time Admin Panel
+**Goal**: The admin panel receives live server-push updates — health state changes, queue depth, new log lines — without requiring manual refresh.
+**Depends on**: Nothing
+**Requirements**: RT-01, RT-02, RT-03, RT-04
 **Success Criteria** (what must be TRUE):
-  1. All user-facing success and error events (save config, restart, allow/block toggle) surface as Sonner toast notifications instead of browser alerts or the custom old toast system
-  2. Every data-fetching tab shows Skeleton placeholder components while the initial fetch is in flight
-  3. If one tab's API call fails completely, that tab shows an error state without crashing the rest of the panel
-  4. Refresh buttons show a spinner while fetching and display a "Last refreshed HH:MM:SS" timestamp after completion
-  5. Tooltips in the Directory and Settings tabs render correctly above table overflow boundaries (via React portals, no clipping)
-**Plans**: 2 plans
-Plans:
-- [ ] 23-01-PLAN.md — Error boundaries, skeleton loading, toast notifications, tooltip portals
-- [ ] 23-02-PLAN.md — Refresh button spinner and "Last refreshed" timestamp
+  1. A persistent SSE connection is established when the admin panel loads — the connection survives tab-switch and auto-reconnects after a brief disconnect
+  2. When a session transitions from healthy to degraded or unhealthy, the Dashboard health card updates its badge color within 2 seconds without a manual refresh
+  3. New log entries appear in the Log tab in real time — the tab auto-scrolls to the latest entry if the user has not manually scrolled up
+  4. The admin sidebar shows a green "Connected" indicator while the SSE stream is live and an amber "Reconnecting" indicator during gaps
+**Plans**: TBD
 
-### Phase 24: Cleanup and Deploy
-**Goal**: The old embedded HTML/JS/CSS is removed from monitor.ts, the build and deploy pipeline is updated to include the Vite build, and the panel is verified end-to-end on hpg6.
-**Depends on**: Phase 23
-**Requirements**: CLNP-01, CLNP-02
+### Phase 30: Analytics
+**Goal**: Message activity is recorded to SQLite and surfaced in a new Analytics tab with hourly/daily charts — giving operators visibility into traffic patterns and response times.
+**Depends on**: Nothing
+**Requirements**: ANL-01, ANL-02, ANL-03
 **Success Criteria** (what must be TRUE):
-  1. The `getAdminPageHtml()` function and all inline CSS/JS strings are removed from monitor.ts — the file serves only API routes and static file serving logic
-  2. Running `npm run build` chains `tsc` and `vite build` in one command and the output is ready to publish
-  3. The deploy script (or documented workflow) copies `dist/admin/` to both hpg6 locations alongside the TypeScript build output
-  4. The admin panel on hpg6 loads the React build and all 7 tabs function correctly after deployment
-**Plans**: 1 plan
-Plans:
-- [ ] 24-01-PLAN.md — Remove legacy HTML/JS from monitor.ts, verify build pipeline
+  1. Every inbound and outbound message event is recorded to the analytics table with timestamp, direction, chat type, action name, processing duration, and status
+  2. The analytics API returns aggregated data for a requested time range and group-by interval (hour or day)
+  3. The Analytics tab in the admin panel displays a messages-per-hour bar chart and a response-time distribution chart populated from live data
+  4. Charts update on manual refresh — data shown is consistent with what was processed (counts match filter stats for the same period)
+**Plans**: TBD
+
+### Phase 31: Test Coverage Sprint
+**Goal**: Every critical untested module gains a test suite — zero-coverage modules (monitor.ts, inbound.ts, shutup.ts) are no longer unguarded, and existing partial coverage in directory.ts and React components is completed.
+**Depends on**: Nothing
+**Requirements**: TST-01, TST-02, TST-03, TST-04, TST-05
+**Success Criteria** (what must be TRUE):
+  1. Every admin API route in monitor.ts has at least one passing test (mock HTTP req/res) — a code change that breaks a route is caught by the test suite before deploy
+  2. The inbound.ts message pipeline (filter, dedup, queue entry, queue processing) has tests with mocked OpenClaw SDK imports
+  3. directory.ts CRUD operations — create/read/update/delete contacts, participant management, LID mapping, group filter overrides — each have at least one passing test
+  4. The shutup.ts interactive mute/unmute flow (pending selection, confirmation, timeout) has tests covering the happy path and the cancellation path
+  5. Each React admin panel tab has at least one component test (render without crash, key interaction verified)
+**Plans**: TBD
+
+### Phase 32: Platform Abstraction
+**Goal**: WAHA API calls are consolidated behind a WahaClient class, a platform adapter interface is defined for future multi-platform support, and the config/session/directory layers are structured for future multi-tenant isolation.
+**Depends on**: Phase 28
+**Requirements**: PLAT-01, PLAT-02, PLAT-03
+**Success Criteria** (what must be TRUE):
+  1. All direct `fetch()` calls to the WAHA API in send.ts are replaced by `WahaClient` methods — no raw fetch calls to WAHA remain outside WahaClient
+  2. A `ChannelAdapter` interface is defined and the plugin's OpenClaw integration implements it — swapping the transport layer requires only a new adapter class, not edits to business logic
+  3. Config, session registry, and DirectoryDb accept a tenant ID parameter — the plugin can run two isolated instances in the same process without state leakage between them
+**Plans**: TBD
 
 ## Progress
 
-**Execution Order:** 18 → 19 → 20 → 21 → 22 → 23 → 24
+**Execution Order:** 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 (28 must precede 32)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -185,6 +188,14 @@ Plans:
 | 19. App Layout | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 20. Dashboard and Settings Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 21. Directory Tab | v1.12 | 3/3 | Complete | 2026-03-18 |
-| 22. Sessions, Modules, Log, and Queue Tabs | 2/2 | Complete    | 2026-03-18 | - |
-| 23. Polish | 2/2 | Complete    | 2026-03-18 | - |
-| 24. Cleanup and Deploy | 1/1 | Complete    | 2026-03-18 | - |
+| 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
+| 23. Polish | v1.12 | 2/2 | Complete | 2026-03-18 |
+| 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
+| 25. Session Auto-Recovery | v1.13 | 0/TBD | Not started | - |
+| 26. Config Safety | v1.13 | 0/TBD | Not started | - |
+| 27. Pairing Cleanup and Code Quality | v1.13 | 0/TBD | Not started | - |
+| 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |
+| 29. Real-Time Admin Panel | v1.13 | 0/TBD | Not started | - |
+| 30. Analytics | v1.13 | 0/TBD | Not started | - |
+| 31. Test Coverage Sprint | v1.13 | 0/TBD | Not started | - |
+| 32. Platform Abstraction | v1.13 | 0/TBD | Not started | - |

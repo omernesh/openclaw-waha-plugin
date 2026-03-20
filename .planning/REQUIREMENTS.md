@@ -101,53 +101,53 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REC-01 | TBD | Pending |
-| REC-02 | TBD | Pending |
-| REC-03 | TBD | Pending |
-| REC-04 | TBD | Pending |
-| CFG-01 | TBD | Pending |
-| CFG-02 | TBD | Pending |
-| CFG-03 | TBD | Pending |
-| CFG-04 | TBD | Pending |
-| CFG-05 | TBD | Pending |
-| PAIR-01 | TBD | Pending |
-| PAIR-02 | TBD | Pending |
-| PAIR-03 | TBD | Pending |
-| API-01 | TBD | Pending |
-| API-02 | TBD | Pending |
-| API-03 | TBD | Pending |
-| API-04 | TBD | Pending |
-| API-05 | TBD | Pending |
-| API-06 | TBD | Pending |
-| API-07 | TBD | Pending |
-| PRES-01 | TBD | Pending |
-| PRES-02 | TBD | Pending |
-| RT-01 | TBD | Pending |
-| RT-02 | TBD | Pending |
-| RT-03 | TBD | Pending |
-| RT-04 | TBD | Pending |
-| ANL-01 | TBD | Pending |
-| ANL-02 | TBD | Pending |
-| ANL-03 | TBD | Pending |
-| TST-01 | TBD | Pending |
-| TST-02 | TBD | Pending |
-| TST-03 | TBD | Pending |
-| TST-04 | TBD | Pending |
-| TST-05 | TBD | Pending |
-| CQ-01 | TBD | Pending |
-| CQ-02 | TBD | Pending |
-| CQ-03 | TBD | Pending |
-| CQ-04 | TBD | Pending |
-| CQ-05 | TBD | Pending |
-| PLAT-01 | TBD | Pending |
-| PLAT-02 | TBD | Pending |
-| PLAT-03 | TBD | Pending |
+| REC-01 | Phase 25 | Pending |
+| REC-02 | Phase 25 | Pending |
+| REC-03 | Phase 25 | Pending |
+| REC-04 | Phase 25 | Pending |
+| CFG-01 | Phase 26 | Pending |
+| CFG-02 | Phase 26 | Pending |
+| CFG-03 | Phase 26 | Pending |
+| CFG-04 | Phase 26 | Pending |
+| CFG-05 | Phase 26 | Pending |
+| PAIR-01 | Phase 27 | Pending |
+| PAIR-02 | Phase 27 | Pending |
+| PAIR-03 | Phase 27 | Pending |
+| CQ-01 | Phase 27 | Pending |
+| CQ-02 | Phase 27 | Pending |
+| CQ-03 | Phase 27 | Pending |
+| CQ-04 | Phase 27 | Pending |
+| CQ-05 | Phase 27 | Pending |
+| API-01 | Phase 28 | Pending |
+| API-02 | Phase 28 | Pending |
+| API-03 | Phase 28 | Pending |
+| API-04 | Phase 28 | Pending |
+| API-05 | Phase 28 | Pending |
+| API-06 | Phase 28 | Pending |
+| API-07 | Phase 28 | Pending |
+| PRES-01 | Phase 28 | Pending |
+| PRES-02 | Phase 28 | Pending |
+| RT-01 | Phase 29 | Pending |
+| RT-02 | Phase 29 | Pending |
+| RT-03 | Phase 29 | Pending |
+| RT-04 | Phase 29 | Pending |
+| ANL-01 | Phase 30 | Pending |
+| ANL-02 | Phase 30 | Pending |
+| ANL-03 | Phase 30 | Pending |
+| TST-01 | Phase 31 | Pending |
+| TST-02 | Phase 31 | Pending |
+| TST-03 | Phase 31 | Pending |
+| TST-04 | Phase 31 | Pending |
+| TST-05 | Phase 31 | Pending |
+| PLAT-01 | Phase 32 | Pending |
+| PLAT-02 | Phase 32 | Pending |
+| PLAT-03 | Phase 32 | Pending |
 
 **Coverage:**
 - v1.13 requirements: 38 total
-- Mapped to phases: 0
-- Unmapped: 38 ⚠️
+- Mapped to phases: 38
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-20*
-*Last updated: 2026-03-20 after gap analysis and WAHA API audit*
+*Last updated: 2026-03-20 — traceability filled after roadmap creation*
