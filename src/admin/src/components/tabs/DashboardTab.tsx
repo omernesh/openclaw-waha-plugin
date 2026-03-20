@@ -181,13 +181,25 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                   key={session.sessionId}
                   className="rounded-md border px-3 py-2 text-sm space-y-1"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span className="font-medium min-w-[120px]">
                       {session.name || session.sessionId}
                     </span>
                     <Badge variant={statusBadgeVariant(session.healthStatus)}>
                       {session.healthStatus || 'unknown'}
                     </Badge>
+                    {/* Role and sub-role badges — from session API */}
+                    {(session as unknown as { role?: string }).role && (
+                      <Badge variant="secondary">{(session as unknown as { role: string }).role}</Badge>
+                    )}
+                    {(session as unknown as { subRole?: string }).subRole && (
+                      <Badge variant="outline">{(session as unknown as { subRole: string }).subRole}</Badge>
+                    )}
+                    {(session as unknown as { wahaStatus?: string }).wahaStatus && (
+                      <span className="text-xs text-muted-foreground">
+                        WAHA: {(session as unknown as { wahaStatus: string }).wahaStatus}
+                      </span>
+                    )}
                     {session.consecutiveFailures > 0 && (
                       <span className="text-muted-foreground text-xs">
                         {session.consecutiveFailures} failure{session.consecutiveFailures !== 1 ? 's' : ''}

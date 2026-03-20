@@ -220,6 +220,7 @@ export default function SessionsTab({ selectedSession: _selectedSession, refresh
                       </p>
                     )}
                     <p>WAHA: {session.wahaStatus || '—'}</p>
+                    <p>Last Check: {session.lastCheck ? new Date(session.lastCheck).toLocaleTimeString() : '—'}</p>
                   </div>
 
                   {/* Role dropdown */}

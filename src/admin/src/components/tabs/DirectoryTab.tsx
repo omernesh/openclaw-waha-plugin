@@ -7,7 +7,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Search, RefreshCw, CheckCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { DirectoryResponse } from '@/types'
 import { GroupsTab } from './directory/GroupsTab'
@@ -82,6 +84,18 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
     setRefreshCounter(c => c + 1)
   }
 
+  // Refresh All: call API to resync directory from WAHA, then reload data
+  async function handleRefreshAll() {
+    try {
+      await api.refreshDirectory()
+      toast.success('Directory refreshed')
+      refreshData()
+    } catch (err) {
+      toast.error('Refresh failed')
+      console.error(err)
+    }
+  }
+
   // Reset pagination and search on sub-tab change
   function handleSubTabChange(tab: string) {
     setActiveSubTab(tab)
@@ -110,16 +124,39 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
 
   return (
     <div className="space-y-4">
-      {/* Search bar */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search directory..."
-          value={searchInput}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="pl-8"
-        />
+      {/* Sync status + Search bar + Refresh All toolbar */}
+      <div className="flex items-center gap-2">
+        {/* Sync status indicator */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
+          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+          <span>Ready</span>
+        </div>
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search directory..."
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefreshAll} className="shrink-0 gap-1.5">
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refresh All
+        </Button>
       </div>
+
+      {/* Summary counts row */}
+      {data && (
+        <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 px-1">
+          <span>Contacts <span className="font-medium text-foreground">{data.dms}</span></span>
+          <span>Groups <span className="font-medium text-foreground">{data.groups}</span></span>
+          <span>Newsletters <span className="font-medium text-foreground">{data.newsletters}</span></span>
+          <span className="text-muted-foreground/70">
+            Showing {pagination.pageIndex * pagination.pageSize + 1}–{pagination.pageIndex * pagination.pageSize + data.contacts.length} of {data.total}
+          </span>
+        </div>
+      )}
 
       {/* Sub-tabs — counts shown from API response totals */}
       <Tabs value={activeSubTab} onValueChange={handleSubTabChange}>

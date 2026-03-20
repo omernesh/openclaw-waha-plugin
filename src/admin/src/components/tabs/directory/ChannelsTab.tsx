@@ -1,7 +1,7 @@
 // ChannelsTab — paginated DataTable of newsletter/channel directory entries with bulk select.
 // DO NOT CHANGE: entityType="newsletter" in BulkEditToolbar — shows Follow/Unfollow actions.
 // DO NOT CHANGE: timestamps are Unix seconds — multiply by 1000 for Date constructor.
-// No row click action — channels don't have individual DM settings.
+// Row click opens ContactSettingsSheet for per-channel settings (added 260320-rii).
 // Verified working: Phase 21 Plan 02 (2026-03-18)
 
 import { useState } from 'react'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/DataTable'
 import { BulkEditToolbar } from './BulkEditToolbar'
+import { ContactSettingsSheet } from './ContactSettingsSheet'
 import { api } from '@/lib/api'
 import type { DirectoryContact } from '@/types'
 
@@ -33,6 +34,9 @@ export function ChannelsTab({
 }: ChannelsTabProps) {
   const [bulkMode, setBulkMode] = useState(false)
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
+  // Per-channel settings sheet (same as ContactsTab pattern)
+  const [selectedJid, setSelectedJid] = useState<string | null>(null)
+  const selectedChannel = selectedJid ? data.find((d) => d.jid === selectedJid) ?? null : null
 
   // Column definitions — DO NOT CHANGE: ColumnDef<DirectoryContact> required for type safety
   const columns: ColumnDef<DirectoryContact, unknown>[] = [
@@ -138,7 +142,7 @@ export function ChannelsTab({
         />
       )}
 
-      {/* Data table — no row click for channels */}
+      {/* Data table — row click opens settings sheet when not in bulk mode */}
       <DataTable
         columns={columns}
         data={data}
@@ -147,7 +151,18 @@ export function ChannelsTab({
         onPaginationChange={onPaginationChange}
         rowSelection={bulkMode ? rowSelection : undefined}
         onRowSelectionChange={bulkMode ? setRowSelection : undefined}
+        onRowClick={bulkMode ? undefined : (row) => setSelectedJid(row.jid)}
         loading={loading}
+      />
+
+      {/* Per-channel settings sheet — identical to ContactsTab pattern */}
+      <ContactSettingsSheet
+        jid={selectedJid}
+        displayName={selectedChannel?.displayName ?? null}
+        dmSettings={selectedChannel?.dmSettings}
+        allowedDm={selectedChannel?.allowedDm ?? false}
+        onClose={() => setSelectedJid(null)}
+        onSaved={onRefresh}
       />
     </div>
   )

@@ -81,6 +81,16 @@ export default function App() {
           <main className="flex flex-1 flex-col overflow-auto p-4">
             {renderActiveTab()}
           </main>
+          <footer className="border-t px-4 py-2 text-xs text-muted-foreground text-center">
+            Created with love by{' '}
+            <a href="https://github.com/omernesh" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+              omer nesher
+            </a>
+            {' — '}
+            <a href="https://github.com/omernesh/openclaw-waha-plugin" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+              GitHub
+            </a>
+          </footer>
         </SidebarInset>
       </SSEProvider>
     </SidebarProvider>

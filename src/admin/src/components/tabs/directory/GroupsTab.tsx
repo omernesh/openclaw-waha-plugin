@@ -63,6 +63,13 @@ const columns: ColumnDef<DirectoryContact, unknown>[] = [
     ),
   },
   {
+    accessorKey: 'participantCount',
+    header: 'Members',
+    cell: ({ row }) => (
+      <span className="text-sm">{(row.original as DirectoryContact & { participantCount?: number }).participantCount ?? '—'}</span>
+    ),
+  },
+  {
     accessorKey: 'messageCount',
     header: 'Messages',
     cell: ({ row }) => (
