@@ -2,6 +2,20 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.2] - 2026-03-21
+
+### Fixed — Code Review (Perfection Pass)
+- **ApiError class** — `api.request()` now throws proper `Error` instances with `.data` preserving server JSON. `err instanceof Error` works everywhere.
+- **Presence fetch** — Migrated from raw `fetch()` to typed `api.getPresence()` with AbortController cleanup, `res.ok` check, and toast on failure.
+- **Double-click protection** — Allow DM buttons in Contacts and Channels tabs disabled during API call to prevent race conditions.
+- **Toast ordering** — `handleAllowAll` success toast moved after both API calls complete (was firing before re-fetch).
+- **Empty results display** — "Showing 1-0 of 0" replaced with "No results" when directory page is empty.
+- **Column memoization** — All column definitions wrapped in `useMemo()` to prevent unnecessary re-renders.
+- **Shared column factories** — Extracted `makeSelectColumn`, `makeDmAccessColumn`, `makeSettingsColumn`, `makeMessagesColumn`, and `formatDate` into `shared-columns.tsx`. Eliminated ~80 lines of duplication.
+- **GroupFilterOverride guard** — Save button disabled after load failure; error banner with retry button prevents overwriting server data with defaults.
+- **Type safety** — Added `participantCount` to `DirectoryContact`, `PresenceEntry` type, narrowed `handleRoleChange` parameter. Removed unsafe `as` casts.
+- **Dead code** — Removed unused `pageRef` block from DataTable, duplicate `min-w-0` class from ParticipantRow.
+
 ## [1.16.1] - 2026-03-20
 
 ### Added — Directory Tab Overhaul & Missing Feature Restoration
