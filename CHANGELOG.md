@@ -2,6 +2,25 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.1] - 2026-03-20
+
+### Added — Directory Tab Overhaul & Missing Feature Restoration
+- **Avatar circles** — Colored initial avatars on all directory rows (contacts, groups, channels, participants). Deterministic color from name hash.
+- **Stacked name + JID layout** — Display name on top, JID below in muted text. Replaces separate columns.
+- **Allow DM buttons** — Clickable "Allow DM" / "Revoke" buttons directly in contact and channel list rows.
+- **Settings buttons** — Explicit "Settings" button per contact and channel row (opens side sheet).
+- **Participants button** — Explicit "Participants" button per group row (was click-only chevron).
+- **Full numbered pagination** — Page number buttons with first/last jump (« 1 2 3 4 5 »). Replaces prev/next only.
+- **Per-page dropdown** — Select 10, 25, 50, or 100 items per page across all directory sub-tabs.
+- **Filter badge** — Header shows green "Filter ON" or red "Filter OFF" indicator.
+- **Settings tab enhancements** — Active WAHA Session dropdown, Pairing link generator, Multi-Session Filtering Guide.
+- **Dashboard enhancements** — Role/sub-role badges and WAHA status per session card.
+- **Sessions tab** — Last Check timestamp in health details.
+- **Directory header** — Sync status indicator, summary counts row, Refresh All button.
+- **Channels settings** — Row click opens ContactSettingsSheet (same per-entity settings as contacts).
+- **Groups** — Members column showing participant count.
+- **Footer** — Creator credit with GitHub link.
+
 ## [1.15.3] - 2026-03-18
 
 ### Fixed — Code Review & Production Fixes
