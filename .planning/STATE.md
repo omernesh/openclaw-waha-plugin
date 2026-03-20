@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 27-01-PLAN.md
-last_updated: "2026-03-20T04:43:05.715Z"
+stopped_at: Completed 28-03-PLAN.md
+last_updated: "2026-03-20T04:55:40.441Z"
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 8
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 27 — Pairing Cleanup and Code Quality
+**Current focus:** Phase 28 — API Coverage Completion
 
 ## Current Position
 
-Phase: 27 (Pairing Cleanup and Code Quality) — EXECUTING
-Plan: 2 of 2
+Phase: 28 (API Coverage Completion) — EXECUTING
+Plan: 1 of 3
 
 ## Accumulated Context
 
@@ -47,6 +47,9 @@ Plan: 2 of 2
 - [Phase 27]: PAIR-01: PairingEngine is active Phase 16 code — no removal. Dead code was the assumption, not the file.
 - [Phase 27]: CQ-02: admin name uses dirDb.getContact() on first godModeSuperUsers entry; falls back to 'the administrator' gracefully
 - [Phase 27]: CQ-03: both error paths in getCachedConfig() now include actionable context and root cause
+- [Phase 28]: getAllWahaPresence was already added by plan 01 — no re-add needed
+- [Phase 28]: [Phase 28-01]: searchChannelsByView defaults viewType to RECOMMENDED when absent
+- [Phase 28]: [Phase 28-01]: getAllWahaPresence uses GET on /presence (same path as POST for setPresenceStatus)
 
 ### Pending Todos
 
@@ -58,6 +61,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T04:38:56.298Z
-Stopped at: Completed 27-01-PLAN.md
+Last session: 2026-03-20T04:55:23.718Z
+Stopped at: Completed 28-03-PLAN.md
 Resume file: None

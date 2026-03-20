@@ -38,8 +38,8 @@
 
 ### Presence
 
-- [ ] **PRES-01**: Verify all 4 presence endpoints work end-to-end (set, get, get-all, subscribe)
-- [ ] **PRES-02**: Surface presence data in admin panel (contact online/offline status in directory)
+- [x] **PRES-01**: Verify all 4 presence endpoints work end-to-end (set, get, get-all, subscribe)
+- [x] **PRES-02**: Surface presence data in admin panel (contact online/offline status in directory)
 
 ### Real-Time Admin
 
@@ -125,8 +125,8 @@
 | API-05 | Phase 28 | Pending |
 | API-06 | Phase 28 | Pending |
 | API-07 | Phase 28 | Pending |
-| PRES-01 | Phase 28 | Pending |
-| PRES-02 | Phase 28 | Pending |
+| PRES-01 | Phase 28 | Complete |
+| PRES-02 | Phase 28 | Complete |
 | RT-01 | Phase 29 | Pending |
 | RT-02 | Phase 29 | Pending |
 | RT-03 | Phase 29 | Pending |
