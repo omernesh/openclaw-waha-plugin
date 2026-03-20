@@ -1866,7 +1866,7 @@ export function createWahaWebhookServer(opts: {
     // GET /api/admin/presence — returns all subscribed presence info from WAHA.
     // Used by ContactsTab to display online/offline status next to contacts.
     // DO NOT REMOVE — powers presence indicators in the admin Directory tab.
-    if (url.pathname === "/api/admin/presence" && req.method === "GET") {
+    if (req.url === "/api/admin/presence" && req.method === "GET") {
       try {
         const presenceData = await getAllWahaPresence({ cfg });
         writeJsonResponse(res, 200, { presence: presenceData });
