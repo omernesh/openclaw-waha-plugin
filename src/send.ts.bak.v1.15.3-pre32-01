@@ -8,7 +8,6 @@ import { callWahaApi, warnOnError } from "./http-client.js";
 import { assertPolicyCanSend } from "./policy-enforcer.js";
 import type { CoreConfig } from "./types.js";
 import { getDirectoryDb } from "./directory.js";
-import { getWahaClient, type WahaClient } from "./waha-client.js";
 
 const HEAD_DETECT_TIMEOUT_MS = 5000;
 const RESOLVE_FETCH_DELAY_MS = 200;
@@ -57,32 +56,15 @@ export function assertCanSend(session: string, cfg: CoreConfig): void {
 // ║  DO NOT re-define callWahaApi here. It comes from the import above. ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
-// ╔══════════════════════════════════════════════════════════════════════╗
-// ║  getClient / resolveSessionPath — internal helpers DO NOT CHANGE    ║
-// ║                                                                     ║
-// ║  getClient() returns a cached WahaClient for the given account.    ║
-// ║  It does NOT call assertCanSend — mutation callers do that.        ║
-// ║                                                                     ║
-// ║  resolveSessionPath() is kept as a thin wrapper for the few        ║
-// ║  call sites that build paths before having a client reference.     ║
-// ║                                                                     ║
-// ║  Added: Phase 32, Plan 01 (2026-03-20).                            ║
-// ╚══════════════════════════════════════════════════════════════════════╝
-
-function getClient(cfg: CoreConfig, accountId?: string): WahaClient {
-  return getWahaClient(cfg, accountId);
-}
-
-// resolveSessionPath — legacy helper kept for internal path building.
-// Delegates to WahaClient.sessionPath when a client is available; used standalone here.
 function resolveSessionPath(template: string, cfg: CoreConfig, accountId?: string): string {
-  return getClient(cfg, accountId).sessionPath(template);
+  const account = resolveWahaAccount({ cfg, accountId: accountId ?? DEFAULT_ACCOUNT_ID });
+  const session = account.session ?? "default";
+  return template.replace("{session}", encodeURIComponent(session));
 }
 
-// resolveAccountParams — kept as a deprecated compatibility shim.
-// Previously used everywhere; now only a few complex send functions that still need
-// the session string directly (sendWahaEvent, getWahaContacts) call this.
-// DO NOT REMOVE until all callers are migrated.
+// Account resolution: determines which WAHA session + API key to use.
+// In production: session=3cf11776_logan, API key from WHATSAPP_API_KEY env var.
+// ⚠️ WAHA has TWO API keys (WAHA_API_KEY vs WHATSAPP_API_KEY) — only WHATSAPP_API_KEY works.
 function resolveAccountParams(cfg: CoreConfig, accountId?: string) {
   const account = resolveWahaAccount({ cfg, accountId: accountId ?? DEFAULT_ACCOUNT_ID });
   const session = account.session ?? "default";
@@ -174,12 +156,17 @@ export async function sendWahaPresence(params: {
   typing: boolean;
   accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
   // Let callers handle errors — they already use .catch(warnOnError(...))
-  return client.post(params.typing ? "/api/startTyping" : "/api/stopTyping", {
-    chatId: params.chatId,
-    session: client.session,
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: params.typing ? "/api/startTyping" : "/api/stopTyping",
+    body: {
+      chatId: params.chatId,
+      session: account.session,
+    },
   });
 }
 
@@ -191,11 +178,16 @@ export async function sendWahaSeen(params: {
   chatId: string;
   accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/sendSeen", {
-    chatId: params.chatId,
-    session: client.session,
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendSeen",
+    body: {
+      chatId: params.chatId,
+      session: account.session,
+    },
   }).catch(warnOnError(`presence /api/sendSeen ${params.chatId}`));
 }
 
@@ -208,8 +200,8 @@ export async function sendWahaText(params: {
   botProxy?: boolean;
   bypassPolicy?: boolean; // Skip rules-based policy check (used by system commands like /shutup)
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendText requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
@@ -225,7 +217,7 @@ export async function sendWahaText(params: {
   // Added Phase 7 (2026-03-15).
   if (chatId.endsWith("@g.us") && !params.bypassPolicy) {
     try {
-      const dirDb = getDirectoryDb(client.accountId);
+      const dirDb = getDirectoryDb(account.accountId);
       if (dirDb.isGroupMuted(chatId)) {
         throw new Error(`Outbound blocked: group ${chatId} is muted. Use /unshutup to unmute.`);
       }
@@ -250,12 +242,17 @@ export async function sendWahaText(params: {
   const autoLP = params.cfg.channels?.waha?.autoLinkPreview;
   const addLinkPreview = autoLP !== false && URL_REGEX.test(textToSend);
 
-  return client.post("/api/sendText", {
-    chatId,
-    text: textToSend,
-    session: client.session,
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
-    ...(addLinkPreview ? { linkPreview: true } : {}),
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendText",
+    body: {
+      chatId,
+      text: textToSend,
+      session: account.session,
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+      ...(addLinkPreview ? { linkPreview: true } : {}),
+    },
   });
 }
 
@@ -288,8 +285,8 @@ async function sendWahaMedia(params: {
   replyToId?: string;
   accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.to);
   if (!chatId) throw new Error("WAHA sendMedia requires chatId");
 
@@ -312,38 +309,58 @@ async function sendWahaMedia(params: {
   const base = {
     chatId,
     file: filePayload,
-    session: client.session,
+    session: account.session,
     ...(params.replyToId ? { reply_to: params.replyToId } : {}),
   };
 
   if (isImage) {
-    return client.post("/api/sendImage", {
-      ...base,
-      ...(params.text ? { caption: params.text } : {}),
+    return callWahaApi({
+      baseUrl: account.baseUrl,
+      apiKey: account.apiKey,
+      path: "/api/sendImage",
+      body: {
+        ...base,
+        ...(params.text ? { caption: params.text } : {}),
+      },
     });
   }
 
   if (isVideo) {
-    return client.post("/api/sendVideo", {
-      ...base,
-      convert: true,
-      ...(params.text ? { caption: params.text } : {}),
+    return callWahaApi({
+      baseUrl: account.baseUrl,
+      apiKey: account.apiKey,
+      path: "/api/sendVideo",
+      body: {
+        ...base,
+        convert: true,
+        ...(params.text ? { caption: params.text } : {}),
+      },
     });
   }
 
   if (isAudio) {
     // Send text first (voice notes don't support captions in WhatsApp)
     if (params.text) {
-      await client.post("/api/sendText", {
-        chatId,
-        text: params.text,
-        session: client.session,
+      await callWahaApi({
+        baseUrl: account.baseUrl,
+        apiKey: account.apiKey,
+        path: "/api/sendText",
+        body: {
+          chatId,
+          text: params.text,
+          session: account.session,
+        },
       });
     }
     // Then send voice bubble
-    return client.post("/api/sendVoice", {
-      ...base,
-      convert: true,
+    return callWahaApi({
+      baseUrl: account.baseUrl,
+      apiKey: account.apiKey,
+      path: "/api/sendVoice",
+      body: {
+        ...base,
+        convert: true,
+      },
     });
   }
 
@@ -355,16 +372,26 @@ async function sendWahaMedia(params: {
   // Verified 2026-03-10 (media routing fix).
   // ───────────────────────────────────────────────────────────────
   if (isDocument) {
-    return client.post("/api/sendFile", {
-      ...base,
-      ...(params.text ? { caption: params.text } : {}),
+    return callWahaApi({
+      baseUrl: account.baseUrl,
+      apiKey: account.apiKey,
+      path: "/api/sendFile",
+      body: {
+        ...base,
+        ...(params.text ? { caption: params.text } : {}),
+      },
     });
   }
 
   // Unknown or undetectable MIME → default to sendImage
-  return client.post("/api/sendImage", {
-    ...base,
-    ...(params.text ? { caption: params.text } : {}),
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendImage",
+    body: {
+      ...base,
+      ...(params.text ? { caption: params.text } : {}),
+    },
   });
 }
 
@@ -415,19 +442,24 @@ export async function sendWahaImage(params: {
   replyToId?: string;
   accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendImage requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
   assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
-  return client.post("/api/sendImage", {
-    chatId,
-    file: filePayload,
-    session: client.session,
-    ...(params.caption ? { caption: params.caption } : {}),
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendImage",
+    body: {
+      chatId,
+      file: filePayload,
+      session: account.session,
+      ...(params.caption ? { caption: params.caption } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
@@ -439,20 +471,25 @@ export async function sendWahaVideo(params: {
   replyToId?: string;
   accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendVideo requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
   assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
-  return client.post("/api/sendVideo", {
-    chatId,
-    file: filePayload,
-    session: client.session,
-    convert: true,
-    ...(params.caption ? { caption: params.caption } : {}),
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendVideo",
+    body: {
+      chatId,
+      file: filePayload,
+      session: account.session,
+      convert: true,
+      ...(params.caption ? { caption: params.caption } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
@@ -464,19 +501,24 @@ export async function sendWahaFile(params: {
   replyToId?: string;
   accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
   const chatId = normalizeWahaMessagingTarget(params.chatId);
   if (!chatId) throw new Error("sendFile requires chatId");
   // Phase 6: Rules-based outbound policy enforcement. DO NOT CHANGE.
   assertPolicyCanSend(chatId, params.cfg);
   const filePayload = buildFilePayload(params.file);
-  return client.post("/api/sendFile", {
-    chatId,
-    file: filePayload,
-    session: client.session,
-    ...(params.caption ? { caption: params.caption } : {}),
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/sendFile",
+    body: {
+      chatId,
+      file: filePayload,
+      session: account.session,
+      ...(params.caption ? { caption: params.caption } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
@@ -490,18 +532,23 @@ export async function sendWahaReaction(params: {
   accountId?: string;
   remove?: boolean;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId });
+  assertCanSend(account.session, params.cfg);
 
   const reaction = params.remove ? "" : params.emoji;
   if (!params.messageId) {
     throw new Error("WAHA reaction requires messageId");
   }
 
-  return client.put("/api/reaction", {
-    messageId: params.messageId,
-    reaction,
-    session: client.session,
+  return callWahaApi({
+    baseUrl: account.baseUrl,
+    apiKey: account.apiKey,
+    path: "/api/reaction",
+    body: {
+      messageId: params.messageId,
+      reaction,
+      session: account.session,
+    },
   });
 }
 
@@ -514,23 +561,24 @@ export async function sendWahaPoll(params: {
   cfg: CoreConfig; chatId: string; name: string; options: string[];
   multipleAnswers?: boolean; replyToId?: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/sendPoll", {
-    chatId: params.chatId, session: client.session,
-    poll: { name: params.name, options: params.options, multipleAnswers: params.multipleAnswers ?? false },
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/sendPoll",
+    body: {
+      chatId: params.chatId, session,
+      poll: { name: params.name, options: params.options, multipleAnswers: params.multipleAnswers ?? false },
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
 export async function sendWahaPollVote(params: {
   cfg: CoreConfig; chatId: string; pollMessageId: string; votes: string[]; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/sendPollVote", {
-    chatId: params.chatId, session: client.session,
-    pollMessageId: params.pollMessageId, votes: params.votes,
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/sendPollVote",
+    body: { chatId: params.chatId, session, pollMessageId: params.pollMessageId, votes: params.votes },
   });
 }
 
@@ -539,12 +587,14 @@ export async function sendWahaLocation(params: {
   cfg: CoreConfig; chatId: string; latitude: number; longitude: number; title: string;
   replyToId?: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/sendLocation", {
-    chatId: params.chatId, session: client.session,
-    latitude: params.latitude, longitude: params.longitude, title: params.title,
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/sendLocation",
+    body: {
+      chatId: params.chatId, session,
+      latitude: params.latitude, longitude: params.longitude, title: params.title,
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
@@ -553,15 +603,17 @@ export async function sendWahaContactVcard(params: {
   contacts: Array<{ fullName: string; phoneNumber: string; organization?: string }>;
   replyToId?: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/sendContactVcard", {
-    chatId: params.chatId, session: client.session,
-    contacts: params.contacts.map(c => ({
-      fullName: c.fullName, phoneNumber: c.phoneNumber,
-      ...(c.organization ? { organization: c.organization } : {}),
-    })),
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/sendContactVcard",
+    body: {
+      chatId: params.chatId, session,
+      contacts: params.contacts.map(c => ({
+        fullName: c.fullName, phoneNumber: c.phoneNumber,
+        ...(c.organization ? { organization: c.organization } : {}),
+      })),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
@@ -570,23 +622,25 @@ export async function sendWahaList(params: {
   sections: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>;
   replyToId?: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/sendList", {
-    chatId: params.chatId, session: client.session,
-    title: params.title, description: params.description, buttonText: params.buttonText,
-    sections: params.sections,
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/sendList",
+    body: {
+      chatId: params.chatId, session,
+      title: params.title, description: params.description, buttonText: params.buttonText,
+      sections: params.sections,
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
 export async function forwardWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/forwardMessage", {
-    chatId: params.chatId, session: client.session, messageId: params.messageId,
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/forwardMessage",
+    body: { chatId: params.chatId, session, messageId: params.messageId },
   });
 }
 
@@ -594,25 +648,26 @@ export async function sendWahaLinkPreview(params: {
   cfg: CoreConfig; chatId: string; url: string; title: string;
   description?: string; image?: string; replyToId?: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/send/link-custom-preview", {
-    chatId: params.chatId, session: client.session,
-    url: params.url, title: params.title,
-    ...(params.description ? { description: params.description } : {}),
-    ...(params.image ? { image: params.image } : {}),
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/send/link-custom-preview",
+    body: {
+      chatId: params.chatId, session,
+      url: params.url, title: params.title,
+      ...(params.description ? { description: params.description } : {}),
+      ...(params.image ? { image: params.image } : {}),
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+    },
   });
 }
 
 export async function sendWahaButtonsReply(params: {
   cfg: CoreConfig; chatId: string; messageId: string; buttonId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/send/buttons/reply", {
-    chatId: params.chatId, session: client.session,
-    messageId: params.messageId, buttonId: params.buttonId,
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, path: "/api/send/buttons/reply",
+    body: { chatId: params.chatId, session, messageId: params.messageId, buttonId: params.buttonId },
   });
 }
 
@@ -625,13 +680,13 @@ export async function sendWahaButtonsReply(params: {
 export async function editWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; text: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/chats")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.chatId)}/messages/${encodeURIComponent(params.messageId)}`,
-    { text: params.text },
-  );
+    body: { text: params.text },
+  });
 }
 
 // ── VERIFIED WORKING 2026-03-10 ──────────────────────────────────
@@ -641,63 +696,69 @@ export async function editWahaMessage(params: {
 export async function deleteWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.del(
-    client.sessionPath("/api/{session}/chats")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.chatId)}/messages/${encodeURIComponent(params.messageId)}`,
-  );
+  });
 }
 
 export async function pinWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/chats")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.chatId)}/messages/${encodeURIComponent(params.messageId)}/pin`,
-    {},
-  );
+    body: {},
+  });
 }
 
 export async function unpinWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/chats")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.chatId)}/messages/${encodeURIComponent(params.messageId)}/unpin`,
-    {},
-  );
+    body: {},
+  });
 }
 
 export async function starWahaMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; star: boolean; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put("/api/star", {
-    chatId: params.chatId, session: client.session,
-    messageId: params.messageId, star: params.star,
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT", path: "/api/star",
+    body: { chatId: params.chatId, session, messageId: params.messageId, star: params.star },
   });
 }
 
 // ── Chat Management ────────────────────────────────────────────
 
 export async function getWahaChats(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/chats"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId),
+  });
 }
 
 export async function getWahaChatsOverview(params: {
   cfg: CoreConfig; page?: number; limit?: number; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/chats/overview"), {
-    ...(params.page != null ? { page: String(params.page) } : {}),
-    ...(params.limit != null ? { limit: String(params.limit) } : {}),
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/chats/overview", params.cfg, params.accountId),
+    query: {
+      ...(params.page != null ? { page: String(params.page) } : {}),
+      ...(params.limit != null ? { limit: String(params.limit) } : {}),
+    },
   });
 }
 
@@ -705,92 +766,109 @@ export async function getWahaChatMessages(params: {
   cfg: CoreConfig; chatId: string; limit?: number; offset?: number;
   downloadMedia?: boolean; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/messages`,
-    {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/messages`,
+    query: {
       ...(params.limit != null ? { limit: String(params.limit) } : {}),
       ...(params.offset != null ? { offset: String(params.offset) } : {}),
       ...(params.downloadMedia != null ? { downloadMedia: String(params.downloadMedia) } : {}),
     },
-  );
+  });
 }
 
 export async function getWahaChatMessage(params: {
   cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/chats")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.chatId)}/messages/${encodeURIComponent(params.messageId)}`,
-  );
+  });
 }
 
 export async function deleteWahaChat(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.del(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}`,
+  });
 }
 
 export async function clearWahaChatMessages(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.del(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/messages`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/messages`,
+  });
 }
 
 export async function archiveWahaChat(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/archive`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/archive`,
+    body: {},
+  });
 }
 
 export async function unarchiveWahaChat(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/unarchive`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/unarchive`,
+    body: {},
+  });
 }
 
 export async function unreadWahaChat(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/unread`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/unread`,
+    body: {},
+  });
 }
 
 export async function readWahaChatMessages(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/messages/read`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/messages/read`,
+    body: {},
+  });
 }
 
 export async function getWahaChatPicture(params: {
   cfg: CoreConfig; chatId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/picture`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.chatId)}/picture`,
+  });
 }
 
 // ── Group Admin ────────────────────────────────────────────────
@@ -798,252 +876,275 @@ export async function getWahaChatPicture(params: {
 export async function createWahaGroup(params: {
   cfg: CoreConfig; name: string; participants: string[]; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/groups"), {
-    name: params.name, participants: params.participants,
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId),
+    body: { name: params.name, participants: params.participants },
   });
 }
 
 export async function getWahaGroups(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/groups"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId),
+  });
 }
 
 export async function getWahaGroup(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}`,
+  });
 }
 
 export async function deleteWahaGroup(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.del(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}`,
+  });
 }
 
 export async function leaveWahaGroup(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}/leave`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}/leave`,
+    body: {},
+  });
 }
 
 export async function setWahaGroupSubject(params: {
   cfg: CoreConfig; groupId: string; subject: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/settings/subject`,
-    { subject: params.subject },
-  );
+    body: { subject: params.subject },
+  });
 }
 
 export async function setWahaGroupDescription(params: {
   cfg: CoreConfig; groupId: string; description: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/settings/description`,
-    { description: params.description },
-  );
+    body: { description: params.description },
+  });
 }
 
 export async function setWahaGroupPicture(params: {
   cfg: CoreConfig; groupId: string; file: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   const filePayload = buildFilePayload(params.file);
-  return client.put(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}/picture`,
-    { file: filePayload },
-  );
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}/picture`,
+    body: { file: filePayload },
+  });
 }
 
 export async function deleteWahaGroupPicture(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.del(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}/picture`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}/picture`,
+  });
 }
 
 export async function getWahaGroupPicture(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}/picture`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}/picture`,
+  });
 }
 
 export async function addWahaGroupParticipants(params: {
   cfg: CoreConfig; groupId: string; participants: string[]; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/participants/add`,
-    { participants: params.participants },
-  );
+    body: { participants: params.participants },
+  });
 }
 
 export async function removeWahaGroupParticipants(params: {
   cfg: CoreConfig; groupId: string; participants: string[]; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/participants/remove`,
-    { participants: params.participants },
-  );
+    body: { participants: params.participants },
+  });
 }
 
 export async function promoteWahaGroupAdmin(params: {
   cfg: CoreConfig; groupId: string; participants: string[]; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/admin/promote`,
-    { participants: params.participants },
-  );
+    body: { participants: params.participants },
+  });
 }
 
 export async function demoteWahaGroupAdmin(params: {
   cfg: CoreConfig; groupId: string; participants: string[]; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/admin/demote`,
-    { participants: params.participants },
-  );
+    body: { participants: params.participants },
+  });
 }
 
 export async function getWahaGroupParticipants(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/participants`,
-  );
+  });
 }
 
 export async function setWahaGroupInfoAdminOnly(params: {
   cfg: CoreConfig; groupId: string; adminOnly: boolean; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/settings/info-admin-only`,
-    { adminsOnly: params.adminOnly },
-  );
+    body: { adminsOnly: params.adminOnly },
+  });
 }
 
 export async function getWahaGroupInfoAdminOnly(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/settings/info-admin-only`,
-  );
+  });
 }
 
 export async function setWahaGroupMessagesAdminOnly(params: {
   cfg: CoreConfig; groupId: string; adminOnly: boolean; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/settings/messages-admin-only`,
-    { adminsOnly: params.adminOnly },
-  );
+    body: { adminsOnly: params.adminOnly },
+  });
 }
 
 export async function getWahaGroupMessagesAdminOnly(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/settings/messages-admin-only`,
-  );
+  });
 }
 
 export async function getWahaGroupInviteCode(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/invite-code`,
-  );
+  });
 }
 
 export async function revokeWahaGroupInviteCode(params: {
   cfg: CoreConfig; groupId: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/groups")
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
       + `/${encodeURIComponent(params.groupId)}/invite-code/revoke`,
-    {},
-  );
+    body: {},
+  });
 }
 
 export async function joinWahaGroup(params: {
   cfg: CoreConfig; inviteCode: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/groups/join"), {
-    inviteCode: params.inviteCode,
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups/join", params.cfg, params.accountId),
+    body: { inviteCode: params.inviteCode },
   });
 }
 
 export async function getWahaGroupsCount(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/groups/count"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({
+    baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups/count", params.cfg, params.accountId),
+  });
 }
 
 export async function getWahaGroupJoinInfo(params: { cfg: CoreConfig; groupId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/groups") + `/${encodeURIComponent(params.groupId)}/join-info`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}/join-info` });
 }
 // Added Phase 28, Plan 01.
 
 export async function refreshWahaGroups(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(client.sessionPath("/api/{session}/groups/refresh"), {});
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups/refresh", params.cfg, params.accountId),
+    body: {} });
 }
 // Added Phase 28, Plan 01.
 
@@ -1051,223 +1152,191 @@ export async function refreshWahaGroups(params: { cfg: CoreConfig; accountId?: s
 
 // WAHA contacts list endpoint is /api/contacts/all (NOT /api/{session}/contacts which 404s). DO NOT CHANGE.
 export async function getWahaContacts(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  // /api/contacts/all uses query param session, not path segment. DO NOT CHANGE.
-  return client.get(`/api/contacts/all`, { session: client.session });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  const account = resolveWahaAccount({ cfg: params.cfg, accountId: params.accountId ?? DEFAULT_ACCOUNT_ID });
+  const session = encodeURIComponent(account.session ?? "default");
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: `/api/contacts/all?session=${session}` });
 }
 
 export async function getWahaContact(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/contacts") + `/${encodeURIComponent(params.contactId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/contacts", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.contactId)}` });
 }
 
 export async function checkWahaContactExists(params: { cfg: CoreConfig; phone: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(
-    client.sessionPath("/api/{session}/contacts/check-exists"),
-    { phone: params.phone },
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/contacts/check-exists", params.cfg, params.accountId),
+    body: { phone: params.phone } });
 }
 
 export async function getWahaContactAbout(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/contacts") + `/${encodeURIComponent(params.contactId)}/about`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/contacts", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.contactId)}/about` });
 }
 
 export async function getWahaContactPicture(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/contacts")
-      + `/${encodeURIComponent(params.contactId)}/profile-picture`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/contacts", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.contactId)}/profile-picture` });
 }
 
 export async function blockWahaContact(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/contacts/block"),
-    { contactId: params.contactId },
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/contacts/block", params.cfg, params.accountId),
+    body: { contactId: params.contactId } });
 }
 
 export async function unblockWahaContact(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/contacts/unblock"),
-    { contactId: params.contactId },
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/contacts/unblock", params.cfg, params.accountId),
+    body: { contactId: params.contactId } });
 }
 
 // ── Labels ─────────────────────────────────────────────────────
 
 export async function getWahaLabels(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/labels"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/labels", params.cfg, params.accountId) });
 }
 
 export async function createWahaLabel(params: { cfg: CoreConfig; name: string; color?: number; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/labels"), {
-    name: params.name, ...(params.color != null ? { color: params.color } : {}),
-  });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/labels", params.cfg, params.accountId),
+    body: { name: params.name, ...(params.color != null ? { color: params.color } : {}) } });
 }
 
 export async function updateWahaLabel(params: { cfg: CoreConfig; labelId: string; name?: string; color?: number; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/labels") + `/${encodeURIComponent(params.labelId)}`,
-    { ...(params.name ? { name: params.name } : {}), ...(params.color != null ? { color: params.color } : {}) },
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/labels", params.cfg, params.accountId) + `/${encodeURIComponent(params.labelId)}`,
+    body: { ...(params.name ? { name: params.name } : {}), ...(params.color != null ? { color: params.color } : {}) } });
 }
 
 export async function deleteWahaLabel(params: { cfg: CoreConfig; labelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.del(
-    client.sessionPath("/api/{session}/labels") + `/${encodeURIComponent(params.labelId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/labels", params.cfg, params.accountId) + `/${encodeURIComponent(params.labelId)}` });
 }
 
 export async function getWahaChatLabels(params: { cfg: CoreConfig; chatId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/labels/chats") + `/${encodeURIComponent(params.chatId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/labels/chats", params.cfg, params.accountId) + `/${encodeURIComponent(params.chatId)}` });
 }
 
 export async function setWahaChatLabels(params: { cfg: CoreConfig; chatId: string; labels: Array<{ id: string }>; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(
-    client.sessionPath("/api/{session}/labels/chats") + `/${encodeURIComponent(params.chatId)}`,
-    { labels: params.labels },
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/labels/chats", params.cfg, params.accountId) + `/${encodeURIComponent(params.chatId)}`,
+    body: { labels: params.labels } });
 }
 
 export async function getWahaChatsByLabel(params: { cfg: CoreConfig; labelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/labels") + `/${encodeURIComponent(params.labelId)}/chats`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/labels", params.cfg, params.accountId) + `/${encodeURIComponent(params.labelId)}/chats` });
 }
 
 // ── Status / Stories ───────────────────────────────────────────
 
 export async function sendWahaTextStatus(params: { cfg: CoreConfig; text: string; backgroundColor?: string; font?: number; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/status/text"), {
-    text: params.text,
-    ...(params.backgroundColor ? { backgroundColor: params.backgroundColor } : {}),
-    ...(params.font != null ? { font: params.font } : {}),
-  });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/status/text", params.cfg, params.accountId),
+    body: { text: params.text, ...(params.backgroundColor ? { backgroundColor: params.backgroundColor } : {}), ...(params.font != null ? { font: params.font } : {}) } });
 }
 
 export async function sendWahaImageStatus(params: { cfg: CoreConfig; image: string; caption?: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   const filePayload = buildFilePayload(params.image);
-  return client.post(client.sessionPath("/api/{session}/status/image"), {
-    file: filePayload, ...(params.caption ? { caption: params.caption } : {}),
-  });
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/status/image", params.cfg, params.accountId),
+    body: { file: filePayload, ...(params.caption ? { caption: params.caption } : {}) } });
 }
 
 export async function sendWahaVoiceStatus(params: { cfg: CoreConfig; voice: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   const filePayload = buildFilePayload(params.voice);
-  return client.post(client.sessionPath("/api/{session}/status/voice"), { file: filePayload });
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/status/voice", params.cfg, params.accountId),
+    body: { file: filePayload } });
 }
 
 export async function sendWahaVideoStatus(params: { cfg: CoreConfig; video: string; caption?: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   const filePayload = buildFilePayload(params.video);
-  return client.post(client.sessionPath("/api/{session}/status/video"), {
-    file: filePayload, ...(params.caption ? { caption: params.caption } : {}),
-  });
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/status/video", params.cfg, params.accountId),
+    body: { file: filePayload, ...(params.caption ? { caption: params.caption } : {}) } });
 }
 
 export async function deleteWahaStatus(params: { cfg: CoreConfig; id: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/status/delete"), { id: params.id });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/status/delete", params.cfg, params.accountId),
+    body: { id: params.id } });
 }
 
 // ── Channels / Newsletters ─────────────────────────────────────
 
 export async function getWahaChannels(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/channels"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) });
 }
 
 export async function createWahaChannel(params: { cfg: CoreConfig; name: string; description?: string; picture?: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/channels"), {
-    name: params.name,
-    ...(params.description ? { description: params.description } : {}),
-    ...(params.picture ? { picture: params.picture } : {}),
-  });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId),
+    body: { name: params.name, ...(params.description ? { description: params.description } : {}), ...(params.picture ? { picture: params.picture } : {}) } });
 }
 
 export async function getWahaChannel(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/channels") + `/${encodeURIComponent(params.channelId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}` });
 }
 
 export async function deleteWahaChannel(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.del(
-    client.sessionPath("/api/{session}/channels") + `/${encodeURIComponent(params.channelId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}` });
 }
 
 export async function followWahaChannel(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/channels") + `/${encodeURIComponent(params.channelId)}/follow`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/follow`, body: {} });
 }
 
 export async function unfollowWahaChannel(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/channels") + `/${encodeURIComponent(params.channelId)}/unfollow`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/unfollow`, body: {} });
 }
 
 export async function muteWahaChannel(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/channels") + `/${encodeURIComponent(params.channelId)}/mute`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/mute`, body: {} });
 }
 
 export async function unmuteWahaChannel(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/channels") + `/${encodeURIComponent(params.channelId)}/unmute`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/unmute`, body: {} });
 }
 
 // ╔══════════════════════════════════════════════════════════════════════╗
@@ -1278,63 +1347,60 @@ export async function unmuteWahaChannel(params: { cfg: CoreConfig; channelId: st
 // ║  These target regular chats via /chats/{chatId}/mute and /unmute.  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 export async function muteWahaChat(params: { cfg: CoreConfig; chatId: string; duration?: number; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/mute`,
-    params.duration != null ? { duration: params.duration } : {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId) + `/${encodeURIComponent(params.chatId)}/mute`,
+    body: params.duration != null ? { duration: params.duration } : {} });
 }
 
 export async function unmuteWahaChat(params: { cfg: CoreConfig; chatId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/chats") + `/${encodeURIComponent(params.chatId)}/unmute`,
-    {},
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/chats", params.cfg, params.accountId) + `/${encodeURIComponent(params.chatId)}/unmute`,
+    body: {} });
 }
 
 export async function searchWahaChannelsByText(params: { cfg: CoreConfig; query: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(client.sessionPath("/api/{session}/channels/search/by-text"), {
-    query: params.query,
-  });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels/search/by-text", params.cfg, params.accountId),
+    body: { query: params.query } });
 }
 
 export async function previewWahaChannelMessages(params: { cfg: CoreConfig; channelId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/channels")
-      + `/${encodeURIComponent(params.channelId)}/messages/preview`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/messages/preview` });
 }
 
 // ── Channel Search ──────────────────────────────────────────────
 
 export async function searchWahaChannelsByView(params: { cfg: CoreConfig; viewType: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(client.sessionPath("/api/{session}/channels/search/by-view"), {
-    view: params.viewType,
-  });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels/search/by-view", params.cfg, params.accountId),
+    body: { view: params.viewType } });
 }
 // Added Phase 28, Plan 01.
 
 export async function getWahaChannelSearchViews(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/channels/search/views"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels/search/views", params.cfg, params.accountId) });
 }
 // Added Phase 28, Plan 01.
 
 export async function getWahaChannelSearchCountries(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/channels/search/countries"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels/search/countries", params.cfg, params.accountId) });
 }
 // Added Phase 28, Plan 01.
 
 export async function getWahaChannelSearchCategories(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/channels/search/categories"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels/search/categories", params.cfg, params.accountId) });
 }
 // Added Phase 28, Plan 01.
 
@@ -1361,17 +1427,19 @@ export async function sendWahaEvent(params: {
   endTime?: number; description?: string; location?: { name: string };
   extraGuestsAllowed?: boolean; replyToId?: string; accountId?: string;
 }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/events"), {
-    chatId: params.chatId,
-    ...(params.replyToId ? { reply_to: params.replyToId } : {}),
-    event: {
-      name: params.name, startTime: params.startTime,
-      ...(params.endTime != null ? { endTime: params.endTime } : {}),
-      ...(params.description ? { description: params.description } : {}),
-      ...(params.location ? { location: params.location } : {}),
-      ...(params.extraGuestsAllowed != null ? { extraGuestsAllowed: params.extraGuestsAllowed } : {}),
+  const { baseUrl, apiKey, session } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: `/api/${encodeURIComponent(session)}/events`,
+    body: {
+      chatId: params.chatId,
+      ...(params.replyToId ? { reply_to: params.replyToId } : {}),
+      event: {
+        name: params.name, startTime: params.startTime,
+        ...(params.endTime != null ? { endTime: params.endTime } : {}),
+        ...(params.description ? { description: params.description } : {}),
+        ...(params.location ? { location: params.location } : {}),
+        ...(params.extraGuestsAllowed != null ? { extraGuestsAllowed: params.extraGuestsAllowed } : {}),
+      },
     },
   });
 }
@@ -1379,93 +1447,97 @@ export async function sendWahaEvent(params: {
 // ── Presence ───────────────────────────────────────────────────
 
 export async function setWahaPresenceStatus(params: { cfg: CoreConfig; status: "online" | "offline"; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(client.sessionPath("/api/{session}/presence"), { status: params.status });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/presence", params.cfg, params.accountId),
+    body: { status: params.status } });
 }
 
 export async function getWahaPresence(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/presence") + `/${encodeURIComponent(params.contactId)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/presence", params.cfg, params.accountId) + `/${encodeURIComponent(params.contactId)}` });
 }
 
 export async function subscribeWahaPresence(params: { cfg: CoreConfig; contactId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post(
-    client.sessionPath("/api/{session}/presence/subscribe"),
-    { contactId: params.contactId },
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/presence/subscribe", params.cfg, params.accountId),
+    body: { contactId: params.contactId } });
 }
 
 export async function getAllWahaPresence(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/presence"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/presence", params.cfg, params.accountId) });
 }
 // Added Phase 28, Plan 01.
 
 // ── Profile ────────────────────────────────────────────────────
 
 export async function getWahaProfile(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/profile"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/profile", params.cfg, params.accountId) });
 }
 
 export async function setWahaProfileName(params: { cfg: CoreConfig; name: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(client.sessionPath("/api/{session}/profile/name"), { name: params.name });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/profile/name", params.cfg, params.accountId),
+    body: { name: params.name } });
 }
 
 export async function setWahaProfileStatus(params: { cfg: CoreConfig; status: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(client.sessionPath("/api/{session}/profile/status"), { status: params.status });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/profile/status", params.cfg, params.accountId),
+    body: { status: params.status } });
 }
 
 export async function setWahaProfilePicture(params: { cfg: CoreConfig; file: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
   const filePayload = buildFilePayload(params.file);
-  return client.put(client.sessionPath("/api/{session}/profile/picture"), { file: filePayload });
+  return callWahaApi({ baseUrl, apiKey, method: "PUT",
+    path: resolveSessionPath("/api/{session}/profile/picture", params.cfg, params.accountId),
+    body: { file: filePayload } });
 }
 
 export async function deleteWahaProfilePicture(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.del(client.sessionPath("/api/{session}/profile/picture"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "DELETE",
+    path: resolveSessionPath("/api/{session}/profile/picture", params.cfg, params.accountId) });
 }
 
 // ── LID Resolution ─────────────────────────────────────────────
 
 export async function findWahaPhoneByLid(params: { cfg: CoreConfig; lid: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/lids") + `/${encodeURIComponent(params.lid)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/lids", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.lid)}` });
 }
 
 export async function findWahaLidByPhone(params: { cfg: CoreConfig; phone: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(
-    client.sessionPath("/api/{session}/lids/pn") + `/${encodeURIComponent(params.phone)}`,
-  );
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/lids/pn", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.phone)}` });
 }
 
 export async function getWahaAllLids(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get(client.sessionPath("/api/{session}/lids"));
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/lids", params.cfg, params.accountId) });
 }
 
 // ── Calls ──────────────────────────────────────────────────────
 
 export async function rejectWahaCall(params: { cfg: CoreConfig; callId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.post(client.sessionPath("/api/{session}/calls/reject"), {
-    callId: params.callId,
-  });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/calls/reject", params.cfg, params.accountId),
+    body: { callId: params.callId } });
 }
 
 // ── API Keys — Added Phase 28, Plan 02 ─────────────────────────────
@@ -1474,26 +1546,23 @@ export async function rejectWahaCall(params: { cfg: CoreConfig; callId: string; 
 // DO NOT CHANGE — API key endpoints are server-level, not session-scoped.
 
 export async function createWahaApiKey(params: { cfg: CoreConfig; name: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.post("/api/keys", { name: params.name });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, path: "/api/keys", body: { name: params.name } });
 }
 
 export async function getWahaApiKeys(params: { cfg: CoreConfig; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  return client.get("/api/keys");
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET", path: "/api/keys" });
 }
 
 export async function updateWahaApiKey(params: { cfg: CoreConfig; keyId: string; name?: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.put(`/api/keys/${encodeURIComponent(params.keyId)}`, { name: params.name });
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "PUT", path: `/api/keys/${encodeURIComponent(params.keyId)}`, body: { name: params.name } });
 }
 
 export async function deleteWahaApiKey(params: { cfg: CoreConfig; keyId: string; accountId?: string }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  return client.del(`/api/keys/${encodeURIComponent(params.keyId)}`);
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "DELETE", path: `/api/keys/${encodeURIComponent(params.keyId)}` });
 }
 
 // ╔══════════════════════════════════════════════════════════════════════╗
