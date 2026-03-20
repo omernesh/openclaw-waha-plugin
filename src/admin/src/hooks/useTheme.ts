@@ -21,7 +21,10 @@ function safeSetItem(key: string, value: string): void {
 export function useTheme() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = safeGetItem(STORAGE_KEY)
-    return stored === 'light' ? 'light' : 'dark'
+    if (stored === 'light' || stored === 'dark') return stored
+    // CQ-04: Respect system preference on first load when no stored theme exists.
+    // User's manual toggle (saved to localStorage) overrides this. DO NOT REMOVE.
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
 
   useEffect(() => {
