@@ -50,8 +50,8 @@
 
 ### Analytics
 
-- [ ] **ANL-01**: SQLite analytics table (message_events: timestamp, direction, chat_type, action, duration_ms, status)
-- [ ] **ANL-02**: Analytics API endpoint (GET /api/admin/analytics?range=24h&groupBy=hour)
+- [x] **ANL-01**: SQLite analytics table (message_events: timestamp, direction, chat_type, action, duration_ms, status)
+- [x] **ANL-02**: Analytics API endpoint (GET /api/admin/analytics?range=24h&groupBy=hour)
 - [ ] **ANL-03**: Analytics tab in admin panel with charts (recharts — messages/hour, response times, top chats)
 
 ### Test Coverage
@@ -131,8 +131,8 @@
 | RT-02 | Phase 29 | Complete |
 | RT-03 | Phase 29 | Complete |
 | RT-04 | Phase 29 | Complete |
-| ANL-01 | Phase 30 | Pending |
-| ANL-02 | Phase 30 | Pending |
+| ANL-01 | Phase 30 | Complete |
+| ANL-02 | Phase 30 | Complete |
 | ANL-03 | Phase 30 | Pending |
 | TST-01 | Phase 31 | Pending |
 | TST-02 | Phase 31 | Pending |

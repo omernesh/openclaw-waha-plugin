@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-03-20T05:33:03.699Z"
+stopped_at: Completed 30-01-PLAN.md
+last_updated: "2026-03-20T06:04:28.893Z"
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 13
+  completed_plans: 12
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 29 — Real-Time Admin Panel
+**Current focus:** Phase 30 — Analytics
 
 ## Current Position
 
-Phase: 29 (Real-Time Admin Panel) — COMPLETE
-Plan: 2 of 2 (all plans complete)
+Phase: 30 (Analytics) — EXECUTING
+Plan: 1 of 2
 
 ## Accumulated Context
 
@@ -57,6 +57,9 @@ Plan: 2 of 2 (all plans complete)
 - [Phase 29-02]: SSE log events emitted selectively (health transitions, queue depth > 10, config save, message enqueue) — not on every console.log
 - [Phase 29-02]: Log buffer capped at LOG_LINE_LIMIT * 2 then trimmed to LOG_LINE_LIMIT from front
 - [Phase 29-02]: newLineCount reads userScrolledUpRef.current (ref) inside SSE callback to avoid stale closure on autoScroll state
+- [Phase 30]: analytics.db stored at ~/.openclaw/data/analytics.db (separate from directory.db)
+- [Phase 30]: 90-day auto-prune runs in AnalyticsDb constructor on every startup
+- [Phase 30]: inbound recording placed at statusSink line (post-filter, post-dedup) -- captures confirmed deliverable messages
 
 ### Pending Todos
 
@@ -68,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T07:45:00.000Z
-Stopped at: Completed 29-02-PLAN.md
+Last session: 2026-03-20T06:04:28.888Z
+Stopped at: Completed 30-01-PLAN.md
 Resume file: None
