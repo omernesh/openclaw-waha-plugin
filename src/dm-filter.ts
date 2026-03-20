@@ -126,7 +126,7 @@ export class DmFilter {
         if (isGod) {
           this._stats.allowed++;
           this._record(true, "god_mode", text);
-          log?.(`dm-filter: allow ${senderId} (god mode, scope=${scope}, filterType=${filterType ?? "unset"})`);
+          log?.(`${filterType ?? "dm"}-filter: allow ${senderId} (god mode, scope=${scope})`);
           return { pass: true, reason: "god_mode" };
         }
       }
@@ -160,7 +160,7 @@ export class DmFilter {
     if (matched) {
       this._stats.allowed++;
       this._record(true, "keyword_match", text);
-      log?.(`dm-filter: allow ${senderId} (keyword match)`);
+      log?.(`${filterType ?? "dm"}-filter: allow ${senderId} (keyword match)`);
       return { pass: true, reason: "keyword_match" };
     }
 
@@ -168,7 +168,7 @@ export class DmFilter {
     this._stats.dropped++;
     this._stats.tokensEstimatedSaved += cfg.tokenEstimate ?? 2500;
     this._record(false, "no_keyword_match", text);
-    log?.(`dm-filter: drop ${senderId} (no keyword match in "${text.slice(0, 60)}")`);
+    log?.(`${filterType ?? "dm"}-filter: drop ${senderId} (no keyword match in "${text.slice(0, 60)}")`);
     return { pass: false, reason: "no_keyword_match" };
   }
 

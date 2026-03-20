@@ -182,7 +182,7 @@ export async function handleWahaInbound(params: {
   // ║  Uses rawMessage fields directly — no media preprocessing needed.   ║
   // ║  Added Phase 7 fix (2026-03-15).                                    ║
   // ╚══════════════════════════════════════════════════════════════════════╝
-  const _earlyIsGroup = isWhatsAppGroupJid(rawMessage.chatId);
+  const _earlyIsGroup = typeof rawMessage.chatId === "string" && rawMessage.chatId.endsWith("@g.us");
   const _earlySenderId = rawMessage.participant || rawMessage.from;
   if (!_earlyIsGroup) {
     const pending = checkPendingSelection(_earlySenderId, config);
@@ -237,7 +237,7 @@ export async function handleWahaInbound(params: {
   }
 
   // Quick pre-check: skip media preprocessing for groups not in allowedGroups
-  const _preCheckIsGroup = isWhatsAppGroupJid(rawMessage.chatId);
+  const _preCheckIsGroup = typeof rawMessage.chatId === "string" && rawMessage.chatId.endsWith("@g.us");
   const _preCheckAllowedGroups = account.config.allowedGroups;
   const _preCheckDropped = _preCheckIsGroup && _preCheckAllowedGroups && _preCheckAllowedGroups.length > 0 && !_preCheckAllowedGroups.includes(rawMessage.chatId);
 
@@ -402,7 +402,9 @@ export async function handleWahaInbound(params: {
     return;
   }
 
-  const isGroup = isWhatsAppGroupJid(message.chatId);
+  // DO NOT CHANGE — direct JID check replaces SDK isWhatsAppGroupJid which was returning
+  // false for valid group JIDs, causing group messages to route through DM filter instead.
+  const isGroup = typeof message.chatId === "string" && message.chatId.endsWith("@g.us");
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
 
@@ -585,6 +587,7 @@ export async function handleWahaInbound(params: {
               return;
             }
             // Custom patterns matched — skip global filter check
+            runtime.log?.(`[waha] group filter (override): allow ${senderId} in ${chatId}`);
             groupFilterHandled = true;
           } catch (filterErr) {
             runtime.log?.(`[waha] invalid per-group filter config for ${chatId}: ${String(filterErr)}, falling through to global`);
@@ -602,9 +605,10 @@ export async function handleWahaInbound(params: {
       const groupFilter = getGroupFilter(config, account.accountId);
       const filterResult = groupFilter.check(groupFilterCheckArgs);
       if (!filterResult.pass) {
-        runtime.log?.(`[waha] group filter: drop ${senderId} in ${chatId} (${filterResult.reason})`);
+        runtime.log?.(`[waha] group filter (global): drop ${senderId} in ${chatId} (${filterResult.reason})`);
         return;
       }
+      runtime.log?.(`[waha] group filter (global): allow ${senderId} in ${chatId}`);
     }
   }
 
