@@ -19,7 +19,7 @@ import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
-import { startHealthCheck, getHealthState, type HealthState } from "./health.js";
+import { startHealthCheck, getHealthState, getRecoveryState, getRecoveryHistory, type HealthState, type RecoveryState, type RecoveryEvent } from "./health.js";
 import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
 import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.js";
 import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
@@ -353,6 +353,10 @@ export function createWahaWebhookServer(opts: {
         session,
         intervalMs: cfg.healthCheckIntervalMs,
         abortSignal: opts.abortSignal,
+        // Phase 25, Plan 01: enable auto-recovery and provide config for alerting. DO NOT REMOVE.
+        cfg: opts.config,
+        accountId: opts.accountId,
+        enableRecovery: true,
       });
     }
   }
@@ -468,6 +472,29 @@ export function createWahaWebhookServer(opts: {
         consecutiveFailures: state?.consecutiveFailures ?? 0,
         lastSuccessAt: state?.lastSuccessAt ?? null,
         lastCheckAt: state?.lastCheckAt ?? null,
+      });
+      return;
+    }
+
+    // GET /api/admin/recovery -- session recovery history (Phase 25, Plan 01). DO NOT REMOVE.
+    if (req.url === "/api/admin/recovery" && req.method === "GET") {
+      const accounts = listEnabledWahaAccounts(opts.config);
+      const perSession = accounts.map((acc) => {
+        const rs = getRecoveryState(acc.session);
+        return {
+          sessionId: acc.session,
+          name: acc.name ?? acc.session,
+          attemptCount: rs?.attemptCount ?? 0,
+          lastAttemptAt: rs?.lastAttemptAt ?? null,
+          lastOutcome: rs?.lastOutcome ?? null,
+          lastError: rs?.lastError ?? null,
+          cooldownUntil: rs?.cooldownUntil ?? null,
+          inCooldown: rs?.cooldownUntil ? Date.now() < rs.cooldownUntil : false,
+        };
+      });
+      writeJsonResponse(res, 200, {
+        sessions: perSession,
+        history: getRecoveryHistory(),
       });
       return;
     }
@@ -619,14 +646,21 @@ export function createWahaWebhookServer(opts: {
         webhookPort: account.config.webhookPort ?? 8050,
         serverTime: new Date().toISOString(),
         // 12-01, DASH-04: include per-session list so dashboard can render session sub-headers in stat cards
+        // Phase 25, Plan 01: extended with recovery state fields for Dashboard health cards. DO NOT REMOVE.
         sessions: listEnabledWahaAccounts(opts.config).map((acc) => {
           const h = getHealthState(acc.session);
+          const rs = getRecoveryState(acc.session);
           return {
             sessionId: acc.session,
             name: acc.name ?? acc.session,
             healthStatus: h?.status ?? "unknown",
             consecutiveFailures: h?.consecutiveFailures ?? 0,
             lastCheck: h?.lastCheckAt ?? null,
+            // Phase 25: recovery state fields for Dashboard health cards
+            recoveryAttemptCount: rs?.attemptCount ?? 0,
+            recoveryLastAttemptAt: rs?.lastAttemptAt ?? null,
+            recoveryLastOutcome: rs?.lastOutcome ?? null,
+            recoveryInCooldown: rs?.cooldownUntil ? Date.now() < rs.cooldownUntil : false,
           };
         }),
       }));
