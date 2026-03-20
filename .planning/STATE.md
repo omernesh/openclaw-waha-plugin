@@ -3,28 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: executing
-stopped_at: Completed 32-02-PLAN.md
-last_updated: "2026-03-20T07:21:43.042Z"
+stopped_at: Completed 32-03-PLAN.md
+last_updated: "2026-03-20T09:30:00Z"
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 19
-  completed_plans: 18
-  percent: 95
----
-
----
-gsd_state_version: 1.0
-milestone: v1.13
-milestone_name: Close All Gaps
-status: executing
-stopped_at: Completed 32-01-PLAN.md
-last_updated: "2026-03-20T09:13:00Z"
-progress:
-  [██████████] 95%
-  completed_phases: 7
-  total_plans: 19
-  completed_plans: 17
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -34,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 32 — Platform Abstraction
+**Current focus:** Phase 32 — Platform Abstraction (COMPLETE)
 
 ## Current Position
 
-Phase: 32 (Platform Abstraction) — EXECUTING
-Plan: 2 of 3
+Phase: 32 (Platform Abstraction) — COMPLETE
+Plan: 3 of 3
 
 ## Accumulated Context
 
@@ -93,6 +79,9 @@ Plan: 2 of 3
 - [Phase 32-01]: getWahaContacts uses client.get with session as query param, NOT path segment
 - [Phase 32]: PlatformAdapter interface is minimal — only operations channel.ts dispatches; WahaPlatformAdapter delegates to send.ts verbatim
 - [Phase 32]: _adapter initialized lazily on first handleAction call; fallback to direct send.ts calls preserved for backward compat
+- [Phase 32-03]: Default tenant 'default' uses legacy DB path (no subdirectory) — no migration required for existing installs
+- [Phase 32-03]: tenantId extracted from coreCfg.channels.waha.tenantId in handleAction — config-driven, not call-site-driven
+- [Phase 32-03]: Cache key changed from safeId to 'safeTenant:safeId' to allow same accountId in different tenants
 
 ### Pending Todos
 
@@ -104,6 +93,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T07:21:43.037Z
-Stopped at: Completed 32-02-PLAN.md
+Last session: 2026-03-20T09:30:00Z
+Stopped at: Completed 32-03-PLAN.md
 Resume file: None
