@@ -215,7 +215,7 @@ Plans:
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 23. Polish | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
-| 25. Session Auto-Recovery | 2/2 | Complete   | 2026-03-20 | - |
+| 25. Session Auto-Recovery | 2/2 | Complete    | 2026-03-20 | - |
 | 26. Config Safety | v1.13 | 0/TBD | Not started | - |
 | 27. Pairing Cleanup and Code Quality | v1.13 | 0/TBD | Not started | - |
 | 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |
