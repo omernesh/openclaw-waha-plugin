@@ -78,6 +78,8 @@ import {
   findWahaPhoneByLid, findWahaLidByPhone, getWahaAllLids,
   // Calls
   rejectWahaCall,
+  // API Keys — Added Phase 28, Plan 02
+  createWahaApiKey, getWahaApiKeys, updateWahaApiKey, deleteWahaApiKey,
   // Name resolution
   resolveWahaTarget,
 } from "./send.js";
@@ -252,6 +254,11 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getAllLids: (p, cfg, aid) => getWahaAllLids({ cfg, accountId: aid }),
   // Calls
   rejectCall: (p, cfg, aid) => rejectWahaCall({ cfg, callId: String(p.callId), accountId: aid }),
+  // API Keys CRUD — Added Phase 28, Plan 02
+  createApiKey: (p, cfg, aid) => createWahaApiKey({ cfg, name: String(p.name), accountId: aid }),
+  getApiKeys: (p, cfg, aid) => getWahaApiKeys({ cfg, accountId: aid }),
+  updateApiKey: (p, cfg, aid) => updateWahaApiKey({ cfg, keyId: String(p.keyId), name: p.name ? String(p.name) : undefined, accountId: aid }),
+  deleteApiKey: (p, cfg, aid) => deleteWahaApiKey({ cfg, keyId: String(p.keyId), accountId: aid }),
   // ── sendMulti — DO NOT CHANGE / DO NOT REMOVE ─────────────────────
   // Multi-recipient text send. Sends same text to up to 10 recipients
   // sequentially with per-recipient results. Added Phase 3, Plan 03.
@@ -387,6 +394,7 @@ const UTILITY_ACTIONS = [
   "searchChannelsByView", "getChannelSearchViews", "getChannelSearchCountries", "getChannelSearchCategories", // Channel search metadata. Added Phase 28, Plan 01.
   "getGroupJoinInfo", "refreshGroups", // Group helpers. Added Phase 28, Plan 01.
   "getAllPresence", // Bulk presence — all subscribed contacts. Added Phase 28, Plan 01.
+  "createApiKey", "getApiKeys", "updateApiKey", "deleteApiKey", // API Keys CRUD. Added Phase 28, Plan 02.
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.

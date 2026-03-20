@@ -1540,6 +1540,31 @@ export async function rejectWahaCall(params: { cfg: CoreConfig; callId: string; 
     body: { callId: params.callId } });
 }
 
+// ── API Keys — Added Phase 28, Plan 02 ─────────────────────────────
+// WAHA server-level API key management. These are server-scoped (not session-scoped),
+// so they use /api/keys directly without resolveSessionPath.
+// DO NOT CHANGE — API key endpoints are server-level, not session-scoped.
+
+export async function createWahaApiKey(params: { cfg: CoreConfig; name: string; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, path: "/api/keys", body: { name: params.name } });
+}
+
+export async function getWahaApiKeys(params: { cfg: CoreConfig; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET", path: "/api/keys" });
+}
+
+export async function updateWahaApiKey(params: { cfg: CoreConfig; keyId: string; name?: string; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "PUT", path: `/api/keys/${encodeURIComponent(params.keyId)}`, body: { name: params.name } });
+}
+
+export async function deleteWahaApiKey(params: { cfg: CoreConfig; keyId: string; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "DELETE", path: `/api/keys/${encodeURIComponent(params.keyId)}` });
+}
+
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  resolveWahaTarget — DO NOT CHANGE / DO NOT REMOVE                  ║
 // ║                                                                      ║

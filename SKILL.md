@@ -396,6 +396,41 @@ Configurable emoji reaction (e.g., eyes emoji) sent when a message is received, 
 
 ---
 
+# Group Membership Events
+
+When contacts join or leave groups, the plugin fires synthetic inbound messages so the agent is aware of membership changes:
+
+- `[group_join] 972544329000@c.us joined group 120363421825201386@g.us`
+- `[group_leave] 972544329000@c.us left group 120363421825201386@g.us`
+
+These are delivered as regular messages to the agent with `chatId` set to the group JID and `from` set to the participant JID. The directory is automatically updated when participants join.
+
+---
+
+# API Keys Management
+
+Manage WAHA server-level API keys programmatically. These are server-scoped (not session-scoped).
+
+| Action | Parameters | Description |
+|--------|-----------|-------------|
+| `getApiKeys` | (none) | List all API keys on the WAHA server |
+| `createApiKey` | `name` | Create a new API key |
+| `updateApiKey` | `keyId`, `name?` | Update an existing API key |
+| `deleteApiKey` | `keyId` | Delete an API key |
+
+```
+Action: getApiKeys
+Parameters: {}
+
+Action: createApiKey
+Parameters: { "name": "my-key" }
+
+Action: deleteApiKey
+Parameters: { "keyId": "key-id-here" }
+```
+
+---
+
 # Broadcast Groups
 
 Multiple agents can process the same incoming message simultaneously.
