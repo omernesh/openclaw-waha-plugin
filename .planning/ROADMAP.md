@@ -168,7 +168,11 @@ Plans:
   3. directory.ts CRUD operations — create/read/update/delete contacts, participant management, LID mapping, group filter overrides — each have at least one passing test
   4. The shutup.ts interactive mute/unmute flow (pending selection, confirmation, timeout) has tests covering the happy path and the cancellation path
   5. Each React admin panel tab has at least one component test (render without crash, key interaction verified)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — directory.ts CRUD + shutup.ts interactive flow tests
+- [ ] 31-02-PLAN.md — monitor.ts admin API route + inbound.ts pipeline tests
+- [ ] 31-03-PLAN.md — React admin panel component tests (vitest + jsdom + testing-library)
 
 ### Phase 32: Platform Abstraction
 **Goal**: WAHA API calls are consolidated behind a WahaClient class, a platform adapter interface is defined for future multi-platform support, and the config/session/directory layers are structured for future multi-tenant isolation.
@@ -178,7 +182,11 @@ Plans:
   1. All direct `fetch()` calls to the WAHA API in send.ts are replaced by `WahaClient` methods — no raw fetch calls to WAHA remain outside WahaClient
   2. A `ChannelAdapter` interface is defined and the plugin's OpenClaw integration implements it — swapping the transport layer requires only a new adapter class, not edits to business logic
   3. Config, session registry, and DirectoryDb accept a tenant ID parameter — the plugin can run two isolated instances in the same process without state leakage between them
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 31-01-PLAN.md — directory.ts CRUD + shutup.ts interactive flow tests
+- [ ] 31-02-PLAN.md — monitor.ts admin API route + inbound.ts pipeline tests
+- [ ] 31-03-PLAN.md — React admin panel component tests (vitest + jsdom + testing-library)
 
 ## Progress
 
