@@ -52,6 +52,11 @@ export interface StatsResponse {
     healthStatus: string
     consecutiveFailures: number
     lastCheck: string | null
+    // Phase 25: recovery state
+    recoveryAttemptCount: number
+    recoveryLastAttemptAt: number | null
+    recoveryLastOutcome: 'success' | 'failed' | null
+    recoveryInCooldown: boolean
   }>
 }
 

@@ -153,23 +153,48 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
               {visibleSessions.map((session) => (
                 <div
                   key={session.sessionId}
-                  className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                  className="rounded-md border px-3 py-2 text-sm space-y-1"
                 >
-                  <span className="font-medium min-w-[120px]">
-                    {session.name || session.sessionId}
-                  </span>
-                  <Badge variant={statusBadgeVariant(session.healthStatus)}>
-                    {session.healthStatus || 'unknown'}
-                  </Badge>
-                  {session.consecutiveFailures > 0 && (
-                    <span className="text-muted-foreground text-xs">
-                      {session.consecutiveFailures} failure{session.consecutiveFailures !== 1 ? 's' : ''}
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium min-w-[120px]">
+                      {session.name || session.sessionId}
                     </span>
-                  )}
-                  {session.lastCheck && (
-                    <span className="text-muted-foreground text-xs ml-auto">
-                      Last check: {new Date(session.lastCheck).toLocaleTimeString()}
-                    </span>
+                    <Badge variant={statusBadgeVariant(session.healthStatus)}>
+                      {session.healthStatus || 'unknown'}
+                    </Badge>
+                    {session.consecutiveFailures > 0 && (
+                      <span className="text-muted-foreground text-xs">
+                        {session.consecutiveFailures} failure{session.consecutiveFailures !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {session.recoveryInCooldown && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">cooldown</Badge>
+                    )}
+                    {session.lastCheck && (
+                      <span className="text-muted-foreground text-xs ml-auto">
+                        Last check: {new Date(session.lastCheck).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                  {session.recoveryAttemptCount > 0 && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground pl-[120px]">
+                      <span>
+                        Recovery: {session.recoveryAttemptCount} attempt{session.recoveryAttemptCount !== 1 ? 's' : ''}
+                      </span>
+                      {session.recoveryLastOutcome && (
+                        <Badge
+                          variant={session.recoveryLastOutcome === 'success' ? 'default' : 'destructive'}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {session.recoveryLastOutcome}
+                        </Badge>
+                      )}
+                      {session.recoveryLastAttemptAt && (
+                        <span>
+                          Last: {new Date(session.recoveryLastAttemptAt).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
