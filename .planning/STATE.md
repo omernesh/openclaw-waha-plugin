@@ -3,10 +3,25 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: executing
+stopped_at: Completed 32-02-PLAN.md
+last_updated: "2026-03-20T07:21:43.042Z"
+progress:
+  total_phases: 8
+  completed_phases: 7
+  total_plans: 19
+  completed_plans: 18
+  percent: 95
+---
+
+---
+gsd_state_version: 1.0
+milestone: v1.13
+milestone_name: Close All Gaps
+status: executing
 stopped_at: Completed 32-01-PLAN.md
 last_updated: "2026-03-20T09:13:00Z"
 progress:
-  total_phases: 8
+  [██████████] 95%
   completed_phases: 7
   total_plans: 19
   completed_plans: 17
@@ -76,6 +91,8 @@ Plan: 2 of 3
 - [Phase 32-01]: resolveAccountParams kept as deprecated shim (no callers remain) — safer than removing
 - [Phase 32-01]: assertCanSend added explicitly to mutation-path functions (getClient does not call it)
 - [Phase 32-01]: getWahaContacts uses client.get with session as query param, NOT path segment
+- [Phase 32]: PlatformAdapter interface is minimal — only operations channel.ts dispatches; WahaPlatformAdapter delegates to send.ts verbatim
+- [Phase 32]: _adapter initialized lazily on first handleAction call; fallback to direct send.ts calls preserved for backward compat
 
 ### Pending Todos
 
@@ -87,6 +104,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T09:13:00Z
-Stopped at: Completed 32-01-PLAN.md
+Last session: 2026-03-20T07:21:43.037Z
+Stopped at: Completed 32-02-PLAN.md
 Resume file: None
