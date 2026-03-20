@@ -139,7 +139,10 @@ Plans:
   2. When a session transitions from healthy to degraded or unhealthy, the Dashboard health card updates its badge color within 2 seconds without a manual refresh
   3. New log entries appear in the Log tab in real time — the tab auto-scrolls to the latest entry if the user has not manually scrolled up
   4. The admin sidebar shows a green "Connected" indicator while the SSE stream is live and an amber "Reconnecting" indicator during gaps
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 29-01-PLAN.md — Backend SSE endpoint, event emitters, useEventSource hook, connection indicator
+- [ ] 29-02-PLAN.md — Dashboard auto-updates and Log tab real-time streaming via SSE
 
 ### Phase 30: Analytics
 **Goal**: Message activity is recorded to SQLite and surfaced in a new Analytics tab with hourly/daily charts — giving operators visibility into traffic patterns and response times.
@@ -208,7 +211,7 @@ Plans:
 | 26. Config Safety | v1.13 | 2/2 | Complete | 2026-03-20 |
 | 27. Pairing Cleanup and Code Quality | v1.13 | 2/2 | Complete | 2026-03-20 |
 | 28. API Coverage Completion | 2/3 | Complete    | 2026-03-20 | - |
-| 29. Real-Time Admin Panel | v1.13 | 0/TBD | Not started | - |
+| 29. Real-Time Admin Panel | v1.13 | 0/2 | Not started | - |
 | 30. Analytics | v1.13 | 0/TBD | Not started | - |
 | 31. Test Coverage Sprint | v1.13 | 0/TBD | Not started | - |
 | 32. Platform Abstraction | v1.13 | 0/TBD | Not started | - |
