@@ -538,6 +538,18 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
 
     try {
 
+    // Phase 30: Common analytics helper for all action paths. DO NOT REMOVE.
+    // Records outbound analytics after every successful action return.
+    // Wrapped in try/catch — analytics must never break the outbound action pipeline.
+    const _recordSuccess = (actionResult: { content: Array<{ type: "text"; text: string }>; details: Record<string, unknown> }) => {
+      try {
+        const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
+        const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
+        recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "success", chat_id: _chatId, account_id: aid });
+      } catch { /* analytics must never break the outbound action pipeline */ }
+      return actionResult;
+    };
+
     // --- Standard targeted actions (gateway-recognized names) ---
 
     if (action === "react") {
@@ -549,10 +561,10 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
 
       await sendWahaReaction({ cfg: coreCfg, messageId, emoji: emojiRaw, remove, accountId: aid });
 
-      return {
+      return _recordSuccess({
         content: [{ type: "text" as const, text: remove ? `Removed reaction from ${messageId}` : `Reacted with ${emojiRaw} on ${messageId}` }],
         details: {},
-      };
+      });
     }
 
     // -- VERIFIED WORKING 2026-03-10 (19s response time) ----------
@@ -570,7 +582,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!options.length) throw new Error("poll action requires pollOption (array of strings)");
 
       const result = await sendWahaPoll({ cfg: coreCfg, chatId, name: question, options, multipleAnswers, accountId: aid });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     // -- VERIFIED WORKING 2026-03-10 ------------------------------
@@ -631,7 +643,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
           replyToId: typeof p.replyToId === "string" ? p.replyToId : undefined,
           accountId: resolvedAid,
         });
-        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+        return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
       }
 
       const text = typeof p.text === "string" ? p.text : (typeof p.message === "string" ? p.message : "");
@@ -646,7 +658,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       const isBotProxy = resolvedAccount.role !== "bot";
 
       const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: resolvedAid, botProxy: isBotProxy });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     // -- VERIFIED WORKING 2026-03-10 ------------------------------
@@ -660,7 +672,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId || !messageId || !text) throw new Error("edit action requires chatId, messageId, and text");
 
       const result = await editWahaMessage({ cfg: coreCfg, chatId, messageId, text, accountId: aid });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     // -- VERIFIED WORKING 2026-03-10 ------------------------------
@@ -673,7 +685,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId || !messageId) throw new Error("unsend action requires chatId and messageId");
 
       const result = await deleteWahaMessage({ cfg: coreCfg, chatId, messageId, accountId: aid });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     if (action === "pin") {
@@ -683,7 +695,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId || !messageId) throw new Error("pin action requires chatId and messageId");
 
       const result = await pinWahaMessage({ cfg: coreCfg, chatId, messageId, accountId: aid });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     if (action === "unpin") {
@@ -693,7 +705,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId || !messageId) throw new Error("unpin action requires chatId and messageId");
 
       const result = await unpinWahaMessage({ cfg: coreCfg, chatId, messageId, accountId: aid });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     if (action === "read") {
@@ -702,7 +714,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       if (!chatId) throw new Error("read action requires chatId");
 
       const result = await readWahaChatMessages({ cfg: coreCfg, chatId, accountId: aid });
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} };
+      return _recordSuccess({ content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }], details: {} });
     }
 
     // --- Fallback: custom WAHA action names (utility actions + backward compat) ---
@@ -710,18 +722,10 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     if (!handler) throw new Error(`WAHA action "${action}" not supported`);
     const result = await handler(p, coreCfg, aid);
 
-    // Phase 30, Plan 01: Record outbound analytics event. DO NOT REMOVE.
-    // Wrapped in try/catch -- analytics must never break the outbound action pipeline.
-    try {
-      const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
-      const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
-      recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "success", chat_id: _chatId, account_id: aid });
-    } catch { /* analytics must never break the outbound action pipeline */ }
-
-    return {
+    return _recordSuccess({
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       details: {},
-    };
+    });
 
     } catch (err) {
       // Outer error handler — formats all action errors for LLM consumption.
