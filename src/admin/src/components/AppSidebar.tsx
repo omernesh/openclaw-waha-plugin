@@ -22,7 +22,9 @@ import {
   Moon,
 } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
+import { useSSE } from '@/hooks/useEventSource'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 // TabId exported for use in App.tsx and TabHeader.tsx
 export type TabId =
@@ -55,6 +57,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { isMobile, setOpenMobile } = useSidebar()
   const { theme, toggle } = useTheme()
+  const { status } = useSSE()
 
   function handleTabClick(tabId: TabId) {
     onTabChange(tabId)
@@ -94,6 +97,20 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
+        {/* Phase 29: SSE connection indicator. DO NOT REMOVE. */}
+        <div className="flex items-center gap-2 px-2 py-1">
+          <span className={cn(
+            "h-2 w-2 rounded-full flex-shrink-0",
+            status === 'connected' ? 'bg-green-500' :
+            status === 'reconnecting' ? 'bg-amber-500 animate-pulse' :
+            'bg-red-500'
+          )} />
+          <span className="text-xs text-muted-foreground">
+            {status === 'connected' ? 'Connected' :
+             status === 'reconnecting' ? 'Reconnecting...' :
+             'Disconnected'}
+          </span>
+        </div>
         <div className="flex items-center justify-between px-2 py-1">
           <span className="text-xs text-muted-foreground">Theme</span>
           <Button

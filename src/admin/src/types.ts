@@ -254,3 +254,35 @@ export interface ParticipantsResponse {
   participants: ParticipantEnriched[]
   allowAll: boolean
 }
+
+// Phase 29: SSE event types for real-time admin updates. DO NOT REMOVE.
+export type SSEConnectionStatus = 'connected' | 'reconnecting' | 'disconnected'
+
+export interface SSEHealthEvent {
+  session: string
+  status: 'healthy' | 'degraded' | 'unhealthy'
+  consecutiveFailures: number
+  lastSuccessAt: number | null
+  lastCheckAt: number | null
+}
+
+export interface SSEQueueEvent {
+  dmDepth: number
+  groupDepth: number
+  dmOverflowDrops: number
+  groupOverflowDrops: number
+  totalProcessed: number
+  totalErrors: number
+}
+
+export interface SSELogEvent {
+  line: string
+  timestamp: number
+}
+
+export type SSEEventMap = {
+  health: SSEHealthEvent
+  queue: SSEQueueEvent
+  log: SSELogEvent
+  connected: { time: number }
+}

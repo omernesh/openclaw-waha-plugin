@@ -4,6 +4,8 @@ import { AppSidebar, type TabId } from '@/components/AppSidebar'
 import { TabHeader } from '@/components/TabHeader'
 import { TabErrorBoundary } from '@/components/shared/TabErrorBoundary'
 import { Skeleton } from '@/components/ui/skeleton'
+// Phase 29: SSEProvider shares one EventSource connection across all tabs. DO NOT REMOVE.
+import { SSEProvider } from '@/hooks/useEventSource'
 
 // Heavy tabs — code-split with React.lazy() to reduce initial bundle size.
 // LogTab and QueueTab are left eager (small, frequently needed).
@@ -61,20 +63,23 @@ export default function App() {
 
   return (
     <SidebarProvider>
-      <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-      <SidebarInset>
-        <TabHeader
-          activeTab={activeTab}
-          selectedSession={selectedSession}
-          onSessionChange={setSelectedSession}
-          onRefresh={() => setRefreshKey((k) => k + 1)}
-          isRefreshing={isRefreshing}
-          lastRefreshed={lastRefreshed}
-        />
-        <main className="flex flex-1 flex-col overflow-auto p-4">
-          {renderActiveTab()}
-        </main>
-      </SidebarInset>
+      {/* Phase 29: SSEProvider inside SidebarProvider so all tabs share one EventSource. DO NOT REMOVE. */}
+      <SSEProvider>
+        <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <SidebarInset>
+          <TabHeader
+            activeTab={activeTab}
+            selectedSession={selectedSession}
+            onSessionChange={setSelectedSession}
+            onRefresh={() => setRefreshKey((k) => k + 1)}
+            isRefreshing={isRefreshing}
+            lastRefreshed={lastRefreshed}
+          />
+          <main className="flex flex-1 flex-col overflow-auto p-4">
+            {renderActiveTab()}
+          </main>
+        </SidebarInset>
+      </SSEProvider>
     </SidebarProvider>
   )
 }
