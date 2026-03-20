@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
-status: unknown
-stopped_at: Completed 31-03-PLAN.md
-last_updated: "2026-03-20T06:53:05.175Z"
+status: executing
+stopped_at: Completed 32-01-PLAN.md
+last_updated: "2026-03-20T09:13:00Z"
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 19
+  completed_plans: 17
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 31 — Test Coverage Sprint
+**Current focus:** Phase 32 — Platform Abstraction
 
 ## Current Position
 
-Phase: 31 (Test Coverage Sprint) — COMPLETE
-Plan: 3 of 3 (all complete)
+Phase: 32 (Platform Abstraction) — EXECUTING
+Plan: 2 of 3
 
 ## Accumulated Context
 
@@ -72,6 +72,10 @@ Plan: 3 of 3 (all complete)
 - [Phase 31-03]: resolve.dedupe for React required — recharts installs own React under src/admin/node_modules
 - [Phase 31-03]: getAllByRole/getAllByText pattern throughout — Radix UI portals duplicate DOM nodes
 - [Phase 31-03]: recharts fully mocked in jsdom — SVG measurement APIs not available in test env
+- [Phase 32-01]: WahaClient cache keyed by accountId (no TTL); clearWahaClientCache() for hot-reload
+- [Phase 32-01]: resolveAccountParams kept as deprecated shim (no callers remain) — safer than removing
+- [Phase 32-01]: assertCanSend added explicitly to mutation-path functions (getClient does not call it)
+- [Phase 32-01]: getWahaContacts uses client.get with session as query param, NOT path segment
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T08:44:30Z
-Stopped at: Completed 31-03-PLAN.md
+Last session: 2026-03-20T09:13:00Z
+Stopped at: Completed 32-01-PLAN.md
 Resume file: None
