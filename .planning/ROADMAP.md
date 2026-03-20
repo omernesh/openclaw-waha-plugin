@@ -124,7 +124,11 @@ Plans:
   4. Group join/leave/participant-change webhook events are handled and delivered to the OpenClaw agent as inbound messages
   5. The agent can create, list, update, and delete WAHA API keys via plugin actions
   6. Contact online/offline presence status is visible in the admin panel Directory tab (with last-seen timestamp where available)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 28-01-PLAN.md — Channel search, bulk presence, group helpers (API-01 through API-05)
+- [ ] 28-02-PLAN.md — Group webhook events, API Keys CRUD (API-06, API-07)
+- [ ] 28-03-PLAN.md — Presence verification and admin panel display (PRES-01, PRES-02)
 
 ### Phase 29: Real-Time Admin Panel
 **Goal**: The admin panel receives live server-push updates — health state changes, queue depth, new log lines — without requiring manual refresh.
@@ -202,8 +206,8 @@ Plans:
 | 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
 | 25. Session Auto-Recovery | v1.13 | 2/2 | Complete | 2026-03-20 |
 | 26. Config Safety | v1.13 | 2/2 | Complete | 2026-03-20 |
-| 27. Pairing Cleanup and Code Quality | 2/2 | Complete    | 2026-03-20 | - |
-| 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |
+| 27. Pairing Cleanup and Code Quality | v1.13 | 2/2 | Complete | 2026-03-20 |
+| 28. API Coverage Completion | v1.13 | 0/3 | Not started | - |
 | 29. Real-Time Admin Panel | v1.13 | 0/TBD | Not started | - |
 | 30. Analytics | v1.13 | 0/TBD | Not started | - |
 | 31. Test Coverage Sprint | v1.13 | 0/TBD | Not started | - |
