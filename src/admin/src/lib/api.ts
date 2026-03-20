@@ -84,7 +84,8 @@ export const api = {
 
   // Directory
   getDirectory: (params?: DirectoryParams) => {
-    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
+    const filtered = params ? Object.fromEntries(Object.entries(params as Record<string, string>).filter(([, v]) => v !== undefined)) : undefined
+    const qs = filtered && Object.keys(filtered).length > 0 ? '?' + new URLSearchParams(filtered).toString() : ''
     return request<DirectoryResponse>(`/directory${qs}`)
   },
   getDirectoryEntry: (jid: string) =>

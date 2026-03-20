@@ -65,13 +65,7 @@ function getLevelClass(level: string): string {
   return ''
 }
 
-function getLineClass(line: string): string {
-  if (/error|fail|crash|exception/i.test(line)) return 'text-destructive'
-  if (/warn|drop |skip|reject|denied/i.test(line)) return 'text-yellow-500 dark:text-yellow-400'
-  return 'text-foreground'
-}
-
-export default function LogTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: LogTabProps) {
+export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
   const [activeLevel, setActiveLevel] = useState<LogLevel>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [logData, setLogData] = useState<LogResponse | null>(null)

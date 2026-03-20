@@ -44,7 +44,7 @@ export function useEventSource(url = '/api/admin/events'): UseEventSourceReturn 
           const data = JSON.parse(e.data) as SSEEventMap[typeof type]
           const handlers = listenersRef.current.get(type)
           if (handlers) handlers.forEach(fn => fn(data))
-        } catch { /* ignore parse errors */ }
+        } catch (parseErr) { console.warn("[SSE] Failed to parse event:", type, parseErr); }
       })
     }
 

@@ -441,7 +441,7 @@ export async function handleWahaInbound(params: {
           runtime.log?.(`[waha] lid-map: ${senderId} → ${authorCus} (from group _data)`);
         }
       }
-    } catch { /* non-fatal — LID mapping is best-effort */ }
+    } catch (lidErr) { console.warn("[waha] LID mapping failed:", lidErr instanceof Error ? lidErr.message : String(lidErr)); }
   }
 
   // === Slash command detection (regex-based, NOT LLM-dependent) ===
@@ -729,8 +729,8 @@ export async function handleWahaInbound(params: {
                 adminName = contact.displayName;
               }
             }
-          } catch {
-            // Non-fatal — fall back to "the administrator"
+          } catch (adminErr) {
+            console.warn("[waha] admin name resolution failed:", adminErr instanceof Error ? adminErr.message : String(adminErr));
           }
 
           const messageTemplate = autoReplyConfig.message

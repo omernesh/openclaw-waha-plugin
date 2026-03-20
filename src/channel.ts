@@ -569,7 +569,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
         const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
         const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
         recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "success", chat_id: _chatId, account_id: aid });
-      } catch { /* analytics must never break the outbound action pipeline */ }
+      } catch (analyticsErr) { console.warn("[waha] analytics recording failed:", analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr)); }
       return actionResult;
     };
 
@@ -761,7 +761,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
         const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
         const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
         recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "error", chat_id: _chatId, account_id: aid });
-      } catch { /* analytics must never break the outbound action pipeline */ }
+      } catch (analyticsErr) { console.warn("[waha] analytics recording failed:", analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr)); }
 
       return {
         content: [{ type: "text" as const, text: formatActionError(err, { action, target }) }],

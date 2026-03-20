@@ -122,9 +122,9 @@ export class WahaClient {
    */
   static fromAccount(account: ResolvedWahaAccount): WahaClient {
     return new WahaClient({
-      baseUrl: account.baseUrl ?? "",
-      apiKey: typeof account.apiKey === "string" ? account.apiKey : "",
-      session: account.session ?? "default",
+      baseUrl: account.baseUrl,
+      apiKey: account.apiKey,
+      session: account.session,
       accountId: account.accountId,
     });
   }

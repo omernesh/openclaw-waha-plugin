@@ -58,7 +58,7 @@ interface AnalyticsTabProps {
 // DO NOT CHANGE: AnalyticsTab — Phase 30 Analytics tab component.
 // Fetches /api/admin/analytics on range change or refreshKey change.
 // Uses recharts BarChart (stacked inbound/outbound) + LineChart (avg response time).
-export default function AnalyticsTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: AnalyticsTabProps) {
+export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsTabProps) {
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState('24h')

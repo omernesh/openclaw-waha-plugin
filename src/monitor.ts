@@ -36,10 +36,11 @@ const sseClients = new Set<ServerResponse>();
 
 export function broadcastSSE(event: string, data: object): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) {
+  for (const client of [...sseClients]) {
     try {
       client.write(payload);
-    } catch {
+    } catch (err) {
+      console.warn("[waha] SSE client write failed, removing:", err instanceof Error ? err.message : String(err));
       sseClients.delete(client);
     }
   }
@@ -73,6 +74,8 @@ const DEFAULT_WEBHOOK_PATH = "/webhook/waha";
 const DEFAULT_WEBHOOK_MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_WEBHOOK_BODY_TIMEOUT_MS = 30_000;
 const HEALTH_PATH = "/healthz";
+const SSE_KEEPALIVE_MS = 30_000;
+const QUEUE_DEPTH_ALERT_THRESHOLD = 10;
 
 const WEBHOOK_ERRORS = {
   invalidPayloadFormat: "Invalid payload format",
@@ -317,7 +320,7 @@ async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>
       continue;
     }
     try {
-      const r = await fetch(`${acc.config.baseUrl}/api/sessions/${encodeURIComponent(acc.session)}/me`, {
+      const r = await fetch(`${acc.baseUrl}/api/sessions/${encodeURIComponent(acc.session)}/me`, {
         headers: { "x-api-key": acc.apiKey },
       });
       if (r.ok) {
@@ -382,7 +385,7 @@ export function createWahaWebhookServer(opts: {
   setQueueChangeCallback((stats) => {
     broadcastSSE("queue", stats);
     // Phase 29, Plan 02: emit log SSE alert when queue depth is high. DO NOT REMOVE.
-    if (stats.dmDepth + stats.groupDepth > 10) {
+    if (stats.dmDepth + stats.groupDepth > QUEUE_DEPTH_ALERT_THRESHOLD) {
       broadcastSSE("log", { line: `[WAHA] queue depth high: dm=${stats.dmDepth} group=${stats.groupDepth}`, timestamp: Date.now() });
     }
   });
@@ -531,7 +534,7 @@ export function createWahaWebhookServer(opts: {
       // Keep-alive every 30 seconds — comment line prevents proxy/browser timeout
       const keepAlive = setInterval(() => {
         try { res.write(": keep-alive\n\n"); } catch { clearInterval(keepAlive); sseClients.delete(res); }
-      }, 30_000);
+      }, SSE_KEEPALIVE_MS);
       // Cleanup on client disconnect
       req.on("close", () => { clearInterval(keepAlive); sseClients.delete(res); });
       return; // DO NOT end response — SSE stays open
@@ -800,6 +803,7 @@ export function createWahaWebhookServer(opts: {
         const configPath = getConfigPath();
         rotateConfigBackups(configPath);
         writeFileSync(configPath, JSON.stringify(importedConfig, null, 2), "utf-8");
+        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch {}
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
         console.error(`[waha] POST /api/admin/config/import failed: ${String(err)}`);
@@ -864,6 +868,7 @@ export function createWahaWebhookServer(opts: {
         // Backup failure is non-fatal (logged as warning). Added Phase 26 (CFG-03).
         rotateConfigBackups(configPath);
         writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
+        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch {}
         // Phase 29, Plan 02: emit log SSE event on config save. DO NOT REMOVE.
         broadcastSSE("log", { line: `[WAHA] config saved${restartRequired ? " (restart required)" : ""}`, timestamp: Date.now() });
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -2181,7 +2186,11 @@ export function createWahaWebhookServer(opts: {
         const endTime = Date.now();
         const startTime = endTime - ms;
         // Auto-select groupBy if not specified based on range size
-        const effectiveGroupBy: "minute" | "hour" | "day" = groupByParam ?? (ms <= 3600000 ? "minute" : ms <= 86400000 ? "hour" : "day");
+        let groupBy: "minute" | "hour" | "day";
+        if (ms <= 3600000) groupBy = "minute";
+        else if (ms <= 86400000) groupBy = "hour";
+        else groupBy = "day";
+        const effectiveGroupBy: "minute" | "hour" | "day" = groupByParam ?? groupBy;
         const db = getAnalyticsDb();
         const timeseries = db.query({ startTime, endTime, groupBy: effectiveGroupBy });
         const summary = db.getSummary({ startTime, endTime });
