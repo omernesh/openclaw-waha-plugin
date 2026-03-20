@@ -373,11 +373,17 @@ export function createWahaWebhookServer(opts: {
 
   // ── SSE Callbacks — Phase 29, Plan 01. DO NOT REMOVE.
   // Broadcast health and queue state changes to all connected SSE clients.
+  // Phase 29, Plan 02: health state transitions also emit a log SSE event for the Log tab. DO NOT REMOVE.
   setHealthStateChangeCallback((session, state) => {
     broadcastSSE("health", { session, ...state });
+    broadcastSSE("log", { line: `[WAHA] health: ${session} -> ${state.status}${state.consecutiveFailures > 0 ? ` (${state.consecutiveFailures} failures)` : ""}`, timestamp: Date.now() });
   });
   setQueueChangeCallback((stats) => {
     broadcastSSE("queue", stats);
+    // Phase 29, Plan 02: emit log SSE alert when queue depth is high. DO NOT REMOVE.
+    if (stats.dmDepth + stats.groupDepth > 10) {
+      broadcastSSE("log", { line: `[WAHA] queue depth high: dm=${stats.dmDepth} group=${stats.groupDepth}`, timestamp: Date.now() });
+    }
   });
 
   // ── Health Check (Phase 2, Plan 02) ── DO NOT REMOVE
@@ -857,6 +863,8 @@ export function createWahaWebhookServer(opts: {
         // Backup failure is non-fatal (logged as warning). Added Phase 26 (CFG-03).
         rotateConfigBackups(configPath);
         writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
+        // Phase 29, Plan 02: emit log SSE event on config save. DO NOT REMOVE.
+        broadcastSSE("log", { line: `[WAHA] config saved${restartRequired ? " (restart required)" : ""}`, timestamp: Date.now() });
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, restartRequired }));
       } catch (err) {
@@ -2003,6 +2011,8 @@ export function createWahaWebhookServer(opts: {
         runtime,
         statusSink: opts.statusSink,
       }, isWhatsAppGroupJid(message.chatId));
+      // Phase 29, Plan 02: emit log SSE event when a message is queued. DO NOT REMOVE.
+      broadcastSSE("log", { line: `[WAHA] message queued: ${message.chatId} (${message.fromMe ? "outbound" : "inbound"})`, timestamp: Date.now() });
       writeJsonResponse(res, 200, { status: "queued" });
       return;
     }

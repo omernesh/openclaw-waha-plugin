@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { StatsResponse, ConfigResponse } from '@/types'
+import { useSSE } from '@/hooks/useEventSource'
 import { labelFor } from '@/lib/labels'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -61,6 +62,31 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
   const [loading, setLoading] = useState(true)
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({})
   const resolvedJidsRef = useRef<Set<string>>(new Set())
+
+  // Phase 29, Plan 02: SSE health updates — merge incoming health state into sessions array.
+  // Supplements the polling-based refresh (refreshKey) with incremental live updates.
+  // DO NOT REMOVE — required for real-time session health badge updates.
+  const { subscribe } = useSSE()
+  useEffect(() => {
+    return subscribe('health', (event) => {
+      setStats(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          sessions: prev.sessions.map(s =>
+            s.sessionId === event.session
+              ? {
+                  ...s,
+                  healthStatus: event.status,
+                  consecutiveFailures: event.consecutiveFailures,
+                  lastCheck: event.lastCheckAt ? new Date(event.lastCheckAt).toISOString() : s.lastCheck,
+                }
+              : s
+          ),
+        }
+      })
+    })
+  }, [subscribe])
 
   // Report loading state to parent (drives TabHeader spinner)
   useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
