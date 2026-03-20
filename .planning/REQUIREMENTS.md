@@ -7,10 +7,10 @@
 
 ### Reliability & Recovery
 
-- [ ] **REC-01**: Unhealthy sessions auto-restart via WAHA API after 5 consecutive health check failures
-- [ ] **REC-02**: Cooldown between restart attempts (5 minute minimum) to prevent restart storms
+- [x] **REC-01**: Unhealthy sessions auto-restart via WAHA API after 5 consecutive health check failures
+- [x] **REC-02**: Cooldown between restart attempts (5 minute minimum) to prevent restart storms
 - [ ] **REC-03**: Recovery events surfaced in admin Dashboard health cards (attempt count, last recovery, outcome)
-- [ ] **REC-04**: Alert god mode users via WhatsApp when session goes unhealthy (using healthy session)
+- [x] **REC-04**: Alert god mode users via WhatsApp when session goes unhealthy (using healthy session)
 
 ### Config Safety
 
@@ -101,10 +101,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REC-01 | Phase 25 | Pending |
-| REC-02 | Phase 25 | Pending |
+| REC-01 | Phase 25 | Complete |
+| REC-02 | Phase 25 | Complete |
 | REC-03 | Phase 25 | Pending |
-| REC-04 | Phase 25 | Pending |
+| REC-04 | Phase 25 | Complete |
 | CFG-01 | Phase 26 | Pending |
 | CFG-02 | Phase 26 | Pending |
 | CFG-03 | Phase 26 | Pending |

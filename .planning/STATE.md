@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
-status: planning
-stopped_at: Roadmap created, ready to plan Phase 25
-last_updated: "2026-03-20"
-last_activity: "2026-03-20 — v1.13 roadmap created, 8 phases, 38 requirements mapped"
+status: in-progress
+stopped_at: "Completed 25-01-PLAN.md"
+last_updated: "2026-03-20T03:55:08Z"
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -21,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** v1.13 Close All Gaps — Phase 25: Session Auto-Recovery
+**Current focus:** Phase 25 — Session Auto-Recovery
 
 ## Current Position
 
-Phase: 25 of 32 (Session Auto-Recovery)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-20 — Roadmap created, 38/38 requirements mapped across 8 phases
-
-Progress: [░░░░░░░░░░] 0% (0 phases complete)
+Phase: 25 (Session Auto-Recovery) — EXECUTING
+Plan: 2 of 2
 
 ## Accumulated Context
 
@@ -42,6 +36,9 @@ Progress: [░░░░░░░░░░] 0% (0 phases complete)
 - PRES-01 and PRES-02 folded into Phase 28 (API coverage theme)
 - E2E tests use both sessions: omer (3cf11776_omer) and logan (3cf11776_logan)
 - Group join/leave events ARE supported by WAHA — included in API-06
+- Dynamic imports in health.ts alertGodModeUsers to avoid circular deps (health -> send -> accounts)
+- enableRecovery defaults false (backward compat); opt-in per startHealthCheck call site
+- UNHEALTHY_THRESHOLD raised from 3 to 5 (unifies with AUTO_RECOVERY_THRESHOLD)
 
 ### Pending Todos
 
@@ -56,5 +53,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Roadmap created — start with `/gsd:plan-phase 25`
+Stopped at: Completed 25-01-PLAN.md
 Resume file: None

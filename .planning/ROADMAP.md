@@ -81,8 +81,8 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   4. When a session goes unhealthy and a healthy session is available, a WhatsApp alert message is delivered to all god mode users via the healthy session
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 26: Config Safety
 **Goal**: Config saves from the admin panel are validated before hitting disk, corrupt configs are rejected with actionable errors, and operators can export/import/restore configs without touching the server.
@@ -95,8 +95,8 @@ Plans:
   4. Uploading a valid JSON file via "Import Config" applies it and shows a success toast; uploading an invalid file shows a structured validation error without touching the live config
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 27: Pairing Cleanup and Code Quality
 **Goal**: Dead pairing code is removed, bot echo no longer triggers pairing challenges for itself, pairing.ts ships reliably in deploy artifacts, and five lingering code quality issues are resolved.
@@ -110,8 +110,8 @@ Plans:
   5. Admin panel theme toggle respects `prefers-color-scheme` on first load (no manual toggle required on a fresh browser session)
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 28: API Coverage Completion
 **Goal**: All identified WAHA API gaps are closed â€” channel search metadata, bulk presence, group join-info, group refresh, group webhook events, API keys CRUD, and all four presence endpoints verified end-to-end.
@@ -126,8 +126,8 @@ Plans:
   6. Contact online/offline presence status is visible in the admin panel Directory tab (with last-seen timestamp where available)
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 29: Real-Time Admin Panel
 **Goal**: The admin panel receives live server-push updates â€” health state changes, queue depth, new log lines â€” without requiring manual refresh.
@@ -140,8 +140,8 @@ Plans:
   4. The admin sidebar shows a green "Connected" indicator while the SSE stream is live and an amber "Reconnecting" indicator during gaps
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 30: Analytics
 **Goal**: Message activity is recorded to SQLite and surfaced in a new Analytics tab with hourly/daily charts â€” giving operators visibility into traffic patterns and response times.
@@ -154,8 +154,8 @@ Plans:
   4. Charts update on manual refresh â€” data shown is consistent with what was processed (counts match filter stats for the same period)
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 31: Test Coverage Sprint
 **Goal**: Every critical untested module gains a test suite â€” zero-coverage modules (monitor.ts, inbound.ts, shutup.ts) are no longer unguarded, and existing partial coverage in directory.ts and React components is completed.
@@ -169,8 +169,8 @@ Plans:
   5. Each React admin panel tab has at least one component test (render without crash, key interaction verified)
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ### Phase 32: Platform Abstraction
 **Goal**: WAHA API calls are consolidated behind a WahaClient class, a platform adapter interface is defined for future multi-platform support, and the config/session/directory layers are structured for future multi-tenant isolation.
@@ -182,8 +182,8 @@ Plans:
   3. Config, session registry, and DirectoryDb accept a tenant ID parameter â€” the plugin can run two isolated instances in the same process without state leakage between them
 **Plans**: 2 plans
 Plans:
-- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
-- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery APIï¿½ Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery displayï¿½ Frontend: Dashboard health card recovery display
 
 ## Progress
 
@@ -215,7 +215,7 @@ Plans:
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 23. Polish | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
-| 25. Session Auto-Recovery | v1.13 | 0/2 | In progress | - |
+| 25. Session Auto-Recovery | 1/2 | In Progress|  | - |
 | 26. Config Safety | v1.13 | 0/TBD | Not started | - |
 | 27. Pairing Cleanup and Code Quality | v1.13 | 0/TBD | Not started | - |
 | 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |
