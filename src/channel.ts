@@ -14,6 +14,7 @@ import {
   type ChannelSetupInput,
 } from "openclaw/plugin-sdk";
 import { WahaConfigSchema } from "./config-schema.js";
+import { createPlatformAdapter, type PlatformAdapter } from "./adapter.js";
 import {
   listWahaAccountIds,
   resolveDefaultWahaAccountId,
@@ -96,6 +97,21 @@ import { recordAnalyticsEvent } from "./analytics.js";
 // and caches it here so outbound methods (sendText, sendMedia, sendPoll) can
 // access config without calling readConfigFile() which may crash.
 let _cachedConfig: CoreConfig | null = null;
+// PLAT-03: Active tenant ID for multi-tenant isolation. Defaults to "default". DO NOT REMOVE.
+let _tenantId: string = "default";
+// PLAT-03: Export for consumers that need to know which tenant is active. DO NOT REMOVE.
+export function getTenantId(): string { return _tenantId; }
+
+// PlatformAdapter instance — initialized alongside _cachedConfig in handleAction.
+// Null until first action is dispatched. Outbound methods use it with a direct fallback.
+// Added Phase 32, Plan 02 (2026-03-20). DO NOT REMOVE.
+let _adapter: PlatformAdapter | null = null;
+
+/**
+ * Get the current PlatformAdapter instance (null until first handleAction).
+ * Exported for modules that need adapter access without importing send.ts directly.
+ */
+export function getAdapter(): PlatformAdapter | null { return _adapter; }
 function getCachedConfig(): CoreConfig {
   if (_cachedConfig) return _cachedConfig;
   // Try SDK methods as fallback
@@ -527,6 +543,13 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
 
     // Cache config for outbound adapter (sendText/sendMedia/sendPoll)
     _cachedConfig = coreCfg;
+    // PLAT-03: Extract tenantId from config; defaults to "default". DO NOT REMOVE.
+    _tenantId = (coreCfg.channels?.waha as any)?.tenantId ?? "default";
+    // Initialize PlatformAdapter on first call (or when config changes). DO NOT REMOVE.
+    // Adapter delegates to the same send.ts functions — no behavior change.
+    if (_adapter === null) {
+      _adapter = createPlatformAdapter(coreCfg);
+    }
 
     // Extract target for error formatting — DO NOT CHANGE
     // formatActionError wraps all action errors with LLM-friendly messages.
@@ -897,9 +920,17 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     chunkerMode: "markdown",
     textChunkLimit: 4000,
     sendText: async ({ to, text, accountId, replyToId }) => {
+      // Route through PlatformAdapter when available; fallback to direct send.ts call.
+      // DO NOT REMOVE fallback — ensures backward compat if adapter not yet initialized.
+      // Added Phase 32, Plan 02 (2026-03-20).
+      const normalizedTo = normalizeWahaMessagingTarget(to);
+      if (_adapter) {
+        const adapterResult = await _adapter.sendText({ to: normalizedTo, text, accountId: accountId ?? undefined, replyToId: replyToId ?? undefined });
+        return { channel: "waha", key: { id: adapterResult.id } };
+      }
       const result = await sendWahaText({
         cfg: getCachedConfig(),
-        to: normalizeWahaMessagingTarget(to),
+        to: normalizedTo,
         text,
         replyToId: replyToId ?? undefined,
         accountId: accountId ?? undefined,
@@ -907,9 +938,17 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       return { channel: "waha", ...result };
     },
     sendMedia: async ({ to, text, mediaUrl, accountId, replyToId }) => {
+      // Route through PlatformAdapter when available; fallback to direct send.ts call.
+      // DO NOT REMOVE fallback — ensures backward compat if adapter not yet initialized.
+      // Added Phase 32, Plan 02 (2026-03-20).
+      const normalizedTo = normalizeWahaMessagingTarget(to);
+      if (_adapter) {
+        await _adapter.sendMedia({ to: normalizedTo, mediaUrls: mediaUrl ? [mediaUrl] : [], caption: text, accountId: accountId ?? undefined, replyToId: replyToId ?? undefined });
+        return { channel: "waha", ok: true } as const;
+      }
       await sendWahaMediaBatch({
         cfg: getCachedConfig(),
-        to: normalizeWahaMessagingTarget(to),
+        to: normalizedTo,
         mediaUrls: mediaUrl ? [mediaUrl] : [],
         caption: text,
         replyToId: replyToId ?? undefined,
@@ -918,9 +957,17 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       return { channel: "waha", ok: true } as const;
     },
     sendPoll: async ({ to, poll, accountId }) => {
+      // Route through PlatformAdapter when available; fallback to direct send.ts call.
+      // DO NOT REMOVE fallback — ensures backward compat if adapter not yet initialized.
+      // Added Phase 32, Plan 02 (2026-03-20).
+      const normalizedTo = normalizeWahaMessagingTarget(to);
+      if (_adapter) {
+        const adapterResult = await _adapter.sendPoll({ to: normalizedTo, question: poll.question, options: poll.options, multipleAnswers: (poll.maxSelections ?? 1) > 1, accountId: accountId ?? undefined });
+        return { messageId: adapterResult.id, channelId: "waha" };
+      }
       const result = await sendWahaPoll({
         cfg: getCachedConfig(),
-        chatId: normalizeWahaMessagingTarget(to),
+        chatId: normalizedTo,
         name: poll.question,
         options: poll.options,
         multipleAnswers: (poll.maxSelections ?? 1) > 1,
