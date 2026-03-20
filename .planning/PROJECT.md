@@ -76,9 +76,20 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone
+## Current Milestone: v1.13 Close All Gaps
 
-v1.12 shipped. Next milestone is TBD.
+**Goal:** Close every remaining gap — session auto-recovery, config safety, API coverage completion (channels, presence, groups, API keys), real-time admin panel, analytics, test coverage, code quality fixes, pairing cleanup, and platform abstraction groundwork for future SaaS deployment.
+
+**Target features:**
+- Session auto-recovery with alerting
+- Config validation, backup/restore, export/import
+- Pairing system cleanup (dead code, bot echo fix)
+- Full WAHA API coverage (channel search metadata, bulk presence, group join-info/refresh, group events, API keys)
+- Real-time admin panel via SSE
+- Analytics tab with charts
+- Comprehensive test coverage for untested modules
+- Code quality fixes (remaining TODOs, singleton guards, theme auto-detect)
+- Platform abstraction (WahaClient, adapter interface, multi-tenant groundwork)
 
 ## Context
 
@@ -134,4 +145,4 @@ v1.12 shipped. Next milestone is TBD.
 | Full UI rewrite (not incremental) | Current code was concatenated HTML strings — no component structure to migrate incrementally | ✓ Good |
 
 ---
-*Last updated: 2026-03-18 after v1.12 milestone*
+*Last updated: 2026-03-20 after v1.13 milestone start*

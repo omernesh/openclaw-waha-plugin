@@ -1,75 +1,46 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.12
-milestone_name: UI Overhaul & Feature Polish
-status: completed
-stopped_at: Completed 24-01-PLAN.md
-last_updated: "2026-03-18T19:09:25.606Z"
-last_activity: "2026-03-18 — 22-02 executed: ModulesTab with Switch toggles + assignment management, LogTab with level filtering + search + auto-scroll"
+milestone: v1.13
+milestone_name: Close All Gaps
+status: planning
+stopped_at: Requirements defined, roadmap pending
+last_updated: "2026-03-20"
+last_activity: "2026-03-20 — v1.13 milestone started, 38 requirements defined"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-18)
+See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** v1.12 UI Overhaul — Phase 19 complete (2/2 plans), Phase 20/21/22 can now run in parallel
+**Current focus:** v1.13 Close All Gaps — defining roadmap
 
 ## Current Position
 
-Phase: 22 — Sessions/Modules/Log/Queue Tabs (Complete — 2/2 plans done)
-Plan: All Phase 22 plans complete
-Status: 22-02 complete (ModulesTab + LogTab)
-Last activity: 2026-03-18 — 22-02 executed: ModulesTab with Switch toggles + assignment management, LogTab with level filtering + search + auto-scroll
-
-```
-Progress: [██████████] 100% — 11/11 plans complete
-```
+Phase: Not started (defining roadmap)
+Plan: —
+Status: Requirements defined, spawning roadmapper
+Last activity: 2026-03-20 — v1.13 milestone started
 
 ## Accumulated Context
 
 ### Decisions
 
-- shadcn/ui + Tailwind CSS + Vite chosen for admin panel UI rewrite (2026-03-18)
-- Full rewrite (not incremental) — current embedded HTML/JS strings have no component structure to migrate incrementally (2026-03-18)
-- Phase 20 and 21 can execute in parallel after Phase 19 (Layout) completes — Dashboard/Settings and Directory are independent tabs
-- Phase 22 can also execute in parallel with Phase 20/21 after Phase 19 — Sessions/Modules/Log/Queue are independent from Dashboard/Settings and Directory
-- Template literal double-escaping (2026-03-16): All embedded JS in monitor.ts must use double-backslash. This goes away entirely with the React rewrite.
-- Modules are WhatsApp-specific (2026-03-17): No cross-platform abstraction.
-- monitor.ts API routes remain unchanged throughout — only the HTML/JS serving logic changes
-- CLNP-03 (tooltip portals) assigned to Phase 23 (Polish) — it is a cross-cutting fix affecting multiple tabs, not a single-tab concern
-- [Phase 18-01]: Used --legacy-peer-deps for npm install (vite@8/vitest peer conflict)
-- [Phase 18-01]: dist/ added to .gitignore; npm publish uses files allowlist to include dist/admin/
-- [Phase 18-01]: All 30+ api.ts methods are live (none commented out) — route audit confirmed all exist in monitor.ts
-- [Phase 18-react-scaffold]: ADMIN_DIST dual-path probing at startup automatically adapts to local dev vs hpg6 flat deploy layout
-- [Phase 18-react-scaffold]: dist/admin/ deployed to plugin_root/dist/admin/ (adjacent to src/) on both hpg6 locations
-- [Phase 19-app-layout]: shadcn components written manually (CLI incompatible with monorepo layout; no package.json in src/admin/)
-- [Phase 19]: All layout state (activeTab, selectedSession, refreshKey) lifted to App.tsx root — prevents session reset on tab switch
-- [Phase 20]: TagInput stores raw JIDs, displays resolved names (display-only; resolvedNames prop is display mapping)
-- [Phase 20]: Session type uses sessionId not id; TabHeader fixed to match actual API response
-- [Phase 20]: SettingsTab: buildPayload sends explicit [] for empty arrays; godModeSuperUsers always Array<{identifier}>; Combined Tasks 1+2 into one atomic commit
-- [Phase 21-directory-tab]: DirectoryTab fetches data centrally and passes contacts/total/loading down to sub-tab components — avoids duplicate fetches
-- [Phase 21-directory-tab]: ChevronDown expand indicator reads expandedRowId from table meta to avoid extra prop threading
-- [Phase 21-02]: ContactSettingsSheet stays open after save — onSaved() triggers parent refresh only
-- [Phase 21-02]: refreshCounter in DirectoryTab drives sub-tab data re-fetch after bulk/settings changes
-- [Phase 22]: QueueResponse uses flat fields matching inbound-queue.ts getStats() — not nested dm/group objects
-- [Phase 22]: Processing state in QueueTab derived from depths only (idle when both 0) — no server-side Paused concept
-- [Phase 22]: No module config form — no server endpoint exists; TagInput assignment management is the only inline action
-- [Phase 22]: LogTab uses server-side level filtering only — no DEBUG chip, no @tanstack/react-virtual (300-line cap sufficient)
-- [Phase 23-polish]: TabErrorBoundary uses key={refreshKey} so Refresh button automatically resets any error state
-- [Phase 23-polish]: DirectoryTab skeleton uses early return (loading && data === null) to show skeleton on first load only
-- [Phase 23-polish]: onLoadingChange optional on all tab props; tabs work standalone without parent wiring
-- [Phase 23-polish]: Refresh button disabled during isRefreshing to prevent double-refresh
-- [Phase 24-01]: Legacy buildAdminHtml() and escapeHtml() removed — React SPA is now the only admin UI
-- [Phase 24-01]: No package.json changes needed for build — npm run build:admin is correct since gateway loads TS directly
+- All gaps from v1.13 gap analysis to be closed (no deferral)
+- Group join/leave events ARE supported by WAHA (corrected from earlier assumption)
+- Platform abstraction included — user plans SaaS deployment
+- Full channels API coverage needed (search metadata endpoints)
+- All presence features to be verified end-to-end
+- E2E tests can use both omer (3cf11776_omer) and logan (3cf11776_logan) sessions
+- Pairing dual-system issue: gateway pairing works, plugin PairingEngine is dead code
 
 ### Pending Todos
 
@@ -77,12 +48,12 @@ None.
 
 ### Blockers/Concerns
 
-- Build pipeline integration: Vite build output must be included in npm package and deployed to both hpg6 locations (addressed in Phase 24 CLNP-02)
-- Phase 18 is a hard dependency for all downstream phases — must be verified end-to-end before proceeding
-- monitor.ts currently serves HTML via `getAdminPageHtml()` — Phase 18 switches this to static file serving; old HTML stays until Phase 24
+- Pairing.ts was missing from deploy — fixed during pairing test but root cause (deploy script) needs addressing
+- _cachedConfig singleton fragility — outbound calls before handleAction will fail
+- 1980-line monitor.ts and 1100-line inbound.ts have zero test coverage
 
 ## Session Continuity
 
-Last session: 2026-03-18T18:46:04.811Z
-Stopped at: Completed 24-01-PLAN.md
+Last session: 2026-03-20
+Stopped at: Requirements defined, roadmap creation pending
 Resume file: None
