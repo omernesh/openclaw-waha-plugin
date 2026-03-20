@@ -1527,15 +1527,24 @@ export class DirectoryDb {
   }
 }
 
-// Module-level singleton map keyed by accountId
+// Module-level singleton map keyed by "tenant:accountId"
 const _directoryInstances = new Map<string, DirectoryDb>();
 
-export function getDirectoryDb(accountId: string): DirectoryDb {
-  // Sanitize accountId to prevent path traversal
+// PLAT-03: tenantId parameter for multi-tenant isolation.
+// "default" tenant uses legacy path (no subdirectory) for backward compat.
+// Non-default tenants get isolated subdirectories.
+// DO NOT CHANGE default path — existing installations depend on it.
+export function getDirectoryDb(accountId: string, tenantId: string = "default"): DirectoryDb {
+  // Sanitize inputs to prevent path traversal
   const safeId = accountId.replace(/[^a-zA-Z0-9_-]/g, "_");
-  if (!_directoryInstances.has(safeId)) {
-    const dbPath = join(homedir(), ".openclaw", "data", `waha-directory-${safeId}.db`);
-    _directoryInstances.set(safeId, new DirectoryDb(dbPath));
+  const safeTenant = tenantId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const cacheKey = `${safeTenant}:${safeId}`;
+  if (!_directoryInstances.has(cacheKey)) {
+    // "default" tenant uses legacy path (no subdirectory) — DO NOT CHANGE for backward compat
+    const dbPath = safeTenant === "default"
+      ? join(homedir(), ".openclaw", "data", `waha-directory-${safeId}.db`)
+      : join(homedir(), ".openclaw", "data", safeTenant, `waha-directory-${safeId}.db`);
+    _directoryInstances.set(cacheKey, new DirectoryDb(dbPath));
   }
-  return _directoryInstances.get(safeId)!;
+  return _directoryInstances.get(cacheKey)!;
 }
