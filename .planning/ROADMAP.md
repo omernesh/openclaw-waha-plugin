@@ -59,7 +59,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 **Milestone Goal:** Close every remaining operational, API coverage, test coverage, and code quality gap. Ship session auto-recovery, config safety, pairing cleanup, full WAHA API coverage, real-time admin panel, analytics, comprehensive test coverage, and platform abstraction groundwork.
 
-- [ ] **Phase 25: Session Auto-Recovery** — Auto-restart unhealthy sessions, cooldown, alerting (REC-01 through REC-04)
+- [x] **Phase 25: Session Auto-Recovery** — Auto-restart unhealthy sessions, cooldown, alerting (REC-01 through REC-04) (completed 2026-03-20)
 - [ ] **Phase 26: Config Safety** — Zod validation, structured errors, backup/rotate, export/import (CFG-01 through CFG-05)
 - [ ] **Phase 27: Pairing Cleanup and Code Quality** — Dead code removal, bot echo fix, deploy guard, and 5 CQ fixes (PAIR-01 through PAIR-03, CQ-01 through CQ-05)
 - [ ] **Phase 28: API Coverage Completion** — Channel search, bulk presence, group join-info/refresh/events, API keys, presence verification (API-01 through API-07, PRES-01, PRES-02)
@@ -215,7 +215,7 @@ Plans:
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 23. Polish | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
-| 25. Session Auto-Recovery | 1/2 | In Progress|  | - |
+| 25. Session Auto-Recovery | 2/2 | Complete   | 2026-03-20 | - |
 | 26. Config Safety | v1.13 | 0/TBD | Not started | - |
 | 27. Pairing Cleanup and Code Quality | v1.13 | 0/TBD | Not started | - |
 | 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |

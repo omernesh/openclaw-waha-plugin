@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
-status: in-progress
-stopped_at: "Completed 25-01-PLAN.md"
-last_updated: "2026-03-20T03:55:08Z"
+status: unknown
+stopped_at: Completed 25-02-PLAN.md
+last_updated: "2026-03-20T03:58:51.594Z"
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -39,6 +39,7 @@ Plan: 2 of 2
 - Dynamic imports in health.ts alertGodModeUsers to avoid circular deps (health -> send -> accounts)
 - enableRecovery defaults false (backward compat); opt-in per startHealthCheck call site
 - UNHEALTHY_THRESHOLD raised from 3 to 5 (unifies with AUTO_RECOVERY_THRESHOLD)
+- [Phase 25]: Recovery info row rendered conditionally (only when recoveryAttemptCount > 0) to preserve clean UI
 
 ### Pending Todos
 
@@ -52,6 +53,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20
-Stopped at: Completed 25-01-PLAN.md
+Last session: 2026-03-20T03:58:51.589Z
+Stopped at: Completed 25-02-PLAN.md
 Resume file: None
