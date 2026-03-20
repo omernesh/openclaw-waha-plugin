@@ -79,7 +79,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. A second restart attempt cannot fire within 5 minutes of the previous one â€” a second failure within the cooldown window is logged but no restart is triggered
   3. The Dashboard health card for the affected session shows attempt count, last recovery timestamp, and whether the last attempt succeeded or failed
   4. When a session goes unhealthy and a healthy session is available, a WhatsApp alert message is delivered to all god mode users via the healthy session
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 26: Config Safety
 **Goal**: Config saves from the admin panel are validated before hitting disk, corrupt configs are rejected with actionable errors, and operators can export/import/restore configs without touching the server.
@@ -90,7 +93,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. Every successful config save rotates backups, preserving the 3 most recent previous versions alongside the current config
   3. Clicking "Export Config" in the admin panel downloads the full current config as a JSON file
   4. Uploading a valid JSON file via "Import Config" applies it and shows a success toast; uploading an invalid file shows a structured validation error without touching the live config
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 27: Pairing Cleanup and Code Quality
 **Goal**: Dead pairing code is removed, bot echo no longer triggers pairing challenges for itself, pairing.ts ships reliably in deploy artifacts, and five lingering code quality issues are resolved.
@@ -102,7 +108,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. pairing.ts is present in both hpg6 deploy locations after a standard deploy â€” absence is detected at startup and logged as an error
   4. The remaining `.catch(() => {})` in shutup.ts:239 is replaced with `warnOnError()` â€” mute confirmation failures are visible in logs
   5. Admin panel theme toggle respects `prefers-color-scheme` on first load (no manual toggle required on a fresh browser session)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 28: API Coverage Completion
 **Goal**: All identified WAHA API gaps are closed â€” channel search metadata, bulk presence, group join-info, group refresh, group webhook events, API keys CRUD, and all four presence endpoints verified end-to-end.
@@ -115,7 +124,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   4. Group join/leave/participant-change webhook events are handled and delivered to the OpenClaw agent as inbound messages
   5. The agent can create, list, update, and delete WAHA API keys via plugin actions
   6. Contact online/offline presence status is visible in the admin panel Directory tab (with last-seen timestamp where available)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 29: Real-Time Admin Panel
 **Goal**: The admin panel receives live server-push updates â€” health state changes, queue depth, new log lines â€” without requiring manual refresh.
@@ -126,7 +138,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. When a session transitions from healthy to degraded or unhealthy, the Dashboard health card updates its badge color within 2 seconds without a manual refresh
   3. New log entries appear in the Log tab in real time â€” the tab auto-scrolls to the latest entry if the user has not manually scrolled up
   4. The admin sidebar shows a green "Connected" indicator while the SSE stream is live and an amber "Reconnecting" indicator during gaps
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 30: Analytics
 **Goal**: Message activity is recorded to SQLite and surfaced in a new Analytics tab with hourly/daily charts â€” giving operators visibility into traffic patterns and response times.
@@ -137,7 +152,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. The analytics API returns aggregated data for a requested time range and group-by interval (hour or day)
   3. The Analytics tab in the admin panel displays a messages-per-hour bar chart and a response-time distribution chart populated from live data
   4. Charts update on manual refresh â€” data shown is consistent with what was processed (counts match filter stats for the same period)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 31: Test Coverage Sprint
 **Goal**: Every critical untested module gains a test suite â€” zero-coverage modules (monitor.ts, inbound.ts, shutup.ts) are no longer unguarded, and existing partial coverage in directory.ts and React components is completed.
@@ -149,7 +167,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. directory.ts CRUD operations â€” create/read/update/delete contacts, participant management, LID mapping, group filter overrides â€” each have at least one passing test
   4. The shutup.ts interactive mute/unmute flow (pending selection, confirmation, timeout) has tests covering the happy path and the cancellation path
   5. Each React admin panel tab has at least one component test (render without crash, key interaction verified)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ### Phase 32: Platform Abstraction
 **Goal**: WAHA API calls are consolidated behind a WahaClient class, a platform adapter interface is defined for future multi-platform support, and the config/session/directory layers are structured for future multi-tenant isolation.
@@ -159,7 +180,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   1. All direct `fetch()` calls to the WAHA API in send.ts are replaced by `WahaClient` methods â€” no raw fetch calls to WAHA remain outside WahaClient
   2. A `ChannelAdapter` interface is defined and the plugin's OpenClaw integration implements it â€” swapping the transport layer requires only a new adapter class, not edits to business logic
   3. Config, session registry, and DirectoryDb accept a tenant ID parameter â€” the plugin can run two isolated instances in the same process without state leakage between them
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 25-01-PLAN.md -- Backend: auto-recovery logic, cooldown, alerting, recovery API— Backend: auto-recovery logic, cooldown, alerting, recovery API
+- [ ] 25-02-PLAN.md -- Frontend: Dashboard health card recovery display— Frontend: Dashboard health card recovery display
 
 ## Progress
 
@@ -191,7 +215,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 | 22. Sessions, Modules, Log, and Queue Tabs | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 23. Polish | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
-| 25. Session Auto-Recovery | v1.13 | 0/TBD | Not started | - |
+| 25. Session Auto-Recovery | v1.13 | 0/2 | In progress | - |
 | 26. Config Safety | v1.13 | 0/TBD | Not started | - |
 | 27. Pairing Cleanup and Code Quality | v1.13 | 0/TBD | Not started | - |
 | 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |
