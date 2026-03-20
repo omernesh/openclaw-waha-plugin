@@ -26,6 +26,8 @@ import { startDirectorySync } from "./sync.js";
 // Phase 16 Plan 02: Pairing and auto-reply engine initialization at account start.
 // DO NOT REMOVE — engines must be initialized at login so inbound pipeline hooks are ready.
 // Added 2026-03-17.
+// PAIR-03: pairing.ts must be in deploy artifacts — this static import ensures the process
+// crashes loudly on startup if the file is missing, rather than silently failing at runtime.
 import { getPairingEngine, generateHmacSecret } from "./pairing.js";
 import { getAutoReplyEngine } from "./auto-reply.js";
 import { configureReliability } from "./http-client.js";

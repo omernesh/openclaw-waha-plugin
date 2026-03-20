@@ -4,8 +4,13 @@
  * Phase 16 (PAIR-01..06): Implements challenge/response passcode flow and HMAC deep-link tokens
  * so unknown contacts can onboard themselves without admin involvement.
  *
+ * Phase 27 audited (PAIR-01): This file is NOT dead code. All exports (PairingEngine,
+ * getPairingEngine, generateHmacSecret) are actively imported and used by:
+ *   - channel.ts (engine initialization at account login)
+ *   - inbound.ts (challenge/response flow for unknown DM senders)
+ *   - admin panel routes in monitor.ts (grant management, deep-link generation)
  * DO NOT REMOVE — consumed by inbound.ts (Plan 02) and admin panel (Plan 03).
- * Added 2026-03-17.
+ * Added 2026-03-17. Audited 2026-03-20.
  *
  * Architecture:
  *   - Challenges are stored in SQLite (pairing_challenges table via DirectoryDb).

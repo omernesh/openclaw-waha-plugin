@@ -621,7 +621,12 @@ export async function handleWahaInbound(params: {
   // DO NOT MOVE -- must run before gateway's built-in pairing/access check below.
   // Added 2026-03-17. DO NOT CHANGE.
   // ======================================================================
-  if (!isGroup && !triggerActivated) {
+  // PAIR-02: skip pairing/auto-reply for bot's own messages (fromMe). DO NOT REMOVE.
+  // Without this guard, messages the bot sends to itself (e.g., confirmations sent via
+  // sendWahaText back to the DM) can re-enter the pairing flow on the bot session,
+  // triggering redundant challenge messages. Belt-and-suspenders even if monitor.ts
+  // filters most fromMe events — this is the definitive guard at the pipeline level.
+  if (!isGroup && !triggerActivated && !message.fromMe) {
     const pairingConfig = account.config.pairingMode ?? {};
     const autoReplyConfig = account.config.autoReply ?? {};
 
