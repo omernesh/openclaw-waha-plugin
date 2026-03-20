@@ -482,32 +482,15 @@ export async function handleWahaInbound(params: {
     }
   }
 
-  // === Group mute check ===
-  // If the group is muted, silently drop all messages.
-  // /shutup and /unshutup commands are handled above and bypass this check.
-  // DO NOT CHANGE — mute check prevents the bot from processing messages in muted groups.
-  if (isGroup) {
-    try {
-      const dirDb = getDirectoryDb(account.accountId);
-      if (dirDb.isGroupMuted(chatId)) {
-        runtime.log?.(`[waha] group ${chatId} is muted, dropping message`);
-        return;
-      }
-    } catch (err) {
-      // DB errors are non-fatal — fall through to normal processing
-      runtime.log?.(`[waha] mute check failed for ${chatId}: ${String(err)}`);
-    }
-  }
-
-  // Trigger word detection — check before group AND DM filters.
-  // Trigger-word messages are explicit bot invocations and bypass BOTH group and DM keyword filtering.
+  // Trigger word detection — check before mute check, group AND DM filters.
+  // Trigger-word messages are explicit bot invocations and bypass mute, group, and DM keyword filtering.
   // Works for all message types (DMs + groups). For human sessions, this is the primary
   // mechanism to let messages through — all non-trigger messages are filtered by default.
   // triggerWord config is per-account (e.g., "!", "!bot"). Case-insensitive.
   // DO NOT MOVE above rawBody calculation — detectTriggerWord needs the text body.
-  // DO NOT MOVE below group/DM filter — trigger must bypass both filters.
+  // DO NOT MOVE below mute check or group/DM filter — trigger must bypass all three.
   // Originally Phase 4 Plan 02 (groups only), extended to DMs for human session support. DO NOT REMOVE.
-  // DO NOT CHANGE — trigger bypass for both DMs and groups is intentional.
+  // DO NOT CHANGE — trigger bypass for mute, group filter, and DM filter is intentional.
   let effectiveBody = rawBody;
   let triggerActivated = false;
   let triggerResponseChatId = chatId; // default: respond in same chat
@@ -529,6 +512,24 @@ export async function handleWahaInbound(params: {
         // DM trigger: respond in the same DM chat (triggerResponseChatId already set to chatId)
         runtime.log?.(`waha: trigger activated in DM from ${senderId}`);
       }
+    }
+  }
+
+  // === Group mute check ===
+  // If the group is muted, silently drop all messages UNLESS trigger word activated.
+  // /shutup and /unshutup commands are handled above and bypass this check.
+  // Trigger-word messages bypass mute — explicit invocation overrides mute state.
+  // DO NOT CHANGE — mute check prevents the bot from processing messages in muted groups.
+  if (isGroup && !triggerActivated) {
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      if (dirDb.isGroupMuted(chatId)) {
+        runtime.log?.(`[waha] group ${chatId} is muted, dropping message`);
+        return;
+      }
+    } catch (err) {
+      // DB errors are non-fatal — fall through to normal processing
+      runtime.log?.(`[waha] mute check failed for ${chatId}: ${String(err)}`);
     }
   }
 
@@ -847,7 +848,9 @@ export async function handleWahaInbound(params: {
     },
   });
 
-  if (isGroup) {
+  if (isGroup && !triggerActivated) {
+    // Trigger-word messages bypass access/allowlist — explicit invocation overrides policy.
+    // DO NOT CHANGE — trigger bypass for access check is intentional.
     if (access.decision !== "allow") {
       runtime.log?.(`waha: drop group sender ${senderId} (reason=${access.reason})`);
       return;
@@ -860,7 +863,7 @@ export async function handleWahaInbound(params: {
       runtime.log?.(`waha: drop group sender ${senderId} (policy=${groupPolicy})`);
       return;
     }
-  } else if (access.decision !== "allow") {
+  } else if (!isGroup && access.decision !== "allow") {
     if (access.decision === "pairing") {
       const { code, created } = await pairing.upsertPairingRequest({
         id: senderId,
