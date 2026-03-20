@@ -362,9 +362,8 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                     <SelectValue placeholder="Select mode..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="reply">reply</SelectItem>
-                    <SelectItem value="send">send</SelectItem>
-                    <SelectItem value="off">off</SelectItem>
+                    <SelectItem value="dm">dm</SelectItem>
+                    <SelectItem value="reply-in-chat">reply-in-chat</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -439,6 +438,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 onChange={(v) => updateConfig('allowFrom', v)}
                 searchFn={searchDirectory}
                 resolvedNames={resolvedNames}
+                mergeByName
                 placeholder="Search contacts..."
               />
             </div>
@@ -450,6 +450,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 onChange={(v) => updateConfig('groupAllowFrom', v)}
                 searchFn={searchDirectory}
                 resolvedNames={resolvedNames}
+                mergeByName
                 placeholder="Search contacts..."
               />
             </div>
@@ -526,6 +527,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 searchFn={searchDirectory}
                 freeform={true}
                 resolvedNames={resolvedNames}
+                mergeByName
                 placeholder="Search contacts or type JID..."
               />
             </div>
@@ -602,6 +604,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 searchFn={searchDirectory}
                 freeform={true}
                 resolvedNames={resolvedNames}
+                mergeByName
                 placeholder="Search contacts or type JID..."
               />
             </div>

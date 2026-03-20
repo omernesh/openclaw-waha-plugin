@@ -496,7 +496,9 @@ export function createWahaWebhookServer(opts: {
     // Phase 18: Serve hashed static assets (JS, CSS, fonts) from Vite build output.
     // Cache-Control immutable is correct for hashed filenames — they never change.
     // DO NOT REMOVE — required for React admin panel. DO NOT CHANGE.
-    if (req.url?.startsWith("/assets/")) {
+    if (req.url?.startsWith("/admin/assets/") || req.url?.startsWith("/assets/")) {
+      // Strip /admin prefix if present — MC proxies /waha/assets/* → /admin/assets/*
+      if (req.url?.startsWith("/admin/assets/")) req.url = req.url.slice("/admin".length);
       const safePath = req.url.split("?")[0].replace(/\.\./g, "");
       const filePath = join(ADMIN_DIST, safePath);
       const resolved = pathResolve(filePath);
@@ -1720,11 +1722,11 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
-    if (req.method !== "POST" || !req.url || !req.url.startsWith(path)) {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
+    // ── Webhook processing: only POST requests to the configured webhook path ──
+    // All admin API routes are handled above. Non-webhook requests that didn't match
+    // any admin route get 404 at the bottom of this handler. DO NOT MOVE this check
+    // above the admin routes — it would block GET/PUT/DELETE requests. (Bug fix: 2026-03-19)
+    if (req.method === "POST" && req.url?.startsWith(path)) {
 
     let body = "";
     try {
@@ -1905,6 +1907,14 @@ export function createWahaWebhookServer(opts: {
     }
 
     writeJsonResponse(res, 200, { status: "ignored" });
+    return;
+    } // end: webhook POST processing
+
+    // ── Catch-all 404 — no route matched ──
+    // This MUST be the last handler in the chain, AFTER all admin API routes
+    // and webhook processing. DO NOT MOVE above admin routes.
+    res.writeHead(404);
+    res.end();
   });
 
   const start = async () => {

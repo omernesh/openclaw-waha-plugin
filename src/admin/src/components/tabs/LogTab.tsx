@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { X, ChevronsDown } from 'lucide-react'
+import { X, ChevronsDown, Pause, Play } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { LogResponse } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -26,10 +26,48 @@ const LEVEL_LABELS: { value: LogLevel; label: string }[] = [
   { value: 'error', label: 'ERROR' },
 ]
 
+/** Parse a journalctl-style log line into timestamp, level, message */
+function parseLine(line: string): { timestamp: string; level: string; message: string } {
+  // Typical journalctl format: "Mar 19 14:23:45 hostname process[pid]: message"
+  // Also handles ISO timestamps: "2026-03-19T14:23:45.123Z ..."
+  // Try ISO timestamp first
+  const isoMatch = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s+(.*)$/)
+  if (isoMatch) {
+    const rest = isoMatch[2]
+    const level = extractLevel(rest)
+    return { timestamp: isoMatch[1], level, message: rest }
+  }
+
+  // Try journalctl syslog format: "Mar 19 14:23:45 hostname ..."
+  const syslogMatch = line.match(/^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+\S+\s+(.*)$/)
+  if (syslogMatch) {
+    const rest = syslogMatch[2]
+    const level = extractLevel(rest)
+    return { timestamp: syslogMatch[1], level, message: rest }
+  }
+
+  // Fallback: no parseable timestamp
+  return { timestamp: '', level: extractLevel(line), message: line }
+}
+
+function extractLevel(text: string): string {
+  if (/error|fail|crash|exception/i.test(text)) return 'ERROR'
+  if (/warn|drop |skip|reject|denied/i.test(text)) return 'WARN'
+  if (/\binfo\b/i.test(text)) return 'INFO'
+  if (/\bdebug\b/i.test(text)) return 'DEBUG'
+  return ''
+}
+
+function getLevelClass(level: string): string {
+  if (level === 'ERROR') return 'text-destructive'
+  if (level === 'WARN') return 'text-yellow-500 dark:text-yellow-400'
+  return ''
+}
+
 function getLineClass(line: string): string {
   if (/error|fail|crash|exception/i.test(line)) return 'text-destructive'
   if (/warn|drop |skip|reject|denied/i.test(line)) return 'text-yellow-500 dark:text-yellow-400'
-  return 'text-muted-foreground'
+  return 'text-foreground'
 }
 
 export default function LogTab({ selectedSession: _selectedSession, refreshKey, onLoadingChange }: LogTabProps) {
@@ -37,6 +75,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
   const [searchQuery, setSearchQuery] = useState('')
   const [logData, setLogData] = useState<LogResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [autoScroll, setAutoScroll] = useState(true)
 
   // Report loading state to parent (drives TabHeader spinner)
   useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
@@ -92,13 +131,13 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery])
 
-  // Auto-scroll to bottom after data loads
+  // Auto-scroll to bottom after data loads (respects autoScroll toggle)
   useEffect(() => {
     if (loading || !logData) return
-    if (!userScrolledUpRef.current) {
+    if (autoScroll && !userScrolledUpRef.current) {
       scrollToBottom()
     }
-  }, [logData, loading])
+  }, [logData, loading, autoScroll])
 
   function scrollToBottom() {
     if (scrollRef.current) {
@@ -140,13 +179,23 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     fetchLogs(activeLevel, '')
   }
 
+  function toggleAutoScroll() {
+    setAutoScroll((prev) => {
+      if (!prev) {
+        // Re-enabling auto-scroll: jump to bottom immediately
+        scrollToBottom()
+      }
+      return !prev
+    })
+  }
+
   const lines = logData?.lines ?? []
   const total = logData?.total ?? 0
   const source = logData?.source ?? 'none'
 
   return (
     <div className="flex flex-1 flex-col gap-3 p-4">
-      {/* Level filter chips */}
+      {/* Level filter chips + auto-scroll toggle */}
       <div className="flex items-center gap-2">
         {LEVEL_LABELS.map(({ value, label }) => (
           <Button
@@ -159,6 +208,19 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
             {label}
           </Button>
         ))}
+
+        <div className="ml-auto">
+          <Button
+            size="sm"
+            variant={autoScroll ? 'default' : 'outline'}
+            onClick={toggleAutoScroll}
+            className="h-7 gap-1.5 px-3 text-xs"
+            title={autoScroll ? 'Auto-scroll ON — click to pause' : 'Auto-scroll OFF — click to resume'}
+          >
+            {autoScroll ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            {autoScroll ? 'Auto-scroll' : 'Paused'}
+          </Button>
+        </div>
       </div>
 
       {/* Search box */}
@@ -181,15 +243,15 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
         )}
       </div>
 
-      {/* Log display area */}
+      {/* Log display area — structured table */}
       <div className="relative flex-1">
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="h-[calc(100vh-280px)] overflow-y-auto rounded-md border bg-muted/30 p-3"
+          className="h-[calc(100vh-280px)] overflow-y-auto rounded-md border bg-muted/30"
         >
           {loading ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 p-3">
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-5/6" />
               <Skeleton className="h-4 w-full" />
@@ -197,21 +259,51 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
               <Skeleton className="h-4 w-full" />
             </div>
           ) : lines.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="p-3 text-sm text-muted-foreground">
               No log entries found
               {activeLevel !== 'all' && ` for level: ${activeLevel.toUpperCase()}`}
               {searchQuery && ` matching: "${searchQuery}"`}
             </p>
           ) : (
-            lines.map((line, idx) => (
-              <div
-                // eslint-disable-next-line react/no-array-index-key
-                key={idx}
-                className={cn('font-mono text-xs whitespace-pre-wrap break-all leading-5', getLineClass(line))}
-              >
-                {line}
-              </div>
-            ))
+            <table className="w-full border-collapse font-mono text-sm">
+              <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="whitespace-nowrap px-3 py-1.5 font-medium">Timestamp</th>
+                  <th className="whitespace-nowrap px-2 py-1.5 font-medium">Level</th>
+                  <th className="px-3 py-1.5 font-medium">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lines.map((line, idx) => {
+                  const parsed = parseLine(line)
+                  const levelCls = getLevelClass(parsed.level)
+                  const lineCls = levelCls || 'text-foreground'
+                  return (
+                    <tr
+                      // eslint-disable-next-line react/no-array-index-key
+                      key={idx}
+                      className={cn(
+                        'border-b border-border/30 hover:bg-muted/50',
+                        lineCls
+                      )}
+                    >
+                      <td className="whitespace-nowrap px-3 py-0.5 align-top text-xs text-muted-foreground">
+                        {parsed.timestamp || '\u2014'}
+                      </td>
+                      <td className={cn(
+                        'whitespace-nowrap px-2 py-0.5 align-top text-xs font-semibold',
+                        levelCls || 'text-muted-foreground'
+                      )}>
+                        {parsed.level || '\u2014'}
+                      </td>
+                      <td className="whitespace-pre-wrap break-all px-3 py-0.5 align-top leading-5">
+                        {parsed.timestamp ? parsed.message : line}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           )}
         </div>
 

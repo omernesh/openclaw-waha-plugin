@@ -234,7 +234,8 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   sendMulti: (p, cfg, aid) => handleSendMulti(p, cfg, aid),
   // ── readMessages — DO NOT CHANGE / DO NOT REMOVE ─────────────────
   // Read recent messages from a chat in lean format for LLM consumption.
-  // Returns [{from, text, timestamp}] — stripped of WAHA metadata noise.
+  // readMessages output — 6 slim fields for LLM efficiency (DO NOT add raw WAHA fields)
+  // Returns [{from, body, timestamp, fromMe, hasMedia, type}].
   // Default limit: 10. Max limit: 50. downloadMedia always false (avoid waste).
   // Added Phase 4, Plan 03. DO NOT REMOVE.
   readMessages: async (p, cfg, aid) => {
@@ -256,8 +257,11 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
     }
     return messages.map((m: any) => ({
         from: m.from || m._data?.notifyName || "unknown",
-        text: m.body || "",
+        body: m.body || "",
         timestamp: m.timestamp,
+        fromMe: Boolean(m.fromMe),
+        hasMedia: Boolean(m.hasMedia),
+        type: m.type || "chat",
       }));
   },
   // ── resolveTarget — DO NOT CHANGE / DO NOT REMOVE ────────────────────

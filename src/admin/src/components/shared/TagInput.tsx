@@ -25,7 +25,37 @@ interface TagInputProps {
   searchFn?: (query: string) => Promise<Array<{ value: string; label: string }>>  // For directory search
   freeform?: boolean                  // true = user can type arbitrary values (mention patterns)
   readOnly?: boolean                  // true = no add/remove, display only
+  mergeByName?: boolean               // true = group JIDs that resolve to the same name into one tag
   className?: string
+}
+
+/** Groups JIDs by their resolved display name so duplicates show as one tag.
+ *  - Wildcards ('*') are never merged with anything else.
+ *  - JIDs that don't resolve (displayName === jid) are kept as standalone tags.
+ *  DO NOT CHANGE — deduplicates @c.us / @lid pairs for allowFrom display. */
+function buildMergedTags(
+  values: string[],
+  resolvedNames: Record<string, string>,
+): Array<{ displayName: string; jids: string[] }> {
+  const groups: Array<{ displayName: string; jids: string[] }> = []
+  const nameIndex: Record<string, number> = {}
+
+  for (const jid of values) {
+    const resolved = resolvedNames[jid]
+    // Only merge if the JID actually resolved to a human name (not itself) and is not '*'
+    if (resolved && resolved !== jid && jid !== '*') {
+      if (resolved in nameIndex) {
+        groups[nameIndex[resolved]].jids.push(jid)
+      } else {
+        nameIndex[resolved] = groups.length
+        groups.push({ displayName: resolved, jids: [jid] })
+      }
+    } else {
+      // Unresolved JIDs and wildcards stay standalone
+      groups.push({ displayName: resolvedNames[jid] ?? jid, jids: [jid] })
+    }
+  }
+  return groups
 }
 
 export function TagInput({
@@ -36,6 +66,7 @@ export function TagInput({
   searchFn,
   freeform = false,
   readOnly = false,
+  mergeByName = false,
   className,
 }: TagInputProps) {
   const [inputValue, setInputValue] = React.useState('')
@@ -63,6 +94,16 @@ export function TagInput({
     onChange(values.filter((v) => v !== val))
   }
 
+  /** Remove all JIDs in a merged group at once */
+  function removeGroup(jids: string[]) {
+    if (readOnly || !onChange) return
+    const jidSet = new Set(jids)
+    onChange(values.filter((v) => !jidSet.has(v)))
+  }
+
+  // Build merged tag groups when mergeByName is enabled
+  const mergedTags = mergeByName ? buildMergedTags(values, resolvedNames) : null
+
   function addValue(val: string) {
     const trimmed = val.trim()
     if (!trimmed || values.includes(trimmed) || !onChange) return
@@ -89,29 +130,52 @@ export function TagInput({
 
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
-      {values.map((val) => {
-        const displayName = resolvedNames[val] ?? val
-        return (
-          <Badge
-            key={val}
-            variant="secondary"
-            className="gap-1 pr-1 font-normal"
-            title={val !== displayName ? val : undefined}
-          >
-            <span className="max-w-[200px] truncate">{displayName}</span>
-            {!readOnly && (
-              <button
-                type="button"
-                className="ml-0.5 rounded-full opacity-70 hover:opacity-100 focus:outline-none"
-                onClick={() => removeValue(val)}
-                aria-label={`Remove ${displayName}`}
+      {mergedTags
+        ? /* Merged mode: group JIDs with same resolved name into one tag */
+          mergedTags.map((group) => (
+            <Badge
+              key={group.jids.join('|')}
+              variant="secondary"
+              className="gap-1 pr-1 font-normal"
+              title={group.jids.length > 1 ? group.jids.join(', ') : (group.jids[0] !== group.displayName ? group.jids[0] : undefined)}
+            >
+              <span className="max-w-[200px] truncate">{group.displayName}</span>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="ml-0.5 rounded-full opacity-70 hover:opacity-100 focus:outline-none"
+                  onClick={() => removeGroup(group.jids)}
+                  aria-label={`Remove ${group.displayName}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          ))
+        : /* Standard mode: one tag per value */
+          values.map((val) => {
+            const displayName = resolvedNames[val] ?? val
+            return (
+              <Badge
+                key={val}
+                variant="secondary"
+                className="gap-1 pr-1 font-normal"
+                title={val !== displayName ? val : undefined}
               >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </Badge>
-        )
-      })}
+                <span className="max-w-[200px] truncate">{displayName}</span>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className="ml-0.5 rounded-full opacity-70 hover:opacity-100 focus:outline-none"
+                    onClick={() => removeValue(val)}
+                    aria-label={`Remove ${displayName}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </Badge>
+            )
+          })}
 
       {!readOnly && searchFn && (
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>

@@ -4,223 +4,104 @@ description: Use when the user asks to send a WhatsApp message, create a poll, s
 version: 4.0.0
 ---
 
-> **IMPORTANT — Standard Action Names**: For targeted actions (those that send to a chat), use these standard names:
-> `poll` (create poll), `send` (send text/DM), `edit` (edit message), `unsend` (delete message), `pin`/`unpin`, `read` (mark read), `react` (add reaction).
-> Do NOT use custom names like sendPoll, editMessage, deleteMessage — they will be rejected by the gateway.
+> **IMPORTANT — Standard Action Names**: For targeted actions, use: `poll`, `send`, `edit`, `unsend`, `pin`/`unpin`, `read`, `react`. Do NOT use custom names like sendPoll, editMessage — they will be rejected.
 
-# Quick Reference — Common Tasks
+# Quick Reference
 
 | Task | Action | Key Parameters |
 |------|--------|---------------|
 | Send text | `send` | text (via target resolution) |
-| Send text to multiple chats | `sendMulti` | recipients[], text |
+| Send to multiple chats | `sendMulti` | recipients[], text |
 | Send contact card | `send` | contacts: [{fullName, phoneNumber}] |
 | Create poll | `poll` | name, options[], multipleAnswers |
 | Send image | `sendImage` | chatId, file (direct URL), caption? |
 | Send video | `sendVideo` | chatId, file (direct URL), caption? |
 | Send document | `sendFile` | chatId, file (direct URL), caption? |
-| Send link preview card | `sendLinkPreview` | chatId, url, title, description? |
+| Send link preview | `sendLinkPreview` | chatId, url, title, description? |
 | React to message | `react` | messageId, emoji |
-| Join group via link | `joinGroup` | inviteCode (code from URL) |
+| Join group | `joinGroup` | inviteCode (part after chat.whatsapp.com/) |
 | Follow channel | `followChannel` | channelId (newsletter JID) |
+| Unfollow channel | `unfollowChannel` | channelId |
 | Share location | `sendLocation` | chatId, latitude, longitude, title |
 | Create group event | `sendEvent` | chatId, name, startTime |
-| Mute a chat | `muteChat` | chatId, duration? |
-| Unmute a chat | `unmuteChat` | chatId |
+| Mute/unmute chat | `muteChat`/`unmuteChat` | chatId, duration? |
 | Read recent messages | `readMessages` | chatId, limit? (1-50, default 10) |
-| Search/list groups, contacts, channels | `search` | query, scope ("group"\|"contact"\|"channel"\|"auto") |
+| Search/list | `search` | query, scope ("group"\|"contact"\|"channel"\|"auto") |
+| Discover channels | `searchChannelsByText` / `getChannels` | query / (none) |
 
 ---
 
 # Auto-Resolution (Preferred)
 
-**You can use human-readable names directly as targets in send/poll/edit/unsend/pin/unpin/read.** The plugin automatically resolves names to JIDs via fuzzy matching.
-
-Example: To send "hello world" to a group called "test group":
-```
-Action: send
-Target: "test group"
-Parameters: { "text": "hello world" }
-```
-The plugin will find the group JID and send the message. If the name is ambiguous, you'll get an error listing possible matches — ask the user which one they meant.
-
-More examples:
-```
-Action: poll
-Target: "test group"
-Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
-```
+Use human-readable names directly as targets in send/poll/edit/unsend/pin/unpin/read. The plugin fuzzy-matches names to JIDs automatically.
 
 ```
-Action: send
-Target: "zeev nesher"
-Parameters: { "text": "Hey Zeev!" }
+Action: send  |  Target: "test group"  |  Parameters: { "text": "hello world" }
+Action: poll  |  Target: "test group"  |  Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
+Action: send  |  Target: "zeev nesher" |  Parameters: { "text": "Hey Zeev!" }
 ```
 
-## Searching & Listing (search action)
+If the name is ambiguous, you'll get an error listing possible matches — ask the user which one they meant.
 
-Use `search` to find groups, contacts, or channels by name. **This is a utility action — do NOT pass a target. Only use parameters.**
+## search Action
 
-```
-Action: search
-Parameters: { "query": "hebrew", "scope": "group" }
-```
+Use `search` to find groups, contacts, or channels by name. **No target — parameters only.**
 
-**Parameters:**
-- **query**: The name (or partial name) to search for. Empty string = list all.
-- **scope**: What to search — `"group"`, `"contact"`, `"channel"`, or `"auto"` (searches all three)
-
-**Returns:** `{ matches: [{jid, name, type, confidence}], query, searchedTypes }`
-
-**Examples:**
 ```
 Action: search
 Parameters: { "query": "test group", "scope": "group" }
 ```
-```
-Action: search
-Parameters: { "query": "zeev nesher", "scope": "contact" }
-```
-```
-Action: search
-Parameters: { "query": "", "scope": "group" }
-```
-(Empty query returns all groups — useful for "list all groups" or "find Hebrew groups".)
 
-**CRITICAL RULES:**
-- `search` does NOT accept a target. Pass query and scope as **parameters only**.
-- If the user says "list all Hebrew groups", call `search` with `query: ""` and `scope: "group"`, then filter the results by Hebrew names.
-- If multiple matches are returned with similar confidence, **ask the user** which one they meant.
-- Results are sorted by confidence (highest first), limited to top 20 matches.
-- `resolveTarget` is an alias for `search` — same rules apply (no target, parameters only).
+- `query`: Name or partial name. Empty string = list all.
+- `scope`: `"group"`, `"contact"`, `"channel"`, or `"auto"` (all three)
+- Returns: `{ matches: [{jid, name, type, confidence}], query, searchedTypes }`
+- `resolveTarget` is an alias for `search` — same rules apply.
+
+**CRITICAL:** `search` does NOT accept a target. If user says "list all Hebrew groups", search with `query: ""`, `scope: "group"`, then filter results. Multiple matches with similar confidence → ask the user.
 
 ---
 
 # Sending Contact Cards (vCards)
 
-Use the **`send`** action with a `contacts` parameter to share WhatsApp contact cards that recipients can save to their phone contacts.
-
-**Preferred method** (uses gateway target resolution):
+Use `send` with `contacts` parameter (preferred, uses target resolution):
 ```
 Action: send
 Parameters: { "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }] }
 ```
-
-**Multiple contacts at once:**
-```
-Action: send
-Parameters: { "contacts": [
-  { "fullName": "John Doe", "phoneNumber": "972544329000" },
-  { "fullName": "Jane Smith", "phoneNumber": "972509876543", "organization": "Acme Corp" }
-] }
-```
-
-**Alternative** (utility action, requires explicit chatId):
-```
-Action: sendContactVcard
-Parameters: { "chatId": "972XXXXXXXXX@c.us", "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }] }
-```
-
-**Rules:**
-- `phoneNumber`: Country code + number, **no + prefix**. Example: `972544329000`
-- `fullName`: Required — the display name on the contact card
-- `organization`: Optional — company/org name shown on the card
-- Each contact becomes a proper WhatsApp vCard that recipients can tap to save
+Multiple contacts: add more objects to the array. Optional field: `organization`.
+Alternative: `sendContactVcard` action (requires explicit chatId).
+**Rule:** `phoneNumber` uses country code + number, **no + prefix**.
 
 ---
 
-# Sending Media (Images, Videos, Documents)
+# Sending Media
 
-## Sending Images
-Use the `sendImage` action with a **direct image URL** (not a JSON API response):
-```
-Action: sendImage
-Parameters: { "chatId": "<target>", "file": "https://example.com/actual-image.jpg", "caption": "optional caption" }
-```
+| Action | Use For | Parameters |
+|--------|---------|-----------|
+| `sendImage` | JPEG, PNG, GIF, WebP | chatId, file, caption? |
+| `sendVideo` | MP4, WebM, MOV, AVI | chatId, file, caption? |
+| `sendFile` | PDFs, documents, other | chatId, file, caption? |
 
-**IMPORTANT**: The `file` parameter must point to an actual image file (JPEG, PNG, GIF, WebP), NOT to an API endpoint that returns JSON. If you fetch an API that returns JSON with an image URL inside, extract the actual URL first.
-
-## Sending Videos
-Use the `sendVideo` action:
-```
-Action: sendVideo
-Parameters: { "chatId": "<target>", "file": "https://example.com/video.mp4", "caption": "optional caption" }
-```
-
-## Sending Documents/Files
-Use the `sendFile` action for PDFs, documents, and other non-media files:
-```
-Action: sendFile
-Parameters: { "chatId": "<target>", "file": "https://example.com/document.pdf", "caption": "optional caption" }
-```
-
-## Media URL Rules
-- **Direct URLs only**: Always use a URL that points directly to the media file
-- **No API responses**: Never pass a JSON API response URL as media content
-- **Supported image formats**: JPEG, PNG, GIF, WebP, BMP, SVG
-- **Supported video formats**: MP4, WebM, MOV, AVI
-- **For web images**: Use the direct image URL (right-click -> "Copy image address" equivalent)
-- **Local files**: Use the full absolute path (e.g., `/tmp/openclaw/image.png`)
-- **Alternative parameters**: `image`/`url` also accepted for sendImage; `video`/`url` for sendVideo; `url` for sendFile
-
----
-
-# Joining Groups via Invite Link
-
-Use the **`joinGroup`** action to join a WhatsApp group from an invite link.
-
-```
-Action: joinGroup
-Parameters: { "inviteCode": "ABC123def456" }
-```
-
-**How to extract the invite code**: Take the part after `chat.whatsapp.com/` in the invite URL.
-- Full URL: `https://chat.whatsapp.com/ABC123def456`
-- Invite code: `ABC123def456`
-
----
-
-# Following / Unfollowing Channels
-
-Use **`followChannel`** to subscribe to a WhatsApp channel (newsletter), or **`unfollowChannel`** to unsubscribe.
-
-```
-Action: followChannel
-Parameters: { "channelId": "120363...@newsletter" }
-
-Action: unfollowChannel
-Parameters: { "channelId": "120363...@newsletter" }
-```
-
-To discover channels first:
-```
-Action: searchChannelsByText
-Parameters: { "query": "news" }
-
-Action: getChannels
-Parameters: {}
-```
+**IMPORTANT:** `file` must be a direct media URL (not a JSON API endpoint). Extract the actual URL if fetching from an API. Local files: use absolute path (e.g., `/tmp/openclaw/image.png`). Alternative param names: `image`/`url` for sendImage, `video`/`url` for sendVideo, `url` for sendFile.
 
 ---
 
 # WhatsApp Actions Reference
 
-Full control of WhatsApp through the WAHA plugin's native action system. Use the `message` tool with actions to perform rich WhatsApp operations.
-
 ## Rich Messages
 
 | Action | Parameters | Notes |
 |--------|-----------|-------|
-| `poll` | chatId, name, options[], multipleAnswers | Standard action with target resolution |
+| `poll` | chatId, name, options[], multipleAnswers | Standard action w/ target resolution |
 | `sendPollVote` | chatId, pollMessageId, votes[] | Vote on existing poll |
-| `sendLocation` | chatId, latitude, longitude, title | Share GPS coordinates |
-| `sendContactVcard` | chatId, contacts[{fullName, phoneNumber}] | Share contact cards |
-| `sendList` | chatId, title, description, buttonText, sections[] | Interactive list |
-| `forwardMessage` | chatId, messageId | Forward existing message |
-| `sendLinkPreview` | chatId, url, title, description?, image? | URL preview card |
-| `sendButtonsReply` | chatId, messageId, buttonId | Reply to button message |
-| `sendEvent` | chatId, name, startTime, endTime?, description?, location? | Calendar event |
-| `react` | messageId, emoji, remove? | Add/remove emoji reaction |
+| `sendLocation` | chatId, latitude, longitude, title | |
+| `sendContactVcard` | chatId, contacts[{fullName, phoneNumber}] | |
+| `sendList` | chatId, title, description, buttonText, sections[] | |
+| `forwardMessage` | chatId, messageId | |
+| `sendLinkPreview` | chatId, url, title, description?, image? | |
+| `sendButtonsReply` | chatId, messageId, buttonId | |
+| `sendEvent` | chatId, name, startTime, endTime?, description?, location? | |
+| `react` | messageId, emoji, remove? | |
 
 ## Message Management
 
@@ -228,24 +109,19 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 |--------|-----------|
 | `edit` | chatId, messageId, text |
 | `unsend` | chatId, messageId |
-| `pin` | chatId, messageId |
-| `unpin` | chatId, messageId |
+| `pin` / `unpin` | chatId, messageId |
 | `starMessage` | chatId, messageId, star (boolean) |
 
 ## Chat Management
 
 | Action | Parameters |
 |--------|-----------|
-| `getChats` | (none) |
-| `getChatsOverview` | page?, limit? |
+| `getChats` / `getChatsOverview` | (none) / page?, limit? |
 | `getChatMessages` | chatId, limit?, offset?, downloadMedia? |
 | `getChatMessage` | chatId, messageId |
-| `deleteChat` | chatId |
-| `clearChatMessages` | chatId |
-| `archiveChat` | chatId |
-| `unarchiveChat` | chatId |
-| `unreadChat` | chatId |
-| `read` | chatId |
+| `deleteChat` / `clearChatMessages` | chatId |
+| `archiveChat` / `unarchiveChat` | chatId |
+| `read` / `unreadChat` | chatId |
 | `getChatPicture` | chatId |
 | `muteChat` | chatId, duration? (seconds) |
 | `unmuteChat` | chatId |
@@ -257,40 +133,28 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 | Action | Parameters |
 |--------|-----------|
 | `createGroup` | name, participants[] |
-| `getGroups` | (none) |
+| `getGroups` / `getGroupsCount` | (none) |
 | `getGroup` | groupId |
-| `deleteGroup` | groupId |
-| `leaveGroup` | groupId |
+| `deleteGroup` / `leaveGroup` | groupId |
 | `joinGroup` | inviteCode |
 | `setGroupSubject` | groupId, subject |
 | `setGroupDescription` | groupId, description |
-| `setGroupPicture` | groupId, file |
-| `deleteGroupPicture` | groupId |
-| `getGroupPicture` | groupId |
-| `addParticipants` | groupId, participants[] |
-| `removeParticipants` | groupId, participants[] |
-| `promoteToAdmin` | groupId, participants[] |
-| `demoteFromAdmin` | groupId, participants[] |
+| `setGroupPicture` / `deleteGroupPicture` / `getGroupPicture` | groupId, file? |
+| `addParticipants` / `removeParticipants` | groupId, participants[] |
+| `promoteToAdmin` / `demoteFromAdmin` | groupId, participants[] |
 | `getParticipants` | groupId |
-| `setInfoAdminOnly` | groupId, adminOnly |
-| `getInfoAdminOnly` | groupId |
-| `setMessagesAdminOnly` | groupId, adminOnly |
-| `getMessagesAdminOnly` | groupId |
-| `getInviteCode` | groupId |
-| `revokeInviteCode` | groupId |
-| `getGroupsCount` | (none) |
+| `setInfoAdminOnly` / `getInfoAdminOnly` | groupId, adminOnly? |
+| `setMessagesAdminOnly` / `getMessagesAdminOnly` | groupId, adminOnly? |
+| `getInviteCode` / `revokeInviteCode` | groupId |
 
 ## Contacts
 
 | Action | Parameters |
 |--------|-----------|
 | `getContacts` | (none) |
-| `getContact` | contactId |
+| `getContact` / `getContactAbout` / `getContactPicture` | contactId |
 | `checkContactExists` | phone |
-| `getContactAbout` | contactId |
-| `getContactPicture` | contactId |
-| `blockContact` | contactId |
-| `unblockContact` | contactId |
+| `blockContact` / `unblockContact` | contactId |
 
 ## Labels
 
@@ -300,8 +164,7 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 | `createLabel` | name, color? |
 | `updateLabel` | labelId, name?, color? |
 | `deleteLabel` | labelId |
-| `getChatLabels` | chatId |
-| `setChatLabels` | chatId, labels[{id}] |
+| `getChatLabels` / `setChatLabels` | chatId, labels[{id}]? |
 | `getChatsByLabel` | labelId |
 
 ## Status/Stories
@@ -309,168 +172,106 @@ Full control of WhatsApp through the WAHA plugin's native action system. Use the
 | Action | Parameters |
 |--------|-----------|
 | `sendTextStatus` | text, backgroundColor?, font? |
-| `sendImageStatus` | image, caption? |
+| `sendImageStatus` / `sendVideoStatus` | image/video, caption? |
 | `sendVoiceStatus` | voice |
-| `sendVideoStatus` | video, caption? |
 | `deleteStatus` | id |
 
-## Channels (WhatsApp Channels / Newsletters)
+## Channels (Newsletters)
 
 | Action | Parameters |
 |--------|-----------|
-| `getChannels` | (none) |
+| `getChannels` / `getChannel` | (none) / channelId |
 | `createChannel` | name, description?, picture? |
-| `getChannel` | channelId |
-| `deleteChannel` | channelId |
-| `followChannel` | channelId |
-| `unfollowChannel` | channelId |
-| `muteChannel` | channelId |
-| `unmuteChannel` | channelId |
+| `deleteChannel` / `followChannel` / `unfollowChannel` | channelId |
+| `muteChannel` / `unmuteChannel` | channelId |
 | `searchChannelsByText` | query |
 | `previewChannelMessages` | channelId |
 
-## Presence
+## Presence & Profile
 
 | Action | Parameters |
 |--------|-----------|
-| `setPresenceStatus` | status ("online" or "offline") |
-| `getPresence` | contactId |
-| `subscribePresence` | contactId |
-
-## Profile
-
-| Action | Parameters |
-|--------|-----------|
-| `getProfile` | (none) |
+| `setPresenceStatus` | status ("online"/"offline") |
+| `getPresence` / `subscribePresence` | contactId |
+| `getProfile` / `deleteProfilePicture` | (none) |
 | `setProfileName` | name |
 | `setProfileStatus` | status |
 | `setProfilePicture` | file |
-| `deleteProfilePicture` | (none) |
 
-## LID (Linked Device IDs)
+## LID & Calls
 
 | Action | Parameters |
 |--------|-----------|
 | `findPhoneByLid` | lid |
 | `findLidByPhone` | phone |
 | `getAllLids` | (none) |
-
-## Calls
-
-| Action | Parameters |
-|--------|-----------|
 | `rejectCall` | callId |
 
 ## Parameter Formats
-- **chatId**: `"972XXXXXXXXX@c.us"` (DM) or `"120363...@g.us"` (group) or `"...@newsletter"` (channel)
+- **chatId**: `"972XXXXXXXXX@c.us"` (DM), `"120363...@g.us"` (group), `"...@newsletter"` (channel)
 - **Phone numbers**: Country code + number, no +. Example: `"972544329000"`
-- **messageId**: Full serialized format: `true_chatId_shortMsgId` or `false_chatId_shortMsgId`
-- **groupId**: Same as chatId for groups: `"120363...@g.us"`
-- **channelId**: Newsletter JID: `"120363...@newsletter"`
+- **messageId**: Full serialized: `true_chatId_shortMsgId` or `false_chatId_shortMsgId`
+- **groupId**: Same as group chatId. **channelId**: Newsletter JID.
 
 ## Known Engine Behaviors
-- NOWEB engine drops >95% of poll.vote webhook events (votes may not trigger webhooks reliably)
-- sendButtons is deprecated — use polls or lists for interactive options
-- pinMessage and sendTextStatus may behave differently across WAHA builds
+- NOWEB engine drops >95% of poll.vote webhook events
+- sendButtons is deprecated — use polls or lists instead
 - Event RSVPs arrive as `[event_rsvp]` messages
 
 ---
 
 # Error Handling and Recovery
 
-When actions fail, use the table below to diagnose the issue and recover.
+| Error Pattern | Cause | Recovery |
+|---------------|-------|----------|
+| `"Session '...' has sub-role 'listener' and cannot send"` | Sent from listener session | Use the bot session — listeners are receive-only |
+| `"Could not resolve '...' to a WhatsApp JID"` | Name not found | Run `search` first, retry with exact JID |
+| `"Ambiguous target '...'. Possible matches: ..."` | Multiple matches | Ask user which one, or use exact JID |
+| `"WAHA API rate limited (429)"` | Too many requests | Plugin auto-retries 3x with backoff (1s/2s/4s). If still failing, wait 5-10s |
+| `"timed out after 30000ms"` | WAHA unresponsive | Check admin panel Status tab. Mutation ops may have succeeded despite timeout |
+| `"Session health: unhealthy"` | WhatsApp disconnected | Reconnect in WAHA dashboard. No messages processed until healthy |
 
-| Error Pattern | What Happened | What To Do |
-|---------------|---------------|------------|
-| `"Session '...' has sub-role 'listener' and cannot send"` | Bot tried to send from a listener session (monitoring-only) | Use the bot session — listener sessions only receive messages, they cannot send |
-| `"Could not resolve '...' to a WhatsApp JID"` | Target name not found in contacts or groups directory | Run `search` action first to find the correct JID, then retry with the exact JID |
-| `"Ambiguous target '...'. Possible matches: ..."` | Multiple contacts/groups match the given name | Disambiguate: ask the user which one, or use the exact JID from `search` results |
-| `"WAHA API rate limited (429)"` | Too many requests sent in a short window | Wait ~1 second before retrying. The plugin retries up to 3 times automatically with exponential backoff (1s / 2s / 4s) — if you see this, the auto-retry already occurred |
-| `"timed out after 30000ms"` | WAHA server did not respond within 30 seconds | Check WAHA health via the admin panel Status tab. Note: for mutation operations (send, edit, delete) the action may have already succeeded even if the response timed out |
-| `"Session health: unhealthy"` | WAHA session has lost its WhatsApp connection | Reconnect the session in the WAHA dashboard or admin panel. No messages will be processed until the session is healthy again |
-
-**General guidance:**
-- If a send action fails unexpectedly, check whether the target is a valid JID using `search` first.
-- If multiple consecutive actions fail, check the admin panel Status tab for session health.
-- If you see many timeouts, WAHA may be overloaded — wait a few seconds between actions.
+**General:** Failed sends → verify JID with `search`. Multiple failures → check Status tab. Many timeouts → space out actions.
 
 ---
 
 # Rate Limiting
 
-The plugin uses a token-bucket rate limiter to protect WAHA from being overwhelmed.
+Token-bucket rate limiter: 20 tokens capacity, 15 tokens/sec refill. Each API call = 1 token. Overflow is queued. HTTP 429 triggers auto-retry with exponential backoff (1s/2s/4s, 3 attempts).
 
-**How it works:**
-- Default capacity: 20 tokens, refill rate: 15 tokens/second
-- Each WAHA API call consumes one token
-- When tokens run out, calls are queued and released as tokens refill
-- If WAHA returns HTTP 429 (Too Many Requests), the plugin applies exponential backoff: 1s wait, then 2s, then 4s — up to 3 automatic retries
+Config: `rateLimitCapacity` (default 20), `rateLimitRefillRate` (default 15) in `channels.waha`.
 
-**Configurable** (in `channels.waha` config):
-- `rateLimitCapacity`: Maximum burst size (default 20)
-- `rateLimitRefillRate`: Tokens refilled per second (default 15)
-
-**For you (the agent):**
-- Most rate limiting is handled automatically — you do not need to add delays between actions
-- If you see persistent 429 errors after the auto-retries, wait 5-10 seconds before retrying
-- Rapid bulk operations (like sending to 20 groups in a loop) may hit rate limits; use `sendMulti` for multi-recipient sends instead
+**For the agent:** Rate limiting is automatic. No delays needed between actions. For bulk sends, use `sendMulti` instead of looping.
 
 ---
 
 # Multi-Session
 
-The plugin supports multiple WhatsApp sessions with different roles, enabling a monitored human session alongside a bot session.
-
 ## Session Roles
 
-| Role | Sub-Role | Can Send? | Receives Messages? | Purpose |
-|------|----------|-----------|-------------------|---------|
-| `bot` | `full-access` | Yes | Yes (all chats) | Primary bot session — the AI agent's active session |
-| `human` | `listener` | No | Yes (monitored chats) | Human operator's session — monitored but cannot send |
-| `human` | `full-access` | Yes | Yes | Human session with full access |
+| Role | Sub-Role | Sends? | Receives? | Purpose |
+|------|----------|--------|-----------|---------|
+| `bot` | `full-access` | Yes | All chats | AI agent's active session |
+| `human` | `listener` | No | Monitored chats | Monitor-only human session |
+| `human` | `full-access` | Yes | Yes | Human session with send access |
 
-**Key rule:** Only `full-access` sub-role sessions can send messages. Attempting to send from a `listener` session will fail with an error.
+**Key rule:** Only `full-access` sessions can send. `listener` sessions fail with an error on send attempts.
 
 ## Trigger Word Activation
 
-When `triggerWord` is configured (e.g., `"!bot"`), the bot only activates in group chats when a message starts with that trigger word.
+When `triggerWord` is configured (e.g., `"!bot"`), the bot only activates in groups when a message starts with that word. `triggerResponseMode`: `"dm"` (default, replies via DM) or `"group"` (replies in-group).
 
-**Example:** If `triggerWord: "!bot"`, only messages like `"!bot what's the weather?"` will activate the bot. Other group messages are monitored but ignored.
+## readMessages
 
-```
-User in group: "!bot what time is the meeting?"
-Bot activates → processes and replies via DM (triggerResponseMode: "dm") or in-group
-```
-
-**`triggerResponseMode` options:**
-- `"dm"` (default): Bot sends its reply as a DM to the triggering user
-- `"group"`: Bot replies in the group chat directly
-
-## readMessages Action
-
-Use `readMessages` to retrieve recent messages from a monitored chat.
-
-> **IMPORTANT:** `readMessages` does NOT accept a target — pass the chat as a `chatId` parameter.
-> If you need the JID, use `search` first to find it.
+**IMPORTANT:** `readMessages` does NOT accept a target — pass chat as `chatId` parameter. Use `search` to find JIDs by name.
 
 ```
 Action: readMessages
 Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
 ```
 
-**Parameters:**
-- `chatId`: The JID of the chat to read from (required — use `search` to find JIDs by name)
-- `limit`: Number of recent messages to fetch (1-50, default 10)
-
-**Returns:** Array of recent messages with sender, text, timestamp, and message type.
-
-**Use cases:**
-- Check what's been said in a group since last check
-- Get context before replying to a thread
-- Monitor a human session's conversation history
+Returns array of recent messages with sender, text, timestamp, type.
 
 ## Cross-Session Routing
 
-When the bot needs to send a message to a group it belongs to via its own session, it uses that session directly. If the bot is not a member of the target group, it falls back to using the human session as a proxy.
-
-This is automatic — you do not need to specify which session to use for sends.
+Automatic — the bot uses its own session for groups it belongs to, falls back to human session as proxy otherwise. No manual session selection needed.

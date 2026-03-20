@@ -502,11 +502,16 @@ function AccessListField({
             </Badge>
           )}
           {nonWildcard.length > 0 && (
-            <TagInput
-              values={nonWildcard}
-              resolvedNames={resolvedNames}
-              readOnly
-            />
+            <div className={hasWildcard ? 'opacity-40' : ''}>
+              {hasWildcard && (
+                <p className="text-xs text-muted-foreground mb-1">Overridden by wildcard</p>
+              )}
+              <TagInput
+                values={nonWildcard}
+                resolvedNames={resolvedNames}
+                readOnly
+              />
+            </div>
           )}
         </div>
       )}
