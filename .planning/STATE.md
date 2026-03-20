@@ -96,9 +96,10 @@ None.
 |---|-------------|------|--------|-----------|
 | 260320-hoy | Embed WAHA WhatsApp pages into OpenClaw Mission Control dashboard | 2026-03-20 | b300c98 | [260320-hoy-embed-waha-whatsapp-pages-into-openclaw-](./quick/260320-hoy-embed-waha-whatsapp-pages-into-openclaw-/) |
 | 260320-k2e | Restore per-group filter override UI in React admin panel | 2026-03-20 | 9a0d101 | [260320-k2e-restore-all-old-gui-features-from-pre-vi](./quick/260320-k2e-restore-all-old-gui-features-from-pre-vi/) |
+| 260320-rii | Restore all missing old GUI features to React admin panel | 2026-03-20 | be3c87e | [260320-rii-restore-all-missing-old-gui-features-to-](./quick/260320-rii-restore-all-missing-old-gui-features-to-/) |
 
 ## Session Continuity
 
-Last session: 2026-03-20T11:30:00Z
-Stopped at: Completed quick task 260320-hoy
+Last session: 2026-03-20T17:53:00Z
+Stopped at: Completed quick task 260320-rii
 Resume file: None
