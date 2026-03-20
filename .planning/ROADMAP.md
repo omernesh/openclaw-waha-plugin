@@ -153,7 +153,10 @@ Plans:
   2. The analytics API returns aggregated data for a requested time range and group-by interval (hour or day)
   3. The Analytics tab in the admin panel displays a messages-per-hour bar chart and a response-time distribution chart populated from live data
   4. Charts update on manual refresh — data shown is consistent with what was processed (counts match filter stats for the same period)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 30-01-PLAN.md — Backend: AnalyticsDb module, API route, inbound/outbound instrumentation
+- [ ] 30-02-PLAN.md — Frontend: AnalyticsTab with recharts charts, range selector, top chats table
 
 ### Phase 31: Test Coverage Sprint
 **Goal**: Every critical untested module gains a test suite — zero-coverage modules (monitor.ts, inbound.ts, shutup.ts) are no longer unguarded, and existing partial coverage in directory.ts and React components is completed.
@@ -210,8 +213,8 @@ Plans:
 | 25. Session Auto-Recovery | v1.13 | 2/2 | Complete | 2026-03-20 |
 | 26. Config Safety | v1.13 | 2/2 | Complete | 2026-03-20 |
 | 27. Pairing Cleanup and Code Quality | v1.13 | 2/2 | Complete | 2026-03-20 |
-| 28. API Coverage Completion | 2/3 | Complete    | 2026-03-20 | - |
-| 29. Real-Time Admin Panel | v1.13 | Complete    | 2026-03-20 | 2026-03-20 |
-| 30. Analytics | v1.13 | 0/TBD | Not started | - |
+| 28. API Coverage Completion | v1.13 | 2/3 | Complete | 2026-03-20 |
+| 29. Real-Time Admin Panel | v1.13 | 2/2 | Complete | 2026-03-20 |
+| 30. Analytics | v1.13 | 0/2 | Not started | - |
 | 31. Test Coverage Sprint | v1.13 | 0/TBD | Not started | - |
 | 32. Platform Abstraction | v1.13 | 0/TBD | Not started | - |
