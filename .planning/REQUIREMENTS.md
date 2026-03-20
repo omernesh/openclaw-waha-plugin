@@ -58,8 +58,8 @@
 
 - [ ] **TST-01**: monitor.ts admin API route tests (mock HTTP req/res, test each endpoint)
 - [ ] **TST-02**: inbound.ts pipeline tests (mock SDK imports, test filter/dedup/queue flow)
-- [ ] **TST-03**: directory.ts CRUD tests (contacts, participants, overrides, LID mapping)
-- [ ] **TST-04**: shutup.ts interactive flow tests (mute/unmute with pending selections)
+- [x] **TST-03**: directory.ts CRUD tests (contacts, participants, overrides, LID mapping)
+- [x] **TST-04**: shutup.ts interactive flow tests (mute/unmute with pending selections)
 - [ ] **TST-05**: React admin panel component tests (vitest + testing-library)
 
 ### Code Quality
@@ -136,8 +136,8 @@
 | ANL-03 | Phase 30 | Complete |
 | TST-01 | Phase 31 | Pending |
 | TST-02 | Phase 31 | Pending |
-| TST-03 | Phase 31 | Pending |
-| TST-04 | Phase 31 | Pending |
+| TST-03 | Phase 31 | Complete |
+| TST-04 | Phase 31 | Complete |
 | TST-05 | Phase 31 | Pending |
 | PLAT-01 | Phase 32 | Pending |
 | PLAT-02 | Phase 32 | Pending |
