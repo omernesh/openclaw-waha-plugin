@@ -6,8 +6,9 @@
 // Verified: Phase 21, Plan 03 (2026-03-18)
 // Visual overhaul (Avatar, stacked name+JID, Participants button) — 260320-u7x
 // Sortable column headers (Group, Members, Messages, Last Message) — 260320
+// Perfection pass: useMemo columns, shared formatDate — 260321
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronDown, Users } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import { Avatar } from '@/components/shared/Avatar'
 import { ParticipantRow } from './ParticipantRow'
 import type { DirectoryContact } from '@/types'
+import { formatDate } from './shared-columns'
 
 interface GroupsTabProps {
   data: DirectoryContact[]
@@ -23,17 +25,6 @@ interface GroupsTabProps {
   onPaginationChange: (p: { pageIndex: number; pageSize: number }) => void
   loading: boolean
   onRefresh?: () => void  // reserved — trigger parent data reload after bulk/settings changes (wired but not yet consumed)
-}
-
-// Format a timestamp (seconds since epoch) as a readable date string
-// DO NOT CHANGE: ts comes from WAHA API as Unix seconds, must multiply by 1000 for JS Date
-function formatDate(ts: number): string {
-  if (!ts) return '—'
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 export function GroupsTab({
@@ -63,7 +54,8 @@ export function GroupsTab({
 
   // Build columns inside component so we have access to expandedGroupJid and toggleGroup
   // meta.sortable + meta.sortValue enable client-side sorting in DataTable
-  const columns: ColumnDef<DirectoryContact, unknown>[] = [
+  // Wrapped in useMemo to prevent new references every render (DataTable memoization)
+  const columns: ColumnDef<DirectoryContact, unknown>[] = useMemo(() => [
     // Group column: Avatar + stacked group name + JID
     {
       id: 'group',
@@ -96,7 +88,7 @@ export function GroupsTab({
         sortValue: (row: DirectoryContact) => row.participantCount ?? 0,
       },
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.participantCount ?? '—'}</span>
+        <span className="text-sm">{row.original.participantCount ?? '\u2014'}</span>
       ),
     },
     {
@@ -148,7 +140,7 @@ export function GroupsTab({
         )
       },
     },
-  ]
+  ], [expandedGroupJid])
 
   return (
     <DataTable

@@ -5,6 +5,7 @@
 // DO NOT CHANGE: mentionPatterns sent as null when empty array (server expects null, not []).
 // DO NOT CHANGE: godModeScope '' (empty string in Select) maps to null on save.
 // Verified: quick task 260320-k2e (2026-03-20)
+// Perfection pass: disable save after load failure, retry button — 260321
 
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
@@ -19,7 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CircleHelp } from 'lucide-react'
+import { CircleHelp, RefreshCw } from 'lucide-react'
 import { TagInput } from '@/components/shared/TagInput'
 import { api } from '@/lib/api'
 import type { GroupFilterOverrideData } from '@/types'
@@ -46,6 +47,7 @@ interface GroupFilterOverrideProps {
 export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   // Override toggle — when false, group inherits global settings
   const [enabled, setEnabled] = useState(false)
@@ -55,8 +57,9 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
   const [godModeScope, setGodModeScope] = useState<string>('')
   const [triggerOperator, setTriggerOperator] = useState<'OR' | 'AND'>('OR')
 
-  useEffect(() => {
+  function fetchFilter() {
     setLoading(true)
+    setLoadError(false)
     api.getGroupFilter(groupJid)
       .then((res) => {
         if (res.override) {
@@ -79,8 +82,14 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
       .catch((err) => {
         console.error('Failed to load group filter:', err)
         toast.error('Failed to load group filter settings')
+        setLoadError(true)
       })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchFilter()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupJid])
 
   async function handleSave() {
@@ -120,6 +129,17 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
         <p className="text-xs text-muted-foreground">Override global filter settings for this group</p>
       </div>
 
+      {/* Load error banner */}
+      {loadError && (
+        <div className="flex items-center justify-between rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 mb-3">
+          <p className="text-xs text-destructive">Failed to load — cannot save</p>
+          <Button variant="outline" size="sm" className="gap-1.5 h-7" onClick={fetchFilter}>
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-4">
         {/* Override Enabled toggle */}
         <div className="flex items-center justify-between">
@@ -133,6 +153,7 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
             id={`filter-override-enabled-${groupJid}`}
             checked={enabled}
             onCheckedChange={setEnabled}
+            disabled={loadError}
           />
         </div>
 
@@ -152,6 +173,7 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
                 id={`filter-enabled-${groupJid}`}
                 checked={filterEnabled}
                 onCheckedChange={setFilterEnabled}
+                disabled={loadError}
               />
             </div>
 
@@ -164,6 +186,7 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
               <Select
                 value={triggerOperator}
                 onValueChange={(v) => setTriggerOperator(v as 'OR' | 'AND')}
+                disabled={loadError}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -200,6 +223,7 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
               <Select
                 value={godModeScope}
                 onValueChange={setGodModeScope}
+                disabled={loadError}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Inherit Global" />
@@ -215,8 +239,8 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
           </>
         )}
 
-        {/* Save button */}
-        <Button onClick={handleSave} disabled={saving} size="sm" className="w-full">
+        {/* Save button — disabled when load failed to prevent overwriting server data with defaults */}
+        <Button onClick={handleSave} disabled={saving || loadError} size="sm" className="w-full">
           {saving ? 'Saving...' : 'Save Override'}
         </Button>
       </div>

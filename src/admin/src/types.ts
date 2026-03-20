@@ -267,6 +267,13 @@ export interface ParticipantsResponse {
   allowAll: boolean
 }
 
+// Presence entry from GET /api/admin/presence
+export interface PresenceEntry {
+  id: string
+  status?: string
+  lastSeen?: number
+}
+
 // Phase 30: Analytics API response types. DO NOT REMOVE.
 export type AnalyticsTimeseriesPoint = {
   period: string

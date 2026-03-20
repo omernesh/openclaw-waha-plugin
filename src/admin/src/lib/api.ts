@@ -18,16 +18,19 @@ import type {
   LogResponse,
   WahaConfig,
   AnalyticsResponse,
+  PresenceEntry,
 } from '@/types'
 
 const BASE = '/api/admin'
 
 class ApiError extends Error {
   status: number
-  constructor(path: string, status: number, body: string) {
+  data: unknown
+  constructor(path: string, status: number, body: string, data?: unknown) {
     super(`API ${path} failed ${status}: ${body}`)
     this.name = 'ApiError'
     this.status = status
+    this.data = data ?? null
   }
 }
 
@@ -41,16 +44,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     // Try to parse structured error body (e.g. { error: 'validation_failed', fields: [...] })
-    // If JSON parse succeeds, throw the parsed object so callers can inspect .error and .fields.
+    // Always throw a proper Error instance so err instanceof Error works everywhere.
+    // Structured server data is preserved on err.data.
     const text = await res.text().catch(() => res.statusText)
+    let parsed: Record<string, unknown> | null = null
     try {
-      const parsed = JSON.parse(text)
-      throw parsed
-    } catch (parseErr) {
-      // If the thrown value is already the parsed object (not a SyntaxError), re-throw it
-      if (!(parseErr instanceof SyntaxError)) throw parseErr
+      parsed = JSON.parse(text)
+    } catch {
+      // not JSON — fall through
     }
-    throw new ApiError(path, res.status, text)
+    const message = (parsed?.error as string) || (parsed?.message as string) || res.statusText
+    const err = new ApiError(path, res.status, message, parsed)
+    throw err
   }
   return res.json() as Promise<T>
 }
@@ -192,6 +197,9 @@ export const api = {
     if (groupBy) params.set('groupBy', groupBy)
     return request<AnalyticsResponse>(`/analytics?${params}`)
   },
+
+  // Presence — returns array of presence entries for all tracked contacts
+  getPresence: () => request<{ presence?: PresenceEntry[] }>('/presence'),
 
   // Pairing
   getPairingDeeplink: (jid: string) =>

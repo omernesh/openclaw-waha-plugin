@@ -5,12 +5,11 @@
 // Verified working: Phase 21 Plan 02 (2026-03-18)
 // Visual overhaul (Avatar, stacked name+JID, Allow DM button, Settings button) — 260320-u7x
 // Sortable column headers (Channel, Messages, First Seen, DM Access) — 260320
+// Perfection pass: useMemo columns, shared column factories — 260321
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
-import { Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/DataTable'
 import { Avatar } from '@/components/shared/Avatar'
@@ -18,6 +17,13 @@ import { BulkEditToolbar } from './BulkEditToolbar'
 import { ContactSettingsSheet } from './ContactSettingsSheet'
 import { api } from '@/lib/api'
 import type { DirectoryContact } from '@/types'
+import {
+  makeSelectColumn,
+  makeDmAccessColumn,
+  makeSettingsColumn,
+  makeMessagesColumn,
+  formatDate,
+} from './shared-columns'
 
 interface ChannelsTabProps {
   data: DirectoryContact[]      // channels are also DirectoryContact entries (jid ends with @newsletter)
@@ -46,30 +52,10 @@ export function ChannelsTab({
 
   // Column definitions — DO NOT CHANGE: ColumnDef<DirectoryContact> required for type safety
   // meta.sortable + meta.sortValue enable client-side sorting in DataTable
-  const columns: ColumnDef<DirectoryContact, unknown>[] = [
+  // Wrapped in useMemo to prevent new references every render (DataTable memoization)
+  const columns: ColumnDef<DirectoryContact, unknown>[] = useMemo(() => [
     // Select column — only visible in bulk mode
-    ...(bulkMode
-      ? [
-          {
-            id: 'select',
-            header: ({ table }: { table: import('@tanstack/react-table').Table<DirectoryContact> }) => (
-              <Checkbox
-                checked={table.getIsAllPageRowsSelected()}
-                onCheckedChange={(checked) => table.toggleAllPageRowsSelected(!!checked)}
-                aria-label="Select all"
-              />
-            ),
-            cell: ({ row }: { row: import('@tanstack/react-table').Row<DirectoryContact> }) => (
-              <Checkbox
-                checked={row.getIsSelected()}
-                onCheckedChange={(checked) => row.toggleSelected(!!checked)}
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Select row"
-              />
-            ),
-          } as ColumnDef<DirectoryContact, unknown>,
-        ]
-      : []),
+    ...(bulkMode ? [makeSelectColumn<DirectoryContact>()] : []),
     // Channel column: Avatar + stacked name + JID
     {
       id: 'channel',
@@ -93,52 +79,8 @@ export function ChannelsTab({
       ),
     },
     // Allow DM button — clickable toggle
-    {
-      id: 'allowedDm',
-      header: 'DM Access',
-      accessorKey: 'allowedDm',
-      meta: {
-        sortable: true,
-        sortValue: (row: DirectoryContact) => row.allowedDm ? 1 : 0,
-      },
-      cell: ({ row }) => {
-        const allowed = row.original.allowedDm
-        const isToggling = togglingJid === row.original.jid
-        return (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isToggling}
-            className={allowed ? 'text-green-600 border-green-600 hover:bg-green-50' : ''}
-            onClick={async (e) => {
-              e.stopPropagation()
-              setTogglingJid(row.original.jid)
-              try {
-                await api.toggleAllowDm(row.original.jid, { allowed: !allowed })
-                toast.success(allowed ? 'DM access revoked' : 'DM access granted')
-                onRefresh()
-              } catch (err) {
-                toast.error('Failed to update DM access')
-                console.error(err)
-              } finally {
-                setTogglingJid(null)
-              }
-            }}
-          >
-            {isToggling ? 'Updating...' : allowed ? 'Allowed' : 'Allow DM'}
-          </Button>
-        )
-      },
-    },
-    {
-      id: 'messageCount',
-      header: 'Messages',
-      accessorKey: 'messageCount',
-      meta: {
-        sortable: true,
-        sortValue: (row: DirectoryContact) => row.messageCount ?? 0,
-      },
-    },
+    makeDmAccessColumn(onRefresh, togglingJid, setTogglingJid),
+    makeMessagesColumn(),
     {
       id: 'firstSeenAt',
       header: 'First Seen',
@@ -150,29 +92,12 @@ export function ChannelsTab({
       // DO NOT CHANGE: timestamps are Unix seconds — multiply by 1000 for Date constructor
       cell: ({ row }) =>
         row.original.firstSeenAt
-          ? new Date(row.original.firstSeenAt * 1000).toLocaleDateString()
-          : '—',
+          ? formatDate(row.original.firstSeenAt)
+          : '\u2014',
     },
     // Settings button — opens ContactSettingsSheet
-    {
-      id: 'settings',
-      header: '',
-      cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5"
-          onClick={(e) => {
-            e.stopPropagation()
-            setSelectedJid(row.original.jid)
-          }}
-        >
-          <Settings className="h-3.5 w-3.5" />
-          Settings
-        </Button>
-      ),
-    },
-  ]
+    makeSettingsColumn(setSelectedJid),
+  ], [bulkMode, onRefresh, togglingJid, setSelectedJid])
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 
