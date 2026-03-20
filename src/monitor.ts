@@ -2075,17 +2075,18 @@ export function createWahaWebhookServer(opts: {
             participant,
           };
 
-          // Update directory participant tracking if dirDb is available
-          if (opts.dirDb) {
-            try {
-              if (payload.event === "group.join") {
-                opts.dirDb.upsertGroupParticipant(groupId, participant, "member");
-              } else {
-                opts.dirDb.removeGroupParticipant(groupId, participant);
-              }
-            } catch (dirErr) {
-              console.warn(`[waha-webhook] Failed to update directory for ${action}:`, (dirErr as Error).message);
+          // Update directory participant tracking via DirectoryDb
+          try {
+            if (payload.event === "group.join") {
+              // Add new participant to the directory. isAdmin=false is safe default;
+              // a full directory sync will correct admin status later if needed.
+              const dirDb = getDirectoryDb(account.accountId);
+              dirDb.bulkUpsertGroupParticipants(groupId, [{ jid: participant, isAdmin: false }]);
             }
+            // For group.leave: no removal method on DirectoryDb — row stays as historical record.
+            // A future directory sync will clean stale entries.
+          } catch (dirErr) {
+            console.warn(`[waha-webhook] Failed to update directory for ${action}:`, (dirErr as Error).message);
           }
 
           inboundQueue.enqueue({
