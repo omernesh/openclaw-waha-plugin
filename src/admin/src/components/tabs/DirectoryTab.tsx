@@ -31,7 +31,7 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 })
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 })
   const [data, setData] = useState<DirectoryResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,7 +101,7 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
     setActiveSubTab(tab)
     setSearchInput('')
     setSearchQuery('')
-    setPagination({ pageIndex: 0, pageSize: 50 })
+    setPagination({ pageIndex: 0, pageSize: 25 })
   }
 
   // Show skeleton on initial load (no data yet)

@@ -3,13 +3,16 @@
 // DO NOT CHANGE: timestamps are Unix seconds — multiply by 1000 for Date constructor.
 // Row click opens ContactSettingsSheet for per-channel settings (added 260320-rii).
 // Verified working: Phase 21 Plan 02 (2026-03-18)
+// Visual overhaul (Avatar, stacked name+JID, Allow DM button, Settings button) — 260320-u7x
 
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
+import { Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/DataTable'
+import { Avatar } from '@/components/shared/Avatar'
 import { BulkEditToolbar } from './BulkEditToolbar'
 import { ContactSettingsSheet } from './ContactSettingsSheet'
 import { api } from '@/lib/api'
@@ -63,19 +66,52 @@ export function ChannelsTab({
           } as ColumnDef<DirectoryContact, unknown>,
         ]
       : []),
+    // Channel column: Avatar + stacked name + JID
     {
-      id: 'displayName',
-      header: 'Channel Name',
-      accessorKey: 'displayName',
-      cell: ({ row }) => row.original.displayName ?? <span className="text-muted-foreground">Unknown</span>,
-    },
-    {
-      id: 'jid',
-      header: 'Newsletter JID',
-      accessorKey: 'jid',
+      id: 'channel',
+      header: 'Channel',
       cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground font-mono">{row.original.jid}</span>
+        <div className="flex items-center gap-2.5">
+          <Avatar name={row.original.displayName} size="md" />
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium leading-tight">
+              {row.original.displayName ?? <span className="text-muted-foreground">Unknown</span>}
+            </span>
+            <span className="text-xs text-muted-foreground font-mono leading-tight truncate">
+              {row.original.jid}
+            </span>
+          </div>
+        </div>
       ),
+    },
+    // Allow DM button — clickable toggle
+    {
+      id: 'allowedDm',
+      header: 'DM Access',
+      accessorKey: 'allowedDm',
+      cell: ({ row }) => {
+        const allowed = row.original.allowedDm
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            className={allowed ? 'text-green-600 border-green-600 hover:bg-green-50' : ''}
+            onClick={async (e) => {
+              e.stopPropagation()
+              try {
+                await api.toggleAllowDm(row.original.jid, { allowed: !allowed })
+                toast.success(allowed ? 'DM access revoked' : 'DM access granted')
+                onRefresh()
+              } catch (err) {
+                toast.error('Failed to update DM access')
+                console.error(err)
+              }
+            }}
+          >
+            {allowed ? 'Allowed' : 'Allow DM'}
+          </Button>
+        )
+      },
     },
     {
       id: 'messageCount',
@@ -91,6 +127,25 @@ export function ChannelsTab({
         row.original.firstSeenAt
           ? new Date(row.original.firstSeenAt * 1000).toLocaleDateString()
           : '—',
+    },
+    // Settings button — opens ContactSettingsSheet
+    {
+      id: 'settings',
+      header: '',
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5"
+          onClick={(e) => {
+            e.stopPropagation()
+            setSelectedJid(row.original.jid)
+          }}
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Settings
+        </Button>
+      ),
     },
   ]
 

@@ -21,6 +21,7 @@ import {
 import { api } from '@/lib/api'
 import type { ParticipantEnriched } from '@/types'
 import { GroupFilterOverride } from './GroupFilterOverride'
+import { Avatar } from '@/components/shared/Avatar'
 
 interface ParticipantRowProps {
   groupJid: string
@@ -141,10 +142,16 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
               key={p.participantJid}
               className="flex items-center gap-3 py-2 border-b last:border-b-0"
             >
-              {/* Name — resolved from server, fallback to JID */}
-              <span className="text-sm font-medium min-w-[140px] truncate">
-                {p.displayName ?? p.participantJid}
-              </span>
+              {/* Avatar + stacked name/JID — 260320-u7x */}
+              <Avatar name={p.displayName} size="sm" />
+              <div className="flex flex-col min-w-0 min-w-[140px]">
+                <span className="text-sm font-medium leading-tight truncate">
+                  {p.displayName ?? p.participantJid}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono leading-tight truncate">
+                  {p.participantJid}
+                </span>
+              </div>
 
               {/* Admin badge */}
               {p.isAdmin && (

@@ -1,14 +1,17 @@
 // GroupsTab — paginated DataTable of groups with expandable participant rows.
-// Clicking a group row expands to show ParticipantRow (lazy-loaded participants).
-// Clicking the same row again collapses it.
+// Clicking a group row OR the Participants button expands to show ParticipantRow (lazy-loaded).
+// Clicking the same row/button again collapses it.
 // DO NOT CHANGE: uses ColumnDef<DirectoryContact>, expandedRowId, renderExpandedRow
 // from DataTable — these are the correct props for expandable rows.
 // Verified: Phase 21, Plan 03 (2026-03-18)
+// Visual overhaul (Avatar, stacked name+JID, Participants button) — 260320-u7x
 
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Users } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
+import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/DataTable'
+import { Avatar } from '@/components/shared/Avatar'
 import { ParticipantRow } from './ParticipantRow'
 import type { DirectoryContact } from '@/types'
 
@@ -32,61 +35,6 @@ function formatDate(ts: number): string {
   })
 }
 
-const columns: ColumnDef<DirectoryContact, unknown>[] = [
-  {
-    id: 'expand',
-    header: '',
-    cell: ({ row, column }) => {
-      const expandedRowId = (column.columnDef.meta as { expandedRowId?: string | null } | undefined)?.expandedRowId
-      const isExpanded = expandedRowId === row.original.jid
-      return (
-        <ChevronDown
-          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-        />
-      )
-    },
-  },
-  {
-    accessorKey: 'displayName',
-    header: 'Group Name',
-    cell: ({ row }) => (
-      <span className="font-medium">
-        {row.original.displayName ?? 'Unknown Group'}
-      </span>
-    ),
-  },
-  {
-    accessorKey: 'jid',
-    header: 'JID',
-    cell: ({ row }) => (
-      <span className="text-xs text-muted-foreground font-mono">{row.original.jid}</span>
-    ),
-  },
-  {
-    accessorKey: 'participantCount',
-    header: 'Members',
-    cell: ({ row }) => (
-      <span className="text-sm">{(row.original as DirectoryContact & { participantCount?: number }).participantCount ?? '—'}</span>
-    ),
-  },
-  {
-    accessorKey: 'messageCount',
-    header: 'Messages',
-    cell: ({ row }) => (
-      <span className="text-sm">{row.original.messageCount}</span>
-    ),
-  },
-  {
-    accessorKey: 'lastMessageAt',
-    header: 'Last Message',
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {formatDate(row.original.lastMessageAt)}
-      </span>
-    ),
-  },
-]
-
 export function GroupsTab({
   data,
   total,
@@ -97,9 +45,13 @@ export function GroupsTab({
 }: GroupsTabProps) {
   const [expandedGroupJid, setExpandedGroupJid] = useState<string | null>(null)
 
+  function toggleGroup(jid: string) {
+    setExpandedGroupJid(prev => prev === jid ? null : jid)
+  }
+
   function handleRowClick(row: DirectoryContact) {
     // Toggle: collapse if already expanded, expand otherwise
-    setExpandedGroupJid(prev => prev === row.jid ? null : row.jid)
+    toggleGroup(row.jid)
   }
 
   // Reset expansion when page changes
@@ -108,15 +60,81 @@ export function GroupsTab({
     onPaginationChange(p)
   }
 
-  // Inject expandedRowId into table meta for the expand indicator column
-  const columnsWithMeta = columns.map(col => ({
-    ...col,
-    meta: { expandedRowId: expandedGroupJid },
-  }))
+  // Build columns inside component so we have access to expandedGroupJid and toggleGroup
+  const columns: ColumnDef<DirectoryContact, unknown>[] = [
+    // Group column: Avatar + stacked group name + JID
+    {
+      id: 'group',
+      header: 'Group',
+      cell: ({ row }) => {
+        return (
+          <div className="flex items-center gap-2.5">
+            <Avatar name={row.original.displayName} size="md" />
+            <div className="flex flex-col min-w-0">
+              <span className="font-medium leading-tight">
+                {row.original.displayName ?? 'Unknown Group'}
+              </span>
+              <span className="text-xs text-muted-foreground font-mono leading-tight truncate">
+                {row.original.jid}
+              </span>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'participantCount',
+      header: 'Members',
+      cell: ({ row }) => (
+        <span className="text-sm">{(row.original as DirectoryContact & { participantCount?: number }).participantCount ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'messageCount',
+      header: 'Messages',
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.messageCount}</span>
+      ),
+    },
+    {
+      accessorKey: 'lastMessageAt',
+      header: 'Last Message',
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {formatDate(row.original.lastMessageAt)}
+        </span>
+      ),
+    },
+    // Participants button — explicit expand toggle (also row click works)
+    {
+      id: 'participants',
+      header: '',
+      cell: ({ row }) => {
+        const isExpanded = expandedGroupJid === row.original.jid
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleGroup(row.original.jid)
+            }}
+          >
+            <Users className="h-3.5 w-3.5" />
+            Participants
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+            />
+          </Button>
+        )
+      },
+    },
+  ]
 
   return (
     <DataTable
-      columns={columnsWithMeta}
+      columns={columns}
       data={data}
       total={total}
       pagination={pagination}
