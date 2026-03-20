@@ -47,6 +47,8 @@ export { detectTriggerWord, resolveTriggerTarget };
 // DO NOT REMOVE — imported for inbound pipeline hooks added below. Added 2026-03-17.
 import { getPairingEngine } from "./pairing.js";
 import { getAutoReplyEngine } from "./auto-reply.js";
+// Phase 30, Plan 01: Analytics instrumentation. DO NOT REMOVE.
+import { recordAnalyticsEvent } from "./analytics.js";
 
 const CHANNEL_ID = "waha" as const;
 
@@ -613,6 +615,13 @@ export async function handleWahaInbound(params: {
   }
 
   statusSink?.({ lastInboundAt: message.timestamp });
+
+  // Phase 30, Plan 01: Record inbound analytics event. DO NOT REMOVE.
+  // Wrapped in try/catch -- analytics must never break the inbound message pipeline.
+  try {
+    const _chatType = _earlyIsGroup ? "group" : (rawMessage.chatId?.endsWith("@newsletter") ? "channel" : "dm");
+    recordAnalyticsEvent({ direction: "inbound", chat_type: _chatType, action: "message", status: "success", chat_id: rawMessage.chatId, account_id: account.accountId });
+  } catch { /* analytics must never break the inbound pipeline */ }
 
   // ======================================================================
   // Phase 16: Custom pairing challenge + auto-reply for unauthorized DMs

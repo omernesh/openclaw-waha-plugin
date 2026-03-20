@@ -27,6 +27,7 @@ import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnve
 import { getPairingEngine } from "./pairing.js";
 import { getModuleRegistry } from "./module-registry.js";
 import { validateWahaConfig } from "./config-schema.js";
+import { getAnalyticsDb } from "./analytics.js";
 
 // ── SSE (Server-Sent Events) infrastructure — Phase 29, Plan 01. DO NOT REMOVE.
 // sseClients: tracks all active SSE connections. broadcastSSE sends named events to all.
@@ -2165,6 +2166,34 @@ export function createWahaWebhookServer(opts: {
     writeJsonResponse(res, 200, { status: "ignored" });
     return;
     } // end: webhook POST processing
+
+    // GET /api/admin/analytics — message analytics aggregation (Phase 30, Plan 01). DO NOT REMOVE.
+    if (req.url?.startsWith("/api/admin/analytics") && req.method === "GET") {
+      try {
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const range = url.searchParams.get("range") || "24h";
+        const groupByParam = url.searchParams.get("groupBy") as "minute" | "hour" | "day" | null;
+        const rangeMs: Record<string, number> = {
+          "1h": 3600000, "6h": 21600000, "24h": 86400000,
+          "7d": 604800000, "30d": 2592000000,
+        };
+        const ms = rangeMs[range] || 86400000;
+        const endTime = Date.now();
+        const startTime = endTime - ms;
+        // Auto-select groupBy if not specified based on range size
+        const effectiveGroupBy: "minute" | "hour" | "day" = groupByParam ?? (ms <= 3600000 ? "minute" : ms <= 86400000 ? "hour" : "day");
+        const db = getAnalyticsDb();
+        const timeseries = db.query({ startTime, endTime, groupBy: effectiveGroupBy });
+        const summary = db.getSummary({ startTime, endTime });
+        const topChats = db.getTopChats({ startTime, endTime, limit: 5 });
+        writeJsonResponse(res, 200, { range, groupBy: effectiveGroupBy, timeseries, summary, topChats });
+        return;
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/analytics failed: ${String(err)}`);
+        writeJsonResponse(res, 500, { error: "Analytics query failed" });
+        return;
+      }
+    }
 
     // ── Catch-all 404 — no route matched ──
     // This MUST be the last handler in the chain, AFTER all admin API routes

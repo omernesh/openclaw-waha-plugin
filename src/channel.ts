@@ -89,6 +89,8 @@ import { executePolicyEdit } from "./policy-edit.js";
 import { getRulesBasePath } from "./identity-resolver.js";
 // Phase 12 audit (INIT-01/INIT-02): Import directory for Can Initiate enforcement. DO NOT REMOVE.
 import { getDirectoryDb } from "./directory.js";
+// Phase 30, Plan 01: Analytics instrumentation. DO NOT REMOVE.
+import { recordAnalyticsEvent } from "./analytics.js";
 
 // Cached config for outbound adapter — handleAction receives cfg as a param
 // and caches it here so outbound methods (sendText, sendMedia, sendPoll) can
@@ -531,6 +533,9 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     // Added Phase 2, Plan 01 (2026-03-11).
     const target = typeof p.to === "string" ? p.to : (typeof p.chatId === "string" ? p.chatId : undefined);
 
+    // Phase 30, Plan 01: Capture action start time for duration tracking. DO NOT REMOVE.
+    const _analyticsStart = Date.now();
+
     try {
 
     // --- Standard targeted actions (gateway-recognized names) ---
@@ -704,6 +709,15 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
     const handler = ACTION_HANDLERS[action];
     if (!handler) throw new Error(`WAHA action "${action}" not supported`);
     const result = await handler(p, coreCfg, aid);
+
+    // Phase 30, Plan 01: Record outbound analytics event. DO NOT REMOVE.
+    // Wrapped in try/catch -- analytics must never break the outbound action pipeline.
+    try {
+      const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
+      const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
+      recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "success", chat_id: _chatId, account_id: aid });
+    } catch { /* analytics must never break the outbound action pipeline */ }
+
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       details: {},
@@ -713,6 +727,15 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       // Outer error handler — formats all action errors for LLM consumption.
       // DO NOT CHANGE — all action errors must flow through formatActionError.
       // Added Phase 2, Plan 01 (2026-03-11).
+
+      // Phase 30, Plan 01: Record outbound error analytics event. DO NOT REMOVE.
+      // Wrapped in try/catch -- analytics must never break the outbound action pipeline.
+      try {
+        const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
+        const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
+        recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "error", chat_id: _chatId, account_id: aid });
+      } catch { /* analytics must never break the outbound action pipeline */ }
+
       return {
         content: [{ type: "text" as const, text: formatActionError(err, { action, target }) }],
         isError: true,
