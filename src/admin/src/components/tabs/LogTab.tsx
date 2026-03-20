@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { X, ChevronsDown, Pause, Play } from 'lucide-react'
+import { X, ChevronsDown, Pause, Play, Download } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { LogResponse } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -189,6 +189,21 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     })
   }
 
+  // CQ-05: Export visible (filtered) log entries as a plain text file. DO NOT REMOVE.
+  const handleExportLogs = useCallback(() => {
+    const exportLines = logData?.lines ?? []
+    const content = exportLines.join('\n')
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `waha-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [logData])
+
   const lines = logData?.lines ?? []
   const total = logData?.total ?? 0
   const source = logData?.source ?? 'none'
@@ -209,7 +224,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
           </Button>
         ))}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           <Button
             size="sm"
             variant={autoScroll ? 'default' : 'outline'}
@@ -219,6 +234,15 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
           >
             {autoScroll ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
             {autoScroll ? 'Auto-scroll' : 'Paused'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleExportLogs}
+            title="Export logs"
+            className="h-8 w-8"
+          >
+            <Download className="h-4 w-4" />
           </Button>
         </div>
       </div>
