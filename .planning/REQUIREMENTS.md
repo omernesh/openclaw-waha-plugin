@@ -43,10 +43,10 @@
 
 ### Real-Time Admin
 
-- [ ] **RT-01**: SSE endpoint (GET /api/admin/events) for live admin panel push
-- [ ] **RT-02**: Dashboard auto-updates on health state changes and queue depth changes
-- [ ] **RT-03**: Log tab auto-scrolls on new log entries via SSE
-- [ ] **RT-04**: Connection indicator in admin sidebar (connected/reconnecting/disconnected)
+- [x] **RT-01**: SSE endpoint (GET /api/admin/events) for live admin panel push
+- [x] **RT-02**: Dashboard auto-updates on health state changes and queue depth changes
+- [x] **RT-03**: Log tab auto-scrolls on new log entries via SSE
+- [x] **RT-04**: Connection indicator in admin sidebar (connected/reconnecting/disconnected)
 
 ### Analytics
 
@@ -127,10 +127,10 @@
 | API-07 | Phase 28 | Complete |
 | PRES-01 | Phase 28 | Complete |
 | PRES-02 | Phase 28 | Complete |
-| RT-01 | Phase 29 | Pending |
-| RT-02 | Phase 29 | Pending |
-| RT-03 | Phase 29 | Pending |
-| RT-04 | Phase 29 | Pending |
+| RT-01 | Phase 29 | Complete |
+| RT-02 | Phase 29 | Complete |
+| RT-03 | Phase 29 | Complete |
+| RT-04 | Phase 29 | Complete |
 | ANL-01 | Phase 30 | Pending |
 | ANL-02 | Phase 30 | Pending |
 | ANL-03 | Phase 30 | Pending |

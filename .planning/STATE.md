@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
-status: unknown
-stopped_at: Completed 29-01-PLAN.md
-last_updated: "2026-03-20T06:00:00.000Z"
+status: in-progress
+stopped_at: Completed 29-02-PLAN.md
+last_updated: "2026-03-20T07:45:00.000Z"
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Current Position
 
-Phase: 29 (Real-Time Admin Panel) — EXECUTING
-Plan: 2 of 2
+Phase: 29 (Real-Time Admin Panel) — COMPLETE
+Plan: 2 of 2 (all plans complete)
 
 ## Accumulated Context
 
@@ -54,6 +54,9 @@ Plan: 2 of 2
 - [Phase 28-02]: API key endpoints are server-scoped (/api/keys), not session-scoped
 - [Phase 28-02]: group.join upserts participant via bulkUpsertGroupParticipants with isAdmin=false default
 - [Phase 29-01]: useEventSource uses .tsx extension (JSX in SSEProvider); SSE callback emitted after lastCheckAt so timestamp is included; SSEProvider placed inside SidebarProvider
+- [Phase 29-02]: SSE log events emitted selectively (health transitions, queue depth > 10, config save, message enqueue) — not on every console.log
+- [Phase 29-02]: Log buffer capped at LOG_LINE_LIMIT * 2 then trimmed to LOG_LINE_LIMIT from front
+- [Phase 29-02]: newLineCount reads userScrolledUpRef.current (ref) inside SSE callback to avoid stale closure on autoScroll state
 
 ### Pending Todos
 
@@ -65,6 +68,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T06:00:00.000Z
-Stopped at: Completed 29-01-PLAN.md
+Last session: 2026-03-20T07:45:00.000Z
+Stopped at: Completed 29-02-PLAN.md
 Resume file: None
