@@ -22,9 +22,9 @@
 
 ### Pairing Cleanup
 
-- [ ] **PAIR-01**: Remove or integrate plugin PairingEngine (currently dead code — gateway pairing runs instead)
-- [ ] **PAIR-02**: Fix bot echo triggering pairing challenges for itself (fromMe messages creating pairing requests)
-- [ ] **PAIR-03**: Ensure pairing.ts is always included in deploy artifacts
+- [x] **PAIR-01**: Remove or integrate plugin PairingEngine (currently dead code — gateway pairing runs instead)
+- [x] **PAIR-02**: Fix bot echo triggering pairing challenges for itself (fromMe messages creating pairing requests)
+- [x] **PAIR-03**: Ensure pairing.ts is always included in deploy artifacts
 
 ### API Coverage
 
@@ -64,11 +64,11 @@
 
 ### Code Quality
 
-- [ ] **CQ-01**: Fix remaining .catch(() => {}) in shutup.ts:239
-- [ ] **CQ-02**: Resolve inbound.ts:704 TODO (admin name resolution from Bot Admin role contacts)
-- [ ] **CQ-03**: Add guard for _cachedConfig singleton in channel.ts (fail-safe when called before handleAction)
-- [ ] **CQ-04**: Add prefers-color-scheme auto-detect to admin panel theme toggle
-- [ ] **CQ-05**: Log tab export/download button (CSV or plain text)
+- [x] **CQ-01**: Fix remaining .catch(() => {}) in shutup.ts:239
+- [x] **CQ-02**: Resolve inbound.ts:704 TODO (admin name resolution from Bot Admin role contacts)
+- [x] **CQ-03**: Add guard for _cachedConfig singleton in channel.ts (fail-safe when called before handleAction)
+- [x] **CQ-04**: Add prefers-color-scheme auto-detect to admin panel theme toggle
+- [x] **CQ-05**: Log tab export/download button (CSV or plain text)
 
 ### Platform Abstraction
 
@@ -110,14 +110,14 @@
 | CFG-03 | Phase 26 | Complete |
 | CFG-04 | Phase 26 | Complete |
 | CFG-05 | Phase 26 | Complete |
-| PAIR-01 | Phase 27 | Pending |
-| PAIR-02 | Phase 27 | Pending |
-| PAIR-03 | Phase 27 | Pending |
-| CQ-01 | Phase 27 | Pending |
-| CQ-02 | Phase 27 | Pending |
-| CQ-03 | Phase 27 | Pending |
-| CQ-04 | Phase 27 | Pending |
-| CQ-05 | Phase 27 | Pending |
+| PAIR-01 | Phase 27 | Complete |
+| PAIR-02 | Phase 27 | Complete |
+| PAIR-03 | Phase 27 | Complete |
+| CQ-01 | Phase 27 | Complete |
+| CQ-02 | Phase 27 | Complete |
+| CQ-03 | Phase 27 | Complete |
+| CQ-04 | Phase 27 | Complete |
+| CQ-05 | Phase 27 | Complete |
 | API-01 | Phase 28 | Pending |
 | API-02 | Phase 28 | Pending |
 | API-03 | Phase 28 | Pending |

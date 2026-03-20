@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 27-02-PLAN.md
-last_updated: "2026-03-20T04:35:19.988Z"
+stopped_at: Completed 27-01-PLAN.md
+last_updated: "2026-03-20T04:39:15.442Z"
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -44,6 +44,9 @@ Plan: 2 of 2
 - [Phase 26-02]: request() throws parsed JSON on non-2xx; SettingsTab shows field-level errors on 400, Export/Import buttons wired
 - [Phase 27]: useTheme falls back to prefers-color-scheme only when no localStorage value exists
 - [Phase 27]: Log export uses plain text format (journalctl-compatible) with server-filtered lines
+- [Phase 27]: PAIR-01: PairingEngine is active Phase 16 code — no removal. Dead code was the assumption, not the file.
+- [Phase 27]: CQ-02: admin name uses dirDb.getContact() on first godModeSuperUsers entry; falls back to 'the administrator' gracefully
+- [Phase 27]: CQ-03: both error paths in getCachedConfig() now include actionable context and root cause
 
 ### Pending Todos
 
@@ -51,12 +54,10 @@ None.
 
 ### Blockers/Concerns
 
-- pairing.ts missing from deploy artifacts (PAIR-03 addresses this)
-- _cachedConfig singleton fragility — outbound calls before handleAction will fail (CQ-03 addresses this)
 - monitor.ts (1980 lines) and inbound.ts (1100 lines) have zero test coverage (Phase 31)
 
 ## Session Continuity
 
-Last session: 2026-03-20T04:35:11.147Z
-Stopped at: Completed 27-02-PLAN.md
+Last session: 2026-03-20T04:38:56.298Z
+Stopped at: Completed 27-01-PLAN.md
 Resume file: None
