@@ -14,6 +14,8 @@ const SettingsTab = lazy(() => import('@/components/tabs/SettingsTab'))
 const DirectoryTab = lazy(() => import('@/components/tabs/DirectoryTab'))
 const SessionsTab = lazy(() => import('@/components/tabs/SessionsTab'))
 const ModulesTab = lazy(() => import('@/components/tabs/ModulesTab'))
+// Phase 30: Analytics tab — recharts charts for message traffic.
+const AnalyticsTab = lazy(() => import('@/components/tabs/AnalyticsTab'))
 
 // Small tabs — keep eager (fast, lightweight)
 import LogTab from '@/components/tabs/LogTab'
@@ -58,6 +60,7 @@ export default function App() {
       case 'modules':   return <TabErrorBoundary key={refreshKey} tabName="modules"><Suspense fallback={<TabSkeleton />}><ModulesTab {...props} /></Suspense></TabErrorBoundary>
       case 'log':       return <TabErrorBoundary key={refreshKey} tabName="log"><LogTab {...props} /></TabErrorBoundary>
       case 'queue':     return <TabErrorBoundary key={refreshKey} tabName="queue"><QueueTab {...props} /></TabErrorBoundary>
+      case 'analytics': return <TabErrorBoundary key={refreshKey} tabName="analytics"><Suspense fallback={<TabSkeleton />}><AnalyticsTab {...props} /></Suspense></TabErrorBoundary>
     }
   }
 

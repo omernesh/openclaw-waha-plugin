@@ -23,6 +23,7 @@ const TAB_TITLES: Record<TabId, string> = {
   modules: 'Modules',
   log: 'Log',
   queue: 'Queue',
+  analytics: 'Analytics',
 }
 
 interface TabHeaderProps {

@@ -18,6 +18,7 @@ import {
   Puzzle,
   FileText,
   ListOrdered,
+  BarChart3,
   Sun,
   Moon,
 } from 'lucide-react'
@@ -35,6 +36,7 @@ export type TabId =
   | 'modules'
   | 'log'
   | 'queue'
+  | 'analytics'
 
 const NAV_ITEMS = [
   { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
@@ -44,6 +46,7 @@ const NAV_ITEMS = [
   { id: 'modules' as const,   label: 'Modules',   icon: Puzzle },
   { id: 'log' as const,       label: 'Log',       icon: FileText },
   { id: 'queue' as const,     label: 'Queue',     icon: ListOrdered },
+  { id: 'analytics' as const, label: 'Analytics', icon: BarChart3 },
 ]
 
 interface AppSidebarProps {
