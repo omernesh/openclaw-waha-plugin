@@ -33,8 +33,8 @@
 - [x] **API-03**: Bulk presence GET (GET /presence — all subscribed presence info)
 - [x] **API-04**: Group join-info (GET /groups/{id}/join-info — preview before joining)
 - [x] **API-05**: Group refresh (POST /groups/refresh — force refresh from server)
-- [ ] **API-06**: Group join/leave/participant-change webhook event handlers
-- [ ] **API-07**: API Keys CRUD (create, list, update, delete via /api/keys endpoints)
+- [x] **API-06**: Group join/leave/participant-change webhook event handlers
+- [x] **API-07**: API Keys CRUD (create, list, update, delete via /api/keys endpoints)
 
 ### Presence
 
@@ -123,8 +123,8 @@
 | API-03 | Phase 28 | Complete |
 | API-04 | Phase 28 | Complete |
 | API-05 | Phase 28 | Complete |
-| API-06 | Phase 28 | Pending |
-| API-07 | Phase 28 | Pending |
+| API-06 | Phase 28 | Complete |
+| API-07 | Phase 28 | Complete |
 | PRES-01 | Phase 28 | Complete |
 | PRES-02 | Phase 28 | Complete |
 | RT-01 | Phase 29 | Pending |
