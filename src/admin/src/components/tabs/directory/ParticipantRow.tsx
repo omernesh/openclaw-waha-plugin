@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import type { ParticipantEnriched } from '@/types'
+import { GroupFilterOverride } from './GroupFilterOverride'
 
 interface ParticipantRowProps {
   groupJid: string
@@ -115,6 +116,9 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
 
   return (
     <div className="border rounded-md p-4 m-2">
+      {/* Group Filter Override — renders above participant controls */}
+      <GroupFilterOverride groupJid={groupJid} />
+
       {/* Allow All toggle at top */}
       <div className="flex items-center gap-3 pb-3 mb-3 border-b">
         <Switch

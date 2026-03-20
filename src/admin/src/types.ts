@@ -236,6 +236,16 @@ export interface GroupFilterResponse {
   override: Record<string, unknown> | null;
 }
 
+// Typed override data shape — cast from GroupFilterResponse.override in GroupFilterOverride.tsx
+export interface GroupFilterOverrideData {
+  enabled: boolean;
+  filterEnabled: boolean;
+  mentionPatterns: string[] | null;
+  godModeScope: 'all' | 'dm' | 'off' | null;
+  triggerOperator: 'OR' | 'AND';
+  updatedAt?: number;
+}
+
 // Participant from GET /api/admin/directory/group/:jid/participants — monitor.ts line 5432
 // DO NOT CHANGE: field names match exact server response shape (participantJid NOT jid, displayName NOT name)
 export interface ParticipantEnriched {
