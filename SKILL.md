@@ -137,6 +137,8 @@ Alternative: `sendContactVcard` action (requires explicit chatId).
 | `getGroup` | groupId |
 | `deleteGroup` / `leaveGroup` | groupId |
 | `joinGroup` | inviteCode |
+| `getGroupJoinInfo` | groupId — preview group details before joining via invite link |
+| `refreshGroups` | (none) — force-refresh groups list from WAHA server |
 | `setGroupSubject` | groupId, subject |
 | `setGroupDescription` | groupId, description |
 | `setGroupPicture` / `deleteGroupPicture` / `getGroupPicture` | groupId, file? |
@@ -185,6 +187,10 @@ Alternative: `sendContactVcard` action (requires explicit chatId).
 | `deleteChannel` / `followChannel` / `unfollowChannel` | channelId |
 | `muteChannel` / `unmuteChannel` | channelId |
 | `searchChannelsByText` | query |
+| `searchChannelsByView` | viewType (e.g. "RECOMMENDED") — search channels by view criteria |
+| `getChannelSearchViews` | (none) — list available view types for channel search |
+| `getChannelSearchCountries` | (none) — list countries for channel search filter |
+| `getChannelSearchCategories` | (none) — list categories for channel search filter |
 | `previewChannelMessages` | channelId |
 
 ## Presence & Profile
@@ -193,6 +199,7 @@ Alternative: `sendContactVcard` action (requires explicit chatId).
 |--------|-----------|
 | `setPresenceStatus` | status ("online"/"offline") |
 | `getPresence` / `subscribePresence` | contactId |
+| `getAllPresence` | (none) — get presence status for all subscribed contacts at once |
 | `getProfile` / `deleteProfilePicture` | (none) |
 | `setProfileName` | name |
 | `setProfileStatus` | status |
@@ -275,3 +282,175 @@ Returns array of recent messages with sender, text, timestamp, type.
 ## Cross-Session Routing
 
 Automatic — the bot uses its own session for groups it belongs to, falls back to human session as proxy otherwise. No manual session selection needed.
+
+---
+
+# Access Control & Policies
+
+## DM Policy
+
+Controls who can message the bot in direct messages.
+
+| Mode | Behavior |
+|------|----------|
+| `pairing` | Default. Unknown senders receive a pairing code challenge. |
+| `allowlist` | Only contacts in `allowFrom` can message. Others are silently blocked. |
+| `open` | Anyone can message. Requires `allowFrom: ["*"]`. |
+| `disabled` | All DMs blocked. |
+
+## Group Policy
+
+Two independent layers control group inbound messages:
+
+1. **Group membership allowlist** (`allowedGroups`) — which groups the bot listens to
+2. **Group sender policy** (`groupPolicy` + `groupAllowFrom`) — who within allowed groups can trigger the bot
+
+| `groupPolicy` | Behavior |
+|----------------|----------|
+| `open` | Sender allowlist bypassed — anyone in allowed groups can trigger the bot |
+| `allowlist` | Sender must be in `groupAllowFrom` |
+| `disabled` | All group inbound blocked |
+
+## God Mode
+
+Superusers bypass all DM and group filters. Configured via `godModeSuperUsers` in config (list of JIDs). Messages from superusers are always processed regardless of policy settings.
+
+## Can Initiate
+
+Controls whether the bot can start new conversations (send first message to contacts it hasn't talked to before).
+
+- `canInitiateGlobal`: default setting for all contacts
+- Per-contact overrides available in the directory
+
+---
+
+# Group Activation & Mentions
+
+## Activation Modes
+
+| Mode | Behavior |
+|------|----------|
+| `mention` | Default. Bot only replies when explicitly mentioned or replied to. |
+| `always` | Bot evaluates every message in the group. |
+
+## Mention Detection
+
+The bot considers itself "mentioned" when any of these are true:
+- Explicit WhatsApp @mention of the bot's number
+- Message matches a configured mention regex pattern (e.g., "sammie", "bot")
+- Message is a reply to a previous bot message
+
+## `/activation` Command
+
+Owner-only command sent in a group to switch between `mention` and `always` modes. Takes effect immediately for that group.
+
+## Group Context
+
+Group messages include additional context fields injected into the conversation:
+- `ChatType=group` — identifies this as a group conversation
+- `GroupSubject` — the group name
+- `GroupMembers` — list of participants
+- `WasMentioned` — whether the bot was mentioned in this message
+
+## Pending History
+
+On the bot's first turn in a group conversation, up to 50 recent messages are injected as context so the bot understands the ongoing discussion.
+
+---
+
+# Message Delivery Behavior
+
+## Text Chunking
+
+Messages exceeding `textChunkLimit` (default 4000 characters) are automatically split into multiple WhatsApp messages.
+
+| `chunkMode` | Behavior |
+|-------------|----------|
+| `length` | Split at the character limit |
+| `newline` | Split at newline boundaries near the limit |
+
+## Debouncing
+
+Rapid consecutive incoming messages are batched into a single turn to avoid fragmented responses.
+
+- Default debounce window: 5000ms for WhatsApp
+- Media/attachments flush immediately (no debounce)
+- Control commands (like `/activation`) bypass debouncing
+
+## Read Receipts
+
+Sent automatically by default. Skipped for self-chat (messages to yourself).
+
+## Ack Reactions
+
+Configurable emoji reaction (e.g., eyes emoji) sent when a message is received, confirming the bot saw it.
+
+- Can be configured separately for DM and group contexts
+- Group ack modes: `"always"` | `"mentions"` | `"never"`
+
+## Media Handling
+
+- **Voice notes**: `audio/ogg` is automatically rewritten to `audio/ogg; codecs=opus` for proper voice bubble display in WhatsApp
+- **GIF playback**: Videos sent with `gifPlayback: true` display as animated GIFs
+- **Media size limit**: `mediaMaxMb` default 50MB, per-account overrides available
+
+---
+
+# Broadcast Groups
+
+Multiple agents can process the same incoming message simultaneously.
+
+- Configured in the top-level `broadcast` config section
+- Each agent has its own isolated session, conversation history, workspace, tools, and memory
+- Broadcast evaluation happens after channel allowlists and group activation checks
+- Currently a WhatsApp-only feature
+
+---
+
+# Pairing Flow
+
+When `dmPolicy` is set to `pairing`, unknown contacts receive a pairing challenge instead of being silently blocked.
+
+- Pairing codes: 8 characters, uppercase alphanumeric
+- Codes expire after 1 hour
+- Maximum 3 pending pairing requests per channel at a time
+- After successful pairing, the contact is automatically added to `allowFrom`
+- Account-scoped: non-default accounts maintain separate pairing state
+
+---
+
+# Session Keys & Routing
+
+## Session Key Format
+
+| Context | Session Key Pattern |
+|---------|-------------------|
+| DM | `agent:<agentId>:main` (all DMs collapsed into one session) |
+| Group | `agent:<agentId>:whatsapp:group:<groupJid>` (isolated per group) |
+
+Each group maintains its own conversation history and context, separate from DMs and other groups.
+
+## Agent Routing Priority
+
+When a message arrives, the system determines which agent handles it using this priority:
+
+1. Exact peer match (specific contact assigned to specific agent)
+2. Parent peer match
+3. Account match
+4. Channel match
+5. Default agent
+
+---
+
+# /shutup and /unshutup Commands
+
+Owner-only commands to mute/unmute the bot in groups.
+
+| Command | Behavior |
+|---------|----------|
+| `/shutup` | Interactive flow: pick groups from a list, set mute duration |
+| `/unshutup` | Unmute the bot in selected groups |
+
+- Muted groups are stored persistently (survives restarts)
+- While muted, the bot ignores all messages in that group (including mentions)
+- When the bot sends messages on behalf of a human session, messages are prefixed with a robot emoji to distinguish them from human messages

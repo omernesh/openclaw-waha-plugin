@@ -53,6 +53,7 @@ import {
   setWahaGroupInfoAdminOnly, getWahaGroupInfoAdminOnly,
   setWahaGroupMessagesAdminOnly, getWahaGroupMessagesAdminOnly,
   getWahaGroupInviteCode, revokeWahaGroupInviteCode, joinWahaGroup, getWahaGroupsCount,
+  getWahaGroupJoinInfo, refreshWahaGroups,
   // Contacts
   getWahaContacts, getWahaContact, checkWahaContactExists,
   getWahaContactAbout, getWahaContactPicture, blockWahaContact, unblockWahaContact,
@@ -66,10 +67,11 @@ import {
   followWahaChannel, unfollowWahaChannel, muteWahaChannel, unmuteWahaChannel,
   muteWahaChat, unmuteWahaChat,
   searchWahaChannelsByText, previewWahaChannelMessages,
+  searchWahaChannelsByView, getWahaChannelSearchViews, getWahaChannelSearchCountries, getWahaChannelSearchCategories,
   // Events
   sendWahaEvent,
   // Presence
-  setWahaPresenceStatus, getWahaPresence, subscribeWahaPresence,
+  setWahaPresenceStatus, getWahaPresence, subscribeWahaPresence, getAllWahaPresence,
   // Profile
   getWahaProfile, setWahaProfileName, setWahaProfileStatus, setWahaProfilePicture, deleteWahaProfilePicture,
   // LID
@@ -191,6 +193,9 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   revokeInviteCode: (p, cfg, aid) => revokeWahaGroupInviteCode({ cfg, groupId: String(p.groupId), accountId: aid }),
   joinGroup: (p, cfg, aid) => joinWahaGroup({ cfg, inviteCode: String(p.inviteCode), accountId: aid }),
   getGroupsCount: (p, cfg, aid) => getWahaGroupsCount({ cfg, accountId: aid }),
+  // Group helpers — Added Phase 28, Plan 01
+  getGroupJoinInfo: (p, cfg, aid) => getWahaGroupJoinInfo({ cfg, groupId: String(p.groupId), accountId: aid }),
+  refreshGroups: (p, cfg, aid) => refreshWahaGroups({ cfg, accountId: aid }),
   // Contacts
   getContacts: (p, cfg, aid) => getWahaContacts({ cfg, accountId: aid }),
   getContact: (p, cfg, aid) => getWahaContact({ cfg, contactId: String(p.contactId), accountId: aid }),
@@ -224,10 +229,17 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   unmuteChannel: (p, cfg, aid) => unmuteWahaChannel({ cfg, channelId: String(p.channelId), accountId: aid }),
   searchChannelsByText: (p, cfg, aid) => searchWahaChannelsByText({ cfg, query: String(p.query), accountId: aid }),
   previewChannelMessages: (p, cfg, aid) => previewWahaChannelMessages({ cfg, channelId: String(p.channelId), accountId: aid }),
+  // Channel search — Added Phase 28, Plan 01
+  searchChannelsByView: (p, cfg, aid) => searchWahaChannelsByView({ cfg, viewType: String(p.viewType ?? p.view ?? "RECOMMENDED"), accountId: aid }),
+  getChannelSearchViews: (p, cfg, aid) => getWahaChannelSearchViews({ cfg, accountId: aid }),
+  getChannelSearchCountries: (p, cfg, aid) => getWahaChannelSearchCountries({ cfg, accountId: aid }),
+  getChannelSearchCategories: (p, cfg, aid) => getWahaChannelSearchCategories({ cfg, accountId: aid }),
   // Presence
   setPresenceStatus: (p, cfg, aid) => setWahaPresenceStatus({ cfg, status: p.status as "online" | "offline", accountId: aid }),
   getPresence: (p, cfg, aid) => getWahaPresence({ cfg, contactId: String(p.contactId), accountId: aid }),
   subscribePresence: (p, cfg, aid) => subscribeWahaPresence({ cfg, contactId: String(p.contactId), accountId: aid }),
+  // Bulk presence — Added Phase 28, Plan 01
+  getAllPresence: (p, cfg, aid) => getAllWahaPresence({ cfg, accountId: aid }),
   // Profile
   getProfile: (p, cfg, aid) => getWahaProfile({ cfg, accountId: aid }),
   setProfileName: (p, cfg, aid) => setWahaProfileName({ cfg, name: String(p.name), accountId: aid }),
@@ -372,6 +384,9 @@ const UTILITY_ACTIONS = [
   "resolveTarget",
   "muteChat", "unmuteChat", // Chat mute/unmute — Added Phase 3, Plan 01. DO NOT REMOVE.
   "editPolicy", // Phase 6: Rules-based policy edit. Manager-authorized field edits for contacts/groups. DO NOT REMOVE.
+  "searchChannelsByView", "getChannelSearchViews", "getChannelSearchCountries", "getChannelSearchCategories", // Channel search metadata. Added Phase 28, Plan 01.
+  "getGroupJoinInfo", "refreshGroups", // Group helpers. Added Phase 28, Plan 01.
+  "getAllPresence", // Bulk presence — all subscribed contacts. Added Phase 28, Plan 01.
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.
