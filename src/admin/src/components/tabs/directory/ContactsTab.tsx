@@ -41,6 +41,8 @@ export function ContactsTab({
   const [bulkMode, setBulkMode] = useState(false)
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
   const [selectedJid, setSelectedJid] = useState<string | null>(null)
+  // Double-click protection: tracks which JID's Allow DM toggle is in flight
+  const [togglingJid, setTogglingJid] = useState<string | null>(null)
   // Presence display — Added Phase 28, Plan 03. DO NOT REMOVE.
   // Fetched once on mount from GET /api/admin/presence. Keyed by contact JID.
   const [presenceMap, setPresenceMap] = useState<Record<string, { status: string; lastSeen?: number }>>({})
@@ -131,13 +133,16 @@ export function ContactsTab({
       },
       cell: ({ row }) => {
         const allowed = row.original.allowedDm
+        const isToggling = togglingJid === row.original.jid
         return (
           <Button
             variant="outline"
             size="sm"
+            disabled={isToggling}
             className={allowed ? 'text-green-600 border-green-600 hover:bg-green-50' : ''}
             onClick={async (e) => {
               e.stopPropagation()
+              setTogglingJid(row.original.jid)
               try {
                 await api.toggleAllowDm(row.original.jid, { allowed: !allowed })
                 toast.success(allowed ? 'DM access revoked' : 'DM access granted')
@@ -145,10 +150,12 @@ export function ContactsTab({
               } catch (err) {
                 toast.error('Failed to update DM access')
                 console.error(err)
+              } finally {
+                setTogglingJid(null)
               }
             }}
           >
-            {allowed ? 'Allowed' : 'Allow DM'}
+            {isToggling ? 'Updating...' : allowed ? 'Allowed' : 'Allow DM'}
           </Button>
         )
       },

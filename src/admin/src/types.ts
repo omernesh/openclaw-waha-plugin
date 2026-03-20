@@ -160,6 +160,7 @@ export interface DirectoryContact {
   expiresAt: number | null
   expired: boolean
   source: string | null
+  participantCount?: number    // present on group entries
 }
 
 export interface ContactDmSettings {

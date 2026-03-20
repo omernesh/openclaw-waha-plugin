@@ -93,10 +93,10 @@ export function GroupsTab({
       header: 'Members',
       meta: {
         sortable: true,
-        sortValue: (row: DirectoryContact) => (row as DirectoryContact & { participantCount?: number }).participantCount ?? 0,
+        sortValue: (row: DirectoryContact) => row.participantCount ?? 0,
       },
       cell: ({ row }) => (
-        <span className="text-sm">{(row.original as DirectoryContact & { participantCount?: number }).participantCount ?? '—'}</span>
+        <span className="text-sm">{row.original.participantCount ?? '—'}</span>
       ),
     },
     {

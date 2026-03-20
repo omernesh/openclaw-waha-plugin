@@ -41,6 +41,8 @@ export function ChannelsTab({
   // Per-channel settings sheet (same as ContactsTab pattern)
   const [selectedJid, setSelectedJid] = useState<string | null>(null)
   const selectedChannel = selectedJid ? data.find((d) => d.jid === selectedJid) ?? null : null
+  // Double-click protection: tracks which JID's Allow DM toggle is in flight
+  const [togglingJid, setTogglingJid] = useState<string | null>(null)
 
   // Column definitions — DO NOT CHANGE: ColumnDef<DirectoryContact> required for type safety
   // meta.sortable + meta.sortValue enable client-side sorting in DataTable
@@ -101,13 +103,16 @@ export function ChannelsTab({
       },
       cell: ({ row }) => {
         const allowed = row.original.allowedDm
+        const isToggling = togglingJid === row.original.jid
         return (
           <Button
             variant="outline"
             size="sm"
+            disabled={isToggling}
             className={allowed ? 'text-green-600 border-green-600 hover:bg-green-50' : ''}
             onClick={async (e) => {
               e.stopPropagation()
+              setTogglingJid(row.original.jid)
               try {
                 await api.toggleAllowDm(row.original.jid, { allowed: !allowed })
                 toast.success(allowed ? 'DM access revoked' : 'DM access granted')
@@ -115,10 +120,12 @@ export function ChannelsTab({
               } catch (err) {
                 toast.error('Failed to update DM access')
                 console.error(err)
+              } finally {
+                setTogglingJid(null)
               }
             }}
           >
-            {allowed ? 'Allowed' : 'Allow DM'}
+            {isToggling ? 'Updating...' : allowed ? 'Allowed' : 'Allow DM'}
           </Button>
         )
       },

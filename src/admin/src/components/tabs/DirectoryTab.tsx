@@ -146,14 +146,16 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
         </Button>
       </div>
 
-      {/* Summary counts row */}
+      {/* Summary counts row — guard against empty results showing "1-0" */}
       {data && (
         <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 px-1">
           <span>Contacts <span className="font-medium text-foreground">{data.dms}</span></span>
           <span>Groups <span className="font-medium text-foreground">{data.groups}</span></span>
           <span>Newsletters <span className="font-medium text-foreground">{data.newsletters}</span></span>
           <span className="text-muted-foreground/70">
-            Showing {pagination.pageIndex * pagination.pageSize + 1}–{pagination.pageIndex * pagination.pageSize + data.contacts.length} of {data.total}
+            {data.contacts.length === 0
+              ? 'No results'
+              : `Showing ${pagination.pageIndex * pagination.pageSize + 1}\u2013${pagination.pageIndex * pagination.pageSize + data.contacts.length} of ${data.total}`}
           </span>
         </div>
       )}

@@ -52,12 +52,11 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
     try {
       // DO NOT CHANGE: sends { allowed: boolean } — server reads "allowed" not "allow"
       await api.bulkAllowAll(groupJid, { allowed: newValue })
-      setAllowAll(newValue)
-      toast.success(newValue ? 'All participants allowed' : 'All participants blocked')
-      // Re-fetch to get updated participant states
+      // Re-fetch to get updated participant states — must complete before showing success toast
       const r = await api.getGroupParticipants(groupJid)
       setParticipants(r.participants)
       setAllowAll(r.allowAll)
+      toast.success(newValue ? 'All participants allowed' : 'All participants blocked')
     } catch (err) {
       console.error('handleAllowAll failed:', err)
       toast.error('Failed to update participants')
@@ -92,13 +91,14 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
     }
   }
 
-  async function handleRoleChange(p: ParticipantEnriched, newRole: string) {
+  // Fix 7: narrowed newRole type — no more `as` cast needed in optimistic update
+  async function handleRoleChange(p: ParticipantEnriched, newRole: ParticipantEnriched['participantRole']) {
     try {
       await api.updateParticipantRole(groupJid, p.participantJid, { role: newRole })
       setParticipants(prev =>
         prev.map(x =>
           x.participantJid === p.participantJid
-            ? { ...x, participantRole: newRole as ParticipantEnriched['participantRole'] }
+            ? { ...x, participantRole: newRole }
             : x
         )
       )
@@ -144,7 +144,7 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
             >
               {/* Avatar + stacked name/JID — 260320-u7x */}
               <Avatar name={p.displayName} size="sm" />
-              <div className="flex flex-col min-w-0 min-w-[140px]">
+              <div className="flex flex-col min-w-[140px]">
                 <span className="text-sm font-medium leading-tight truncate">
                   {p.displayName ?? p.participantJid}
                 </span>
@@ -199,7 +199,7 @@ export function ParticipantRow({ groupJid }: ParticipantRowProps) {
                   {/* Role dropdown */}
                   <Select
                     value={p.participantRole}
-                    onValueChange={(v) => handleRoleChange(p, v)}
+                    onValueChange={(v: ParticipantEnriched['participantRole']) => handleRoleChange(p, v)}
                   >
                     <SelectTrigger className="w-[130px] h-8 text-xs">
                       <SelectValue />

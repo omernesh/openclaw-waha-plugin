@@ -86,13 +86,6 @@ export function DataTable<TData>({
   // Client-side sort state for current page data
   const [sort, setSort] = React.useState<SortState | null>(null)
 
-  // Reset sort when page changes (data changes)
-  const pageRef = React.useRef(pagination.pageIndex)
-  if (pageRef.current !== pagination.pageIndex) {
-    pageRef.current = pagination.pageIndex
-    // Don't reset sort on page change — keep user's sort preference
-  }
-
   // Toggle sort cycle: none -> asc -> desc -> none
   function handleHeaderClick(columnId: string) {
     setSort((prev) => {
