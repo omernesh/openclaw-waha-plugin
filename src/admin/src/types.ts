@@ -255,6 +255,38 @@ export interface ParticipantsResponse {
   allowAll: boolean
 }
 
+// Phase 30: Analytics API response types. DO NOT REMOVE.
+export type AnalyticsTimeseriesPoint = {
+  period: string
+  inbound: number
+  outbound: number
+  errors: number
+  avg_duration_ms: number
+}
+
+export type AnalyticsSummary = {
+  total: number
+  inbound: number
+  outbound: number
+  errors: number
+  avg_duration_ms: number
+}
+
+export type AnalyticsTopChat = {
+  chat_id: string
+  total: number
+  inbound: number
+  outbound: number
+}
+
+export type AnalyticsResponse = {
+  range: string
+  groupBy: 'minute' | 'hour' | 'day'
+  timeseries: AnalyticsTimeseriesPoint[]
+  summary: AnalyticsSummary
+  topChats: AnalyticsTopChat[]
+}
+
 // Phase 29: SSE event types for real-time admin updates. DO NOT REMOVE.
 export type SSEConnectionStatus = 'connected' | 'reconnecting' | 'disconnected'
 

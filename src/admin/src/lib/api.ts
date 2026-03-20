@@ -17,6 +17,7 @@ import type {
   ParticipantsResponse,
   LogResponse,
   WahaConfig,
+  AnalyticsResponse,
 } from '@/types'
 
 const BASE = '/api/admin'
@@ -183,6 +184,13 @@ export const api = {
   // Bulk directory operations — returns { ok: true, updated: number }
   bulkDirectory: (body: { action: 'allow-dm' | 'revoke-dm' | 'set-role' | 'follow' | 'unfollow'; jids: string[]; value?: unknown; groupJid?: string }) =>
     request<{ ok: boolean; updated: number }>('/directory/bulk', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Analytics — Phase 30
+  getAnalytics: (range = '24h', groupBy?: string): Promise<AnalyticsResponse> => {
+    const params = new URLSearchParams({ range })
+    if (groupBy) params.set('groupBy', groupBy)
+    return request<AnalyticsResponse>(`/analytics?${params}`)
+  },
 
   // Pairing
   getPairingDeeplink: (jid: string) =>
