@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, extname, dirname, resolve as pathResolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,7 @@ import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 import { getPairingEngine } from "./pairing.js";
 import { getModuleRegistry } from "./module-registry.js";
+import { validateWahaConfig } from "./config-schema.js";
 
 const DEFAULT_WEBHOOK_PORT = 8050;
 const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
@@ -219,6 +220,26 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
 function getConfigPath(): string {
   // Config save path: must write to ~/.openclaw/openclaw.json (NOT workspace subfolder)
   return process.env.OPENCLAW_CONFIG_PATH ?? join(homedir(), ".openclaw", "openclaw.json");
+}
+
+// rotateConfigBackups — creates a rolling backup of openclaw.json before each save.
+// Keeps at most 3 backups: .bak.1 (newest), .bak.2, .bak.3 (oldest).
+// Rotation: delete .bak.3, shift .bak.2->.bak.3, .bak.1->.bak.2, copy current->.bak.1.
+// Failure is non-fatal: logs a warning but does NOT block the save.
+// Added Phase 26 (CFG-03). DO NOT REMOVE.
+function rotateConfigBackups(configPath: string): void {
+  try {
+    const bak1 = configPath + ".bak.1";
+    const bak2 = configPath + ".bak.2";
+    const bak3 = configPath + ".bak.3";
+    // Shift existing backups: .bak.2 -> .bak.3, .bak.1 -> .bak.2
+    if (existsSync(bak2)) renameSync(bak2, bak3);
+    if (existsSync(bak1)) renameSync(bak1, bak2);
+    // Copy current config as newest backup
+    if (existsSync(configPath)) copyFileSync(configPath, bak1);
+  } catch (err) {
+    console.warn(`[waha] rotateConfigBackups: backup failed (non-fatal): ${String(err)}`);
+  }
 }
 
 // Legacy buildAdminHtml and escapeHtml removed in Phase 24 — React SPA serves /admin now.
@@ -679,6 +700,60 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
+    // GET /api/admin/config/export — returns full openclaw.json as downloadable file.
+    // Content-Disposition triggers browser download. Returns raw file, not just waha section.
+    // Added Phase 26 (CFG-04). DO NOT REMOVE.
+    if (req.url === "/api/admin/config/export" && req.method === "GET") {
+      try {
+        const configPath = getConfigPath();
+        const raw = readFileSync(configPath, "utf-8");
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Content-Disposition": 'attachment; filename="openclaw-config.json"',
+        });
+        res.end(raw);
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/config/export failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
+      return;
+    }
+
+    // POST /api/admin/config/import — validates and applies an imported openclaw.json.
+    // Validates the waha section against Zod schema. Rejects with 400 + field errors on failure.
+    // On success: rotates backups, writes full config, returns { ok: true }.
+    // Added Phase 26 (CFG-05). DO NOT REMOVE.
+    if (req.url === "/api/admin/config/import" && req.method === "POST") {
+      try {
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const importedConfig = JSON.parse(bodyStr) as Record<string, unknown>;
+        const importedChannels = (importedConfig.channels as Record<string, unknown>) ?? {};
+        const importedWaha = (importedChannels.waha as Record<string, unknown>) ?? {};
+
+        // Validate waha section before applying
+        const validationResult = validateWahaConfig(importedWaha);
+        if (!validationResult.valid) {
+          writeJsonResponse(res, 400, {
+            error: "validation_failed",
+            fields: validationResult.errors.map((e) => ({
+              path: e.path.join("."),
+              message: e.message,
+            })),
+          });
+          return;
+        }
+
+        const configPath = getConfigPath();
+        rotateConfigBackups(configPath);
+        writeFileSync(configPath, JSON.stringify(importedConfig, null, 2), "utf-8");
+        writeJsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        console.error(`[waha] POST /api/admin/config/import failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
+      return;
+    }
+
     // POST /api/admin/config
     if (req.url === "/api/admin/config" && req.method === "POST") {
       try {
@@ -702,6 +777,21 @@ export function createWahaWebhookServer(opts: {
         if (currentWaha.webhookHmacKeyFile) merged.webhookHmacKeyFile = currentWaha.webhookHmacKeyFile;
         // godModeSuperUsers are now editable via the admin panel UI
 
+        // Validate merged waha config against Zod schema before writing to disk.
+        // Returns 400 with field-level errors on failure — does NOT modify config file.
+        // Added Phase 26 (CFG-01, CFG-02). DO NOT REMOVE.
+        const validationResult = validateWahaConfig(merged);
+        if (!validationResult.valid) {
+          writeJsonResponse(res, 400, {
+            error: "validation_failed",
+            fields: validationResult.errors.map((e) => ({
+              path: e.path.join("."),
+              message: e.message,
+            })),
+          });
+          return;
+        }
+
         const updatedConfig = {
           ...currentConfig,
           channels: {
@@ -716,6 +806,9 @@ export function createWahaWebhookServer(opts: {
           incomingWaha.webhookPort !== undefined ||
           incomingWaha.webhookPath !== undefined;
 
+        // Rotate backups before writing — keeps last 3 copies as safety net.
+        // Backup failure is non-fatal (logged as warning). Added Phase 26 (CFG-03).
+        rotateConfigBackups(configPath);
         writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, restartRequired }));

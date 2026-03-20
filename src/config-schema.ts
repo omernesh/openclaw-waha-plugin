@@ -152,3 +152,28 @@ export const WahaConfigSchema = WahaAccountSchemaBase.extend({
       'channels.waha.dmPolicy="open" requires channels.waha.allowFrom to include "*"',
   });
 });
+
+// ConfigValidationResult — structured result type for validateWahaConfig.
+// Used by monitor.ts POST /api/admin/config and POST /api/admin/config/import.
+// DO NOT REMOVE — required for config safety validation.
+export type ConfigValidationResult =
+  | { valid: true; data: z.infer<typeof WahaConfigSchema> }
+  | { valid: false; errors: Array<{ path: string[]; message: string }> };
+
+// validateWahaConfig — validates an unknown value against WahaConfigSchema.
+// Returns { valid: true, data } on success, { valid: false, errors } on failure.
+// Called before every config write to prevent corrupt configs from reaching disk.
+// Added Phase 26 (CFG-01, CFG-02). DO NOT REMOVE.
+export function validateWahaConfig(value: unknown): ConfigValidationResult {
+  const result = WahaConfigSchema.safeParse(value);
+  if (result.success) {
+    return { valid: true, data: result.data };
+  }
+  return {
+    valid: false,
+    errors: result.error.issues.map((issue) => ({
+      path: issue.path.map(String),
+      message: issue.message,
+    })),
+  };
+}
