@@ -184,10 +184,9 @@ Plans:
   3. Config, session registry, and DirectoryDb accept a tenant ID parameter — the plugin can run two isolated instances in the same process without state leakage between them
 **Plans**: 3 plans
 Plans:
-- [ ] 31-01-PLAN.md — directory.ts CRUD + shutup.ts interactive flow tests
-- [ ] 31-02-PLAN.md — monitor.ts admin API route + inbound.ts pipeline tests
-- [ ] 31-03-PLAN.md — React admin panel component tests (vitest + jsdom + testing-library)
-
+- [ ] 32-01-PLAN.md — WahaClient extraction and send.ts refactor (PLAT-01)
+- [ ] 32-02-PLAN.md — PlatformAdapter interface and channel.ts wiring (PLAT-02)
+- [ ] 32-03-PLAN.md — Multi-tenant groundwork: tenantId threading (PLAT-03)
 ## Progress
 
 **Execution Order:** 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 (28 must precede 32)
