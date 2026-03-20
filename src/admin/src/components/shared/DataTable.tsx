@@ -2,6 +2,7 @@
 // DO NOT CHANGE: uses v8 API (useReactTable, not useTable). manualPagination: true is required
 // for server-side pagination to work correctly. getCoreRowModel() is REQUIRED.
 // Verified working: Phase 21 (2026-03-18)
+// Pagination overhaul: numbered pages + page-size dropdown — quick task 260320-u7x
 
 import * as React from 'react'
 import {
@@ -19,6 +20,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, unknown>[]
@@ -33,6 +43,7 @@ interface DataTableProps<TData> {
   getRowId?: (row: TData) => string       // default: uses 'jid' field
   expandedRowId?: string | null           // for group participant expansion
   renderExpandedRow?: (row: TData) => React.ReactNode
+  pageSizeOptions?: number[]              // default: [10, 25, 50, 100]
 }
 
 export function DataTable<TData>({
@@ -48,8 +59,9 @@ export function DataTable<TData>({
   getRowId,
   expandedRowId,
   renderExpandedRow,
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
 }: DataTableProps<TData>) {
-  const pageCount = Math.ceil(total / pagination.pageSize)
+  const pageCount = Math.max(1, Math.ceil(total / pagination.pageSize))
 
   const table = useReactTable({
     data,
@@ -72,6 +84,18 @@ export function DataTable<TData>({
     // DO NOT CHANGE: getRowId defaults to 'jid' field — all directory entries have jid
     getRowId: getRowId ?? ((row) => (row as Record<string, unknown>).jid as string),
   })
+
+  // Build visible page number window (up to 5 pages around current)
+  const currentPage = pagination.pageIndex
+  function getPageNumbers(): number[] {
+    if (pageCount <= 5) {
+      return Array.from({ length: pageCount }, (_, i) => i)
+    }
+    let start = Math.max(0, currentPage - 2)
+    const end = Math.min(pageCount - 1, start + 4)
+    start = Math.max(0, end - 4)
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i)
+  }
 
   return (
     <div className="space-y-2">
@@ -131,29 +155,98 @@ export function DataTable<TData>({
         </Table>
       </div>
 
-      {/* Pagination controls */}
-      <div className="flex items-center justify-between px-1">
+      {/* Pagination controls — numbered pages + page-size dropdown */}
+      <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+        {/* Left: page-size dropdown */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Rows per page:</span>
+          <Select
+            value={String(pagination.pageSize)}
+            onValueChange={(val) => {
+              onPaginationChange({ pageIndex: 0, pageSize: Number(val) })
+            }}
+            disabled={!!loading}
+          >
+            <SelectTrigger className="h-8 w-[72px] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pageSizeOptions.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Center: page info */}
         <div className="text-sm text-muted-foreground">
           {total > 0
-            ? `Page ${pagination.pageIndex + 1} of ${Math.max(1, pageCount)} (${total} total)`
+            ? `Page ${pagination.pageIndex + 1} of ${pageCount} (${total} total)`
             : 'No results'}
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Right: numbered pagination bar */}
+        <div className="flex items-center gap-1">
+          {/* First page */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onPaginationChange({ ...pagination, pageIndex: pagination.pageIndex - 1 })}
-            disabled={pagination.pageIndex === 0 || loading}
+            className="h-8 w-8 p-0"
+            onClick={() => onPaginationChange({ ...pagination, pageIndex: 0 })}
+            disabled={currentPage === 0 || !!loading}
+            title="First page"
           >
-            Previous
+            {'<<'}
           </Button>
+          {/* Previous */}
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onPaginationChange({ ...pagination, pageIndex: pagination.pageIndex + 1 })}
-            disabled={pagination.pageIndex >= pageCount - 1 || loading}
+            className="h-8 w-8 p-0"
+            onClick={() => onPaginationChange({ ...pagination, pageIndex: currentPage - 1 })}
+            disabled={currentPage === 0 || !!loading}
+            title="Previous page"
           >
-            Next
+            {'<'}
+          </Button>
+
+          {/* Numbered page buttons */}
+          {getPageNumbers().map((pageNum) => (
+            <Button
+              key={pageNum}
+              variant={pageNum === currentPage ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => onPaginationChange({ ...pagination, pageIndex: pageNum })}
+              disabled={!!loading}
+            >
+              {pageNum + 1}
+            </Button>
+          ))}
+
+          {/* Next */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => onPaginationChange({ ...pagination, pageIndex: currentPage + 1 })}
+            disabled={currentPage >= pageCount - 1 || !!loading}
+            title="Next page"
+          >
+            {'>'}
+          </Button>
+          {/* Last page */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => onPaginationChange({ ...pagination, pageIndex: pageCount - 1 })}
+            disabled={currentPage >= pageCount - 1 || !!loading}
+            title="Last page"
+          >
+            {'>>'}
           </Button>
         </div>
       </div>
