@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with a React admin panel (shadcn/ui, Tailwind CSS, Vite) for directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine that enforces policies on inbound and outbound messages across sessions with configurable merge strategies. v1.11 added background directory sync with FTS5 full-text search, name resolution for @lid JIDs across all admin panel surfaces, TTL-based auto-expiring access for contacts and groups, passcode-gated pairing mode with wa.me deep links, an auto-reply system for unauthorized DMs, and a modules framework with admin panel integration. v1.12 replaced the legacy embedded HTML/JS admin panel with a modern React SPA built on shadcn/ui, Tailwind CSS, and Vite.
+A production-grade WhatsApp channel plugin for OpenClaw that enables AI agents to fully interact with WhatsApp — messaging, group management, contact resolution, media handling, multi-session support, and a rules/policy enforcement system. Deployed on hpg6, serving as the bridge between OpenClaw's AI gateway and WAHA (WhatsApp HTTP API). Ships with a React admin panel (shadcn/ui, Tailwind CSS, Vite) with real-time SSE updates, analytics charts, directory management, configuration, filter stats, session health, and logs. Includes a YAML-based rules engine, session auto-recovery, config validation/backup, and platform abstraction groundwork for future SaaS deployment. v1.13 closed all remaining gaps: session auto-recovery with alerting, config safety (Zod validation, backup rotation, export/import), full WAHA API coverage, real-time admin panel via SSE, analytics tab with SQLite event store and recharts charts, 149 new tests, and WahaClient/PlatformAdapter abstraction layer.
 
 ## Core Value
 
@@ -64,6 +64,18 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Full admin panel UI rewrite with React + shadcn/ui + Tailwind CSS + Vite — v1.12
 - ✓ Mobile-responsive admin panel layout — v1.12
 - ✓ All existing admin panel functionality preserved in new UI framework — v1.12
+- ✓ Session auto-recovery with cooldown and alerting — v1.13
+- ✓ Config validation, backup rotation, export/import — v1.13
+- ✓ Pairing cleanup, bot echo fix, code quality fixes — v1.13
+- ✓ Full WAHA API coverage (channels, presence, groups, API keys, webhooks) — v1.13
+- ✓ Real-time admin panel via SSE (health, queue, logs) — v1.13
+- ✓ Analytics tab with SQLite event store and recharts charts — v1.13
+- ✓ Test coverage sprint (149 new tests: monitor, inbound, directory, shutup, React) — v1.13
+- ✓ Platform abstraction (WahaClient, PlatformAdapter, tenant-aware config) — v1.13
+
+### Active
+
+(No active requirements — next milestone will define them.)
 
 ### Out of Scope
 
@@ -76,31 +88,20 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone: v1.13 Close All Gaps
+## Current Milestone
 
-**Goal:** Close every remaining gap — session auto-recovery, config safety, API coverage completion (channels, presence, groups, API keys), real-time admin panel, analytics, test coverage, code quality fixes, pairing cleanup, and platform abstraction groundwork for future SaaS deployment.
-
-**Target features:**
-- Session auto-recovery with alerting
-- Config validation, backup/restore, export/import
-- Pairing system cleanup (dead code, bot echo fix)
-- Full WAHA API coverage (channel search metadata, bulk presence, group join-info/refresh, group events, API keys)
-- Real-time admin panel via SSE
-- Analytics tab with charts
-- Comprehensive test coverage for untested modules
-- Code quality fixes (remaining TODOs, singleton guards, theme auto-detect)
-- Platform abstraction (WahaClient, adapter interface, multi-tenant groundwork)
+v1.13 shipped 2026-03-20. Next milestone is TBD.
 
 ## Context
 
 - **Runtime**: TypeScript on Node.js, deployed to hpg6 Linux server
-- **Codebase**: 13,026+ LOC TypeScript (38+ source files including v1.11 additions: sync.ts, pairing.ts, auto-reply.ts, module-registry.ts, module-types.ts; v1.12: src/admin/ React SPA ~3000+ lines TSX), 5,619+ LOC tests, 313+ passing tests; monitor.ts reduced from ~5500 lines to ~1960 lines after v1.12
+- **Codebase**: 15,000+ LOC TypeScript (40+ source files including WahaClient, PlatformAdapter, AnalyticsDb, SSE; src/admin/ React SPA ~4000+ lines TSX), 7,500+ LOC tests, 460+ passing tests
 - **WAHA Engine**: NOWEB (has known limitations — poll.vote <5% capture, contacts API needs store.enabled)
 - **Gateway**: OpenClaw at `/usr/lib/node_modules/openclaw/dist/` — READ-ONLY, not ours
 - **Sessions**: `3cf11776_logan` (bot), `3cf11776_omer` (Omer/human)
 - **Primary user**: OpenClaw agent on WhatsApp, model gpt-5.3-codex
 - **Code is brittle**: Many hard-won fixes have DO NOT CHANGE markers — always read comments before modifying
-- **~95% WAHA API coverage** as of v1.10
+- **~99% WAHA API coverage** as of v1.13
 
 ## Constraints
 
@@ -143,6 +144,12 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | shadcn/ui over React Aria for admin panel UI | React Aria is headless (must design everything from scratch), shadcn/ui is pre-styled on Radix primitives with Tailwind — better fit for internal dashboard | ✓ Good |
 | Vite for admin panel build | First-class React support, HMR for dev, optimized builds, shadcn/ui official integration | ✓ Good |
 | Full UI rewrite (not incremental) | Current code was concatenated HTML strings — no component structure to migrate incrementally | ✓ Good |
+| SSE for real-time admin panel (not WebSocket) | Simpler, unidirectional, auto-reconnect built in, no ws library needed | ✓ Good |
+| Zod for config validation | Type-safe schema with structured error messages, composable with TypeScript types | ✓ Good |
+| WahaClient class extraction | Consolidates all WAHA API calls behind a single class, enables testing and future transport swap | ✓ Good |
+| PlatformAdapter interface | Decouples business logic from transport — future platforms only need a new adapter | ✓ Good |
+| SQLite analytics event store | Reuses existing SQLite infrastructure, no external dependencies, simple aggregation queries | ✓ Good |
+| 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-20 after v1.13 milestone start*
+*Last updated: 2026-03-20 — v1.13 shipped*

@@ -1,10 +1,21 @@
 # Milestones
 
+## v1.13 Close All Gaps (Shipped: 2026-03-20)
+
+**Phases completed:** 8 phases, 19 plans, 2 tasks
+
+**Key accomplishments:**
+
+- (none recorded)
+
+---
+
 ## v1.12 UI Overhaul & Feature Polish (Shipped: 2026-03-18)
 
 **Phases completed:** 7 phases, 14 plans, 7 tasks
 
 **Key accomplishments:**
+
 - (none recorded)
 
 ---
@@ -14,6 +25,7 @@
 **Phases completed:** 6 phases, 18 plans, 6 tasks
 
 **Key accomplishments:**
+
 - (none recorded)
 
 ---
@@ -25,6 +37,7 @@
 **Requirements:** 65/65 satisfied | **Integration:** 65/65 wired | **E2E Flows:** 9/9 verified
 
 **Key accomplishments:**
+
 1. Reliability foundation — timeouts, rate limiting, exponential backoff on all WAHA API calls
 2. Multi-session support — bot + human sessions with role-based permissions and trigger words
 3. Rules & policy system — file-based hierarchical YAML policies with 5-layer merge engine
@@ -33,4 +46,3 @@
 6. Complete documentation — SKILL.md v4.0 and README with deployment guide
 
 ---
-
