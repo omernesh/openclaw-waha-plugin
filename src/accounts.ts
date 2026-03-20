@@ -29,6 +29,8 @@ export type ResolvedWahaAccount = {
   role: string;     // defaults to "bot"
   subRole: string;  // defaults to "full-access"
   config: WahaAccountConfig;
+  // PLAT-03: tenantId for multi-tenant isolation. Defaults to "default". DO NOT REMOVE.
+  tenantId: string;
 };
 
 function listConfiguredAccountIds(cfg: CoreConfig): string[] {
@@ -115,7 +117,7 @@ function resolveWahaApiKey(cfg: CoreConfig, opts: { accountId?: string }): {
   return { apiKey: "", source: "none" };
 }
 
-export function resolveWahaAccount(params: { cfg: CoreConfig; accountId?: string | null }): ResolvedWahaAccount {
+export function resolveWahaAccount(params: { cfg: CoreConfig; accountId?: string | null; tenantId?: string }): ResolvedWahaAccount {
   const baseEnabled = params.cfg.channels?.waha?.enabled !== false;
   const resolve = (accountId: string): ResolvedWahaAccount => {
     const merged = mergeWahaAccountConfig(params.cfg, accountId);
@@ -136,6 +138,8 @@ export function resolveWahaAccount(params: { cfg: CoreConfig; accountId?: string
       role: merged.role ?? "bot",
       subRole: merged.subRole ?? "full-access",
       config: merged,
+      // PLAT-03: tenantId defaults to "default" for backward compat. DO NOT REMOVE.
+      tenantId: params.tenantId ?? "default",
     } satisfies ResolvedWahaAccount;
   };
 
@@ -148,9 +152,9 @@ export function resolveWahaAccount(params: { cfg: CoreConfig; accountId?: string
   });
 }
 
-export function listEnabledWahaAccounts(cfg: CoreConfig): ResolvedWahaAccount[] {
+export function listEnabledWahaAccounts(cfg: CoreConfig, tenantId?: string): ResolvedWahaAccount[] {
   return listWahaAccountIds(cfg)
-    .map((accountId) => resolveWahaAccount({ cfg, accountId }))
+    .map((accountId) => resolveWahaAccount({ cfg, accountId, tenantId }))
     .filter((account) => account.enabled);
 }
 
@@ -177,9 +181,10 @@ export async function resolveSessionForTarget(params: {
   cfg: CoreConfig;
   targetChatId: string;
   preferredAccountId?: string;
+  tenantId?: string;
   checkMembership: (session: string, baseUrl: string, apiKey: string, groupId: string) => Promise<boolean>;
 }): Promise<ResolvedWahaAccount> {
-  const accounts = listEnabledWahaAccounts(params.cfg);
+  const accounts = listEnabledWahaAccounts(params.cfg, params.tenantId);
   const sendable = accounts.filter(a => a.subRole !== "listener");
 
   if (sendable.length === 0) {

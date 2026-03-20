@@ -622,7 +622,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       // DO NOT CHANGE — this is the outbound enforcement gate for Can Initiate policy.
       // Added 2026-03-17.
       if (chatId && (chatId.endsWith("@c.us") || chatId.endsWith("@lid"))) {
-        const dirDb = getDirectoryDb(aid ?? "default");
+        const dirDb = getDirectoryDb(aid ?? "default", _tenantId);
         if (!dirDb.hasReceivedMessageFrom(chatId)) {
           const wahaConfig = coreCfg.channels?.waha;
           const globalDefault = wahaConfig?.canInitiateGlobal ?? true;
@@ -677,7 +677,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
       // Bot proxy detection for cross-session sends — when the bot routes through
       // a human session, prefix the message so recipients know it's the bot.
       // DO NOT CHANGE — prevents confusion about message source in group chats.
-      const resolvedAccount = resolveWahaAccount({ cfg: coreCfg, accountId: resolvedAid });
+      const resolvedAccount = resolveWahaAccount({ cfg: coreCfg, accountId: resolvedAid, tenantId: _tenantId });
       const isBotProxy = resolvedAccount.role !== "bot";
 
       const result = await sendWahaText({ cfg: coreCfg, to: chatId, text, replyToId, accountId: resolvedAid, botProxy: isBotProxy });
@@ -823,7 +823,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
   configSchema: buildChannelConfigSchema(WahaConfigSchema),
   config: {
     listAccountIds: (cfg) => listWahaAccountIds(cfg as CoreConfig),
-    resolveAccount: (cfg, accountId) => resolveWahaAccount({ cfg: cfg as CoreConfig, accountId }),
+    resolveAccount: (cfg, accountId) => resolveWahaAccount({ cfg: cfg as CoreConfig, accountId, tenantId: _tenantId }),
     defaultAccountId: (cfg) => resolveDefaultWahaAccountId(cfg as CoreConfig),
     setAccountEnabled: ({ cfg, accountId, enabled }) =>
       setAccountEnabledInConfigSection({
@@ -851,7 +851,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       session: account.session,
     }),
     resolveAllowFrom: ({ cfg, accountId }) =>
-      (resolveWahaAccount({ cfg: cfg as CoreConfig, accountId }).config.allowFrom ?? []).map(
+      (resolveWahaAccount({ cfg: cfg as CoreConfig, accountId, tenantId: _tenantId }).config.allowFrom ?? []).map(
         (entry) => normalizeWahaAllowEntry(entry),
       ),
     formatAllowFrom: ({ allowFrom }) =>
