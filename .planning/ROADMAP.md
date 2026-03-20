@@ -108,7 +108,10 @@ Plans:
   3. pairing.ts is present in both hpg6 deploy locations after a standard deploy — absence is detected at startup and logged as an error
   4. The remaining `.catch(() => {})` in shutup.ts:239 is replaced with `warnOnError()` — mute confirmation failures are visible in logs
   5. Admin panel theme toggle respects `prefers-color-scheme` on first load (no manual toggle required on a fresh browser session)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 27-01-PLAN.md — Backend: pairing cleanup, bot echo fix, CQ-01/02/03
+- [ ] 27-02-PLAN.md — Frontend: system theme auto-detect, log export button
 
 ### Phase 28: API Coverage Completion
 **Goal**: All identified WAHA API gaps are closed — channel search metadata, bulk presence, group join-info, group refresh, group webhook events, API keys CRUD, and all four presence endpoints verified end-to-end.
@@ -198,8 +201,8 @@ Plans:
 | 23. Polish | v1.12 | 2/2 | Complete | 2026-03-18 |
 | 24. Cleanup and Deploy | v1.12 | 1/1 | Complete | 2026-03-18 |
 | 25. Session Auto-Recovery | v1.13 | 2/2 | Complete | 2026-03-20 |
-| 26. Config Safety | 2/2 | Complete    | 2026-03-20 | - |
-| 27. Pairing Cleanup and Code Quality | v1.13 | 0/TBD | Not started | - |
+| 26. Config Safety | v1.13 | 2/2 | Complete | 2026-03-20 |
+| 27. Pairing Cleanup and Code Quality | v1.13 | 0/2 | Not started | - |
 | 28. API Coverage Completion | v1.13 | 0/TBD | Not started | - |
 | 29. Real-Time Admin Panel | v1.13 | 0/TBD | Not started | - |
 | 30. Analytics | v1.13 | 0/TBD | Not started | - |
