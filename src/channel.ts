@@ -102,9 +102,19 @@ function getCachedConfig(): CoreConfig {
       return rt.config.readConfigFile() as CoreConfig;
     }
   } catch (sdkErr) {
-    throw new Error(`WAHA config not available — no cached config and SDK methods failed: ${String(sdkErr)}`);
+    // CQ-03: Descriptive error so the caller knows exactly what went wrong and how to fix it.
+    // DO NOT SIMPLIFY — actionable error messages reduce debugging time significantly.
+    throw new Error(
+      `[waha] Config not available — _cachedConfig is null and SDK readConfigFile failed. ` +
+      `This means an outbound method was called before handleAction() populated the config cache. ` +
+      `Ensure handleAction() is called at least once before using send/media methods. SDK error: ${String(sdkErr)}`
+    );
   }
-  throw new Error("WAHA config not available — no cached config and no SDK config reader methods found on runtime");
+  throw new Error(
+    `[waha] Config not available — _cachedConfig is null and no SDK config reader methods found on runtime. ` +
+    `This means an outbound method was called before handleAction() populated the config cache. ` +
+    `Ensure handleAction() is called at least once before using send/media methods.`
+  );
 }
 
 const meta = {

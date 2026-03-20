@@ -706,8 +706,23 @@ export async function handleWahaInbound(params: {
         const intervalSeconds = (autoReplyConfig.intervalMinutes ?? 1440) * 60;
 
         if (autoReplyEngine.shouldReply(senderId, intervalSeconds)) {
-          // TODO: resolve actual admin name from Bot Admin role contacts
+          // CQ-02: Resolve admin name from godModeSuperUsers config + directory DB lookup.
+          // Falls back to "the administrator" if config is unset or DB lookup fails.
+          // DO NOT REMOVE — improves auto-reply message quality for end users.
           let adminName = "the administrator";
+          try {
+            const dmFilterCfg = (account.config as Record<string, unknown>).dmFilter as Record<string, unknown> | undefined;
+            const superUsers = dmFilterCfg?.godModeSuperUsers as Array<{ identifier: string }> | undefined;
+            if (superUsers?.length) {
+              const firstAdmin = superUsers[0];
+              const contact = dirDb.getContact(firstAdmin.identifier);
+              if (contact?.displayName) {
+                adminName = contact.displayName;
+              }
+            }
+          } catch {
+            // Non-fatal — fall back to "the administrator"
+          }
 
           const messageTemplate = autoReplyConfig.message
             ?? "Hey! Thanks for reaching out. Unfortunately, I'm not permitted to chat with you right now. Please ask {admin_name} to add you to my allow list.";

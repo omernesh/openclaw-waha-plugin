@@ -13,7 +13,7 @@
 import { sendWahaText, getWahaGroupParticipants } from "./send.js";
 import { getDirectoryDb } from "./directory.js";
 import type { PendingSelectionRecord } from "./directory.js";
-import { callWahaApi } from "./http-client.js";
+import { callWahaApi, warnOnError } from "./http-client.js";
 import { resolveWahaAccount, listEnabledWahaAccounts } from "./accounts.js";
 import type { CoreConfig } from "./types.js";
 import type { ResolvedWahaAccount } from "./accounts.js";
@@ -236,7 +236,7 @@ export async function handleShutupCommand(params: {
             }
           }
           runtime.log?.(`[waha] shutup all: muted ${successCount}/${groups.length} groups`);
-          await sendWahaText({ cfg: config, to: chatId, text: `✅ Done. Muted ${successCount}/${groups.length} groups.`, accountId: account.accountId, bypassPolicy: true }).catch(() => {});
+          await sendWahaText({ cfg: config, to: chatId, text: `✅ Done. Muted ${successCount}/${groups.length} groups.`, accountId: account.accountId, bypassPolicy: true }).catch(warnOnError("shutup all confirmation"));
         })().catch(err => runtime.log?.(`[waha] shutup all background error: ${String(err)}`));
       } else {
         // Show group list for selection
