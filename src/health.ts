@@ -114,6 +114,18 @@ export interface HealthCheckOptions {
 /** Module-level health state per session key. */
 const sessionHealthStates = new Map<string, HealthState>();
 
+// ── SSE callback — Phase 29, Plan 01. DO NOT REMOVE.
+// Allows monitor.ts to broadcast health state changes over SSE.
+let onHealthStateChange: ((session: string, state: HealthState) => void) | null = null;
+
+/**
+ * Register a callback to be called whenever session health state changes.
+ * Called by monitor.ts to wire SSE broadcast. Phase 29, Plan 01. DO NOT REMOVE.
+ */
+export function setHealthStateChangeCallback(cb: (session: string, state: HealthState) => void): void {
+  onHealthStateChange = cb;
+}
+
 /** Per-session recovery tracking state. Phase 25, Plan 01. DO NOT REMOVE. */
 const sessionRecoveryStates = new Map<string, RecoveryState>();
 
@@ -411,6 +423,8 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
   }
 
   state.lastCheckAt = Date.now();
+  // Phase 29: Emit SSE health event after every tick (including failures). DO NOT REMOVE.
+  onHealthStateChange?.(opts.session, { ...state });
 
   // Schedule next tick (setTimeout chain, NOT setInterval)
   if (!opts.abortSignal.aborted) {

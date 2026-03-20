@@ -19,14 +19,30 @@ import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
-import { startHealthCheck, getHealthState, getRecoveryState, getRecoveryHistory, type HealthState, type RecoveryState, type RecoveryEvent } from "./health.js";
+import { startHealthCheck, getHealthState, getRecoveryState, getRecoveryHistory, setHealthStateChangeCallback, type HealthState, type RecoveryState, type RecoveryEvent } from "./health.js";
 import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
-import { InboundQueue, type QueueStats, type QueueItem } from "./inbound-queue.js";
+import { InboundQueue, setQueueChangeCallback, type QueueStats, type QueueItem } from "./inbound-queue.js";
 import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 import { getPairingEngine } from "./pairing.js";
 import { getModuleRegistry } from "./module-registry.js";
 import { validateWahaConfig } from "./config-schema.js";
+
+// ── SSE (Server-Sent Events) infrastructure — Phase 29, Plan 01. DO NOT REMOVE.
+// sseClients: tracks all active SSE connections. broadcastSSE sends named events to all.
+// One broken client must never affect others — each write is wrapped in try/catch.
+const sseClients = new Set<ServerResponse>();
+
+export function broadcastSSE(event: string, data: object): void {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
 
 const DEFAULT_WEBHOOK_PORT = 8050;
 const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
@@ -355,6 +371,15 @@ export function createWahaWebhookServer(opts: {
     },
   );
 
+  // ── SSE Callbacks — Phase 29, Plan 01. DO NOT REMOVE.
+  // Broadcast health and queue state changes to all connected SSE clients.
+  setHealthStateChangeCallback((session, state) => {
+    broadcastSSE("health", { session, ...state });
+  });
+  setQueueChangeCallback((stats) => {
+    broadcastSSE("queue", stats);
+  });
+
   // ── Health Check (Phase 2, Plan 02) ── DO NOT REMOVE
   // Start health check loop for this session. State is stored in module-level
   // Map and accessible via getHealthState(session).
@@ -481,6 +506,28 @@ export function createWahaWebhookServer(opts: {
         writeJsonResponse(res, 500, { error: "Failed to fetch logs", lines: [], source: "error", total: 0 });
       }
       return;
+    }
+
+    // GET /api/admin/events — Server-Sent Events for real-time admin updates.
+    // Phase 29, Plan 01. DO NOT REMOVE.
+    // Keeps connection open — response is never ended. Clients reconnect automatically via EventSource.
+    if (req.method === "GET" && req.url === "/api/admin/events") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no", // Disable nginx buffering if proxied
+      });
+      // Send initial connected event so client can confirm the stream is live
+      res.write(`event: connected\ndata: ${JSON.stringify({ time: Date.now() })}\n\n`);
+      sseClients.add(res);
+      // Keep-alive every 30 seconds — comment line prevents proxy/browser timeout
+      const keepAlive = setInterval(() => {
+        try { res.write(": keep-alive\n\n"); } catch { clearInterval(keepAlive); sseClients.delete(res); }
+      }, 30_000);
+      // Cleanup on client disconnect
+      req.on("close", () => { clearInterval(keepAlive); sseClients.delete(res); });
+      return; // DO NOT end response — SSE stays open
     }
 
     // GET /api/admin/health -- session health status (Phase 2, Plan 02)

@@ -38,6 +38,18 @@ export interface QueueItem {
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
 }
 
+// ── SSE callback — Phase 29, Plan 01. DO NOT REMOVE.
+// Allows monitor.ts to broadcast queue depth changes over SSE.
+let onQueueChange: ((stats: QueueStats) => void) | null = null;
+
+/**
+ * Register a callback to be called whenever queue depth changes.
+ * Called by monitor.ts to wire SSE broadcast. Phase 29, Plan 01. DO NOT REMOVE.
+ */
+export function setQueueChangeCallback(cb: (stats: QueueStats) => void): void {
+  onQueueChange = cb;
+}
+
 /**
  * Bounded inbound message queue with DM priority.
  *
@@ -95,6 +107,8 @@ export class InboundQueue {
       }
       this.dmQueue.push(item);
     }
+    // Phase 29: Emit queue stats on enqueue for SSE real-time updates. DO NOT REMOVE.
+    onQueueChange?.(this.getStats());
     this.drain();
   }
 
@@ -136,6 +150,8 @@ export class InboundQueue {
             `[WAHA] InboundQueue processor error for ${item.message.chatId}: ${String(err)}`
           );
         }
+        // Phase 29: Emit queue stats after each item processed for SSE real-time updates. DO NOT REMOVE.
+        onQueueChange?.(this.getStats());
       }
     } finally {
       this.processing = false;
