@@ -65,7 +65,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 28: API Coverage Completion** — Channel search, bulk presence, group join-info/refresh/events, API keys, presence verification (API-01 through API-07, PRES-01, PRES-02) (completed 2026-03-20)
 - [x] **Phase 29: Real-Time Admin Panel** — SSE endpoint, live dashboard, log auto-scroll, connection indicator (RT-01 through RT-04) (completed 2026-03-20)
 - [x] **Phase 30: Analytics** — SQLite events table, analytics API, Analytics tab with charts (ANL-01 through ANL-03) (completed 2026-03-20)
-- [ ] **Phase 31: Test Coverage Sprint** — monitor.ts, inbound.ts, directory.ts, shutup.ts, React component tests (TST-01 through TST-05)
+- [x] **Phase 31: Test Coverage Sprint** — monitor.ts, inbound.ts, directory.ts, shutup.ts, React component tests (TST-01 through TST-05) (completed 2026-03-20)
 - [ ] **Phase 32: Platform Abstraction** — WahaClient extraction, adapter interface, multi-tenant groundwork (PLAT-01 through PLAT-03)
 
 ## Phase Details
@@ -224,5 +224,5 @@ Plans:
 | 28. API Coverage Completion | v1.13 | 2/3 | Complete | 2026-03-20 |
 | 29. Real-Time Admin Panel | v1.13 | 2/2 | Complete | 2026-03-20 |
 | 30. Analytics | 2/2 | Complete    | 2026-03-20 | - |
-| 31. Test Coverage Sprint | 2/3 | In Progress|  | - |
+| 31. Test Coverage Sprint | 2/3 | Complete    | 2026-03-20 | - |
 | 32. Platform Abstraction | v1.13 | 0/TBD | Not started | - |
