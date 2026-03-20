@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: in-progress
-stopped_at: Completed 26-01-PLAN.md
-last_updated: "2026-03-20T04:18:00.000Z"
+stopped_at: Completed 26-02-PLAN.md
+last_updated: "2026-03-20T04:28:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Current Position
 
-Phase: 26 (Config Safety) — EXECUTING
-Plan: 2 of 2
+Phase: 26 (Config Safety) — COMPLETE
+Plan: 2 of 2 (all complete)
 
 ## Accumulated Context
 
@@ -41,6 +41,7 @@ Plan: 2 of 2
 - UNHEALTHY_THRESHOLD raised from 3 to 5 (unifies with AUTO_RECOVERY_THRESHOLD)
 - [Phase 25]: Recovery info row rendered conditionally (only when recoveryAttemptCount > 0) to preserve clean UI
 - [Phase 26-01]: validateWahaConfig() validates before every config write; backup failure is non-fatal; import writes full config verbatim
+- [Phase 26-02]: request() throws parsed JSON on non-2xx; SettingsTab shows field-level errors on 400, Export/Import buttons wired
 
 ### Pending Todos
 
