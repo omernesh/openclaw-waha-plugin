@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 31-02-PLAN.md
-last_updated: "2026-03-20T08:38:00.000Z"
+stopped_at: Completed 31-03-PLAN.md
+last_updated: "2026-03-20T08:44:30.000Z"
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Current Position
 
-Phase: 31 (Test Coverage Sprint) — EXECUTING
-Plan: 3 of 3
+Phase: 31 (Test Coverage Sprint) — COMPLETE
+Plan: 3 of 3 (all complete)
 
 ## Accumulated Context
 
@@ -68,6 +68,10 @@ Plan: 3 of 3
 - [Phase 31-02]: callRoute resolves when res.end() is called — avoids fixed timeouts for async routes
 - [Phase 31-02]: InboundQueue mock uses class syntax (not vi.fn) because createWahaWebhookServer uses new
 - [Phase 31-02]: url.pathname ReferenceError in /api/admin/presence route fixed (url was block-scoped to directory if-block)
+- [Phase 31-03]: Separate vitest configs: root uses node env, src/admin uses jsdom env — prevents contamination
+- [Phase 31-03]: resolve.dedupe for React required — recharts installs own React under src/admin/node_modules
+- [Phase 31-03]: getAllByRole/getAllByText pattern throughout — Radix UI portals duplicate DOM nodes
+- [Phase 31-03]: recharts fully mocked in jsdom — SVG measurement APIs not available in test env
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T08:38:00Z
-Stopped at: Completed 31-02-PLAN.md
+Last session: 2026-03-20T08:44:30Z
+Stopped at: Completed 31-03-PLAN.md
 Resume file: None
