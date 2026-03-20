@@ -1132,6 +1132,22 @@ export async function getWahaGroupsCount(params: { cfg: CoreConfig; accountId?: 
   });
 }
 
+export async function getWahaGroupJoinInfo(params: { cfg: CoreConfig; groupId: string; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/groups", params.cfg, params.accountId)
+      + `/${encodeURIComponent(params.groupId)}/join-info` });
+}
+// Added Phase 28, Plan 01.
+
+export async function refreshWahaGroups(params: { cfg: CoreConfig; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/groups/refresh", params.cfg, params.accountId),
+    body: {} });
+}
+// Added Phase 28, Plan 01.
+
 // ── Contacts ───────────────────────────────────────────────────
 
 // WAHA contacts list endpoint is /api/contacts/all (NOT /api/{session}/contacts which 404s). DO NOT CHANGE.
@@ -1357,6 +1373,37 @@ export async function previewWahaChannelMessages(params: { cfg: CoreConfig; chan
     path: resolveSessionPath("/api/{session}/channels", params.cfg, params.accountId) + `/${encodeURIComponent(params.channelId)}/messages/preview` });
 }
 
+// ── Channel Search ──────────────────────────────────────────────
+
+export async function searchWahaChannelsByView(params: { cfg: CoreConfig; viewType: string; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey,
+    path: resolveSessionPath("/api/{session}/channels/search/by-view", params.cfg, params.accountId),
+    body: { view: params.viewType } });
+}
+// Added Phase 28, Plan 01.
+
+export async function getWahaChannelSearchViews(params: { cfg: CoreConfig; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels/search/views", params.cfg, params.accountId) });
+}
+// Added Phase 28, Plan 01.
+
+export async function getWahaChannelSearchCountries(params: { cfg: CoreConfig; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels/search/countries", params.cfg, params.accountId) });
+}
+// Added Phase 28, Plan 01.
+
+export async function getWahaChannelSearchCategories(params: { cfg: CoreConfig; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/channels/search/categories", params.cfg, params.accountId) });
+}
+// Added Phase 28, Plan 01.
+
 /**
  * Get newsletter info by JID. Tries /channels endpoint first (newsletters are channels in WAHA).
  * Falls back gracefully if the newsletter is not found.
@@ -1418,6 +1465,13 @@ export async function subscribeWahaPresence(params: { cfg: CoreConfig; contactId
     path: resolveSessionPath("/api/{session}/presence/subscribe", params.cfg, params.accountId),
     body: { contactId: params.contactId } });
 }
+
+export async function getAllWahaPresence(params: { cfg: CoreConfig; accountId?: string }) {
+  const { baseUrl, apiKey } = resolveAccountParams(params.cfg, params.accountId);
+  return callWahaApi({ baseUrl, apiKey, method: "GET",
+    path: resolveSessionPath("/api/{session}/presence", params.cfg, params.accountId) });
+}
+// Added Phase 28, Plan 01.
 
 // ── Profile ────────────────────────────────────────────────────
 
