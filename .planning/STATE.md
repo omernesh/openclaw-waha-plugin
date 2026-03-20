@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 28-01-PLAN.md (backfill)
-last_updated: "2026-03-20T05:04:13.102Z"
+stopped_at: Completed 29-01-PLAN.md
+last_updated: "2026-03-20T06:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 28 — API Coverage Completion
+**Current focus:** Phase 29 — Real-Time Admin Panel
 
 ## Current Position
 
-Phase: 28 (API Coverage Completion) — EXECUTING
-Plan: 2 of 3
+Phase: 29 (Real-Time Admin Panel) — EXECUTING
+Plan: 2 of 2
 
 ## Accumulated Context
 
@@ -53,6 +53,7 @@ Plan: 2 of 3
 - [Phase 28-02]: group.leave does not remove participant from DirectoryDb — no removal method exists; row kept as historical record
 - [Phase 28-02]: API key endpoints are server-scoped (/api/keys), not session-scoped
 - [Phase 28-02]: group.join upserts participant via bulkUpsertGroupParticipants with isAdmin=false default
+- [Phase 29-01]: useEventSource uses .tsx extension (JSX in SSEProvider); SSE callback emitted after lastCheckAt so timestamp is included; SSEProvider placed inside SidebarProvider
 
 ### Pending Todos
 
@@ -64,6 +65,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T04:55:48.912Z
-Stopped at: Completed 28-01-PLAN.md (backfill)
+Last session: 2026-03-20T06:00:00.000Z
+Stopped at: Completed 29-01-PLAN.md
 Resume file: None
