@@ -13,7 +13,27 @@
 // ║  cause of missed messages.                                          ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  AUTO-RECOVERY — DO NOT CHANGE (Phase 25, Plan 01)                 ║
+// ║                                                                     ║
+// ║  After AUTO_RECOVERY_THRESHOLD (5) consecutive failures, the       ║
+// ║  session is automatically restarted via POST /api/sessions/restart. ║
+// ║                                                                     ║
+// ║  Cooldown: RECOVERY_COOLDOWN_MS (5 min) between attempts —         ║
+// ║  prevents restart storms when WAHA is in a bad state.              ║
+// ║                                                                     ║
+// ║  Alerting: god mode users are notified via WhatsApp using a        ║
+// ║  healthy session (bypassPolicy: true for system alerts).           ║
+// ║                                                                     ║
+// ║  History: last 50 recovery events stored in recoveryHistory ring   ║
+// ║  buffer, accessible via getRecoveryHistory() for admin API.        ║
+// ║                                                                     ║
+// ║  enableRecovery: false by default — opt in per startHealthCheck    ║
+// ║  call to preserve backward compatibility.                           ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
 import { callWahaApi } from "./http-client.js";
+import type { CoreConfig } from "./types.js";
 
 // ── Named constants (no magic numbers) ──────────────────────────────
 /** Timeout for the health check fetch call. */
@@ -21,6 +41,21 @@ const HEALTH_CHECK_TIMEOUT_MS = 10_000;
 
 /** Default initial delay before first health ping. */
 const DEFAULT_INITIAL_DELAY_MS = 5_000;
+
+/** Threshold for unhealthy status (also auto-recovery trigger). */
+const UNHEALTHY_THRESHOLD = 5;
+
+// ── Auto-recovery constants ──────────────────────────────────────────
+/** Number of consecutive failures before auto-recovery is attempted. */
+const AUTO_RECOVERY_THRESHOLD = 5;
+
+/** Minimum time between recovery attempts (5 minutes). */
+const RECOVERY_COOLDOWN_MS = 5 * 60 * 1000;
+
+/** Maximum number of recovery events stored in history ring buffer. */
+const RECOVERY_HISTORY_MAX = 50;
+
+// ── Types ────────────────────────────────────────────────────────────
 
 /** Health state for a WAHA session. */
 export interface HealthState {
@@ -30,11 +65,29 @@ export interface HealthState {
   lastCheckAt: number | null;
 }
 
-/** Module-level health state per session key. */
-const sessionHealthStates = new Map<string, HealthState>();
+/**
+ * Per-session recovery tracking state.
+ * Phase 25, Plan 01 — DO NOT REMOVE.
+ */
+export interface RecoveryState {
+  attemptCount: number;
+  lastAttemptAt: number | null;
+  lastOutcome: "success" | "failed" | null;
+  lastError: string | null;
+  cooldownUntil: number | null;
+}
 
-/** Threshold for unhealthy status. */
-const UNHEALTHY_THRESHOLD = 3;
+/**
+ * Single auto-recovery event stored in history ring buffer.
+ * Phase 25, Plan 01 — DO NOT REMOVE.
+ */
+export interface RecoveryEvent {
+  timestamp: number;
+  session: string;
+  outcome: "success" | "failed";
+  error: string | null;
+  consecutiveFailuresAtTrigger: number;
+}
 
 export interface HealthCheckOptions {
   baseUrl: string;
@@ -44,7 +97,28 @@ export interface HealthCheckOptions {
   abortSignal: AbortSignal;
   /** Override initial delay (default 5000ms, shorter for tests). */
   initialDelayMs?: number;
+  /** CoreConfig — required for alerting god mode users. Phase 25, Plan 01. */
+  cfg?: CoreConfig;
+  /** Account ID — used to identify the account for alerting. Phase 25, Plan 01. */
+  accountId?: string;
+  /**
+   * Enable auto-recovery on 5 consecutive failures.
+   * Default false for backward compatibility — must be explicitly set to true.
+   * Phase 25, Plan 01. DO NOT REMOVE.
+   */
+  enableRecovery?: boolean;
 }
+
+// ── Module-level state ───────────────────────────────────────────────
+
+/** Module-level health state per session key. */
+const sessionHealthStates = new Map<string, HealthState>();
+
+/** Per-session recovery tracking state. Phase 25, Plan 01. DO NOT REMOVE. */
+const sessionRecoveryStates = new Map<string, RecoveryState>();
+
+/** Recovery event history ring buffer (max RECOVERY_HISTORY_MAX entries). Phase 25, Plan 01. DO NOT REMOVE. */
+const recoveryHistory: RecoveryEvent[] = [];
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -54,6 +128,194 @@ function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
     (timer as NodeJS.Timeout).unref();
   }
 }
+
+// ── Exported state accessors ─────────────────────────────────────────
+
+/**
+ * Get the current health state for a session.
+ * Returns undefined if no health check has been started for that session.
+ */
+export function getHealthState(session: string): HealthState | undefined {
+  return sessionHealthStates.get(session);
+}
+
+/**
+ * Get the current recovery state for a session.
+ * Returns undefined if no recovery has ever been attempted for that session.
+ * Phase 25, Plan 01 — DO NOT REMOVE.
+ */
+export function getRecoveryState(session: string): RecoveryState | undefined {
+  return sessionRecoveryStates.get(session);
+}
+
+/**
+ * Get the full recovery event history (up to RECOVERY_HISTORY_MAX=50 events).
+ * Phase 25, Plan 01 — DO NOT REMOVE.
+ */
+export function getRecoveryHistory(): RecoveryEvent[] {
+  return recoveryHistory;
+}
+
+// ── Auto-recovery internals ──────────────────────────────────────────
+
+/**
+ * Send WhatsApp alerts to god mode users about a recovery event.
+ * Uses a healthy session as the sender — bypassPolicy: true for system alerts.
+ * Phase 25, Plan 01 — DO NOT REMOVE.
+ */
+async function alertGodModeUsers(
+  opts: HealthCheckOptions,
+  healthState: HealthState,
+  recoveryState: RecoveryState,
+): Promise<void> {
+  if (!opts.cfg) return; // no config = can't alert
+
+  // Dynamic imports to avoid circular dependency issues
+  const { listEnabledWahaAccounts } = await import("./accounts.js");
+  const { sendWahaText } = await import("./send.js");
+
+  // Find a healthy session to send the alert from (not the failed session)
+  const accounts = listEnabledWahaAccounts(opts.cfg);
+  const healthySender = accounts.find(
+    (acc) =>
+      acc.session !== opts.session &&
+      sessionHealthStates.get(acc.session)?.status === "healthy",
+  );
+
+  if (!healthySender) {
+    console.warn(
+      `[WAHA] Cannot alert god mode users — no healthy session available`,
+    );
+    return;
+  }
+
+  // Extract god mode users from BOTH dmFilter and groupFilter
+  const wahaCfg = opts.cfg.channels?.waha;
+  const godUsers = [
+    ...(wahaCfg?.dmFilter?.godModeSuperUsers ?? []),
+    ...(wahaCfg?.groupFilter?.godModeSuperUsers ?? []),
+  ];
+
+  // Deduplicate by identifier
+  const uniqueJids = [
+    ...new Set(
+      godUsers.map((u) =>
+        typeof u === "string" ? u : (u as { identifier: string }).identifier,
+      ),
+    ),
+  ];
+
+  if (uniqueJids.length === 0) return; // no god mode users to alert
+
+  const alertMessage =
+    `[WAHA Alert] Session ${opts.session} is unhealthy (${healthState.consecutiveFailures} failures). ` +
+    `Auto-recovery attempt #${recoveryState.attemptCount}: ${recoveryState.lastOutcome?.toUpperCase() ?? "UNKNOWN"}` +
+    `${recoveryState.lastError ? " — " + recoveryState.lastError : ""}`;
+
+  for (const jid of uniqueJids) {
+    try {
+      await sendWahaText({
+        cfg: opts.cfg,
+        to: jid,
+        text: alertMessage,
+        accountId: healthySender.accountId,
+        bypassPolicy: true, // system alert — must bypass policy filters
+      });
+    } catch (err) {
+      console.warn(
+        `[WAHA] Failed to send recovery alert to ${jid}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+}
+
+/**
+ * Attempt to auto-recover a WAHA session via POST /api/sessions/{session}/restart.
+ * Enforces RECOVERY_COOLDOWN_MS between attempts.
+ * Phase 25, Plan 01 — DO NOT REMOVE.
+ */
+async function attemptRecovery(
+  opts: HealthCheckOptions,
+  state: HealthState,
+): Promise<void> {
+  // Get or create recovery state for this session
+  let recoveryState = sessionRecoveryStates.get(opts.session);
+  if (!recoveryState) {
+    recoveryState = {
+      attemptCount: 0,
+      lastAttemptAt: null,
+      lastOutcome: null,
+      lastError: null,
+      cooldownUntil: null,
+    };
+    sessionRecoveryStates.set(opts.session, recoveryState);
+  }
+
+  // Check cooldown — prevent restart storms
+  const now = Date.now();
+  if (recoveryState.cooldownUntil !== null && now < recoveryState.cooldownUntil) {
+    console.warn(
+      `[WAHA] Recovery skipped for session ${opts.session} — cooldown until ${new Date(recoveryState.cooldownUntil).toISOString()}`,
+    );
+    return;
+  }
+
+  // Set cooldown immediately to prevent concurrent attempts
+  recoveryState.cooldownUntil = now + RECOVERY_COOLDOWN_MS;
+  recoveryState.attemptCount += 1;
+  recoveryState.lastAttemptAt = now;
+
+  const attemptCount = recoveryState.attemptCount;
+  console.warn(
+    `[WAHA] Attempting auto-recovery for session ${opts.session} (attempt #${attemptCount}, ${state.consecutiveFailures} consecutive failures)`,
+  );
+
+  let outcome: "success" | "failed";
+  let errMsg: string | null = null;
+
+  try {
+    await callWahaApi({
+      baseUrl: opts.baseUrl,
+      apiKey: opts.apiKey,
+      path: `/api/sessions/${opts.session}/restart`,
+      method: "POST",
+      timeoutMs: 30_000,
+      context: { action: "session-recovery" },
+    });
+    outcome = "success";
+    recoveryState.lastOutcome = "success";
+    recoveryState.lastError = null;
+    console.warn(`[WAHA] Auto-recovery SUCCESS for session ${opts.session}`);
+  } catch (err) {
+    errMsg = err instanceof Error ? err.message : String(err);
+    outcome = "failed";
+    recoveryState.lastOutcome = "failed";
+    recoveryState.lastError = errMsg;
+    console.warn(`[WAHA] Auto-recovery FAILED for session ${opts.session}: ${errMsg}`);
+  }
+
+  // Push to history ring buffer (cap at RECOVERY_HISTORY_MAX)
+  const event: RecoveryEvent = {
+    timestamp: now,
+    session: opts.session,
+    outcome,
+    error: errMsg,
+    consecutiveFailuresAtTrigger: state.consecutiveFailures,
+  };
+  recoveryHistory.push(event);
+  if (recoveryHistory.length > RECOVERY_HISTORY_MAX) {
+    recoveryHistory.shift();
+  }
+
+  // Alert god mode users — fire and forget
+  alertGodModeUsers(opts, state, recoveryState).catch((err) => {
+    console.warn(
+      `[WAHA] alertGodModeUsers error for ${opts.session}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+}
+
+// ── Health check loop ────────────────────────────────────────────────
 
 /**
  * Start a health check loop for a WAHA session.
@@ -78,9 +340,10 @@ export function startHealthCheck(opts: HealthCheckOptions): HealthState {
   // Store in module-level map for getHealthState()
   sessionHealthStates.set(opts.session, state);
 
-  // Clean up the Map entry when the session is aborted to prevent memory leaks
+  // Clean up Map entries when the session is aborted to prevent memory leaks
   opts.abortSignal.addEventListener("abort", () => {
     sessionHealthStates.delete(opts.session);
+    sessionRecoveryStates.delete(opts.session); // Phase 25: also clean up recovery state
   }, { once: true });
 
   const initialDelay = opts.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
@@ -94,14 +357,6 @@ export function startHealthCheck(opts: HealthCheckOptions): HealthState {
   unrefTimer(timer);
 
   return state;
-}
-
-/**
- * Get the current health state for a session.
- * Returns undefined if no health check has been started for that session.
- */
-export function getHealthState(session: string): HealthState | undefined {
-  return sessionHealthStates.get(session);
 }
 
 /** Single health ping + schedule next tick. */
@@ -135,6 +390,17 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
         `[WAHA] Health check UNHEALTHY for session ${opts.session} ` +
         `(${state.consecutiveFailures} consecutive failures): ${msg}`
       );
+
+      // Phase 25, Plan 01: Auto-recovery on 5+ consecutive failures.
+      // Fire-and-forget — recovery runs async, doesn't block next health tick.
+      // DO NOT REMOVE — this is the core recovery trigger.
+      if (opts.enableRecovery && state.consecutiveFailures >= AUTO_RECOVERY_THRESHOLD) {
+        attemptRecovery(opts, state).catch((err) => {
+          console.warn(
+            `[WAHA] Recovery attempt error for ${opts.session}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      }
     } else {
       state.status = "degraded";
       console.warn(
