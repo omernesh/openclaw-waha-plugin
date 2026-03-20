@@ -5,6 +5,7 @@
 // from DataTable — these are the correct props for expandable rows.
 // Verified: Phase 21, Plan 03 (2026-03-18)
 // Visual overhaul (Avatar, stacked name+JID, Participants button) — 260320-u7x
+// Sortable column headers (Group, Members, Messages, Last Message) — 260320
 
 import { useState } from 'react'
 import { ChevronDown, Users } from 'lucide-react'
@@ -61,11 +62,16 @@ export function GroupsTab({
   }
 
   // Build columns inside component so we have access to expandedGroupJid and toggleGroup
+  // meta.sortable + meta.sortValue enable client-side sorting in DataTable
   const columns: ColumnDef<DirectoryContact, unknown>[] = [
     // Group column: Avatar + stacked group name + JID
     {
       id: 'group',
       header: 'Group',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => (row.displayName ?? '').toLowerCase(),
+      },
       cell: ({ row }) => {
         return (
           <div className="flex items-center gap-2.5">
@@ -85,6 +91,10 @@ export function GroupsTab({
     {
       accessorKey: 'participantCount',
       header: 'Members',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => (row as DirectoryContact & { participantCount?: number }).participantCount ?? 0,
+      },
       cell: ({ row }) => (
         <span className="text-sm">{(row.original as DirectoryContact & { participantCount?: number }).participantCount ?? '—'}</span>
       ),
@@ -92,6 +102,10 @@ export function GroupsTab({
     {
       accessorKey: 'messageCount',
       header: 'Messages',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.messageCount ?? 0,
+      },
       cell: ({ row }) => (
         <span className="text-sm">{row.original.messageCount}</span>
       ),
@@ -99,6 +113,10 @@ export function GroupsTab({
     {
       accessorKey: 'lastMessageAt',
       header: 'Last Message',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.lastMessageAt ?? 0,
+      },
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
           {formatDate(row.original.lastMessageAt)}

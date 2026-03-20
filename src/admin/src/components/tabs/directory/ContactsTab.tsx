@@ -6,6 +6,7 @@
 // Verified working: Phase 21 Plan 02 (2026-03-18)
 // Presence display — Added Phase 28, Plan 03. DO NOT REMOVE.
 // Visual overhaul (Avatar, stacked name+JID, Allow DM button, Settings button) — 260320-u7x
+// Sortable column headers (Name, Messages, Last Message, DM Access) — 260320
 
 import { useState, useEffect } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -62,6 +63,7 @@ export function ContactsTab({
   const selectedContact = selectedJid ? data.find((c) => c.jid === selectedJid) ?? null : null
 
   // Column definitions — DO NOT CHANGE: ColumnDef<DirectoryContact> required for type safety
+  // meta.sortable + meta.sortValue enable client-side sorting in DataTable
   const columns: ColumnDef<DirectoryContact, unknown>[] = [
     // Select column — only visible in bulk mode
     ...(bulkMode
@@ -90,6 +92,10 @@ export function ContactsTab({
     {
       id: 'name',
       header: 'Name',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => (row.displayName ?? '').toLowerCase(),
+      },
       cell: ({ row }) => {
         const presence = presenceMap[row.original.jid]
         const isOnline = presence?.status === 'online'
@@ -119,6 +125,10 @@ export function ContactsTab({
       id: 'allowedDm',
       header: 'DM Access',
       accessorKey: 'allowedDm',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.allowedDm ? 1 : 0,
+      },
       cell: ({ row }) => {
         const allowed = row.original.allowedDm
         return (
@@ -147,11 +157,19 @@ export function ContactsTab({
       id: 'messageCount',
       header: 'Messages',
       accessorKey: 'messageCount',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.messageCount ?? 0,
+      },
     },
     {
       id: 'lastMessageAt',
       header: 'Last Message',
       accessorKey: 'lastMessageAt',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.lastMessageAt ?? 0,
+      },
       // DO NOT CHANGE: timestamps are Unix seconds — multiply by 1000 for Date constructor
       cell: ({ row }) =>
         row.original.lastMessageAt
@@ -181,7 +199,9 @@ export function ContactsTab({
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 
-  async function handleBulkAction(action: 'allow-dm' | 'revoke-dm') {
+  async function handleBulkAction(action: 'allow-dm' | 'revoke-dm' | 'follow' | 'unfollow') {
+    // Only allow-dm and revoke-dm are valid for contacts — ignore other action types
+    if (action !== 'allow-dm' && action !== 'revoke-dm') return
     if (selectedJids.length === 0) return
     try {
       const result = await api.bulkDirectory({ action, jids: selectedJids })

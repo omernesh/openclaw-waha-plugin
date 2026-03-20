@@ -4,6 +4,7 @@
 // Row click opens ContactSettingsSheet for per-channel settings (added 260320-rii).
 // Verified working: Phase 21 Plan 02 (2026-03-18)
 // Visual overhaul (Avatar, stacked name+JID, Allow DM button, Settings button) — 260320-u7x
+// Sortable column headers (Channel, Messages, First Seen, DM Access) — 260320
 
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
@@ -42,6 +43,7 @@ export function ChannelsTab({
   const selectedChannel = selectedJid ? data.find((d) => d.jid === selectedJid) ?? null : null
 
   // Column definitions — DO NOT CHANGE: ColumnDef<DirectoryContact> required for type safety
+  // meta.sortable + meta.sortValue enable client-side sorting in DataTable
   const columns: ColumnDef<DirectoryContact, unknown>[] = [
     // Select column — only visible in bulk mode
     ...(bulkMode
@@ -70,6 +72,10 @@ export function ChannelsTab({
     {
       id: 'channel',
       header: 'Channel',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => (row.displayName ?? '').toLowerCase(),
+      },
       cell: ({ row }) => (
         <div className="flex items-center gap-2.5">
           <Avatar name={row.original.displayName} size="md" />
@@ -89,6 +95,10 @@ export function ChannelsTab({
       id: 'allowedDm',
       header: 'DM Access',
       accessorKey: 'allowedDm',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.allowedDm ? 1 : 0,
+      },
       cell: ({ row }) => {
         const allowed = row.original.allowedDm
         return (
@@ -117,11 +127,19 @@ export function ChannelsTab({
       id: 'messageCount',
       header: 'Messages',
       accessorKey: 'messageCount',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.messageCount ?? 0,
+      },
     },
     {
       id: 'firstSeenAt',
       header: 'First Seen',
       accessorKey: 'firstSeenAt',
+      meta: {
+        sortable: true,
+        sortValue: (row: DirectoryContact) => row.firstSeenAt ?? 0,
+      },
       // DO NOT CHANGE: timestamps are Unix seconds — multiply by 1000 for Date constructor
       cell: ({ row }) =>
         row.original.firstSeenAt
@@ -151,7 +169,9 @@ export function ChannelsTab({
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 
-  async function handleBulkAction(action: 'follow' | 'unfollow') {
+  async function handleBulkAction(action: 'allow-dm' | 'revoke-dm' | 'follow' | 'unfollow') {
+    // Only follow and unfollow are valid for newsletters — ignore other action types
+    if (action !== 'follow' && action !== 'unfollow') return
     if (selectedJids.length === 0) return
     try {
       const result = await api.bulkDirectory({ action, jids: selectedJids })

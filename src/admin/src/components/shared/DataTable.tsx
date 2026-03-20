@@ -3,6 +3,7 @@
 // for server-side pagination to work correctly. getCoreRowModel() is REQUIRED.
 // Verified working: Phase 21 (2026-03-18)
 // Pagination overhaul: numbered pages + page-size dropdown — quick task 260320-u7x
+// Sortable column headers: client-side sort on current page data — quick task 260320
 
 import * as React from 'react'
 import {
@@ -27,8 +28,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+
+// DO NOT CHANGE: SortState tracks which column is sorted and in which direction.
+// null means no sort active. Cycle: none -> asc -> desc -> none.
+export interface SortState {
+  columnId: string
+  direction: 'asc' | 'desc'
+}
+
+// Column meta extension — set meta.sortable = true and meta.sortValue accessor
+// to enable sorting on a column. sortValue receives the row and returns a sortable value.
+// DO NOT REMOVE: this augments @tanstack/react-table ColumnMeta globally.
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    sortable?: boolean
+    sortValue?: (row: TData) => string | number | boolean | null | undefined
+  }
+}
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, unknown>[]
@@ -63,8 +83,53 @@ export function DataTable<TData>({
 }: DataTableProps<TData>) {
   const pageCount = Math.max(1, Math.ceil(total / pagination.pageSize))
 
+  // Client-side sort state for current page data
+  const [sort, setSort] = React.useState<SortState | null>(null)
+
+  // Reset sort when page changes (data changes)
+  const pageRef = React.useRef(pagination.pageIndex)
+  if (pageRef.current !== pagination.pageIndex) {
+    pageRef.current = pagination.pageIndex
+    // Don't reset sort on page change — keep user's sort preference
+  }
+
+  // Toggle sort cycle: none -> asc -> desc -> none
+  function handleHeaderClick(columnId: string) {
+    setSort((prev) => {
+      if (!prev || prev.columnId !== columnId) return { columnId, direction: 'asc' }
+      if (prev.direction === 'asc') return { columnId, direction: 'desc' }
+      return null // desc -> none
+    })
+  }
+
+  // Apply client-side sort to current page data
+  // DO NOT CHANGE: sorting is applied BEFORE passing to useReactTable so row order reflects sort.
+  const sortedData = React.useMemo(() => {
+    if (!sort) return data
+    // Find column def by id
+    const colDef = columns.find((c) => {
+      const id = 'id' in c ? c.id : ('accessorKey' in c ? String(c.accessorKey) : undefined)
+      return id === sort.columnId
+    })
+    const sortValue = colDef?.meta?.sortValue
+    if (!sortValue) return data
+    const sorted = [...data].sort((a, b) => {
+      const aVal = sortValue(a)
+      const bVal = sortValue(b)
+      // nulls/undefined always last
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      if (typeof aVal === 'number' && typeof bVal === 'number') return aVal - bVal
+      if (typeof aVal === 'boolean' && typeof bVal === 'boolean') return (aVal ? 1 : 0) - (bVal ? 1 : 0)
+      return String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base' })
+    })
+    if (sort.direction === 'desc') sorted.reverse()
+    return sorted
+  }, [data, sort, columns])
+
   const table = useReactTable({
-    data,
+    data: sortedData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     // DO NOT REMOVE: manualPagination: true — server handles pagination, not the table
@@ -104,13 +169,33 @@ export function DataTable<TData>({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const isSortable = !!header.column.columnDef.meta?.sortable
+                  const columnId = header.column.id
+                  const isActive = sort?.columnId === columnId
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={isSortable ? 'cursor-pointer select-none hover:bg-muted/50 transition-colors' : ''}
+                      onClick={isSortable ? () => handleHeaderClick(columnId) : undefined}
+                    >
+                      {header.isPlaceholder ? null : (
+                        <div className={isSortable ? 'flex items-center gap-1' : ''}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {isSortable && (
+                            isActive && sort ? (
+                              sort.direction === 'asc'
+                                ? <ArrowUp className="h-3.5 w-3.5 text-foreground" />
+                                : <ArrowDown className="h-3.5 w-3.5 text-foreground" />
+                            ) : (
+                              <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />
+                            )
+                          )}
+                        </div>
+                      )}
+                    </TableHead>
+                  )
+                })}
               </TableRow>
             ))}
           </TableHeader>
