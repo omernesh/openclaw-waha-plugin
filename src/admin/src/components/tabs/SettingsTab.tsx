@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
-import type { WahaConfig } from '@/types'
+import type { WahaConfig, Session } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,12 @@ import { Button } from '@/components/ui/button'
 import { TagInput } from '@/components/shared/TagInput'
 import { RestartOverlay } from '@/components/shared/RestartOverlay'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CircleHelp } from 'lucide-react'
+import { CircleHelp, ChevronDown, Copy } from 'lucide-react'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 
 function Tip({ text }: { text: string }) {
   return (
@@ -74,6 +79,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   const [restarting, setRestarting] = React.useState(false)
   const [dirty, setDirty] = React.useState(false)
   const [resolvedNames, setResolvedNames] = React.useState<Record<string, string>>({})
+  // Available sessions for the Active WAHA Session dropdown
+  const [availableSessions, setAvailableSessions] = React.useState<Session[]>([])
+  // Pairing link generator state
+  const [pairingJid, setPairingJid] = React.useState('')
+  const [pairingLink, setPairingLink] = React.useState('')
 
   // Field-level validation errors from backend (keyed by Zod field path)
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({})
@@ -98,6 +108,13 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
 
     return () => controller.abort()
   }, [refreshKey])
+
+  // Load available sessions for Active WAHA Session dropdown (once on mount)
+  React.useEffect(() => {
+    api.getSessions()
+      .then((sessions) => setAvailableSessions(sessions))
+      .catch((err) => console.error('Settings sessions fetch failed:', err))
+  }, [])
 
   // Stable key derived from JIDs in config — avoids re-firing on every keystroke
   const jidKey = React.useMemo(() => {
@@ -133,6 +150,15 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       return setNestedValue(prev, path, value)
     })
     setDirty(true)
+  }
+
+  // Generate pairing link from JID
+  function handleGeneratePairingLink() {
+    if (!pairingJid) return
+    const phone = pairingJid.replace('@c.us', '').replace('@lid', '')
+    const passcode = config?.pairingMode?.passcode ?? ''
+    const link = `https://wa.me/${phone}?text=${encodeURIComponent(passcode)}`
+    setPairingLink(link)
   }
 
   // Directory search for TagInput
@@ -397,6 +423,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                   onChange={(e) => updateConfig('baseUrl', e.target.value)}
                   placeholder="http://localhost:3000"
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="wahaSessionName">Active WAHA Session<Tip text="WAHA session name. Select from sessions available on your WAHA server." /></Label>
+                <Select
+                  value={config.wahaSessionName ?? ''}
+                  onValueChange={(v) => updateConfig('wahaSessionName', v)}
+                >
+                  <SelectTrigger id="wahaSessionName">
+                    <SelectValue placeholder="Select session..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSessions.map((s) => (
+                      <SelectItem key={s.sessionId} value={s.sessionId}>
+                        {s.name ?? s.sessionId}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="webhookPort">Webhook Port<Tip text="Port the webhook HTTP server listens on. Default: 8050. Restart required after change." /></Label>
@@ -893,21 +937,41 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pairingMode.passcode">Passcode<Tip text="The 6-digit code contacts must enter to get DM access. Click Generate to create a random one." /></Label>
-              <Input
-                id="pairingMode.passcode"
-                value={config.pairingMode?.passcode ?? ''}
-                onChange={(e) => updateConfig('pairingMode.passcode', e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="pairingMode.passcode"
+                  value={config.pairingMode?.passcode ?? ''}
+                  onChange={(e) => updateConfig('pairingMode.passcode', e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => updateConfig('pairingMode.passcode', String(Math.floor(100000 + Math.random() * 900000)))}
+                >
+                  Generate
+                </Button>
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.grantTtlMinutes">Grant TTL<Tip text="How long pairing-granted access lasts. After this period, access is automatically revoked." /></Label>
-              <Input
-                id="pairingMode.grantTtlMinutes"
-                type="number"
-                value={config.pairingMode?.grantTtlMinutes ?? ''}
-                onChange={(e) => updateConfig('pairingMode.grantTtlMinutes', Number(e.target.value))}
-                className="w-40"
-              />
+              <Label htmlFor="pairingMode.grantTtlMinutes">Expiry Duration<Tip text="How long pairing-granted access lasts. After this period, access is automatically revoked." /></Label>
+              <Select
+                value={String(config.pairingMode?.grantTtlMinutes ?? 0)}
+                onValueChange={(v) => updateConfig('pairingMode.grantTtlMinutes', Number(v))}
+              >
+                <SelectTrigger id="pairingMode.grantTtlMinutes" className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Never</SelectItem>
+                  <SelectItem value="30">30 minutes</SelectItem>
+                  <SelectItem value="60">1 hour</SelectItem>
+                  <SelectItem value="240">4 hours</SelectItem>
+                  <SelectItem value="1440">24 hours</SelectItem>
+                  <SelectItem value="10080">7 days</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pairingMode.challengeMessage">Challenge Message<Tip text="The message sent to unknown DMs asking them to enter the passcode." /></Label>
@@ -918,6 +982,36 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 onChange={(e) => updateConfig('pairingMode.challengeMessage', e.target.value)}
               />
             </div>
+            {/* Pairing Link Generator — only visible when pairing mode is enabled */}
+            {config.pairingMode?.enabled && (
+              <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+                <Label className="text-sm font-medium">Pairing Link Generator<Tip text="Share this link to let a specific contact start a pairing flow. Enter their JID below to generate." /></Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={pairingJid}
+                    onChange={(e) => setPairingJid(e.target.value)}
+                    placeholder="972544329000@c.us"
+                    className="flex-1"
+                  />
+                  <Button variant="outline" size="sm" type="button" onClick={handleGeneratePairingLink}>
+                    Generate Link
+                  </Button>
+                </div>
+                {pairingLink && (
+                  <div className="flex gap-2 items-center">
+                    <Input value={pairingLink} readOnly className="flex-1 text-xs font-mono" />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      type="button"
+                      onClick={() => { navigator.clipboard.writeText(pairingLink); toast.success('Link copied') }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1048,6 +1142,68 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             </div>
           </CardContent>
         </Card>
+
+        {/* Section 11: Multi-Session Filtering Guide (collapsible info) */}
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Multi-Session Filtering Guide</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4 text-sm text-muted-foreground">
+                <div>
+                  <p className="font-medium text-foreground mb-1">Message Processing Pipeline</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Message arrives on a session (bot or human)</li>
+                    <li>Session role check — human sessions require a trigger word</li>
+                    <li>Group policy check — is this group in the allowed list?</li>
+                    <li>DM policy check — is this sender in the allow-from list?</li>
+                    <li>Keyword filter — does the message match a mention pattern?</li>
+                    <li>God Mode bypass — super-users skip keyword filters</li>
+                    <li>Message delivered to AI agent</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <p className="font-medium text-foreground mb-1">Common Scenarios</p>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="font-medium text-foreground/80">Bot + Human session in same group</p>
+                      <p>The bot session processes messages normally. The human session only forwards messages that start with the trigger word. Both sessions can coexist — the bot handles automated responses while the human monitors or sends manual messages.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground/80">Only human session in group</p>
+                      <p>All messages are forwarded only if they start with the trigger word. This lets a human use the group normally while the bot only sees triggered messages.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground/80">DMs</p>
+                      <p>DMs bypass the trigger word check. The bot responds to all DMs from contacts in the Allow From list (or all DMs if policy is "open").</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="font-medium text-foreground mb-1">God Mode Scope</p>
+                  <ul className="space-y-1">
+                    <li><span className="font-medium text-foreground/80">all</span> — Bypass both DM and Group keyword filters (recommended for bot sessions)</li>
+                    <li><span className="font-medium text-foreground/80">dm</span> — Bypass DM filter only, group filter still applies (recommended for human sessions in groups)</li>
+                    <li><span className="font-medium text-foreground/80">off</span> — Never bypass keyword filters</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p className="font-medium text-foreground mb-1">Per-Group Filter Overrides</p>
+                  <p>Individual groups can override the global keyword filter settings. Go to Directory → Groups → click a group row → use the Filter Override section to customize patterns, god mode scope, and trigger behavior for that specific group.</p>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Save / Save & Restart / Export / Import buttons */}
         <div className="flex flex-wrap items-center gap-3 pb-6">

@@ -67,6 +67,7 @@ export interface ConfigResponse {
 
 export interface WahaConfig {
   baseUrl?: string
+  wahaSessionName?: string
   webhookPort?: number
   webhookPath?: string
   triggerWord?: string

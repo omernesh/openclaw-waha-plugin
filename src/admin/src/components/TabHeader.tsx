@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import { RefreshCw, ChevronDown } from 'lucide-react'
@@ -50,6 +51,7 @@ export function TabHeader({
   lastRefreshed,
 }: TabHeaderProps) {
   const [sessions, setSessions] = useState<Session[]>([])
+  const [filterEnabled, setFilterEnabled] = useState<boolean | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -59,6 +61,17 @@ export function TabHeader({
       })
       .catch((err) => console.error('Failed to load sessions:', err))
     return () => controller.abort()
+  }, [])
+
+  // Fetch config once on mount to get filter status for the badge
+  useEffect(() => {
+    api.getConfig()
+      .then((cfg) => {
+        const dmOn = cfg.waha?.dmFilter?.enabled ?? false
+        const groupOn = cfg.waha?.groupFilter?.enabled ?? false
+        setFilterEnabled(dmOn || groupOn)
+      })
+      .catch((err) => console.error('Failed to load config for filter badge:', err))
   }, [])
 
   const selectedLabel =
@@ -71,6 +84,13 @@ export function TabHeader({
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4" />
       <h1 className="flex-1 text-lg font-semibold">{TAB_TITLES[activeTab]}</h1>
+
+      {/* Filter ON/OFF badge — shows combined DM + Group filter state */}
+      {filterEnabled !== null && (
+        filterEnabled
+          ? <Badge className="bg-green-600 text-white hover:bg-green-700">Filter ON</Badge>
+          : <Badge variant="destructive">Filter OFF</Badge>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
