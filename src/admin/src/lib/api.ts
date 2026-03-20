@@ -39,7 +39,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   })
   if (!res.ok) {
+    // Try to parse structured error body (e.g. { error: 'validation_failed', fields: [...] })
+    // If JSON parse succeeds, throw the parsed object so callers can inspect .error and .fields.
     const text = await res.text().catch(() => res.statusText)
+    try {
+      const parsed = JSON.parse(text)
+      throw parsed
+    } catch (parseErr) {
+      // If the thrown value is already the parsed object (not a SyntaxError), re-throw it
+      if (!(parseErr instanceof SyntaxError)) throw parseErr
+    }
     throw new ApiError(path, res.status, text)
   }
   return res.json() as Promise<T>
@@ -54,6 +63,15 @@ export const api = {
   getConfig: () => request<ConfigResponse>('/config'),
   updateConfig: (body: { waha: Partial<WahaConfig> }) =>
     request<void>('/config', { method: 'POST', body: JSON.stringify(body) }),
+  exportConfig: (): Promise<Blob> => {
+    // Direct fetch to trigger download — bypasses request() since we need a Blob, not JSON
+    return fetch(`${BASE}/config/export`).then((r) => {
+      if (!r.ok) throw new Error('Export failed')
+      return r.blob()
+    })
+  },
+  importConfig: (body: Record<string, unknown>) =>
+    request<{ ok: boolean }>('/config/import', { method: 'POST', body: JSON.stringify(body) }),
 
   // Sessions
   getSessions: () => request<SessionsResponse>('/sessions'),

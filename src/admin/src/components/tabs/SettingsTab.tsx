@@ -36,6 +36,14 @@ function Tip({ text }: { text: string }) {
   )
 }
 
+// Inline field-level error message pinned to a specific config path.
+// path must match the Zod error path returned by the backend (e.g. "dmFilter.tokenEstimate").
+function FieldError({ path, errors }: { path: string; errors: Record<string, string> }) {
+  const msg = errors[path]
+  if (!msg) return null
+  return <p className="text-xs text-destructive mt-1">{msg}</p>
+}
+
 interface SettingsTabProps {
   selectedSession: string
   refreshKey: number
@@ -66,6 +74,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   const [restarting, setRestarting] = React.useState(false)
   const [dirty, setDirty] = React.useState(false)
   const [resolvedNames, setResolvedNames] = React.useState<Record<string, string>>({})
+
+  // Field-level validation errors from backend (keyed by Zod field path)
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({})
+  // Hidden file input for Import Config
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // Load config on mount and refreshKey change
   React.useEffect(() => {
@@ -251,14 +264,32 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     return { waha }
   }
 
+  // Parse structured validation error response and set field-level errors
+  function applyValidationErrors(err: unknown): boolean {
+    if (err && typeof err === 'object' && (err as Record<string, unknown>).error === 'validation_failed') {
+      const fields = (err as Record<string, unknown>).fields
+      if (Array.isArray(fields)) {
+        const errMap: Record<string, string> = {}
+        for (const f of fields) errMap[f.path] = f.message
+        setFieldErrors(errMap)
+        toast.error(`Validation failed: ${fields.length} field(s) have errors`)
+        return true
+      }
+    }
+    return false
+  }
+
   async function handleSave() {
     setSaving(true)
+    setFieldErrors({})
     try {
       await api.updateConfig(buildPayload())
       setDirty(false)
       toast.success('Settings saved')
-    } catch (err) {
-      toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
+    } catch (err: unknown) {
+      if (!applyValidationErrors(err)) {
+        toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
     } finally {
       setSaving(false)
     }
@@ -266,6 +297,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
 
   async function handleSaveAndRestart() {
     setSaving(true)
+    setFieldErrors({})
     try {
       await api.updateConfig(buildPayload())
       setDirty(false)
@@ -273,9 +305,49 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       setSaving(false)
       await api.restart()
       setRestarting(true)
-    } catch (err) {
+    } catch (err: unknown) {
       setSaving(false)
-      toast.error(`Save & Restart failed: ${err instanceof Error ? err.message : String(err)}`)
+      if (!applyValidationErrors(err)) {
+        toast.error(`Save & Restart failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+  }
+
+  async function handleExport() {
+    try {
+      const blob = await api.exportConfig()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'openclaw-config.json'
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Config exported')
+    } catch {
+      toast.error('Export failed')
+    }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFieldErrors({})
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      await api.importConfig(parsed)
+      toast.success('Config imported successfully')
+      // Reload config from server so UI reflects imported state
+      const resp = await api.getConfig()
+      setConfig(resp.waha)
+      setDirty(false)
+    } catch (err: unknown) {
+      if (!applyValidationErrors(err)) {
+        toast.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    } finally {
+      // Reset file input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -334,6 +406,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                   value={config.webhookPort ?? ''}
                   onChange={(e) => updateConfig('webhookPort', Number(e.target.value))}
                 />
+                <FieldError path="webhookPort" errors={fieldErrors} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="webhookPath">Webhook Path<Tip text="URL path WAHA sends events to. Default: /webhook/waha" /></Label>
@@ -541,6 +614,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 onChange={(e) => updateConfig('dmFilter.tokenEstimate', Number(e.target.value))}
                 className="w-40"
               />
+              <FieldError path="dmFilter.tokenEstimate" errors={fieldErrors} />
             </div>
           </CardContent>
         </Card>
@@ -618,6 +692,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 onChange={(e) => updateConfig('groupFilter.tokenEstimate', Number(e.target.value))}
                 className="w-40"
               />
+              <FieldError path="groupFilter.tokenEstimate" errors={fieldErrors} />
             </div>
           </CardContent>
         </Card>
@@ -974,8 +1049,8 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           </CardContent>
         </Card>
 
-        {/* Save / Save & Restart buttons */}
-        <div className="flex items-center gap-3 pb-6">
+        {/* Save / Save & Restart / Export / Import buttons */}
+        <div className="flex flex-wrap items-center gap-3 pb-6">
           <Button
             onClick={handleSave}
             disabled={saving || !dirty}
@@ -989,6 +1064,20 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           >
             {saving ? 'Saving...' : 'Save & Restart'}
           </Button>
+          <Button variant="outline" onClick={handleExport} disabled={saving}>
+            Export Config
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={saving}>
+            Import Config
+          </Button>
+          {/* Hidden file input for Import Config — reset after each use so same file re-triggers onChange */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleImport}
+          />
           {dirty && (
             <span className="text-sm text-muted-foreground">Unsaved changes</span>
           )}
