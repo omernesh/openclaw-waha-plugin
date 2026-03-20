@@ -14,7 +14,7 @@ import {
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
-import { getWahaGroupParticipants, getWahaContacts, toArr } from "./send.js";
+import { getWahaGroupParticipants, getWahaContacts, toArr, getAllWahaPresence } from "./send.js";
 import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
@@ -1806,6 +1806,20 @@ export function createWahaWebhookServer(opts: {
       }
     }
 
+    // ── Presence data for admin panel — Added Phase 28, Plan 03 ──
+    // GET /api/admin/presence — returns all subscribed presence info from WAHA.
+    // Used by ContactsTab to display online/offline status next to contacts.
+    // DO NOT REMOVE — powers presence indicators in the admin Directory tab.
+    if (url.pathname === "/api/admin/presence" && req.method === "GET") {
+      try {
+        const presenceData = await getAllWahaPresence({ cfg });
+        writeJsonResponse(res, 200, { presence: presenceData });
+      } catch (err) {
+        writeJsonResponse(res, 200, { presence: [], error: String(err) });
+      }
+      return;
+    }
+
     // Phase 16: GET /api/admin/pairing/deeplink?jid=<jid>
     // Generates a wa.me deep link with HMAC token for a specific JID. DO NOT REMOVE.
     if (req.method === "GET" && req.url?.startsWith("/api/admin/pairing/deeplink")) {
@@ -2028,6 +2042,63 @@ export function createWahaWebhookServer(opts: {
           writeJsonResponse(res, 200, { status: "queued" });
           return;
         }
+      }
+      writeJsonResponse(res, 200, { status: "ok" });
+      return;
+    }
+
+    // ── Group join/leave events — Added Phase 28, Plan 02 ──────────────
+    // Handle group membership changes. Creates synthetic messages for the agent
+    // and updates directory participant tracking.
+    // DO NOT CHANGE — group events are critical for directory consistency.
+    if (payload.event === "group.join" || payload.event === "group.leave") {
+      const groupData = payload.payload as Record<string, unknown>;
+      // WAHA group event payload: { id: groupJid, participants: string[], action: "add"|"remove"|... }
+      const groupId = (groupData.id as string) ?? (groupData.chatId as string) ?? "";
+      const participants = Array.isArray(groupData.participants) ? groupData.participants as string[] : [];
+      const action = payload.event === "group.join" ? "group_join" : "group_leave";
+      const verb = payload.event === "group.join" ? "joined" : "left";
+
+      if (groupId && participants.length > 0) {
+        for (const participant of participants) {
+          const eventKey = `${action}-${groupId}-${participant}`;
+          if (isDuplicate(payload.event, eventKey)) continue;
+
+          const syntheticMessage: WahaInboundMessage = {
+            messageId: `${action}-${Date.now()}-${participant}`,
+            timestamp: normalizeTimestamp(typeof groupData.timestamp === "number" ? groupData.timestamp : Date.now()),
+            from: participant,
+            fromMe: false,
+            chatId: groupId,
+            body: `[${action}] ${participant} ${verb} group ${groupId}`,
+            hasMedia: false,
+            participant,
+          };
+
+          // Update directory participant tracking if dirDb is available
+          if (opts.dirDb) {
+            try {
+              if (payload.event === "group.join") {
+                opts.dirDb.upsertGroupParticipant(groupId, participant, "member");
+              } else {
+                opts.dirDb.removeGroupParticipant(groupId, participant);
+              }
+            } catch (dirErr) {
+              console.warn(`[waha-webhook] Failed to update directory for ${action}:`, (dirErr as Error).message);
+            }
+          }
+
+          inboundQueue.enqueue({
+            message: syntheticMessage,
+            rawPayload: groupData,
+            account,
+            config: opts.config,
+            runtime,
+            statusSink: opts.statusSink,
+          }, true); // group events are always group-queue priority
+        }
+        writeJsonResponse(res, 200, { status: "queued" });
+        return;
       }
       writeJsonResponse(res, 200, { status: "ok" });
       return;
