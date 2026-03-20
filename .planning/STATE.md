@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 28-01-PLAN.md (backfill)
-last_updated: "2026-03-20T04:55:48.919Z"
+stopped_at: Completed 28-02-PLAN.md
+last_updated: "2026-03-20T05:20:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 28 (API Coverage Completion) — EXECUTING
-Plan: 1 of 3
+Plan: 2 of 3
 
 ## Accumulated Context
 
@@ -50,6 +50,9 @@ Plan: 1 of 3
 - [Phase 28]: getAllWahaPresence was already added by plan 01 — no re-add needed
 - [Phase 28]: [Phase 28-01]: searchChannelsByView defaults viewType to RECOMMENDED when absent
 - [Phase 28]: [Phase 28-01]: getAllWahaPresence uses GET on /presence (same path as POST for setPresenceStatus)
+- [Phase 28-02]: group.leave does not remove participant from DirectoryDb — no removal method exists; row kept as historical record
+- [Phase 28-02]: API key endpoints are server-scoped (/api/keys), not session-scoped
+- [Phase 28-02]: group.join upserts participant via bulkUpsertGroupParticipants with isAdmin=false default
 
 ### Pending Todos
 
