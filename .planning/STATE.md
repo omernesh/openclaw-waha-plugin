@@ -95,6 +95,7 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260320-hoy | Embed WAHA WhatsApp pages into OpenClaw Mission Control dashboard | 2026-03-20 | b300c98 | [260320-hoy-embed-waha-whatsapp-pages-into-openclaw-](./quick/260320-hoy-embed-waha-whatsapp-pages-into-openclaw-/) |
+| 260320-k2e | Restore per-group filter override UI in React admin panel | 2026-03-20 | 9a0d101 | [260320-k2e-restore-all-old-gui-features-from-pre-vi](./quick/260320-k2e-restore-all-old-gui-features-from-pre-vi/) |
 
 ## Session Continuity
 
