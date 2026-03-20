@@ -28,11 +28,11 @@
 
 ### API Coverage
 
-- [ ] **API-01**: Channel search by view (POST /channels/search/by-view)
-- [ ] **API-02**: Channel search metadata endpoints (GET views, countries, categories)
-- [ ] **API-03**: Bulk presence GET (GET /presence — all subscribed presence info)
-- [ ] **API-04**: Group join-info (GET /groups/{id}/join-info — preview before joining)
-- [ ] **API-05**: Group refresh (POST /groups/refresh — force refresh from server)
+- [x] **API-01**: Channel search by view (POST /channels/search/by-view)
+- [x] **API-02**: Channel search metadata endpoints (GET views, countries, categories)
+- [x] **API-03**: Bulk presence GET (GET /presence — all subscribed presence info)
+- [x] **API-04**: Group join-info (GET /groups/{id}/join-info — preview before joining)
+- [x] **API-05**: Group refresh (POST /groups/refresh — force refresh from server)
 - [ ] **API-06**: Group join/leave/participant-change webhook event handlers
 - [ ] **API-07**: API Keys CRUD (create, list, update, delete via /api/keys endpoints)
 
@@ -118,11 +118,11 @@
 | CQ-03 | Phase 27 | Complete |
 | CQ-04 | Phase 27 | Complete |
 | CQ-05 | Phase 27 | Complete |
-| API-01 | Phase 28 | Pending |
-| API-02 | Phase 28 | Pending |
-| API-03 | Phase 28 | Pending |
-| API-04 | Phase 28 | Pending |
-| API-05 | Phase 28 | Pending |
+| API-01 | Phase 28 | Complete |
+| API-02 | Phase 28 | Complete |
+| API-03 | Phase 28 | Complete |
+| API-04 | Phase 28 | Complete |
+| API-05 | Phase 28 | Complete |
 | API-06 | Phase 28 | Pending |
 | API-07 | Phase 28 | Pending |
 | PRES-01 | Phase 28 | Complete |
