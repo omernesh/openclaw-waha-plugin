@@ -15,5 +15,6 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, 'src/admin/src'),
     },
+    dedupe: ['react', 'react-dom'],
   },
 })
