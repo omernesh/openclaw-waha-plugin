@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 30-01-PLAN.md
-last_updated: "2026-03-20T06:04:28.893Z"
+stopped_at: Completed 30-02-PLAN.md
+last_updated: "2026-03-20T06:11:40.960Z"
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -60,6 +60,8 @@ Plan: 1 of 2
 - [Phase 30]: analytics.db stored at ~/.openclaw/data/analytics.db (separate from directory.db)
 - [Phase 30]: 90-day auto-prune runs in AnalyticsDb constructor on every startup
 - [Phase 30]: inbound recording placed at statusSink line (post-filter, post-dedup) -- captures confirmed deliverable messages
+- [Phase 30]: AnalyticsTab uses direct color values (#22c55e, #3b82f6, #f59e0b) for recharts fills — shadcn chart CSS vars not guaranteed
+- [Phase 30]: recharts installed in src/admin; AnalyticsTab is lazy-loaded (374kB chunk)
 
 ### Pending Todos
 
@@ -71,6 +73,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T06:04:28.888Z
-Stopped at: Completed 30-01-PLAN.md
+Last session: 2026-03-20T06:11:31.470Z
+Stopped at: Completed 30-02-PLAN.md
 Resume file: None
