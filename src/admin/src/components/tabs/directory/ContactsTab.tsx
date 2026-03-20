@@ -4,8 +4,9 @@
 // DO NOT CHANGE: onRowClick is omitted when bulkMode is true — DataTable handles selection.
 // DO NOT CHANGE: timestamps are Unix seconds — multiply by 1000 for Date constructor.
 // Verified working: Phase 21 Plan 02 (2026-03-18)
+// Presence display — Added Phase 28, Plan 03. DO NOT REMOVE.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +38,23 @@ export function ContactsTab({
   const [bulkMode, setBulkMode] = useState(false)
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({})
   const [selectedJid, setSelectedJid] = useState<string | null>(null)
+  // Presence display — Added Phase 28, Plan 03. DO NOT REMOVE.
+  // Fetched once on mount from GET /api/admin/presence. Keyed by contact JID.
+  const [presenceMap, setPresenceMap] = useState<Record<string, { status: string; lastSeen?: number }>>({})
+
+  useEffect(() => {
+    fetch('/api/admin/presence')
+      .then((r) => r.json())
+      .then((data: { presence?: Array<{ id: string; status?: string; lastSeen?: number }> }) => {
+        if (!Array.isArray(data.presence)) return
+        const map: Record<string, { status: string; lastSeen?: number }> = {}
+        for (const p of data.presence) {
+          if (p.id) map[p.id] = { status: p.status ?? 'offline', lastSeen: p.lastSeen }
+        }
+        setPresenceMap(map)
+      })
+      .catch((err) => console.error('[waha] presence fetch failed:', err))
+  }, [])
 
   // Find the currently selected contact for the sheet
   const selectedContact = selectedJid ? data.find((c) => c.jid === selectedJid) ?? null : null
@@ -70,7 +88,21 @@ export function ContactsTab({
       id: 'displayName',
       header: 'Name',
       accessorKey: 'displayName',
-      cell: ({ row }) => row.original.displayName ?? <span className="text-muted-foreground">Unknown</span>,
+      cell: ({ row }) => {
+        const presence = presenceMap[row.original.jid]
+        const isOnline = presence?.status === 'online'
+        return (
+          <span className="flex items-center gap-1.5">
+            {presence && (
+              <span
+                className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}
+                title={presence.status}
+              />
+            )}
+            {row.original.displayName ?? <span className="text-muted-foreground">Unknown</span>}
+          </span>
+        )
+      },
     },
     {
       id: 'jid',
