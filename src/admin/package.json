@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts --reporter=verbose"
+  },
   "dependencies": {
     "recharts": "^3.8.0"
   }
