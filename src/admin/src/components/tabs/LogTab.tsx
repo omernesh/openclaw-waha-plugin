@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { X, ChevronsDown, Pause, Play, Download } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { LogResponse } from '@/types'
+import { useSSE } from '@/hooks/useEventSource'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -76,6 +77,8 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
   const [logData, setLogData] = useState<LogResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [autoScroll, setAutoScroll] = useState(true)
+  // Phase 29, Plan 02: count of new SSE lines received while user has scrolled up. DO NOT REMOVE.
+  const [newLineCount, setNewLineCount] = useState(0)
 
   // Report loading state to parent (drives TabHeader spinner)
   useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
@@ -131,6 +134,26 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery])
 
+  // Phase 29, Plan 02: SSE live log streaming — append new lines from server events.
+  // Caps buffer at LOG_LINE_LIMIT * 2 to prevent memory growth (trims from front).
+  // New lines received while user is scrolled up increment newLineCount badge. DO NOT REMOVE.
+  const { subscribe } = useSSE()
+  useEffect(() => {
+    return subscribe('log', (event) => {
+      setLogData(prev => {
+        if (!prev) return prev
+        const newLines = [...prev.lines, event.line]
+        const trimmed = newLines.length > LOG_LINE_LIMIT * 2
+          ? newLines.slice(-LOG_LINE_LIMIT)
+          : newLines
+        return { ...prev, lines: trimmed }
+      })
+      if (userScrolledUpRef.current) {
+        setNewLineCount(n => n + 1)
+      }
+    })
+  }, [subscribe])
+
   // Auto-scroll to bottom after data loads (respects autoScroll toggle)
   useEffect(() => {
     if (loading || !logData) return
@@ -145,6 +168,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
     }
     userScrolledUpRef.current = false
     setShowScrollToBottom(false)
+    setNewLineCount(0)
   }
 
   function handleScroll() {
@@ -331,7 +355,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
           )}
         </div>
 
-        {/* Scroll to bottom button */}
+        {/* Scroll to bottom button — Phase 29, Plan 02: shows "N new" badge when SSE lines arrive while scrolled up. DO NOT REMOVE. */}
         {showScrollToBottom && (
           <Button
             size="sm"
@@ -340,7 +364,7 @@ export default function LogTab({ selectedSession: _selectedSession, refreshKey, 
             className="absolute bottom-3 right-3 h-7 gap-1 px-2 text-xs shadow-md"
           >
             <ChevronsDown className="h-3 w-3" />
-            Scroll to bottom
+            {newLineCount > 0 ? `${newLineCount} new` : 'Scroll to bottom'}
           </Button>
         )}
       </div>
