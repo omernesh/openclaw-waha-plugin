@@ -14,11 +14,11 @@
 
 ### Config Safety
 
-- [ ] **CFG-01**: Admin config POST validated against Zod schema before saving to disk
-- [ ] **CFG-02**: Validation errors returned as structured field-level response to admin panel
-- [ ] **CFG-03**: Config backup before save (rotate last 3 backups)
-- [ ] **CFG-04**: Config export endpoint (GET /api/admin/config/export — full JSON download)
-- [ ] **CFG-05**: Config import endpoint (POST /api/admin/config/import) with schema validation
+- [x] **CFG-01**: Admin config POST validated against Zod schema before saving to disk
+- [x] **CFG-02**: Validation errors returned as structured field-level response to admin panel
+- [x] **CFG-03**: Config backup before save (rotate last 3 backups)
+- [x] **CFG-04**: Config export endpoint (GET /api/admin/config/export — full JSON download)
+- [x] **CFG-05**: Config import endpoint (POST /api/admin/config/import) with schema validation
 
 ### Pairing Cleanup
 
@@ -105,11 +105,11 @@
 | REC-02 | Phase 25 | Complete |
 | REC-03 | Phase 25 | Complete |
 | REC-04 | Phase 25 | Complete |
-| CFG-01 | Phase 26 | Pending |
-| CFG-02 | Phase 26 | Pending |
-| CFG-03 | Phase 26 | Pending |
-| CFG-04 | Phase 26 | Pending |
-| CFG-05 | Phase 26 | Pending |
+| CFG-01 | Phase 26 | Complete |
+| CFG-02 | Phase 26 | Complete |
+| CFG-03 | Phase 26 | Complete |
+| CFG-04 | Phase 26 | Complete |
+| CFG-05 | Phase 26 | Complete |
 | PAIR-01 | Phase 27 | Pending |
 | PAIR-02 | Phase 27 | Pending |
 | PAIR-03 | Phase 27 | Pending |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
-status: unknown
-stopped_at: Completed 25-02-PLAN.md
-last_updated: "2026-03-20T04:01:39.186Z"
+status: in-progress
+stopped_at: Completed 26-01-PLAN.md
+last_updated: "2026-03-20T04:18:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 25 — Session Auto-Recovery
+**Current focus:** Phase 26 — Config Safety
 
 ## Current Position
 
-Phase: 25 (Session Auto-Recovery) — EXECUTING
+Phase: 26 (Config Safety) — EXECUTING
 Plan: 2 of 2
 
 ## Accumulated Context
@@ -40,6 +40,7 @@ Plan: 2 of 2
 - enableRecovery defaults false (backward compat); opt-in per startHealthCheck call site
 - UNHEALTHY_THRESHOLD raised from 3 to 5 (unifies with AUTO_RECOVERY_THRESHOLD)
 - [Phase 25]: Recovery info row rendered conditionally (only when recoveryAttemptCount > 0) to preserve clean UI
+- [Phase 26-01]: validateWahaConfig() validates before every config write; backup failure is non-fatal; import writes full config verbatim
 
 ### Pending Todos
 
@@ -53,6 +54,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T03:58:51.589Z
-Stopped at: Completed 25-02-PLAN.md
+Last session: 2026-03-20T04:18:00.000Z
+Stopped at: Completed 26-01-PLAN.md
 Resume file: None
