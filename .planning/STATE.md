@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 31-01-PLAN.md
-last_updated: "2026-03-20T06:32:04.195Z"
+stopped_at: Completed 31-02-PLAN.md
+last_updated: "2026-03-20T08:38:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 31 (Test Coverage Sprint) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Accumulated Context
 
@@ -64,6 +64,10 @@ Plan: 2 of 3
 - [Phase 30]: recharts installed in src/admin; AnalyticsTab is lazy-loaded (374kB chunk)
 - [Phase 31-01]: DirectoryDb tests use real :memory: SQLite — no mocking at the DB layer
 - [Phase 31-01]: better-sqlite3 NODE_MODULE_VERSION mismatch fixed with npm rebuild (127 vs 141)
+- [Phase 31-02]: server.emit('request', req, res) pattern used to test routes without starting HTTP server
+- [Phase 31-02]: callRoute resolves when res.end() is called — avoids fixed timeouts for async routes
+- [Phase 31-02]: InboundQueue mock uses class syntax (not vi.fn) because createWahaWebhookServer uses new
+- [Phase 31-02]: url.pathname ReferenceError in /api/admin/presence route fixed (url was block-scoped to directory if-block)
 
 ### Pending Todos
 
@@ -71,10 +75,10 @@ None.
 
 ### Blockers/Concerns
 
-- monitor.ts (1980 lines) and inbound.ts (1100 lines) have zero test coverage (Phase 31)
+None.
 
 ## Session Continuity
 
-Last session: 2026-03-20T06:32:00Z
-Stopped at: Completed 31-01-PLAN.md
+Last session: 2026-03-20T08:38:00Z
+Stopped at: Completed 31-02-PLAN.md
 Resume file: None

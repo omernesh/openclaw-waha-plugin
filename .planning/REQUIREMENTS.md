@@ -56,8 +56,8 @@
 
 ### Test Coverage
 
-- [ ] **TST-01**: monitor.ts admin API route tests (mock HTTP req/res, test each endpoint)
-- [ ] **TST-02**: inbound.ts pipeline tests (mock SDK imports, test filter/dedup/queue flow)
+- [x] **TST-01**: monitor.ts admin API route tests (mock HTTP req/res, test each endpoint)
+- [x] **TST-02**: inbound.ts pipeline tests (mock SDK imports, test filter/dedup/queue flow)
 - [x] **TST-03**: directory.ts CRUD tests (contacts, participants, overrides, LID mapping)
 - [x] **TST-04**: shutup.ts interactive flow tests (mute/unmute with pending selections)
 - [ ] **TST-05**: React admin panel component tests (vitest + testing-library)
@@ -134,8 +134,8 @@
 | ANL-01 | Phase 30 | Complete |
 | ANL-02 | Phase 30 | Complete |
 | ANL-03 | Phase 30 | Complete |
-| TST-01 | Phase 31 | Pending |
-| TST-02 | Phase 31 | Pending |
+| TST-01 | Phase 31 | Complete |
+| TST-02 | Phase 31 | Complete |
 | TST-03 | Phase 31 | Complete |
 | TST-04 | Phase 31 | Complete |
 | TST-05 | Phase 31 | Pending |
