@@ -1041,17 +1041,27 @@ export async function handleWahaInbound(params: {
       const bestSession = await resolveSessionForTarget({
         cfg: config as CoreConfig,
         targetChatId: chatId,
+        tenantId: account.tenantId,
         checkMembership: checkGroupMembership,
       });
       replyAccountId = bestSession.accountId;
       replyBotProxy = bestSession.role !== "bot";
       runtime.log?.(`waha: trigger session routing — using ${bestSession.role} session '${bestSession.accountId}' for group ${chatId}`);
     } catch (err) {
-      // No session can reach this group — fall back to current account
-      runtime.log?.(`waha: trigger session routing failed, using current account: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      // Expected: no sessions available or none is a member — log at info level.
+      // Unexpected: infrastructure errors (WAHA down, auth failure) — log at error level. DO NOT CHANGE.
+      const isExpected = /no full-access|no session is a member|no bot session/i.test(msg);
+      if (isExpected) {
+        runtime.log?.(`waha: trigger session routing — ${msg}, using current account`);
+      } else {
+        runtime.error?.(`waha: trigger session routing failed (unexpected): ${msg}`);
+      }
     }
   }
 
+  // Uses account.accountId (inbound account), NOT replyAccountId — agent routing is per-inbound-account.
+  // The delivery session (replyAccountId) is a separate concern. DO NOT CHANGE.
   const route = core.channel.routing.resolveAgentRoute({
     cfg: config as OpenClawConfig,
     channel: CHANNEL_ID,
@@ -1123,6 +1133,8 @@ export async function handleWahaInbound(params: {
     },
   });
 
+  // Uses account.accountId (inbound account), NOT replyAccountId — prefix config is per-receiving-account.
+  // DO NOT CHANGE.
   const { onModelSelected, ...prefixOptions } = createReplyPrefixOptions({
     cfg: config as OpenClawConfig,
     agentId: route.agentId,

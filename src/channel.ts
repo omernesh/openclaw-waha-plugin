@@ -528,8 +528,18 @@ export async function checkGroupMembership(
     // If the call succeeded, the session has visibility into the group (i.e., is a member).
     return Array.isArray(participants) && participants.length > 0;
   } catch (err) {
-    console.warn(`[waha] checkGroupMembership failed for session=${session} group=${groupId}: ${err instanceof Error ? err.message : String(err)}`);
-    return false;
+    const msg = err instanceof Error ? err.message : String(err);
+    // 404 / "not found" means the session genuinely isn't in the group — return false.
+    // Any other error (WAHA down, auth failure, network timeout) is infrastructure —
+    // re-throw so the caller knows the check failed vs "not a member". DO NOT CHANGE.
+    const isNotFound =
+      (err instanceof Error && "status" in err && (err as any).status === 404) ||
+      /not found|404|does not exist/i.test(msg);
+    if (isNotFound) {
+      console.warn(`[waha] checkGroupMembership: session=${session} not in group=${groupId}`);
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -646,10 +656,16 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
             cfg: coreCfg,
             targetChatId: chatId,
             checkMembership: checkGroupMembership,
+            tenantId: _tenantId,
           });
           resolvedAid = resolved.accountId;
         } catch (routeErr) {
-          console.warn(`[waha] cross-session routing failed for ${chatId}, using default account: ${routeErr}`);
+          const msg = routeErr instanceof Error ? routeErr.message : String(routeErr);
+          if (/No full-access sessions|No session is a member/i.test(msg)) {
+            console.warn(`[waha] cross-session routing — no reachable session for ${chatId}, using default account`);
+          } else {
+            console.error(`[waha] cross-session routing unexpected error for ${chatId}: ${msg}`);
+          }
         }
       }
 
