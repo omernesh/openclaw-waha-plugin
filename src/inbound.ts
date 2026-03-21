@@ -535,9 +535,10 @@ export async function handleWahaInbound(params: {
     }
   }
 
-  // Group whitelist: if allowedGroups is set, only respond in those groups
-  // Trigger-word activation still respects allowedGroups — only configured groups accepted.
-  if (isGroup) {
+  // Group whitelist: if allowedGroups is set, only respond in those groups.
+  // SKIP for trigger-word messages — explicit invocation bypasses group whitelist.
+  // DO NOT CHANGE — trigger bypass for allowedGroups is intentional. Added 2026-03-21.
+  if (isGroup && !triggerActivated) {
     const allowedGroups = account.config.allowedGroups;
     if (allowedGroups && allowedGroups.length > 0 && !allowedGroups.includes(chatId)) {
       runtime.log?.(`waha: drop group ${chatId} (not in allowedGroups)`);
