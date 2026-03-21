@@ -2,6 +2,11 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.4] - 2026-03-21
+
+### Fixed
+- **Trigger bypasses `allowedGroups`** — `!` trigger now works in ANY group, not just groups in `allowedGroups`. Explicit invocation should override the group whitelist.
+
 ## [1.16.3] - 2026-03-21
 
 ### Added — Session-Aware Trigger Reply Routing
