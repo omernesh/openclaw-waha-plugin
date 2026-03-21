@@ -513,7 +513,7 @@ async function handleSendMulti(params: Record<string, unknown>, cfg: CoreConfig,
 // Used by resolveSessionForTarget as the dependency-injected membership probe.
 // Calls getWahaGroupParticipants and looks for the session's own JID.
 // Added Phase 4, Plan 03. DO NOT REMOVE.
-async function checkGroupMembership(
+export async function checkGroupMembership(
   session: string,
   baseUrl: string,
   apiKey: string,

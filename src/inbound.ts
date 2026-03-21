@@ -17,6 +17,8 @@ import {
 } from "openclaw/plugin-sdk";
 import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
 import type { ResolvedWahaAccount } from "./accounts.js";
+import { resolveSessionForTarget } from "./accounts.js";
+import { checkGroupMembership } from "./channel.js";
 import { DmFilter, type DmFilterConfig } from "./dm-filter.js";
 import { getDirectoryDb } from "./directory.js";
 import { claimMessage, isClaimedByBotSession } from "./dedup.js";
@@ -1021,6 +1023,35 @@ export async function handleWahaInbound(params: {
   // ╚══════════════════════════════════════════════════════════════════════╝
   const isBotProxy = account.role !== "bot";
 
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  Trigger session routing — DO NOT CHANGE                            ║
+  // ║                                                                     ║
+  // ║  When trigger word (!) activates in a group with reply-in-chat     ║
+  // ║  mode, route the reply through the bot session if the bot is a     ║
+  // ║  member of that group. Otherwise fall back to human session with   ║
+  // ║  botProxy prefix. DMs always use current (human) session.          ║
+  // ║  Added 2026-03-21. DO NOT REMOVE.                                  ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  let replyAccountId = account.accountId;
+  let replyBotProxy = isBotProxy;
+
+  if (triggerActivated && isGroup && triggerResponseChatId === chatId) {
+    // reply-in-chat mode in a group — try to use bot session
+    try {
+      const bestSession = await resolveSessionForTarget({
+        cfg: config as CoreConfig,
+        targetChatId: chatId,
+        checkMembership: checkGroupMembership,
+      });
+      replyAccountId = bestSession.accountId;
+      replyBotProxy = bestSession.role !== "bot";
+      runtime.log?.(`waha: trigger session routing — using ${bestSession.role} session '${bestSession.accountId}' for group ${chatId}`);
+    } catch (err) {
+      // No session can reach this group — fall back to current account
+      runtime.log?.(`waha: trigger session routing failed, using current account: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   const route = core.channel.routing.resolveAgentRoute({
     cfg: config as OpenClawConfig,
     channel: CHANNEL_ID,
@@ -1106,18 +1137,18 @@ export async function handleWahaInbound(params: {
     chatId: responseChatId,
     messageId: message.messageId,
     incomingText: effectiveBody,
-    accountId: account.accountId,
+    accountId: replyAccountId,
   });
 
   const deliverReply = createNormalizedOutboundDeliverer(async (payload) => {
     await deliverWahaReply({
       payload,
       chatId: responseChatId,
-      accountId: account.accountId,
+      accountId: replyAccountId,
       statusSink,
       cfg: config as CoreConfig,
       presenceCtrl,
-      botProxy: isBotProxy,
+      botProxy: replyBotProxy,
     });
   });
 
