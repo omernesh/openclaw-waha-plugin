@@ -2,6 +2,18 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.3] - 2026-03-21
+
+### Added — Session-Aware Trigger Reply Routing
+- **Trigger session routing** — When `!` trigger fires in a group, the bot now auto-selects the best session for the reply: bot session if the bot is a member (no robot emoji prefix), human session with proxy prefix if not. DMs always use the human session (unchanged).
+- **Exported `checkGroupMembership`** from channel.ts for reuse in inbound trigger routing.
+
+### Fixed — Code Review
+- **`checkGroupMembership` error handling** — Now re-throws infrastructure errors (network, auth, 500) instead of silently returning `false`. Only returns `false` for genuine 404/not-found responses.
+- **Trigger routing catch** — Distinguishes expected errors (no sessions available) from unexpected errors (infra failures), logging at appropriate severity levels.
+- **`tenantId` forwarding** — Both inbound trigger routing and outbound cross-session routing now pass `tenantId` to `resolveSessionForTarget`, preventing wrong-tenant resolution in multi-tenant setups.
+- **Outbound routing error handling** — `handleAction` cross-session routing catch block now differentiates expected vs unexpected errors (parity with inbound fix).
+
 ## [1.16.2] - 2026-03-21
 
 ### Fixed — Code Review (Perfection Pass)
