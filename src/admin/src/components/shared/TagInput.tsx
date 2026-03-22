@@ -188,7 +188,7 @@ export function TagInput({
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-80 p-0" align="start">
-            <Command>
+            <Command shouldFilter={false}>
               <CommandInput
                 placeholder="Search..."
                 value={inputValue}

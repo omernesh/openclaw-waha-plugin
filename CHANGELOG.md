@@ -2,6 +2,14 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.7] - 2026-03-22
+
+### Fixed
+- **Dashboard/Settings filter mismatch** — Dashboard DM/Group filter widgets now show the global config (same source as Settings tab). Previously showed account-specific merged config, causing "Off" when the bot account had no filter configured.
+- **Sidebar active tab highlight** — Active tab now visually prominent with blue foreground and slate-200 background instead of near-invisible light gray.
+- **God mode user name resolution** — Bare numeric identifiers (e.g. `271862907039996`) now normalized to JID format (`@c.us`) before resolve API call, so names display correctly in both Settings and Dashboard.
+- **Settings contact search** — TagInput search now shows server results by disabling cmdk's client-side JID-based filtering (`shouldFilter={false}`).
+
 ## [1.16.6] - 2026-03-22
 
 ### Fixed

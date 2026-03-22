@@ -133,12 +133,25 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   React.useEffect(() => {
     if (!jidKey) return
 
-    const allJids = jidKey.split(',').filter((jid) => jid && jid !== '*')
-    if (allJids.length === 0) return
+    const rawIds = jidKey.split(',').filter((jid) => jid && jid !== '*')
+    if (rawIds.length === 0) return
 
-    api.resolveNames(allJids)
+    // Normalize bare numbers (god mode users) to JIDs so the resolve API can match them
+    const normalizedJids = rawIds.map((id) =>
+      /^\d{10,}$/.test(id) ? `${id}@c.us` : id
+    )
+
+    api.resolveNames(normalizedJids)
       .then((resp) => {
-        setResolvedNames((prev) => ({ ...prev, ...resp.resolved }))
+        // Map resolved names back to both the JID and the original bare identifier
+        const merged: Record<string, string> = { ...resp.resolved }
+        rawIds.forEach((raw, i) => {
+          const norm = normalizedJids[i]
+          if (norm !== raw && merged[norm]) {
+            merged[raw] = merged[norm]
+          }
+        })
+        setResolvedNames((prev) => ({ ...prev, ...merged }))
       })
       .catch((err) => console.error('Settings name resolution failed:', err))
   }, [jidKey])

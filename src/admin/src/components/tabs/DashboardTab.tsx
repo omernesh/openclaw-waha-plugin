@@ -102,7 +102,12 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
         setConfig(c)
 
         // Batch-resolve JIDs from access control + god mode — only ones not already resolved
-        const extractJid = (u: string | { identifier: string }) => typeof u === 'string' ? u : u.identifier
+        const extractJid = (u: string | { identifier: string }) => {
+          const raw = typeof u === 'string' ? u : u.identifier
+          // Bare numbers (10+ digits) need @c.us suffix for resolve API
+          if (raw && !raw.includes('@') && /^\d{10,}$/.test(raw)) return `${raw}@c.us`
+          return raw
+        }
         const jids = [
           ...(s.access?.allowFrom ?? []),
           ...(s.access?.groupAllowFrom ?? []),

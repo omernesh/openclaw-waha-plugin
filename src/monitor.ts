@@ -633,9 +633,13 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/api/admin/stats" && req.method === "GET") {
       try {
       const dmFilter = getDmFilterForAdmin(opts.config, opts.accountId);
-      const dmCfg = account.config.dmFilter ?? {};
+      // Use GLOBAL waha config (same source as Settings tab), not account-specific merged config.
+      // account.config may have no dmFilter/groupFilter if the bot account doesn't define them,
+      // even though the global config does. DO NOT CHANGE back to account.config.
+      const globalWahaCfg = (opts.config.channels?.waha ?? {}) as Record<string, unknown>;
+      const dmCfg = globalWahaCfg.dmFilter ?? {};
       const groupFilter = getGroupFilterForAdmin(opts.config, opts.accountId);
-      const groupFilterCfg = (account.config.groupFilter ?? {}) as Record<string, unknown>;
+      const groupFilterCfg = (globalWahaCfg.groupFilter ?? {}) as Record<string, unknown>;
       // Build access block — resolve unknown @lid JIDs from WAHA before dedup.
       // This is async because WAHA API calls are needed for LIDs not in the local DB.
       // All numbers in allowFrom ARE on WhatsApp — WAHA just hasn't mapped them yet. DO NOT REMOVE.
