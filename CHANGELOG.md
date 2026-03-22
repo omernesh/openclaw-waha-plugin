@@ -2,7 +2,7 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
-## [1.16.5] - 2026-03-22
+## [1.16.6] - 2026-03-22
 
 ### Fixed
 - **Session health checks for all accounts** — Health check now runs for ALL enabled WAHA accounts, not just the default session. Previously, non-default accounts (e.g. human sessions) showed "unknown" health status in the admin panel Dashboard.
