@@ -42,6 +42,25 @@ function formatRange(val: [number, number] | undefined): string {
   return `${val[0]} - ${val[1]}`
 }
 
+/** Deduplicate god mode users by resolved name — if a phone and its LID resolve to the same
+ *  person, show only one badge. DO NOT REMOVE — prevents duplicate badges for same person. */
+function dedupeGodModeUsers(
+  users: Array<string | { identifier: string }>,
+  resolvedNames: Record<string, string>,
+): Array<{ jid: string; display: string }> {
+  const seen = new Map<string, string>() // resolvedName -> first jid
+  const result: Array<{ jid: string; display: string }> = []
+  for (const u of users) {
+    const jid = typeof u === 'string' ? u : u.identifier
+    const display = resolvedNames[jid] ?? jid
+    // If another JID already resolved to the same display name, skip this one
+    if (seen.has(display) && display !== jid) continue
+    if (!seen.has(display)) seen.set(display, jid)
+    result.push({ jid, display })
+  }
+  return result
+}
+
 function formatTs(ts: number): string {
   return new Date(ts).toLocaleTimeString()
 }
@@ -307,10 +326,9 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                 </div>
                 {dmFilter.godModeSuperUsers.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
-                    {dmFilter.godModeSuperUsers.map((u) => {
-                      const jid = typeof u === 'string' ? u : u.identifier
-                      return <Badge key={jid} variant="outline">{resolvedNames[jid] ?? jid}</Badge>
-                    })}
+                    {dedupeGodModeUsers(dmFilter.godModeSuperUsers, resolvedNames).map(({ jid, display }) => (
+                      <Badge key={jid} variant="outline">{display}</Badge>
+                    ))}
                   </div>
                 )}
               </div>
@@ -418,10 +436,9 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                 </div>
                 {groupFilter.godModeSuperUsers?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
-                    {groupFilter.godModeSuperUsers.map((u) => {
-                      const jid = typeof u === 'string' ? u : u.identifier
-                      return <Badge key={jid} variant="outline">{resolvedNames[jid] ?? jid}</Badge>
-                    })}
+                    {dedupeGodModeUsers(groupFilter.godModeSuperUsers, resolvedNames).map(({ jid, display }) => (
+                      <Badge key={jid} variant="outline">{display}</Badge>
+                    ))}
                   </div>
                 )}
               </div>
