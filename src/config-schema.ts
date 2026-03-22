@@ -2,7 +2,6 @@ import {
   BlockStreamingCoalesceSchema,
   DmPolicySchema,
   GroupPolicySchema,
-  MarkdownConfigSchema,
   ReplyRuntimeConfigSchemaShape,
   ToolPolicySchema,
   requireOpenAllowFrom,
@@ -60,7 +59,10 @@ export const WahaAccountSchemaBase = z
         reactions: z.boolean().optional(),
       })
       .optional(),
-    markdown: MarkdownConfigSchema,
+    // Accept any markdown config shape — the gateway writes values (tables: "auto",
+    // enabled: true) not recognized by the SDK's MarkdownConfigSchema.
+    // Using z.any() prevents validation_failed on config save. DO NOT tighten.
+    markdown: z.any().optional(),
     tools: ToolPolicySchema,
     ...ReplyRuntimeConfigSchemaShape,
     blockStreaming: z.boolean().optional(),
@@ -164,8 +166,20 @@ export type ConfigValidationResult =
 // Returns { valid: true, data } on success, { valid: false, errors } on failure.
 // Called before every config write to prevent corrupt configs from reaching disk.
 // Added Phase 26 (CFG-01, CFG-02). DO NOT REMOVE.
+//
+// Strip unknown top-level keys before strict validation.
+// The config file contains keys from other subsystems (presence, mediaPreprocessing,
+// plugin, etc.) that are not part of WahaConfigSchema. Rather than relaxing the schema
+// with .passthrough(), we strip them before validation so known fields are still strictly
+// checked. DO NOT CHANGE — .passthrough() was tried and caused regressions.
 export function validateWahaConfig(value: unknown): ConfigValidationResult {
-  const result = WahaConfigSchema.safeParse(value);
+  // WahaConfigSchema is WahaAccountSchemaBase.extend({accounts,defaultAccount}).superRefine(...)
+  // .superRefine() returns ZodEffects which has no .shape — derive keys from the base + extension.
+  const knownKeys = new Set([...Object.keys(WahaAccountSchemaBase.shape), 'accounts', 'defaultAccount']);
+  const stripped = typeof value === 'object' && value !== null
+    ? Object.fromEntries(Object.entries(value).filter(([k]) => knownKeys.has(k)))
+    : value;
+  const result = WahaConfigSchema.safeParse(stripped);
   if (result.success) {
     return { valid: true, data: result.data };
   }

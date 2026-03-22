@@ -722,6 +722,7 @@ export function createWahaWebhookServer(opts: {
           patterns: Array.isArray(groupFilterCfg.mentionPatterns) ? groupFilterCfg.mentionPatterns : [],
           godModeBypass: groupFilterCfg.godModeBypass !== false,
           godModeScope: typeof groupFilterCfg.godModeScope === 'string' ? groupFilterCfg.godModeScope : 'all',
+          godModeSuperUsers: Array.isArray(groupFilterCfg.godModeSuperUsers) ? groupFilterCfg.godModeSuperUsers : [],
           tokenEstimate: typeof groupFilterCfg.tokenEstimate === "number" ? groupFilterCfg.tokenEstimate : 2500,
           stats: groupFilter.stats,
           recentEvents: groupFilter.recentEvents,

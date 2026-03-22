@@ -78,6 +78,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   React.useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
   const [restarting, setRestarting] = React.useState(false)
   const [dirty, setDirty] = React.useState(false)
+  // Auto-save: track whether initial config load has completed (skip auto-save on first hydration)
+  const initialLoadDone = React.useRef(false)
+  const [autoSaveStatus, setAutoSaveStatus] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [resolvedNames, setResolvedNames] = React.useState<Record<string, string>>({})
   // Available sessions for the Active WAHA Session dropdown
   const [availableSessions, setAvailableSessions] = React.useState<Session[]>([])
@@ -100,6 +103,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
         if (controller.signal.aborted) return
         setConfig(resp.waha)
         setDirty(false)
+        // Mark initial load done AFTER state settles (next tick) so the auto-save
+        // useEffect does not fire for the hydration render.
+        setTimeout(() => { initialLoadDone.current = true }, 0)
       })
       .catch((err) => console.error('Settings config fetch failed:', err))
       .finally(() => {
@@ -164,6 +170,31 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     })
     setDirty(true)
   }
+
+  // ── Auto-save: debounce 1.5s after any user change ──
+  // Skips the initial hydration render via initialLoadDone ref.
+  // DO NOT REMOVE — replaces manual Save button. Only auto-saves when dirty.
+  React.useEffect(() => {
+    if (!initialLoadDone.current || !dirty || !config) return
+    setAutoSaveStatus('saving')
+    const timer = setTimeout(async () => {
+      setFieldErrors({})
+      try {
+        await api.updateConfig(buildPayload())
+        setDirty(false)
+        setAutoSaveStatus('saved')
+        // Fade "Saved" indicator after 2s
+        setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+      } catch (err: unknown) {
+        setAutoSaveStatus('error')
+        if (!applyValidationErrors(err)) {
+          toast.error(`Auto-save failed: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
+    }, 1500)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, dirty])
 
   // Generate pairing link from JID
   function handleGeneratePairingLink() {
@@ -1218,20 +1249,33 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           </Card>
         </Collapsible>
 
-        {/* Save / Save & Restart / Export / Import buttons */}
+        {/* Restart / Export / Import buttons + auto-save indicator */}
         <div className="flex flex-wrap items-center gap-3 pb-6">
           <Button
-            onClick={handleSave}
-            disabled={saving || !dirty}
-            variant="outline"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-          <Button
-            onClick={handleSaveAndRestart}
+            onClick={async () => {
+              // Save any pending changes before restart
+              if (dirty) {
+                setSaving(true)
+                setFieldErrors({})
+                try {
+                  await api.updateConfig(buildPayload())
+                  setDirty(false)
+                } catch (err: unknown) {
+                  setSaving(false)
+                  if (!applyValidationErrors(err)) {
+                    toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
+                  }
+                  return
+                }
+                setSaving(false)
+              }
+              toast.success('Restarting gateway...')
+              await api.restart()
+              setRestarting(true)
+            }}
             disabled={saving}
           >
-            {saving ? 'Saving...' : 'Save & Restart'}
+            Restart Gateway
           </Button>
           <Button variant="outline" onClick={handleExport} disabled={saving}>
             Export Config
@@ -1247,8 +1291,15 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             className="hidden"
             onChange={handleImport}
           />
-          {dirty && (
-            <span className="text-sm text-muted-foreground">Unsaved changes</span>
+          {/* Auto-save status indicator */}
+          {autoSaveStatus === 'saving' && (
+            <span className="text-sm text-muted-foreground animate-pulse">Saving...</span>
+          )}
+          {autoSaveStatus === 'saved' && (
+            <span className="text-sm text-emerald-500">Saved</span>
+          )}
+          {autoSaveStatus === 'error' && (
+            <span className="text-sm text-destructive">Save failed</span>
           )}
         </div>
       </div>

@@ -2,6 +2,16 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.8] - 2026-03-22
+
+### Fixed
+- **Dashboard group filter god mode users** — Stats API now returns `godModeSuperUsers` for the group filter (was missing from the response entirely).
+- **Dashboard/Settings data source** — Both now use the same global waha config source, eliminating mismatches between Dashboard and Settings tabs.
+- **Config save validation** — Strips unknown top-level keys and relaxes `markdown` schema to accept gateway-written values. Config save no longer returns `validation_failed`.
+
+### Added
+- **Auto-save** — Settings tab now auto-saves 1.5 seconds after any change. Manual Save button replaced with subtle "Saving..."/"Saved" status indicator. Only "Restart Gateway" button remains.
+
 ## [1.16.7] - 2026-03-22
 
 ### Fixed
