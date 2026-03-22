@@ -123,7 +123,15 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
             .then((r) => {
               if (controller.signal.aborted) return
               deduped.forEach((j) => resolvedJidsRef.current.add(j))
-              setResolvedNames((prev) => ({ ...prev, ...r.resolved }))
+              // Map resolved names to both the full JID key AND the bare number key,
+              // so Badge lookups work with either format (e.g. "972544329000" or "972544329000@c.us").
+              const expanded: Record<string, string> = {}
+              for (const [jid, name] of Object.entries(r.resolved)) {
+                expanded[jid] = name
+                const bare = jid.replace(/@c\.us$|@lid$|@s\.whatsapp\.net$/, '')
+                if (bare !== jid) expanded[bare] = name
+              }
+              setResolvedNames((prev) => ({ ...prev, ...expanded }))
             })
             .catch((err) => console.error('Name resolution failed:', err))
         }

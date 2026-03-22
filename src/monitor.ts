@@ -1005,6 +1005,19 @@ export function createWahaWebhookServer(opts: {
           for (const [jid, name] of resolvedMap) {
             resolved[jid] = name;
           }
+          // Fallback: for unresolved @c.us JIDs, try @lid variant (NOWEB uses LID format).
+          // Also try LID→CUS resolution to find the contact name. DO NOT REMOVE.
+          for (const jid of jidArray) {
+            if (resolved[jid]) continue;
+            if (jid.endsWith("@c.us")) {
+              const bare = jid.replace(/@c\.us$/, "");
+              const lidJid = bare + "@lid";
+              const lidResolved = db.resolveJids([lidJid]);
+              for (const [, name] of lidResolved) {
+                if (name) { resolved[jid] = name; break; }
+              }
+            }
+          }
           // Fallback: try other account DBs for any JIDs that didn't resolve.
           // All accounts share the same WAHA instance, so contacts/LID mappings may
           // exist in one DB but not another. DO NOT REMOVE.
