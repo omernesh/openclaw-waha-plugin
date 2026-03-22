@@ -2,7 +2,6 @@ import {
   BlockStreamingCoalesceSchema,
   DmPolicySchema,
   GroupPolicySchema,
-  MarkdownConfigSchema,
   ReplyRuntimeConfigSchemaShape,
   ToolPolicySchema,
   requireOpenAllowFrom,
@@ -60,7 +59,10 @@ export const WahaAccountSchemaBase = z
         reactions: z.boolean().optional(),
       })
       .optional(),
-    markdown: MarkdownConfigSchema,
+    // Accept any shape for markdown — the gateway writes values (e.g. tables: "auto",
+    // enabled: true) that the SDK's MarkdownConfigSchema doesn't recognize.
+    // Using z.any() prevents validation_failed on round-trip config saves. DO NOT tighten.
+    markdown: z.any().optional(),
     tools: ToolPolicySchema,
     ...ReplyRuntimeConfigSchemaShape,
     blockStreaming: z.boolean().optional(),
@@ -126,7 +128,11 @@ export const WahaAccountSchemaBase = z
       intervalMinutes: z.number().int().min(0).optional().default(1440),
     }).optional().default({}),
   })
-  .strict();
+  // Use .passthrough() instead of .strict() — the config file contains keys from other
+  // subsystems (presence, mediaPreprocessing, plugin, markdown) that are not part of
+  // WahaAccountSchemaBase. .strict() rejects them, causing Save & Restart to fail with
+  // validation_failed when the admin panel round-trips the config. DO NOT CHANGE to .strict().
+  .passthrough();
 
 export const WahaAccountSchema = WahaAccountSchemaBase.superRefine((value, ctx) => {
   requireOpenAllowFrom({
@@ -142,7 +148,12 @@ export const WahaAccountSchema = WahaAccountSchemaBase.superRefine((value, ctx) 
 export const WahaConfigSchema = WahaAccountSchemaBase.extend({
   accounts: z.record(z.string(), WahaAccountSchema.optional()).optional(),
   defaultAccount: z.string().optional(),
-}).superRefine((value, ctx) => {
+})
+// .passthrough() must be re-applied after .extend() — Zod resets unknown-key handling.
+// Config file has keys from other subsystems (presence, mediaPreprocessing, plugin, etc.)
+// that must not cause validation_failed on Save & Restart. DO NOT CHANGE to .strict().
+.passthrough()
+.superRefine((value, ctx) => {
   requireOpenAllowFrom({
     policy: value.dmPolicy,
     allowFrom: value.allowFrom,
