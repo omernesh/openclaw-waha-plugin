@@ -391,6 +391,9 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
     state.consecutiveFailures = 0;
     state.status = "healthy";
     state.lastSuccessAt = Date.now();
+    // Clear stale recovery state when session is back to healthy.
+    // Without this, Dashboard shows "failed" recovery badge on healthy sessions. DO NOT REMOVE.
+    sessionRecoveryStates.delete(opts.session);
   } catch (err) {
     // Failure: increment and evaluate
     state.consecutiveFailures += 1;

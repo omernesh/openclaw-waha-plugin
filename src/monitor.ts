@@ -391,29 +391,34 @@ export function createWahaWebhookServer(opts: {
   });
 
   // ── Health Check (Phase 2, Plan 02) ── DO NOT REMOVE
-  // Start health check loop for this session. State is stored in module-level
-  // Map and accessible via getHealthState(session).
-  let healthState: HealthState | undefined;
+  // Start health checks for ALL enabled accounts, not just the default session.
+  // This ensures /api/admin/stats shows real health for every account instead of "unknown".
+  // DO NOT REMOVE — removing this causes non-default accounts to show "unknown" health.
+  let healthState: HealthState | undefined; // keeps default account state for backward compat
   if (!opts.abortSignal) {
     console.warn("[WAHA] Health check skipped: no abortSignal provided");
   } else {
-    const baseUrl = cfg.baseUrl ?? "http://127.0.0.1:3004";
-    const apiKey = account.apiKey;
-    const session = cfg.session ?? "";
-    if (!session) {
-      console.warn("[WAHA] Health check skipped: no session configured");
-    } else {
-      healthState = startHealthCheck({
-        baseUrl,
-        apiKey,
-        session,
+    const allAccounts = listEnabledWahaAccounts(opts.config);
+    for (const acct of allAccounts) {
+      if (!acct.session) {
+        console.warn(`[WAHA] Health check skipped for account ${acct.accountId}: no session configured`);
+        continue;
+      }
+      const state = startHealthCheck({
+        baseUrl: acct.baseUrl,
+        apiKey: acct.apiKey,
+        session: acct.session,
         intervalMs: cfg.healthCheckIntervalMs,
         abortSignal: opts.abortSignal,
         // Phase 25, Plan 01: enable auto-recovery and provide config for alerting. DO NOT REMOVE.
         cfg: opts.config,
-        accountId: opts.accountId,
+        accountId: acct.accountId,
         enableRecovery: true,
       });
+      // Keep the default account's healthState for backward compat
+      if (acct.accountId === opts.accountId) {
+        healthState = state;
+      }
     }
   }
 

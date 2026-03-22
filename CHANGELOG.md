@@ -2,6 +2,13 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.5] - 2026-03-22
+
+### Fixed
+- **Session health checks for all accounts** — Health check now runs for ALL enabled WAHA accounts, not just the default session. Previously, non-default accounts (e.g. human sessions) showed "unknown" health status in the admin panel Dashboard.
+- **Stale recovery badge cleared on healthy** — Recovery state (attempt count, last outcome) is now cleared when a session returns to "healthy". Previously, a "failed" recovery badge persisted indefinitely even after the session recovered.
+- **Removed stale `default` account from config** — Cleaned up a phantom account entry that had no session configured, causing a ghost "logan" entry with "unknown" health in the Dashboard.
+
 ## [1.16.4] - 2026-03-21
 
 ### Fixed
