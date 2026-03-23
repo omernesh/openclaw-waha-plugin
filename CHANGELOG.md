@@ -2,6 +2,12 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.13] - 2026-03-23
+
+### Changed
+- **"Changes are live" toast** — Auto-save now shows a success toast confirming changes take effect immediately without restart.
+- **Removed Restart Gateway button** — Config changes are hot-reloaded automatically; manual restart is never needed from the UI.
+
 ## [1.16.12] - 2026-03-23
 
 ### Fixed

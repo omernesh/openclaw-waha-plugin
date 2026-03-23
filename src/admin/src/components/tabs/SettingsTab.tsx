@@ -201,7 +201,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
         await api.updateConfig(buildPayload())
         setDirty(false)
         setAutoSaveStatus('saved')
-        // Fade "Saved" indicator after 2s
+        toast.success('Changes are live')
         setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
       } catch (err: unknown) {
         // Config saves that trigger a gateway restart cause "Failed to fetch" because
@@ -214,11 +214,13 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               await api.updateConfig(buildPayload())
               setDirty(false)
               setAutoSaveStatus('saved')
+              toast.success('Changes are live')
               setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
             } catch {
               // Config likely saved but gateway restarted — treat as success
               setDirty(false)
               setAutoSaveStatus('saved')
+              toast.success('Changes are live')
               setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
             }
           }, 3000)
@@ -1330,34 +1332,8 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           </Card>
         </Collapsible>
 
-        {/* Restart / Export / Import buttons + auto-save indicator */}
+        {/* Export / Import buttons + auto-save indicator */}
         <div className="flex flex-wrap items-center gap-3 pb-6">
-          <Button
-            onClick={async () => {
-              // Save any pending changes before restart
-              if (dirty) {
-                setSaving(true)
-                setFieldErrors({})
-                try {
-                  await api.updateConfig(buildPayload())
-                  setDirty(false)
-                } catch (err: unknown) {
-                  setSaving(false)
-                  if (!applyValidationErrors(err)) {
-                    toast.error(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
-                  }
-                  return
-                }
-                setSaving(false)
-              }
-              toast.success('Restarting gateway...')
-              await api.restart()
-              setRestarting(true)
-            }}
-            disabled={saving}
-          >
-            Restart Gateway
-          </Button>
           <Button variant="outline" onClick={handleExport} disabled={saving}>
             Export Config
           </Button>
