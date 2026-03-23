@@ -584,7 +584,7 @@ export async function handleWahaInbound(params: {
               mentionPatterns: override.mentionPatterns,
               triggerOperator: override.triggerOperator ?? "OR",  // UX-03: per-group AND/OR operator
               godModeBypass: globalGroupFilterCfg?.godModeBypass as boolean | undefined,
-              godModeScope: (override.godModeScope ?? globalGroupFilterCfg?.godModeScope ?? "dm") as "all" | "dm" | "off",
+              godModeScope: (override.godModeScope ?? globalGroupFilterCfg?.godModeScope ?? "dm") as "all" | "dm" | "group" | "off",
               godModeSuperUsers: globalGroupFilterCfg?.godModeSuperUsers as Array<{ identifier: string; platform?: string; passwordRequired?: boolean }> | undefined,
             });
             const filterResult = perGroupFilter.check(groupFilterCheckArgs);
@@ -639,13 +639,34 @@ export async function handleWahaInbound(params: {
   // sendWahaText back to the DM) can re-enter the pairing flow on the bot session,
   // triggering redundant challenge messages. Belt-and-suspenders even if monitor.ts
   // filters most fromMe events — this is the definitive guard at the pipeline level.
-  if (!isGroup && !triggerActivated && !message.fromMe) {
+  // Phase 16: Pairing mode + auto-reply for unauthorized DMs.
+  // ONLY runs on bot sessions — human sessions must NEVER auto-reply. DO NOT REMOVE role guard.
+  // Also skips if sender is a god mode super-user (god mode bypasses all access checks).
+  if (!isGroup && !triggerActivated && !message.fromMe && account.role === "bot") {
     const pairingConfig = account.config.pairingMode ?? {};
     const autoReplyConfig = account.config.autoReply ?? {};
 
     // Check if sender is already allowed (skip pairing/auto-reply for allowed contacts)
     const dirDb = getDirectoryDb(account.accountId);
-    const senderAllowed = dirDb.isContactAllowedDm(senderId);
+    let senderAllowed = dirDb.isContactAllowedDm(senderId);
+
+    // Check if sender is a god mode super-user — they bypass all access checks including auto-reply.
+    // Uses same normalization as dm-filter.ts godModeSuperUsers check. DO NOT REMOVE.
+    if (!senderAllowed) {
+      const godCfg = account.config.dmFilter ?? {};
+      const godUsers: Array<{ identifier: string }> = (godCfg as Record<string, unknown>).godModeSuperUsers as Array<{ identifier: string }> ?? [];
+      const godBypass = (godCfg as Record<string, unknown>).godModeBypass !== false;
+      if (godBypass && godUsers.length > 0) {
+        const normSender = senderId.replace(/@.*$/, "").replace(/[^0-9+]/g, "").replace(/^\+/, "");
+        const isGod = godUsers.some((u) => {
+          const normId = u.identifier.replace(/@.*$/, "").replace(/[^0-9+]/g, "").replace(/^\+/, "");
+          return normId === normSender;
+        });
+        if (isGod) {
+          senderAllowed = true;
+        }
+      }
+    }
 
     if (!senderAllowed) {
       const messageText = (textBody ?? "").trim();

@@ -204,9 +204,29 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
         // Fade "Saved" indicator after 2s
         setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
       } catch (err: unknown) {
-        setAutoSaveStatus('error')
-        if (!applyValidationErrors(err)) {
-          toast.error(`Auto-save failed: ${err instanceof Error ? err.message : String(err)}`)
+        // Config saves that trigger a gateway restart cause "Failed to fetch" because
+        // the HTTP connection breaks mid-restart. Retry once after 3s. DO NOT REMOVE.
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+          setAutoSaveStatus('saving')
+          setTimeout(async () => {
+            try {
+              await api.updateConfig(buildPayload())
+              setDirty(false)
+              setAutoSaveStatus('saved')
+              setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+            } catch {
+              // Config likely saved but gateway restarted — treat as success
+              setDirty(false)
+              setAutoSaveStatus('saved')
+              setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+            }
+          }, 3000)
+        } else {
+          setAutoSaveStatus('error')
+          if (!applyValidationErrors(err)) {
+            toast.error(`Auto-save failed: ${msg}`)
+          }
         }
       }
     }, 1500)
@@ -306,17 +326,25 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     waha.groupAllowFrom = config.groupAllowFrom ?? []
     waha.allowedGroups = config.allowedGroups ?? []
 
+    // God mode values — read from dmFilter (source of truth), sync to both filters
+    const godModeBypass = config.dmFilter?.godModeBypass ?? false
+    const godModeScope = config.dmFilter?.godModeScope ?? 'off'
+    const godModeSuperUsers = (config.dmFilter?.godModeSuperUsers ?? []).map((u) =>
+      typeof u === 'string' ? { identifier: u } : u
+    )
+
+    // New top-level god mode field
+    if (config.godModeGroupReplyMode !== undefined) waha.godModeGroupReplyMode = config.godModeGroupReplyMode
+
     // Complete sub-objects — always send complete (Pitfall 5)
+    // God mode fields synced from unified card to BOTH filters. DO NOT CHANGE.
     if (config.dmFilter) {
       waha.dmFilter = {
         enabled: config.dmFilter.enabled,
         mentionPatterns: config.dmFilter.mentionPatterns ?? [],
-        godModeBypass: config.dmFilter.godModeBypass,
-        godModeScope: config.dmFilter.godModeScope,
-        // CRITICAL: godModeSuperUsers must be Array<{identifier}> NOT string[]
-        godModeSuperUsers: (config.dmFilter.godModeSuperUsers ?? []).map((u) =>
-          typeof u === 'string' ? { identifier: u } : u
-        ),
+        godModeBypass,
+        godModeScope,
+        godModeSuperUsers,
         tokenEstimate: config.dmFilter.tokenEstimate,
       }
     }
@@ -325,11 +353,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       waha.groupFilter = {
         enabled: config.groupFilter.enabled,
         mentionPatterns: config.groupFilter.mentionPatterns ?? [],
-        godModeBypass: config.groupFilter.godModeBypass,
-        godModeScope: config.groupFilter.godModeScope,
-        godModeSuperUsers: (config.groupFilter.godModeSuperUsers ?? []).map((u) =>
-          typeof u === 'string' ? { identifier: u } : u
-        ),
+        godModeBypass,
+        godModeScope,
+        godModeSuperUsers,
         tokenEstimate: config.groupFilter.tokenEstimate,
       }
     }
@@ -715,45 +741,6 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
             </div>
 
-            <div className="flex items-center gap-3">
-              <Switch
-                id="dmFilter.godModeBypass"
-                checked={config.dmFilter?.godModeBypass ?? false}
-                onCheckedChange={(v) => updateConfig('dmFilter.godModeBypass', v)}
-              />
-              <Label htmlFor="dmFilter.godModeBypass">God Mode Bypass<Tip text="When on, super-users bypass the keyword filter entirely (their messages always get a response)." /></Label>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="dmFilter.godModeScope">God Mode Scope<Tip text="Controls which filters god mode bypass applies to. 'All' = bypass both DM and group filters. 'DM Only' = bypass DM filter only, NOT group filter. 'Off' = never bypass." /></Label>
-              <Select
-                value={config.dmFilter?.godModeScope ?? 'off'}
-                onValueChange={(v) => updateConfig('dmFilter.godModeScope', v)}
-              >
-                <SelectTrigger id="dmFilter.godModeScope">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">all</SelectItem>
-                  <SelectItem value="dm">dm</SelectItem>
-                  <SelectItem value="off">off</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>God Mode Users<Tip text="JIDs that bypass the DM keyword filter entirely. Search and select contacts. Include both @c.us and @lid formats for NOWEB compatibility." /></Label>
-              <TagInput
-                values={godModeJids('dm')}
-                onChange={(v) => updateGodModeUsers('dm', v)}
-                searchFn={searchContacts}
-                freeform={true}
-                resolvedNames={resolvedNames}
-                mergeByName
-                placeholder="Search contacts or type JID..."
-              />
-            </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="dmFilter.tokenEstimate">Token Estimate<Tip text="Estimated tokens saved per dropped DM. Used for stats display only. Default: 2500." /></Label>
               <Input
@@ -793,45 +780,6 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
             </div>
 
-            <div className="flex items-center gap-3">
-              <Switch
-                id="groupFilter.godModeBypass"
-                checked={config.groupFilter?.godModeBypass ?? false}
-                onCheckedChange={(v) => updateConfig('groupFilter.godModeBypass', v)}
-              />
-              <Label htmlFor="groupFilter.godModeBypass">God Mode Bypass<Tip text="When on, super-users bypass the group keyword filter entirely." /></Label>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="groupFilter.godModeScope">God Mode Scope<Tip text="Controls which filters god mode bypass applies to. 'All' = bypass both DM and group filters. 'DM Only' = bypass DM filter only. 'Off' = never bypass." /></Label>
-              <Select
-                value={config.groupFilter?.godModeScope ?? 'off'}
-                onValueChange={(v) => updateConfig('groupFilter.godModeScope', v)}
-              >
-                <SelectTrigger id="groupFilter.godModeScope">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">all</SelectItem>
-                  <SelectItem value="dm">dm</SelectItem>
-                  <SelectItem value="off">off</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>God Mode Users<Tip text="JIDs that bypass the group keyword filter entirely. Search and select contacts. Supports @c.us and @lid formats." /></Label>
-              <TagInput
-                values={godModeJids('group')}
-                onChange={(v) => updateGodModeUsers('group', v)}
-                searchFn={searchContacts}
-                freeform={true}
-                resolvedNames={resolvedNames}
-                mergeByName
-                placeholder="Search contacts or type JID..."
-              />
-            </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="groupFilter.tokenEstimate">Token Estimate<Tip text="Estimated tokens saved per dropped group message. Default: 2500." /></Label>
               <Input
@@ -846,7 +794,79 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           </CardContent>
         </Card>
 
-        {/* Section 5: Presence Settings */}
+        {/* Section 5: God Mode — unified card that syncs to both dmFilter and groupFilter */}
+        <Card>
+          <CardHeader>
+            <CardTitle>God Mode<Tip text="Super-user access that bypasses keyword filters. God mode users can message the bot without matching any mention pattern. These are global defaults — override per contact in Directory." /></CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="godMode.enabled"
+                checked={config.dmFilter?.godModeBypass ?? false}
+                onCheckedChange={(v) => {
+                  updateConfig('dmFilter.godModeBypass', v)
+                  updateConfig('groupFilter.godModeBypass', v)
+                }}
+              />
+              <Label htmlFor="godMode.enabled">Enabled<Tip text="When on, god mode users bypass keyword filters entirely (their messages always get a response)." /></Label>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="godMode.scope">Scope<Tip text="Where god mode bypass is active. 'All' = DMs and groups. 'DMs Only' = bypass DM filter only. 'Groups Only' = bypass group filter only." /></Label>
+              <Select
+                value={config.dmFilter?.godModeScope ?? 'off'}
+                onValueChange={(v) => {
+                  updateConfig('dmFilter.godModeScope', v)
+                  updateConfig('groupFilter.godModeScope', v)
+                }}
+              >
+                <SelectTrigger id="godMode.scope">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="dm">DMs Only</SelectItem>
+                  <SelectItem value="group">Groups Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="godMode.groupReplyMode">Group Reply Mode<Tip text="How the bot responds to god mode users in groups. 'Reply in Group' = normal group reply. 'Reply in DM' = bot sends the response privately to avoid spamming the group." /></Label>
+              <Select
+                value={config.godModeGroupReplyMode ?? 'in-chat'}
+                onValueChange={(v) => updateConfig('godModeGroupReplyMode', v)}
+              >
+                <SelectTrigger id="godMode.groupReplyMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in-chat">Reply in Group</SelectItem>
+                  <SelectItem value="dm">Reply in DM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>God Mode Users<Tip text="JIDs that bypass keyword filters. Search and select contacts. Include both @c.us and @lid formats for NOWEB compatibility." /></Label>
+              <TagInput
+                values={godModeJids('dm')}
+                onChange={(v) => {
+                  updateGodModeUsers('dm', v)
+                  updateGodModeUsers('group', v)
+                }}
+                searchFn={searchContacts}
+                freeform={true}
+                resolvedNames={resolvedNames}
+                mergeByName
+                placeholder="Search contacts or type JID..."
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Section 6: Presence Settings */}
         <Card>
           <CardHeader>
             <CardTitle>Presence Settings</CardTitle>

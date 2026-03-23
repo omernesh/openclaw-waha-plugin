@@ -2,6 +2,13 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.12] - 2026-03-23
+
+### Fixed
+- **Human session no longer auto-replies** — Added `role === "bot"` guard to Phase 16. Human sessions never send pairing/rejection auto-replies to DMs.
+- **God mode users bypass auto-reply** — God mode super-users are checked before auto-reply decision. Previously god mode check ran after auto-reply, so god users got rejected.
+- **Auto-save handles gateway restarts** — Config saves that trigger a gateway restart no longer show "Failed to fetch" error. Retries once after 3s on network errors.
+
 ## [1.16.11] - 2026-03-23
 
 ### Changed
