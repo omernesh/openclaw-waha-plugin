@@ -219,7 +219,7 @@ export default function SessionsTab({ selectedSession: _selectedSession, refresh
                         {session.consecutiveFailures} consecutive failure{session.consecutiveFailures !== 1 ? 's' : ''}
                       </p>
                     )}
-                    <p>WAHA: {session.wahaStatus || '—'}</p>
+                    <p>WhatsApp: {session.wahaStatus || '—'}</p>
                     <p>Last Check: {session.lastCheck ? new Date(session.lastCheck).toLocaleTimeString() : '—'}</p>
                   </div>
 

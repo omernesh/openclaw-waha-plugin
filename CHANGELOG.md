@@ -2,6 +2,13 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.11] - 2026-03-23
+
+### Changed
+- **"WAHA" → "WhatsApp"** — All user-facing text in admin panel now says "WhatsApp" instead of "WAHA" (sidebar title, labels, tooltips).
+- **Session persistence** — Active WhatsApp Session dropdown remembers last picked session across page reloads via localStorage.
+- **Session role badge** — Dropdown shows role next to name, e.g. "Sammie Bot (bot)", "Omer (human)".
+
 ## [1.16.10] - 2026-03-23
 
 ### Fixed — Code Review

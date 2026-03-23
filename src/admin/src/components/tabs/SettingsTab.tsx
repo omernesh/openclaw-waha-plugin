@@ -119,10 +119,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     return () => controller.abort()
   }, [refreshKey])
 
-  // Load available sessions for Active WAHA Session dropdown (once on mount)
+  // Load available sessions for Active WAHA Session dropdown (once on mount).
+  // Restores last-picked session from localStorage when config has no saved value.
   React.useEffect(() => {
     api.getSessions()
-      .then((sessions) => setAvailableSessions(sessions))
+      .then((sessions) => {
+        setAvailableSessions(sessions)
+        // Restore last-picked session from localStorage when config has no value
+        const saved = localStorage.getItem('waha-admin-active-session')
+        if (saved) {
+          setConfig((prev) => {
+            if (!prev || prev.wahaSessionName) return prev
+            const exists = sessions.some((s) => s.sessionId === saved)
+            const fallback = exists ? saved : (sessions[0]?.sessionId ?? '')
+            if (!fallback) return prev
+            return { ...prev, wahaSessionName: fallback }
+          })
+        }
+      })
       .catch((err) => console.error('Settings sessions fetch failed:', err))
   }, [])
 
@@ -504,7 +518,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="baseUrl">Base URL<Tip text="WAHA server URL. Must be accessible from this host. Example: http://127.0.0.1:3004" /></Label>
+                <Label htmlFor="baseUrl">Base URL<Tip text="WhatsApp API server URL. Must be accessible from this host. Example: http://127.0.0.1:3004" /></Label>
                 <Input
                   id="baseUrl"
                   value={config.baseUrl ?? ''}
@@ -513,10 +527,13 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="wahaSessionName">Active WAHA Session<Tip text="WAHA session name. Select from sessions available on your WAHA server." /></Label>
+                <Label htmlFor="wahaSessionName">Active WhatsApp Session<Tip text="WhatsApp session name. Select from sessions available on the server." /></Label>
                 <Select
                   value={config.wahaSessionName ?? ''}
-                  onValueChange={(v) => updateConfig('wahaSessionName', v)}
+                  onValueChange={(v) => {
+                    updateConfig('wahaSessionName', v)
+                    localStorage.setItem('waha-admin-active-session', v)
+                  }}
                 >
                   <SelectTrigger id="wahaSessionName">
                     <SelectValue placeholder="Select session..." />
@@ -524,7 +541,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                   <SelectContent>
                     {availableSessions.map((s) => (
                       <SelectItem key={s.sessionId} value={s.sessionId}>
-                        {s.name ?? s.sessionId}
+                        {s.name ?? s.sessionId}{s.role ? <span className="text-muted-foreground ml-1">({s.role})</span> : null}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -541,7 +558,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 <FieldError path="webhookPort" errors={fieldErrors} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="webhookPath">Webhook Path<Tip text="URL path WAHA sends events to. Default: /webhook/waha" /></Label>
+                <Label htmlFor="webhookPath">Webhook Path<Tip text="URL path for incoming webhook events. Default: /webhook/waha" /></Label>
                 <Input
                   id="webhookPath"
                   value={config.webhookPath ?? ''}

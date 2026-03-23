@@ -74,7 +74,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     <Sidebar collapsible="offcanvas">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1">
-          <span className="text-sm font-semibold tracking-tight">WAHA Admin</span>
+          <span className="text-sm font-semibold tracking-tight">WhatsApp Admin</span>
         </div>
       </SidebarHeader>
 

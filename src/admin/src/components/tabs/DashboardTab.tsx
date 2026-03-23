@@ -201,7 +201,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
       {/* Section 1: Session Health */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Session Health<Tip text="Real-time connection status for all WAHA sessions. 'healthy' = connected and responsive." /></CardTitle>
+          <CardTitle>Session Health<Tip text="Real-time connection status for all WhatsApp sessions. 'healthy' = connected and responsive." /></CardTitle>
         </CardHeader>
         <CardContent>
           {visibleSessions.length === 0 ? (
@@ -229,7 +229,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                     )}
                     {session.wahaStatus && (
                       <span className="text-xs text-muted-foreground">
-                        WAHA: {session.wahaStatus}
+                        WhatsApp: {session.wahaStatus}
                       </span>
                     )}
                     {session.consecutiveFailures > 0 && (
@@ -558,7 +558,7 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
 
       {/* Server info footer */}
       <div className={cn('text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 px-1')}>
-        <span>{labelFor('baseUrl')}<Tip text="WAHA server address used for API calls." />: {stats.baseUrl}</span>
+        <span>{labelFor('baseUrl')}<Tip text="WhatsApp API server address used for API calls." />: {stats.baseUrl}</span>
         <span>{labelFor('webhookPort')}<Tip text="Port the admin panel and webhook server listen on." />: {stats.webhookPort}</span>
         <span>{labelFor('serverTime')}: {stats.serverTime}</span>
         {config && (
