@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import {
   DEFAULT_ACCOUNT_ID,
-  listConfiguredAccountIds as listConfiguredAccountIdsFromSection,
   normalizeAccountId,
+  listConfiguredAccountIds as listConfiguredAccountIdsFromSection,
   resolveAccountWithDefaultFallback,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/account-resolution";
 import { LRUCache } from "lru-cache";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, WahaAccountConfig } from "./types.js";

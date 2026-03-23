@@ -7,7 +7,7 @@ export interface StatsResponse {
     enabled: boolean
     patterns: string[]
     godModeBypass: boolean
-    godModeScope: 'all' | 'dm' | 'off'
+    godModeScope: 'all' | 'dm' | 'group' | 'off'
     godModeSuperUsers: Array<string | { identifier: string }>
     tokenEstimate: number
     stats: { allowed: number; dropped: number; tokensEstimatedSaved: number }
@@ -17,7 +17,7 @@ export interface StatsResponse {
     enabled: boolean
     patterns: string[]
     godModeBypass: boolean
-    godModeScope: 'all' | 'dm' | 'off'
+    godModeScope: 'all' | 'dm' | 'group' | 'off'
     godModeSuperUsers: Array<string | { identifier: string }>
     tokenEstimate: number
     stats: { allowed: number; dropped: number; tokensEstimatedSaved: number }
@@ -97,6 +97,7 @@ export interface WahaConfig {
     godModeSuperUsers: Array<{ identifier: string }>
     tokenEstimate: number
   }
+  godModeGroupReplyMode?: 'in-chat' | 'dm'
   presence?: {
     enabled: boolean
     sendSeen: boolean
@@ -116,6 +117,9 @@ export interface WahaConfig {
     passcode?: string
     grantTtlMinutes: number
     challengeMessage?: string
+    hmacSecret?: string
+    wrongPasscodeMessage?: string
+    lockoutMessage?: string
   }
   autoReply?: {
     enabled: boolean
@@ -247,7 +251,7 @@ export interface GroupFilterOverrideData {
   enabled: boolean;
   filterEnabled: boolean;
   mentionPatterns: string[] | null;
-  godModeScope: 'all' | 'dm' | 'off' | null;
+  godModeScope: 'all' | 'dm' | 'group' | 'off' | null;
   triggerOperator: 'OR' | 'AND';
   updatedAt?: number;
 }

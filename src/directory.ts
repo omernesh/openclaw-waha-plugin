@@ -50,7 +50,7 @@ export type GroupFilterOverride = {
   enabled: boolean;          // is override active?
   filterEnabled: boolean;    // keyword filter on/off
   mentionPatterns: string[] | null;  // null = inherit global
-  godModeScope: 'all' | 'dm' | 'off' | null;  // null = inherit global
+  godModeScope: 'all' | 'dm' | 'group' | 'off' | null;  // null = inherit global
   triggerOperator: 'OR' | 'AND';   // 'OR' (any keyword) or 'AND' (all keywords) — UX-03
   updatedAt: number;
 };
@@ -1151,7 +1151,7 @@ export class DirectoryDb {
       enabled: row.enabled === 1,
       filterEnabled: row.filter_enabled === 1,
       mentionPatterns,
-      godModeScope: (row.god_mode_scope === 'all' || row.god_mode_scope === 'dm' || row.god_mode_scope === 'off') ? row.god_mode_scope : null,
+      godModeScope: (row.god_mode_scope === 'all' || row.god_mode_scope === 'dm' || row.god_mode_scope === 'group' || row.god_mode_scope === 'off') ? row.god_mode_scope : null,
       triggerOperator: row.trigger_operator === 'AND' ? 'AND' : 'OR',
       updatedAt: row.updated_at as number,
     };

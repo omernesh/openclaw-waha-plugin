@@ -87,8 +87,6 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   // Bot's own JIDs (including @lid variants) — hidden from filter list displays. DO NOT REMOVE.
   const [botJidSet, setBotJidSet] = React.useState<Set<string>>(new Set())
   // Pairing link generator state
-  const [pairingJid, setPairingJid] = React.useState('')
-  const [pairingLink, setPairingLink] = React.useState('')
 
   // Field-level validation errors from backend (keyed by Zod field path)
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({})
@@ -216,12 +214,17 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               setAutoSaveStatus('saved')
               toast.success('Changes are live')
               setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
-            } catch {
-              // Config likely saved but gateway restarted — treat as success
-              setDirty(false)
-              setAutoSaveStatus('saved')
-              toast.success('Changes are live')
-              setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+            } catch (retryErr: unknown) {
+              const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+              if (retryMsg.includes('Failed to fetch') || retryMsg.includes('NetworkError')) {
+                setDirty(false)
+                setAutoSaveStatus('saved')
+                toast.success('Changes are live')
+                setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+              } else {
+                setAutoSaveStatus('error')
+                toast.error(`Auto-save failed: ${retryMsg}`)
+              }
             }
           }, 3000)
         } else {
@@ -235,15 +238,6 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, dirty])
-
-  // Generate pairing link from JID
-  function handleGeneratePairingLink() {
-    if (!pairingJid) return
-    const phone = pairingJid.replace('@c.us', '').replace('@lid', '')
-    const passcode = config?.pairingMode?.passcode ?? ''
-    const link = `https://wa.me/${phone}?text=${encodeURIComponent(passcode)}`
-    setPairingLink(link)
-  }
 
   // Format phone number from JID for display in search results
   function formatPhone(jid: string): string {
@@ -383,6 +377,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
         passcode: config.pairingMode.passcode,
         grantTtlMinutes: config.pairingMode.grantTtlMinutes,
         challengeMessage: config.pairingMode.challengeMessage,
+        hmacSecret: config.pairingMode.hmacSecret,
+        wrongPasscodeMessage: config.pairingMode.wrongPasscodeMessage,
+        lockoutMessage: config.pairingMode.lockoutMessage,
       }
     }
 
@@ -479,8 +476,8 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       a.click()
       URL.revokeObjectURL(url)
       toast.success('Config exported')
-    } catch {
-      toast.error('Export failed')
+    } catch (err) {
+      toast.error(`Export failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -1167,6 +1164,14 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                         updateConfig('pairingMode.enabled', v)
                         // Mutual exclusion: passcode ON → auto reply OFF
                         if (v) updateConfig('autoReply.enabled', false)
+                        // Auto-generate hmacSecret when enabling passcode protection.
+                        // Without hmacSecret the backend gate `if (enabled && hmacSecret)` fails
+                        // and pairing deep links cannot be generated. DO NOT REMOVE.
+                        if (v && !config.pairingMode?.hmacSecret) {
+                          const secret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                            .map(b => b.toString(16).padStart(2, '0')).join('')
+                          updateConfig('pairingMode.hmacSecret', secret)
+                        }
                       }}
                     />
                     <Label htmlFor="pairingMode.enabled">Passcode Protection<Tip text="Unknown DM senders can enter a passcode to get added to the allow list. Cannot be used together with Auto Reply." /></Label>
@@ -1220,33 +1225,50 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                           onChange={(e) => updateConfig('pairingMode.challengeMessage', e.target.value)}
                         />
                       </div>
-                      {/* Pairing Link Generator */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pairingMode.wrongPasscodeMessage">Wrong Passcode Message<Tip text="Sent when a contact enters an incorrect passcode." /></Label>
+                        <textarea
+                          id="pairingMode.wrongPasscodeMessage"
+                          className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          value={config.pairingMode?.wrongPasscodeMessage ?? 'Incorrect passcode. Please try again.'}
+                          onChange={(e) => updateConfig('pairingMode.wrongPasscodeMessage', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pairingMode.lockoutMessage">Lockout Message<Tip text="Sent after 3 consecutive wrong attempts." /></Label>
+                        <textarea
+                          id="pairingMode.lockoutMessage"
+                          className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          value={config.pairingMode?.lockoutMessage ?? 'Too many incorrect attempts. Please try again later.'}
+                          onChange={(e) => updateConfig('pairingMode.lockoutMessage', e.target.value)}
+                        />
+                      </div>
+                      {/* Pairing Link — pre-populated with bot's phone + static passcode */}
                       <div className="space-y-2 rounded-md border p-3 bg-muted/30">
-                        <Label className="text-sm font-medium">Pairing Link Generator<Tip text="Share this link to let a specific contact start a pairing flow. Enter their JID below to generate." /></Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={pairingJid}
-                            onChange={(e) => setPairingJid(e.target.value)}
-                            placeholder="972544329000@c.us"
-                            className="flex-1"
-                          />
-                          <Button variant="outline" size="sm" type="button" onClick={handleGeneratePairingLink}>
-                            Generate Link
-                          </Button>
-                        </div>
-                        {pairingLink && (
-                          <div className="flex gap-2 items-center">
-                            <Input value={pairingLink} readOnly className="flex-1 text-xs font-mono" />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              type="button"
-                              onClick={() => { navigator.clipboard.writeText(pairingLink); toast.success('Link copied') }}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                        <Label className="text-sm font-medium">Pairing Link<Tip text="Share this link so contacts can start chatting with the bot. Opens WhatsApp with the passcode pre-filled." /></Label>
+                        {(() => {
+                          // Build link from bot session phone + static passcode
+                          // Get bot phone from botJids (returned by /api/admin/config)
+                          const botCusJid = botJidSet.size > 0 ? [...botJidSet].find(j => j.endsWith('@c.us')) : undefined
+                          const phone = botCusJid?.replace(/@c\.us$/, '') ?? ''
+                          const passcode = config.pairingMode?.passcode ?? ''
+                          const link = phone && passcode ? `https://wa.me/${phone}?text=${encodeURIComponent(passcode)}` : ''
+                          return link ? (
+                            <div className="flex gap-2 items-center">
+                              <Input value={link} readOnly className="flex-1 text-xs font-mono" />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                type="button"
+                                onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copied') }}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Set a passcode above to generate the pairing link.</p>
+                          )
+                        })()}
                       </div>
                     </div>
                   )}

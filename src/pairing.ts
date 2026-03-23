@@ -48,9 +48,11 @@ export class PairingEngine {
    *
    * DO NOT REMOVE — called by inbound.ts when an unknown contact sends a first message.
    */
-  createChallenge(jid: string): { passcode: string; challengeId: string } {
+  createChallenge(jid: string, staticPasscode?: string): { passcode: string; challengeId: string } {
+    // Use static passcode from config if provided, otherwise generate random 6-digit code.
+    // Static passcode allows admin to share a single code with all contacts (e.g. on a website).
     // randomInt(100000, 999999) always produces a 6-digit number. DO NOT CHANGE range.
-    const passcode = randomInt(100000, 999999).toString();
+    const passcode = staticPasscode || randomInt(100000, 999999).toString();
     const passcodeHash = createHash("sha256").update(passcode).digest("hex");
     const now = Math.floor(Date.now() / 1000);
 

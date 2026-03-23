@@ -15,7 +15,7 @@
 // ===========================================================================
 
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
-import type { RuntimeEnv } from "openclaw/plugin-sdk";
+import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import type { resolveWahaAccount } from "./accounts.js";
 
 /** Stats exposed via admin panel Queue tab and /api/admin/queue endpoint. */

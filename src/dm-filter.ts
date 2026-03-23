@@ -11,7 +11,7 @@
  * - "off"  — god mode never bypasses any filter
  * DO NOT CHANGE — this type is used by config-schema.ts and admin panel. Added for human session guardrails.
  */
-export type GodModeScope = "all" | "dm" | "off";
+export type GodModeScope = "all" | "dm" | "group" | "off";
 
 /**
  * Filter type identifies whether this filter instance is used for DM or group filtering.
@@ -110,12 +110,14 @@ export class DmFilter {
       const scope: GodModeScope = cfg.godModeScope ?? "all";
 
       // Validate scope value — warn on unrecognized values and treat as "off" for safety
-      if (scope !== "all" && scope !== "dm" && scope !== "off") {
+      if (scope !== "all" && scope !== "dm" && scope !== "group" && scope !== "off") {
         this.log?.(`dm-filter: unrecognized godModeScope "${scope}", defaulting to "off"`);
       }
 
       const scopeAllowsBypass =
-        scope === "all" || (scope === "dm" && filterType !== "group");
+        scope === "all"
+        || (scope === "dm" && filterType !== "group")
+        || (scope === "group" && filterType === "group");
 
       if (scopeAllowsBypass) {
         const normalized = normalizePhoneIdentifier(senderId);
@@ -184,7 +186,7 @@ export class DmFilter {
  * Normalize Israeli phone numbers and WhatsApp JIDs to bare digits for god mode comparison.
  * Handles: 05X, 972X, +972X, JID suffixes (@c.us, @lid, @s.whatsapp.net)
  */
-function normalizePhoneIdentifier(id: string): string {
+export function normalizePhoneIdentifier(id: string): string {
   let s = id.trim().toLowerCase();
   // Strip JID suffix
   s = s.replace(/@.*$/, "");

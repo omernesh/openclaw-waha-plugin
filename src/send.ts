@@ -1,7 +1,9 @@
 import { readFileSync } from "fs";
 import { extname, basename } from "path";
 import { LRUCache } from "lru-cache";
-import { detectMime, sendMediaWithLeadingCaption, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
+import { detectMime } from "openclaw/plugin-sdk/media-runtime";
+import { sendMediaWithLeadingCaption } from "openclaw/plugin-sdk/reply-payload";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
 import { listEnabledWahaAccounts, resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
 import { callWahaApi, warnOnError } from "./http-client.js";

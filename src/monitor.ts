@@ -4,13 +4,13 @@ import { homedir } from "node:os";
 import { join, extname, dirname, resolve as pathResolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
+import { createLoggerBackedRuntime } from "openclaw/plugin-sdk/runtime";
 import {
-  createLoggerBackedRuntime,
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
-  type RuntimeEnv,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/webhook-ingress";
+import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import { resolveWahaAccount } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
@@ -22,7 +22,8 @@ import { isDuplicate } from "./dedup.js";
 import { startHealthCheck, getHealthState, getRecoveryState, getRecoveryHistory, setHealthStateChangeCallback, type HealthState, type RecoveryState, type RecoveryEvent } from "./health.js";
 import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
 import { InboundQueue, setQueueChangeCallback, type QueueStats, type QueueItem } from "./inbound-queue.js";
-import { isWhatsAppGroupJid, DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
+import { isWhatsAppGroupJid } from "openclaw/plugin-sdk/whatsapp-shared";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
 import type { CoreConfig, WahaInboundMessage, WahaReactionEvent, WahaWebhookEnvelope } from "./types.js";
 import { getPairingEngine } from "./pairing.js";
 import { getModuleRegistry } from "./module-registry.js";
@@ -968,8 +969,8 @@ export function createWahaWebhookServer(opts: {
               return;
             }
           }
-          if (body.godModeScope != null && !["all", "dm", "off"].includes(body.godModeScope)) {
-            writeJsonResponse(res, 400, { error: "godModeScope must be 'all', 'dm', 'off', or null" });
+          if (body.godModeScope != null && !["all", "dm", "group", "off"].includes(body.godModeScope)) {
+            writeJsonResponse(res, 400, { error: "godModeScope must be 'all', 'dm', 'group', 'off', or null" });
             return;
           }
           // UX-03: Validate triggerOperator if provided

@@ -202,8 +202,6 @@ export const api = {
   getPresence: () => request<{ presence?: PresenceEntry[] }>('/presence'),
 
   // Pairing
-  getPairingDeeplink: (jid: string) =>
-    request<{ url: string }>(`/pairing/deeplink?jid=${encodeURIComponent(jid)}`),
   revokePairingGrant: (jid: string) =>
     request<void>(`/pairing/grant/${encodeURIComponent(jid)}`, { method: 'DELETE' }),
 }

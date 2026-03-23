@@ -1,25 +1,26 @@
 import {
   GROUP_POLICY_BLOCKED_LABEL,
-  createNormalizedOutboundDeliverer,
-  createReplyPrefixOptions,
-  createScopedPairingAccess,
-  formatTextWithAttachmentLinks,
-  logInboundDrop,
-  readStoreAllowFromForDmPolicy,
   resolveAllowlistProviderRuntimeGroupPolicy,
   resolveDefaultGroupPolicy,
-  resolveDmGroupAccessWithCommandGate,
-  resolveOutboundMediaUrls,
   warnMissingProviderGroupPolicyFallbackOnce,
-  type OpenClawConfig,
+} from "openclaw/plugin-sdk/config-runtime";
+import {
+  createNormalizedOutboundDeliverer,
+  formatTextWithAttachmentLinks,
+  resolveOutboundMediaUrls,
   type OutboundReplyPayload,
-  type RuntimeEnv,
-} from "openclaw/plugin-sdk";
-import { isWhatsAppGroupJid } from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/reply-payload";
+import { createReplyPrefixOptions } from "openclaw/plugin-sdk/channel-runtime";
+import { logInboundDrop } from "openclaw/plugin-sdk/channel-inbound";
+import { readStoreAllowFromForDmPolicy, resolveDmGroupAccessWithCommandGate } from "openclaw/plugin-sdk/security-runtime";
+import { isWhatsAppGroupJid } from "openclaw/plugin-sdk/whatsapp-shared";
+import { normalizeAccountId } from "openclaw/plugin-sdk/account-id";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
+import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import type { ResolvedWahaAccount } from "./accounts.js";
 import { resolveSessionForTarget } from "./accounts.js";
 import { checkGroupMembership } from "./channel.js";
-import { DmFilter, type DmFilterConfig } from "./dm-filter.js";
+import { DmFilter, normalizePhoneIdentifier, type DmFilterConfig } from "./dm-filter.js";
 import { getDirectoryDb } from "./directory.js";
 import { claimMessage, isClaimedByBotSession } from "./dedup.js";
 import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.js";
@@ -53,6 +54,36 @@ import { getAutoReplyEngine } from "./auto-reply.js";
 import { recordAnalyticsEvent } from "./analytics.js";
 
 const CHANNEL_ID = "waha" as const;
+
+// Local shim for createScopedPairingAccess — removed from openclaw/plugin-sdk in v2026.3.22.
+// Provides account-scoped pairing helpers (readStoreForDmPolicy, upsertPairingRequest).
+// DO NOT REMOVE — inbound pipeline depends on this for DM pairing flow.
+function createScopedPairingAccess(params: {
+  core: ReturnType<typeof getWahaRuntime>;
+  channel: string;
+  accountId: string;
+}) {
+  const resolvedAccountId = normalizeAccountId(params.accountId);
+  return {
+    accountId: resolvedAccountId,
+    readAllowFromStore: () =>
+      params.core.channel.pairing.readAllowFromStore({
+        channel: params.channel,
+        accountId: resolvedAccountId,
+      }),
+    readStoreForDmPolicy: (provider: string, accountId: string) =>
+      params.core.channel.pairing.readAllowFromStore({
+        channel: provider,
+        accountId: normalizeAccountId(accountId),
+      }),
+    upsertPairingRequest: (input: { id: string }) =>
+      params.core.channel.pairing.upsertPairingRequest({
+        channel: params.channel,
+        accountId: resolvedAccountId,
+        ...input,
+      }),
+  };
+}
 
 // Human session deferral delay (ms) — how long human sessions wait for bot to claim.
 // DO NOT CHANGE — cross-session dedup timing constant. Moved to module level for clarity.
@@ -652,15 +683,18 @@ export async function handleWahaInbound(params: {
 
     // Check if sender is a god mode super-user — they bypass all access checks including auto-reply.
     // Uses same normalization as dm-filter.ts godModeSuperUsers check. DO NOT REMOVE.
+    // Respects godModeScope: only "all" or "dm" bypass DM pairing (not "group"). DO NOT CHANGE.
     if (!senderAllowed) {
       const godCfg = account.config.dmFilter ?? {};
-      const godUsers: Array<{ identifier: string }> = (godCfg as Record<string, unknown>).godModeSuperUsers as Array<{ identifier: string }> ?? [];
+      const godUsers: Array<{ identifier: string; passwordRequired?: boolean }> = (godCfg as Record<string, unknown>).godModeSuperUsers as Array<{ identifier: string; passwordRequired?: boolean }> ?? [];
       const godBypass = (godCfg as Record<string, unknown>).godModeBypass !== false;
-      if (godBypass && godUsers.length > 0) {
-        const normSender = senderId.replace(/@.*$/, "").replace(/[^0-9+]/g, "").replace(/^\+/, "");
+      const scope = ((godCfg as Record<string, unknown>).godModeScope as string) ?? "all";
+      const scopeAllowsBypass = scope === "all" || scope === "dm";
+      if (godBypass && scopeAllowsBypass && godUsers.length > 0) {
+        const normSender = normalizePhoneIdentifier(senderId);
         const isGod = godUsers.some((u) => {
-          const normId = u.identifier.replace(/@.*$/, "").replace(/[^0-9+]/g, "").replace(/^\+/, "");
-          return normId === normSender;
+          if (u.passwordRequired) return false;
+          return normalizePhoneIdentifier(u.identifier) === normSender;
         });
         if (isGod) {
           senderAllowed = true;
@@ -714,11 +748,15 @@ export async function handleWahaInbound(params: {
             return; // Message handled
           } else if (result.reason === "locked") {
             runtime.log?.(`[waha] [pairing] ${senderId} locked out (too many attempts)`);
-            await sendPairingReply("Too many incorrect attempts. Please try again later.", "lockout message");
+            const lockoutMsg = pairingConfig.lockoutMessage
+              ?? "Too many incorrect attempts. Please try again later.";
+            await sendPairingReply(lockoutMsg, "lockout message");
             return; // Do not pass to LLM
           } else if (result.reason === "wrong") {
             runtime.log?.(`[waha] [pairing] wrong passcode from ${senderId}`);
-            await sendPairingReply("Incorrect passcode. Please try again.", "wrong passcode message");
+            const wrongMsg = pairingConfig.wrongPasscodeMessage
+              ?? "Incorrect passcode. Please try again.";
+            await sendPairingReply(wrongMsg, "wrong passcode message");
             return;
           }
           // If reason is "not_found" or "expired", fall through to send challenge
@@ -726,7 +764,9 @@ export async function handleWahaInbound(params: {
 
         // No valid passcode/token -- send challenge message (creates challenge if needed)
         if (!engine.hasActiveChallenge(senderId)) {
-          engine.createChallenge(senderId);
+          // Pass static passcode from config if set — all contacts use the same code.
+          // If not set, createChallenge generates a random 6-digit code per contact.
+          engine.createChallenge(senderId, pairingConfig.passcode || undefined);
         }
         const challengeMsg = pairingConfig.challengeMessage
           ?? "Welcome! Please enter the 6-digit passcode to get started.";

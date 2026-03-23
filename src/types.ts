@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
 import type { DmFilterConfig } from "./dm-filter.js";
 export type { DmFilterConfig } from "./dm-filter.js";
 
@@ -32,8 +32,8 @@ export type WahaAccountConfig = {
   apiKey?: string | { source: "env" | "file" | "exec"; provider: string; id: string };
   apiKeyFile?: string;
   session?: string;
-  dmPolicy?: "open" | "closed" | "allowlist";
-  groupPolicy?: "allowlist" | "open" | "closed";
+  dmPolicy?: "open" | "allowlist" | "pairing" | "disabled";
+  groupPolicy?: "allowlist" | "open" | "disabled";
   allowFrom?: string[];
   groupAllowFrom?: string[];
   allowedGroups?: string[];
@@ -91,6 +91,8 @@ export type WahaAccountConfig = {
     grantTtlMinutes?: number;
     challengeMessage?: string;
     hmacSecret?: string;
+    wrongPasscodeMessage?: string;
+    lockoutMessage?: string;
   };
   // Phase 16 — auto-reply config for unauthorized DMs. DO NOT REMOVE.
   autoReply?: {

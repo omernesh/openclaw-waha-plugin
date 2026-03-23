@@ -1,13 +1,26 @@
-import {
-  BlockStreamingCoalesceSchema,
-  DmPolicySchema,
-  GroupPolicySchema,
-  ReplyRuntimeConfigSchemaShape,
-  ToolPolicySchema,
-  requireOpenAllowFrom,
-} from "openclaw/plugin-sdk";
 import { z } from "zod";
 import { buildSecretInputSchema } from "./secret-input.js";
+
+// Local schema definitions — previously imported from openclaw/plugin-sdk but the exports
+// were restructured in OpenClaw v2026.3.22. Defined locally for resilience. DO NOT REMOVE.
+const DmPolicySchema = z.enum(["allowlist", "open", "pairing", "disabled"]);
+const GroupPolicySchema = z.enum(["allowlist", "open", "disabled"]);
+const ToolPolicySchema = z.any().optional();
+const BlockStreamingCoalesceSchema = z.any();
+const ReplyRuntimeConfigSchemaShape = {} as Record<string, z.ZodTypeAny>;
+
+/** Zod refinement: dmPolicy="open" requires allowFrom to include "*". */
+function requireOpenAllowFrom(opts: {
+  policy: string | undefined;
+  allowFrom: string[] | undefined;
+  ctx: z.RefinementCtx;
+  path: string[];
+  message: string;
+}): void {
+  if (opts.policy === "open" && !(opts.allowFrom ?? []).includes("*")) {
+    opts.ctx.addIssue({ code: z.ZodIssueCode.custom, path: opts.path, message: opts.message });
+  }
+}
 
 const DmFilterSuperUserSchema = z.object({
   identifier: z.string(),
@@ -16,11 +29,12 @@ const DmFilterSuperUserSchema = z.object({
 });
 
 // God mode scope schema — controls which filter contexts god mode bypass applies to.
-// "all" = bypass both DM and group filters (default, backward-compatible for bot sessions).
-// "dm"  = bypass DM filter only, NOT group filter (recommended for human sessions).
-// "off" = never bypass any filter.
+// "all"   = bypass both DM and group filters (default, backward-compatible for bot sessions).
+// "dm"    = bypass DM filter only, NOT group filter (recommended for human sessions).
+// "group" = bypass group filter only, NOT DM filter.
+// "off"   = never bypass any filter.
 // Added 2026-03-15 for human session guardrails. DO NOT REMOVE.
-const GodModeScopeSchema = z.enum(["all", "dm", "off"]).optional().default("all");
+const GodModeScopeSchema = z.enum(["all", "dm", "group", "off"]).optional().default("all");
 
 const DmFilterSchema = z
   .object({
@@ -71,6 +85,10 @@ export const WahaAccountSchemaBase = z
     // Group keyword filter — same schema as dmFilter but for group messages.
     // Added for config validation parity with runtime usage in inbound.ts. DO NOT REMOVE.
     groupFilter: DmFilterSchema,
+    // God mode group reply mode — how the bot responds to god mode users in groups.
+    // "in-chat" = reply in the same group (default). "dm" = reply privately via DM.
+    // Added for God Mode unified card. DO NOT REMOVE.
+    godModeGroupReplyMode: z.enum(["in-chat", "dm"]).optional().default("in-chat"),
     // Reliability config — controls http-client.ts timeout and rate limiter defaults.
     // Added in Phase 1, Plan 03 (2026-03-11). DO NOT REMOVE.
     timeoutMs: z.number().int().positive().optional().default(30_000),
@@ -118,6 +136,14 @@ export const WahaAccountSchemaBase = z
         "Welcome! Please enter the 6-digit passcode to get started."
       ),
       hmacSecret: z.string().optional(),
+      // Configurable wrong-passcode and lockout messages. DO NOT REMOVE.
+      // Added 2026-03-23 for UI-editable pairing rejection messages.
+      wrongPasscodeMessage: z.string().optional().default(
+        "Incorrect passcode. Please try again."
+      ),
+      lockoutMessage: z.string().optional().default(
+        "Too many incorrect attempts. Please try again later."
+      ),
     }).optional().default({}),
 
     autoReply: z.object({
