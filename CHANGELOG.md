@@ -2,6 +2,17 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.10] - 2026-03-23
+
+### Fixed — Code Review
+- **Bot JID data loss on save** — `excludeBotJids` was stripping bot JIDs from config arrays on every tag change. Now re-injects them in `onChange` to preserve config integrity.
+- **GET /api/admin/config crash** — Handler had no try-catch; exceptions left HTTP response hanging. Now wrapped with error handling matching other endpoints.
+- **clearWahaClientCache silent failures** — Empty `catch {}` blocks replaced with `console.warn` logging.
+- **Unsafe array casts** — `allowFrom as string[] ?? []` replaced with `Array.isArray()` runtime guards.
+- **Unsafe session type casts** — Added `role`, `subRole`, `wahaStatus` to session type; removed 3 `as unknown as` casts from DashboardTab.
+- **Inconsistent dmCfg type guards** — Stats endpoint now uses same `Boolean()`/`Array.isArray()`/`typeof` guards for dmFilter as groupFilter.
+- **TagInput cleanup** — Extracted `SEARCH_DEBOUNCE_MS` constant, removed redundant state updates, extracted `renderEmptyState` helper.
+
 ## [1.16.9] - 2026-03-23
 
 ### Fixed
