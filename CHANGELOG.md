@@ -2,6 +2,12 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.14] - 2026-03-23
+
+### Changed
+- **Collapsible Settings cards** — All Settings sections are now collapsible. General Settings and Access Control open by default, rest collapsed.
+- **Merged Auto Reply + Passcode Protection** — Combined into single "Unauthorized DM Response" card with mutually exclusive toggles (enabling one disables the other).
+
 ## [1.16.13] - 2026-03-23
 
 ### Changed

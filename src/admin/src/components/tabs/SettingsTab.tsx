@@ -539,11 +539,18 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       <div className="flex-1 overflow-auto p-6 space-y-6">
 
         {/* Section 1: General Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>General Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={true}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>General Settings</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="baseUrl">Base URL<Tip text="WhatsApp API server URL. Must be accessible from this host. Example: http://127.0.0.1:3004" /></Label>
@@ -637,15 +644,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 <Label htmlFor="blockStreaming">Single Message Mode<Tip text="Send responses as a single message instead of streaming chunks. Reduces message spam for long responses." /></Label>
               </div>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 2: Access Control */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Control</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={true}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Access Control</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="dmPolicy">DM Policy<Tip text="How to handle DMs from unknown senders. open: accept all. closed: block all. allowlist: only contacts in Allow From list." /></Label>
@@ -715,15 +731,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 placeholder="Search groups..."
               />
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 3: DM Keyword Filter */}
-        <Card>
-          <CardHeader>
-            <CardTitle>DM Keyword Filter</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>DM Keyword Filter</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="dmFilter.enabled"
@@ -754,15 +779,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
               <FieldError path="dmFilter.tokenEstimate" errors={fieldErrors} />
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 4: Group Keyword Filter */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Group Keyword Filter</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Group Keyword Filter</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="groupFilter.enabled"
@@ -793,15 +827,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
               <FieldError path="groupFilter.tokenEstimate" errors={fieldErrors} />
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 5: God Mode — unified card that syncs to both dmFilter and groupFilter */}
-        <Card>
-          <CardHeader>
-            <CardTitle>God Mode<Tip text="Super-user access that bypasses keyword filters. God mode users can message the bot without matching any mention pattern. These are global defaults — override per contact in Directory." /></CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>God Mode<Tip text="Super-user access that bypasses keyword filters. God mode users can message the bot without matching any mention pattern. These are global defaults — override per contact in Directory." /></CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="godMode.enabled"
@@ -865,15 +908,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 placeholder="Search contacts or type JID..."
               />
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 6: Presence Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Presence Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Presence Settings</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="presence.enabled"
@@ -1045,146 +1097,178 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Section 6: Passcode Protection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Passcode Protection</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="pairingMode.enabled"
-                checked={config.pairingMode?.enabled ?? false}
-                onCheckedChange={(v) => updateConfig('pairingMode.enabled', v)}
-              />
-              <Label htmlFor="pairingMode.enabled">Enable Passcode Protection<Tip text="When enabled, unknown DM senders can enter a passcode to get added to the allow list automatically." /></Label>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.passcode">Passcode<Tip text="The 6-digit code contacts must enter to get DM access. Click Generate to create a random one." /></Label>
-              <div className="flex gap-2">
-                <Input
-                  id="pairingMode.passcode"
-                  value={config.pairingMode?.passcode ?? ''}
-                  onChange={(e) => updateConfig('pairingMode.passcode', e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  onClick={() => updateConfig('pairingMode.passcode', String(Math.floor(100000 + Math.random() * 900000)))}
-                >
-                  Generate
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.grantTtlMinutes">Expiry Duration<Tip text="How long pairing-granted access lasts. After this period, access is automatically revoked." /></Label>
-              <Select
-                value={String(config.pairingMode?.grantTtlMinutes ?? 0)}
-                onValueChange={(v) => updateConfig('pairingMode.grantTtlMinutes', Number(v))}
-              >
-                <SelectTrigger id="pairingMode.grantTtlMinutes" className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Never</SelectItem>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="60">1 hour</SelectItem>
-                  <SelectItem value="240">4 hours</SelectItem>
-                  <SelectItem value="1440">24 hours</SelectItem>
-                  <SelectItem value="10080">7 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pairingMode.challengeMessage">Challenge Message<Tip text="The message sent to unknown DMs asking them to enter the passcode." /></Label>
-              <textarea
-                id="pairingMode.challengeMessage"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                value={config.pairingMode?.challengeMessage ?? ''}
-                onChange={(e) => updateConfig('pairingMode.challengeMessage', e.target.value)}
-              />
-            </div>
-            {/* Pairing Link Generator — only visible when passcode protection is enabled */}
-            {config.pairingMode?.enabled && (
-              <div className="space-y-2 rounded-md border p-3 bg-muted/30">
-                <Label className="text-sm font-medium">Pairing Link Generator<Tip text="Share this link to let a specific contact start a pairing flow. Enter their JID below to generate." /></Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={pairingJid}
-                    onChange={(e) => setPairingJid(e.target.value)}
-                    placeholder="972544329000@c.us"
-                    className="flex-1"
-                  />
-                  <Button variant="outline" size="sm" type="button" onClick={handleGeneratePairingLink}>
-                    Generate Link
-                  </Button>
+        {/* Section 7: Unauthorized DM Response (merged Passcode + Auto Reply) */}
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Unauthorized DM Response</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
                 </div>
-                {pairingLink && (
-                  <div className="flex gap-2 items-center">
-                    <Input value={pairingLink} readOnly className="flex-1 text-xs font-mono" />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      type="button"
-                      onClick={() => { navigator.clipboard.writeText(pairingLink); toast.success('Link copied') }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-6">
+                {/* Auto Reply section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="autoReply.enabled"
+                      checked={config.autoReply?.enabled ?? false}
+                      onCheckedChange={(v) => {
+                        updateConfig('autoReply.enabled', v)
+                        // Mutual exclusion: auto reply ON → passcode OFF
+                        if (v) updateConfig('pairingMode.enabled', false)
+                      }}
+                    />
+                    <Label htmlFor="autoReply.enabled">Auto Reply<Tip text="Send an automatic rejection message to unauthorized DMs. Cannot be used together with Passcode Protection." /></Label>
                   </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  {(config.autoReply?.enabled ?? false) && (
+                    <div className="space-y-4 pl-10">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="autoReply.message">Rejection Message<Tip text="Message sent to blocked DMs. Use {admin_name} to insert the bot owner's name." /></Label>
+                        <textarea
+                          id="autoReply.message"
+                          className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          value={config.autoReply?.message ?? ''}
+                          onChange={(e) => updateConfig('autoReply.message', e.target.value)}
+                          placeholder="Auto-reply message text..."
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="autoReply.intervalMinutes">Rate Limit<Tip text="Minimum minutes between auto-replies to the same contact to prevent spam." /></Label>
+                        <Input
+                          id="autoReply.intervalMinutes"
+                          type="number"
+                          value={config.autoReply?.intervalMinutes ?? ''}
+                          onChange={(e) => updateConfig('autoReply.intervalMinutes', Number(e.target.value))}
+                          className="w-40"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-        {/* Section 7: Auto Reply */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Auto Reply</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="autoReply.enabled"
-                checked={config.autoReply?.enabled ?? false}
-                onCheckedChange={(v) => updateConfig('autoReply.enabled', v)}
-              />
-              <Label htmlFor="autoReply.enabled">Send rejection message<Tip text="When enabled, contacts whose DMs are blocked will receive an automatic reply explaining they are not authorized." /></Label>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="autoReply.message">Rejection Message<Tip text="Message sent to blocked DMs. Use {admin_name} to insert the bot owner's name." /></Label>
-              <textarea
-                id="autoReply.message"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                value={config.autoReply?.message ?? ''}
-                onChange={(e) => updateConfig('autoReply.message', e.target.value)}
-                placeholder="Auto-reply message text..."
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="autoReply.intervalMinutes">Rate Limit<Tip text="Minimum minutes between auto-replies to the same contact to prevent spam." /></Label>
-              <Input
-                id="autoReply.intervalMinutes"
-                type="number"
-                value={config.autoReply?.intervalMinutes ?? ''}
-                onChange={(e) => updateConfig('autoReply.intervalMinutes', Number(e.target.value))}
-                className="w-40"
-              />
-            </div>
-          </CardContent>
-        </Card>
+                <hr className="border-border" />
+
+                {/* Passcode Protection section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="pairingMode.enabled"
+                      checked={config.pairingMode?.enabled ?? false}
+                      onCheckedChange={(v) => {
+                        updateConfig('pairingMode.enabled', v)
+                        // Mutual exclusion: passcode ON → auto reply OFF
+                        if (v) updateConfig('autoReply.enabled', false)
+                      }}
+                    />
+                    <Label htmlFor="pairingMode.enabled">Passcode Protection<Tip text="Unknown DM senders can enter a passcode to get added to the allow list. Cannot be used together with Auto Reply." /></Label>
+                  </div>
+                  {(config.pairingMode?.enabled ?? false) && (
+                    <div className="space-y-4 pl-10">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pairingMode.passcode">Passcode<Tip text="The 6-digit code contacts must enter to get DM access. Click Generate to create a random one." /></Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="pairingMode.passcode"
+                            value={config.pairingMode?.passcode ?? ''}
+                            onChange={(e) => updateConfig('pairingMode.passcode', e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={() => updateConfig('pairingMode.passcode', String(Math.floor(100000 + Math.random() * 900000)))}
+                          >
+                            Generate
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pairingMode.grantTtlMinutes">Expiry Duration<Tip text="How long pairing-granted access lasts. After this period, access is automatically revoked." /></Label>
+                        <Select
+                          value={String(config.pairingMode?.grantTtlMinutes ?? 0)}
+                          onValueChange={(v) => updateConfig('pairingMode.grantTtlMinutes', Number(v))}
+                        >
+                          <SelectTrigger id="pairingMode.grantTtlMinutes" className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">Never</SelectItem>
+                            <SelectItem value="30">30 minutes</SelectItem>
+                            <SelectItem value="60">1 hour</SelectItem>
+                            <SelectItem value="240">4 hours</SelectItem>
+                            <SelectItem value="1440">24 hours</SelectItem>
+                            <SelectItem value="10080">7 days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="pairingMode.challengeMessage">Challenge Message<Tip text="The message sent to unknown DMs asking them to enter the passcode." /></Label>
+                        <textarea
+                          id="pairingMode.challengeMessage"
+                          className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          value={config.pairingMode?.challengeMessage ?? ''}
+                          onChange={(e) => updateConfig('pairingMode.challengeMessage', e.target.value)}
+                        />
+                      </div>
+                      {/* Pairing Link Generator */}
+                      <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+                        <Label className="text-sm font-medium">Pairing Link Generator<Tip text="Share this link to let a specific contact start a pairing flow. Enter their JID below to generate." /></Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={pairingJid}
+                            onChange={(e) => setPairingJid(e.target.value)}
+                            placeholder="972544329000@c.us"
+                            className="flex-1"
+                          />
+                          <Button variant="outline" size="sm" type="button" onClick={handleGeneratePairingLink}>
+                            Generate Link
+                          </Button>
+                        </div>
+                        {pairingLink && (
+                          <div className="flex gap-2 items-center">
+                            <Input value={pairingLink} readOnly className="flex-1 text-xs font-mono" />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              type="button"
+                              onClick={() => { navigator.clipboard.writeText(pairingLink); toast.success('Link copied') }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 8: Media Preprocessing */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Media Preprocessing</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Media Preprocessing</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="mediaPreprocessing.enabled"
@@ -1217,15 +1301,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 9: Markdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Markdown</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Markdown</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="markdown.enabled"
@@ -1250,15 +1343,24 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 </SelectContent>
               </Select>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 10: Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Actions</CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Switch
                 id="actions.reactions"
@@ -1267,8 +1369,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               />
               <Label htmlFor="actions.reactions">Reactions<Tip text="Enable emoji reaction support. When on, the bot can receive and process message reactions." /></Label>
             </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Section 11: Multi-Session Filtering Guide (collapsible info) */}
         <Collapsible defaultOpen={false}>
