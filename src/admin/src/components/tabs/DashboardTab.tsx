@@ -221,15 +221,15 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
                       {session.healthStatus || 'unknown'}
                     </Badge>
                     {/* Role and sub-role badges — from session API */}
-                    {(session as unknown as { role?: string }).role && (
-                      <Badge variant="secondary">{(session as unknown as { role: string }).role}</Badge>
+                    {session.role && (
+                      <Badge variant="secondary">{session.role}</Badge>
                     )}
-                    {(session as unknown as { subRole?: string }).subRole && (
-                      <Badge variant="outline">{(session as unknown as { subRole: string }).subRole}</Badge>
+                    {session.subRole && (
+                      <Badge variant="outline">{session.subRole}</Badge>
                     )}
-                    {(session as unknown as { wahaStatus?: string }).wahaStatus && (
+                    {session.wahaStatus && (
                       <span className="text-xs text-muted-foreground">
-                        WAHA: {(session as unknown as { wahaStatus: string }).wahaStatus}
+                        WAHA: {session.wahaStatus}
                       </span>
                     )}
                     {session.consecutiveFailures > 0 && (

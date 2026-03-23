@@ -46,6 +46,7 @@ export function broadcastSSE(event: string, data: object): void {
   }
 }
 
+const MAX_RESOLVE_JIDS = 500;
 const DEFAULT_WEBHOOK_PORT = 8050;
 const DEFAULT_WEBHOOK_HOST = "0.0.0.0";
 // Phase 18: React admin panel static file serving. DO NOT REMOVE.
@@ -637,7 +638,7 @@ export function createWahaWebhookServer(opts: {
       // account.config may have no dmFilter/groupFilter if the bot account doesn't define them,
       // even though the global config does. DO NOT CHANGE back to account.config.
       const globalWahaCfg = (opts.config.channels?.waha ?? {}) as Record<string, unknown>;
-      const dmCfg = globalWahaCfg.dmFilter ?? {};
+      const dmCfg = (globalWahaCfg.dmFilter ?? {}) as Record<string, unknown>;
       const groupFilter = getGroupFilterForAdmin(opts.config, opts.accountId);
       const groupFilterCfg = (globalWahaCfg.groupFilter ?? {}) as Record<string, unknown>;
       // Build access block — resolve unknown @lid JIDs from WAHA before dedup.
@@ -708,12 +709,12 @@ export function createWahaWebhookServer(opts: {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         dmFilter: {
-          enabled: dmCfg.enabled ?? false,
-          patterns: dmCfg.mentionPatterns ?? [],
-          godModeBypass: dmCfg.godModeBypass ?? true,
-          godModeScope: dmCfg.godModeScope ?? 'all',
-          godModeSuperUsers: dmCfg.godModeSuperUsers ?? [],
-          tokenEstimate: dmCfg.tokenEstimate ?? 2500,
+          enabled: Boolean(dmCfg.enabled),
+          patterns: Array.isArray(dmCfg.mentionPatterns) ? dmCfg.mentionPatterns : [],
+          godModeBypass: dmCfg.godModeBypass !== false,
+          godModeScope: typeof dmCfg.godModeScope === 'string' ? dmCfg.godModeScope : 'all',
+          godModeSuperUsers: Array.isArray(dmCfg.godModeSuperUsers) ? dmCfg.godModeSuperUsers : [],
+          tokenEstimate: typeof dmCfg.tokenEstimate === 'number' ? dmCfg.tokenEstimate : 2500,
           stats: dmFilter.stats,
           recentEvents: dmFilter.recentEvents,
         },
@@ -761,6 +762,7 @@ export function createWahaWebhookServer(opts: {
 
     // GET /api/admin/config
     if (req.url === "/api/admin/config" && req.method === "GET") {
+      try {
       const wahaCfg = opts.config.channels?.waha ?? {};
       // Include bot JIDs so the admin panel can hide the bot's own entries from filter lists.
       // Bot always has access to itself — showing it in allowFrom/godMode is noise. DO NOT REMOVE.
@@ -768,9 +770,11 @@ export function createWahaWebhookServer(opts: {
       // Also resolve @lid equivalents so both formats are filtered in the UI.
       const db = getDirectoryDb(opts.accountId);
       const expandedBotJids = new Set<string>(botJidSet);
+      const af = (wahaCfg as Record<string, unknown>).allowFrom;
+      const gaf = (wahaCfg as Record<string, unknown>).groupAllowFrom;
       const allFilterLists = [
-        ...((wahaCfg as Record<string, unknown>).allowFrom as string[] ?? []),
-        ...((wahaCfg as Record<string, unknown>).groupAllowFrom as string[] ?? []),
+        ...(Array.isArray(af) ? af : []),
+        ...(Array.isArray(gaf) ? gaf : []),
       ];
       for (const j of allFilterLists) {
         if (typeof j === "string" && j.endsWith("@lid")) {
@@ -793,6 +797,10 @@ export function createWahaWebhookServer(opts: {
       }
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ waha: wahaCfg, botJids: Array.from(expandedBotJids) }));
+      } catch (err) {
+        console.error(`[waha] GET /api/admin/config failed: ${String(err)}`);
+        writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
+      }
       return;
     }
 
@@ -842,7 +850,7 @@ export function createWahaWebhookServer(opts: {
         const configPath = getConfigPath();
         rotateConfigBackups(configPath);
         writeFileSync(configPath, JSON.stringify(importedConfig, null, 2), "utf-8");
-        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch {}
+        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { console.warn("[waha] clearWahaClientCache failed:", err); }
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
         console.error(`[waha] POST /api/admin/config/import failed: ${String(err)}`);
@@ -907,7 +915,7 @@ export function createWahaWebhookServer(opts: {
         // Backup failure is non-fatal (logged as warning). Added Phase 26 (CFG-03).
         rotateConfigBackups(configPath);
         writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
-        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch {}
+        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { console.warn("[waha] clearWahaClientCache failed:", err); }
         // Phase 29, Plan 02: emit log SSE event on config save. DO NOT REMOVE.
         broadcastSSE("log", { line: `[WAHA] config saved${restartRequired ? " (restart required)" : ""}`, timestamp: Date.now() });
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -1027,7 +1035,7 @@ export function createWahaWebhookServer(opts: {
       if (pathParts.length === 1 && pathParts[0] === "resolve") {
         try {
           const jidsParam = url.searchParams.get("jids") ?? "";
-          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean).slice(0, 500);
+          const jidArray = jidsParam.split(",").map(j => j.trim()).filter(Boolean).slice(0, MAX_RESOLVE_JIDS);
           const db = getDirectoryDb(opts.accountId);
           const resolvedMap = db.resolveJids(jidArray);
           const resolved: Record<string, string> = {};

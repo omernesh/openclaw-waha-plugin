@@ -52,6 +52,9 @@ export interface StatsResponse {
     healthStatus: string
     consecutiveFailures: number
     lastCheck: string | null
+    role?: string
+    subRole?: string
+    wahaStatus?: string
     // Phase 25: recovery state
     recoveryAttemptCount: number
     recoveryLastAttemptAt: number | null

@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 
+const SEARCH_DEBOUNCE_MS = 300
+
 interface TagInputProps {
   values: string[]                    // Raw JID strings or patterns
   onChange?: (values: string[]) => void  // Omit for read-only mode
@@ -83,7 +85,7 @@ export function TagInput({
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       searchFn(inputValue).then(setSearchResults).catch((err) => { console.error('TagInput search failed:', err); setSearchResults([]) })
-    }, 300)
+    }, SEARCH_DEBOUNCE_MS)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
@@ -112,6 +114,20 @@ export function TagInput({
     setPopoverOpen(false)
   }
 
+  function renderEmptyState() {
+    if (inputValue.length === 0) return <span>Type to search...</span>
+    if (freeform) return (
+      <button
+        type="button"
+        className="w-full py-2 text-center text-sm"
+        onClick={() => addValue(inputValue)}
+      >
+        Add &quot;{inputValue}&quot;
+      </button>
+    )
+    return <span>No results found</span>
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -123,9 +139,7 @@ export function TagInput({
 
   function handleSearchSelect(val: string) {
     addValue(val)
-    setInputValue('')
     setSearchResults([])
-    setPopoverOpen(false)
   }
 
   return (
@@ -196,23 +210,7 @@ export function TagInput({
               />
               <CommandList>
                 {searchResults.length === 0 ? (
-                  <CommandEmpty>
-                    {inputValue.length > 0 ? (
-                      freeform ? (
-                        <button
-                          type="button"
-                          className="w-full py-2 text-center text-sm"
-                          onClick={() => addValue(inputValue)}
-                        >
-                          Add &quot;{inputValue}&quot;
-                        </button>
-                      ) : (
-                        <span>No results found</span>
-                      )
-                    ) : (
-                      <span>Type to search...</span>
-                    )}
-                  </CommandEmpty>
+                  <CommandEmpty>{renderEmptyState()}</CommandEmpty>
                 ) : (
                   <CommandGroup>
                     {searchResults.map((item) => (

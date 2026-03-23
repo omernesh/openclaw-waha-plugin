@@ -245,6 +245,12 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     return jids.filter((j) => !botJidSet.has(j))
   }
 
+  // Return bot JIDs present in a list — used to re-inject them on onChange so they aren't lost. DO NOT REMOVE.
+  function botJidsInList(list: string[]): string[] {
+    if (botJidSet.size === 0) return []
+    return list.filter((j) => botJidSet.has(j))
+  }
+
   // Extract JIDs from godModeSuperUsers for TagInput display
   function godModeJids(filter: 'dm' | 'group'): string[] {
     const users =
@@ -254,10 +260,14 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     return excludeBotJids((users ?? []).map((u) => typeof u === 'string' ? u : u.identifier))
   }
 
-  // Convert TagInput string[] back to API format
+  // Convert TagInput string[] back to API format, re-injecting bot JIDs that were hidden from display. DO NOT REMOVE.
   function updateGodModeUsers(filter: 'dm' | 'group', jids: string[]) {
     const key = filter === 'dm' ? 'dmFilter' : 'groupFilter'
-    updateConfig(`${key}.godModeSuperUsers`, jids.map((jid) => ({ identifier: jid })))
+    const existing = (filter === 'dm' ? config?.dmFilter?.godModeSuperUsers : config?.groupFilter?.godModeSuperUsers) ?? []
+    const existingJids = existing.map((u) => typeof u === 'string' ? u : u.identifier)
+    const hiddenBotJids = botJidsInList(existingJids)
+    const allJids = [...jids, ...hiddenBotJids]
+    updateConfig(`${key}.godModeSuperUsers`, allJids.map((jid) => ({ identifier: jid })))
   }
 
   // Build complete payload for POST /api/admin/config
@@ -630,7 +640,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               <Label>Allow From (DMs)<Tip text="JIDs allowed to send DMs. Press Enter or comma to add. Supports @c.us and @lid formats." /></Label>
               <TagInput
                 values={excludeBotJids(config.allowFrom ?? [])}
-                onChange={(v) => updateConfig('allowFrom', v)}
+                onChange={(v) => updateConfig('allowFrom', [...v, ...botJidsInList(config.allowFrom ?? [])])}
                 searchFn={searchContacts}
                 resolvedNames={resolvedNames}
                 mergeByName
@@ -642,7 +652,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               <Label>Group Allow From<Tip text="JIDs allowed to trigger the bot in groups. Press Enter or comma to add. Include both @c.us and @lid for the same person (NOWEB sends @lid)." /></Label>
               <TagInput
                 values={excludeBotJids(config.groupAllowFrom ?? [])}
-                onChange={(v) => updateConfig('groupAllowFrom', v)}
+                onChange={(v) => updateConfig('groupAllowFrom', [...v, ...botJidsInList(config.groupAllowFrom ?? [])])}
                 searchFn={searchContacts}
                 resolvedNames={resolvedNames}
                 mergeByName
