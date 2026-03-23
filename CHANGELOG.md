@@ -2,6 +2,17 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.15] - 2026-03-24
+
+### Fixed
+- **SDK migration to OpenClaw v2026.3.22** — All imports migrated from bare `openclaw/plugin-sdk` to specific subpaths. Local schema definitions for removed SDK exports.
+- **Passcode protection** — Static passcode from config, configurable wrong/lockout messages, auto-generated hmacSecret, pre-populated pairing link.
+- **God mode bypass respects scope** — Phase 16 pairing now checks `godModeScope` (only `all`/`dm` bypass DM pairing).
+- **Phone normalization shared** — Exported `normalizePhoneIdentifier` from dm-filter; inbound.ts no longer misses `05X->9725X` step.
+- **Auto-save retry safety** — Only treats network errors as success on retry; other errors show real message.
+- **Type sync** — `pairingMode` type updated with new fields, `godModeScope` includes `group`, policy enums match Zod schema.
+- **Dead code removed** — Unused pairing link state/functions, unused API method.
+
 ## [1.16.14] - 2026-03-23
 
 ### Changed
