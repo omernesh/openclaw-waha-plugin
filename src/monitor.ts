@@ -762,8 +762,37 @@ export function createWahaWebhookServer(opts: {
     // GET /api/admin/config
     if (req.url === "/api/admin/config" && req.method === "GET") {
       const wahaCfg = opts.config.channels?.waha ?? {};
+      // Include bot JIDs so the admin panel can hide the bot's own entries from filter lists.
+      // Bot always has access to itself — showing it in allowFrom/godMode is noise. DO NOT REMOVE.
+      const botJidSet = await fetchBotJids(listEnabledWahaAccounts(opts.config));
+      // Also resolve @lid equivalents so both formats are filtered in the UI.
+      const db = getDirectoryDb(opts.accountId);
+      const expandedBotJids = new Set<string>(botJidSet);
+      const allFilterLists = [
+        ...((wahaCfg as Record<string, unknown>).allowFrom as string[] ?? []),
+        ...((wahaCfg as Record<string, unknown>).groupAllowFrom as string[] ?? []),
+      ];
+      for (const j of allFilterLists) {
+        if (typeof j === "string" && j.endsWith("@lid")) {
+          const cus = db.resolveLidToCus(j);
+          if (cus && expandedBotJids.has(cus)) expandedBotJids.add(j);
+        }
+      }
+      // Also check godModeSuperUsers for @lid entries that resolve to bot JIDs
+      const dmGodUsers = ((wahaCfg as Record<string, unknown>).dmFilter as Record<string, unknown> | undefined)?.godModeSuperUsers;
+      const grpGodUsers = ((wahaCfg as Record<string, unknown>).groupFilter as Record<string, unknown> | undefined)?.godModeSuperUsers;
+      for (const users of [dmGodUsers, grpGodUsers]) {
+        if (!Array.isArray(users)) continue;
+        for (const u of users) {
+          const id = typeof u === "string" ? u : u?.identifier;
+          if (typeof id === "string" && id.endsWith("@lid")) {
+            const cus = db.resolveLidToCus(id);
+            if (cus && expandedBotJids.has(cus)) expandedBotJids.add(id);
+          }
+        }
+      }
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ waha: wahaCfg }));
+      res.end(JSON.stringify({ waha: wahaCfg, botJids: Array.from(expandedBotJids) }));
       return;
     }
 

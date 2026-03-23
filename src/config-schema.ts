@@ -113,7 +113,7 @@ export const WahaAccountSchemaBase = z
     pairingMode: z.object({
       enabled: z.boolean().optional().default(false),
       passcode: z.string().optional(),
-      grantTtlMinutes: z.number().int().positive().optional().default(1440),
+      grantTtlMinutes: z.number().int().min(0).optional().default(1440),
       challengeMessage: z.string().optional().default(
         "Welcome! Please enter the 6-digit passcode to get started."
       ),

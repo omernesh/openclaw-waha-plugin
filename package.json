@@ -1,6 +1,6 @@
 {
   "name": "waha-openclaw-channel",
-  "version": "1.16.8",
+  "version": "1.16.9",
   "description": "OpenClaw WAHA (WhatsApp HTTP API) channel plugin",
   "type": "module",
   "main": "./index.ts",

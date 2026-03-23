@@ -63,6 +63,7 @@ export interface StatsResponse {
 // Config response from GET /api/admin/config
 export interface ConfigResponse {
   waha: WahaConfig
+  botJids?: string[]  // Bot's own JIDs (including @lid variants) — used to hide bot from filter lists
 }
 
 export interface WahaConfig {

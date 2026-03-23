@@ -84,6 +84,8 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   const [resolvedNames, setResolvedNames] = React.useState<Record<string, string>>({})
   // Available sessions for the Active WAHA Session dropdown
   const [availableSessions, setAvailableSessions] = React.useState<Session[]>([])
+  // Bot's own JIDs (including @lid variants) — hidden from filter list displays. DO NOT REMOVE.
+  const [botJidSet, setBotJidSet] = React.useState<Set<string>>(new Set())
   // Pairing link generator state
   const [pairingJid, setPairingJid] = React.useState('')
   const [pairingLink, setPairingLink] = React.useState('')
@@ -102,6 +104,8 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       .then((resp) => {
         if (controller.signal.aborted) return
         setConfig(resp.waha)
+        // Store bot JIDs for filtering from display lists. DO NOT REMOVE.
+        if (resp.botJids?.length) setBotJidSet(new Set(resp.botJids))
         setDirty(false)
         // Mark initial load done AFTER state settles (next tick) so the auto-save
         // useEffect does not fire for the hydration render.
@@ -205,10 +209,40 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     setPairingLink(link)
   }
 
-  // Directory search for TagInput
-  async function searchDirectory(query: string): Promise<Array<{ value: string; label: string }>> {
-    const result = await api.getDirectory({ search: query, limit: '10' })
+  // Format phone number from JID for display in search results
+  function formatPhone(jid: string): string {
+    const match = jid.match(/^(\d+)@/)
+    if (!match) return ''
+    const num = match[1]
+    return `+${num.slice(0, 3)}-${num.slice(3)}`
+  }
+
+  // Directory search for TagInput — contacts only (deduplicates @c.us / @lid by name)
+  async function searchContacts(query: string): Promise<Array<{ value: string; label: string; phone?: string }>> {
+    const result = await api.getDirectory({ search: query, limit: '10', type: 'contact' })
+    // Deduplicate: prefer @c.us over @lid for same display name
+    const seen = new Map<string, { value: string; label: string; phone?: string }>()
+    for (const item of result.contacts) {
+      const label = item.displayName || item.jid
+      const existing = seen.get(label)
+      if (!existing || item.jid.endsWith('@c.us')) {
+        const phone = formatPhone(item.jid)
+        seen.set(label, { value: item.jid, label, phone: phone || undefined })
+      }
+    }
+    return Array.from(seen.values())
+  }
+
+  // Directory search for TagInput — groups only
+  async function searchGroups(query: string): Promise<Array<{ value: string; label: string; phone?: string }>> {
+    const result = await api.getDirectory({ search: query, limit: '10', type: 'group' })
     return result.contacts.map((item) => ({ value: item.jid, label: item.displayName || item.jid }))
+  }
+
+  // Hide bot's own JIDs from filter list displays — bot always has access to itself. DO NOT REMOVE.
+  function excludeBotJids(jids: string[]): string[] {
+    if (botJidSet.size === 0) return jids
+    return jids.filter((j) => !botJidSet.has(j))
   }
 
   // Extract JIDs from godModeSuperUsers for TagInput display
@@ -217,7 +251,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       filter === 'dm'
         ? config?.dmFilter?.godModeSuperUsers
         : config?.groupFilter?.godModeSuperUsers
-    return (users ?? []).map((u) => typeof u === 'string' ? u : u.identifier)
+    return excludeBotJids((users ?? []).map((u) => typeof u === 'string' ? u : u.identifier))
   }
 
   // Convert TagInput string[] back to API format
@@ -595,9 +629,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             <div className="space-y-1.5">
               <Label>Allow From (DMs)<Tip text="JIDs allowed to send DMs. Press Enter or comma to add. Supports @c.us and @lid formats." /></Label>
               <TagInput
-                values={config.allowFrom ?? []}
+                values={excludeBotJids(config.allowFrom ?? [])}
                 onChange={(v) => updateConfig('allowFrom', v)}
-                searchFn={searchDirectory}
+                searchFn={searchContacts}
                 resolvedNames={resolvedNames}
                 mergeByName
                 placeholder="Search contacts..."
@@ -607,9 +641,9 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
             <div className="space-y-1.5">
               <Label>Group Allow From<Tip text="JIDs allowed to trigger the bot in groups. Press Enter or comma to add. Include both @c.us and @lid for the same person (NOWEB sends @lid)." /></Label>
               <TagInput
-                values={config.groupAllowFrom ?? []}
+                values={excludeBotJids(config.groupAllowFrom ?? [])}
                 onChange={(v) => updateConfig('groupAllowFrom', v)}
-                searchFn={searchDirectory}
+                searchFn={searchContacts}
                 resolvedNames={resolvedNames}
                 mergeByName
                 placeholder="Search contacts..."
@@ -621,7 +655,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               <TagInput
                 values={config.allowedGroups ?? []}
                 onChange={(v) => updateConfig('allowedGroups', v)}
-                searchFn={searchDirectory}
+                searchFn={searchGroups}
                 resolvedNames={resolvedNames}
                 placeholder="Search groups..."
               />
@@ -685,7 +719,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               <TagInput
                 values={godModeJids('dm')}
                 onChange={(v) => updateGodModeUsers('dm', v)}
-                searchFn={searchDirectory}
+                searchFn={searchContacts}
                 freeform={true}
                 resolvedNames={resolvedNames}
                 mergeByName
@@ -763,7 +797,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
               <TagInput
                 values={godModeJids('group')}
                 onChange={(v) => updateGodModeUsers('group', v)}
-                searchFn={searchDirectory}
+                searchFn={searchContacts}
                 freeform={true}
                 resolvedNames={resolvedNames}
                 mergeByName
@@ -965,10 +999,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           </CardContent>
         </Card>
 
-        {/* Section 6: Pairing Mode */}
+        {/* Section 6: Passcode Protection */}
         <Card>
           <CardHeader>
-            <CardTitle>Pairing Mode</CardTitle>
+            <CardTitle>Passcode Protection</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
@@ -977,7 +1011,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 checked={config.pairingMode?.enabled ?? false}
                 onCheckedChange={(v) => updateConfig('pairingMode.enabled', v)}
               />
-              <Label htmlFor="pairingMode.enabled">Enable Pairing Mode<Tip text="When enabled, unknown DM senders can enter a passcode to get added to the allow list automatically." /></Label>
+              <Label htmlFor="pairingMode.enabled">Enable Passcode Protection<Tip text="When enabled, unknown DM senders can enter a passcode to get added to the allow list automatically." /></Label>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pairingMode.passcode">Passcode<Tip text="The 6-digit code contacts must enter to get DM access. Click Generate to create a random one." /></Label>
@@ -1026,7 +1060,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 onChange={(e) => updateConfig('pairingMode.challengeMessage', e.target.value)}
               />
             </div>
-            {/* Pairing Link Generator — only visible when pairing mode is enabled */}
+            {/* Pairing Link Generator — only visible when passcode protection is enabled */}
             {config.pairingMode?.enabled && (
               <div className="space-y-2 rounded-md border p-3 bg-muted/30">
                 <Label className="text-sm font-medium">Pairing Link Generator<Tip text="Share this link to let a specific contact start a pairing flow. Enter their JID below to generate." /></Label>

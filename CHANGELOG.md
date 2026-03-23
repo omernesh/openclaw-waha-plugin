@@ -2,6 +2,15 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.9] - 2026-03-23
+
+### Fixed
+- **Search shows contacts only** — Allow From and God Mode search fields now filter by type (contacts-only or groups-only), no more newsletters/groups in contact fields.
+- **Search deduplicates @c.us/@lid** — Same person no longer appears multiple times in search results.
+- **Phone numbers in search results** — Search dropdown shows formatted phone next to name, e.g. `Ran (+972-543090170)`.
+- **Bot hidden from own filter lists** — The bot's own JIDs (phone + LID) are excluded from Allow From, Group Allow From, and God Mode Users displays.
+- **Passcode Protection save** — Fixed `grantTtlMinutes` validator rejecting value 0 ("Never" expiry). Renamed UI from "Pairing Mode" to "Passcode Protection".
+
 ## [1.16.8] - 2026-03-22
 
 ### Fixed

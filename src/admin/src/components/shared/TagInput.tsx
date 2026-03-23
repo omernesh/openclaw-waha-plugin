@@ -22,7 +22,7 @@ interface TagInputProps {
   onChange?: (values: string[]) => void  // Omit for read-only mode
   resolvedNames?: Record<string, string> // JID -> display name mapping
   placeholder?: string
-  searchFn?: (query: string) => Promise<Array<{ value: string; label: string }>>  // For directory search
+  searchFn?: (query: string) => Promise<Array<{ value: string; label: string; phone?: string }>>  // For directory search
   freeform?: boolean                  // true = user can type arbitrary values (mention patterns)
   readOnly?: boolean                  // true = no add/remove, display only
   mergeByName?: boolean               // true = group JIDs that resolve to the same name into one tag
@@ -70,7 +70,7 @@ export function TagInput({
   className,
 }: TagInputProps) {
   const [inputValue, setInputValue] = React.useState('')
-  const [searchResults, setSearchResults] = React.useState<Array<{ value: string; label: string }>>([])
+  const [searchResults, setSearchResults] = React.useState<Array<{ value: string; label: string; phone?: string }>>([])
   const [popoverOpen, setPopoverOpen] = React.useState(false)
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -222,6 +222,7 @@ export function TagInput({
                         onSelect={() => handleSearchSelect(item.value)}
                       >
                         {item.label}
+                        {item.phone && <span className="ml-1.5 text-muted-foreground text-xs">({item.phone})</span>}
                       </CommandItem>
                     ))}
                   </CommandGroup>
