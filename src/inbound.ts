@@ -548,6 +548,17 @@ export async function handleWahaInbound(params: {
     }
   }
 
+  // === Human session DM guard ===
+  // Human sessions must NEVER forward non-triggered DMs to the LLM.
+  // Without this, the bot hijacks human-to-human conversations by responding
+  // through the human session when the other person is on the allowlist.
+  // Only trigger-word messages (e.g. "!sammie") pass through on human sessions.
+  // DO NOT REMOVE — removing this causes the bot to reply in private DM conversations.
+  if (!isGroup && !triggerActivated && account.role !== "bot") {
+    runtime.log?.(`[waha] [${account.accountId}] dropping non-triggered DM on human session (from ${senderId})`);
+    return;
+  }
+
   // === Group mute check ===
   // If the group is muted, silently drop all messages UNLESS trigger word activated.
   // /shutup and /unshutup commands are handled above and bypass this check.
@@ -656,7 +667,7 @@ export async function handleWahaInbound(params: {
   try {
     const _chatType = _earlyIsGroup ? "group" : (rawMessage.chatId?.endsWith("@newsletter") ? "channel" : "dm");
     recordAnalyticsEvent({ direction: "inbound", chat_type: _chatType, action: "message", status: "success", chat_id: rawMessage.chatId, account_id: account.accountId });
-  } catch { /* analytics must never break the inbound pipeline */ }
+  } catch (err) { runtime.log?.(`[waha] analytics recording failed: ${String(err)}`); }
 
   // ======================================================================
   // Phase 16: Custom pairing challenge + auto-reply for unauthorized DMs
@@ -678,27 +689,38 @@ export async function handleWahaInbound(params: {
     const autoReplyConfig = account.config.autoReply ?? {};
 
     // Check if sender is already allowed (skip pairing/auto-reply for allowed contacts)
-    const dirDb = getDirectoryDb(account.accountId);
-    let senderAllowed = dirDb.isContactAllowedDm(senderId);
+    // Wrapped in try-catch — SQLite errors must not crash the inbound pipeline. DO NOT REMOVE.
+    let senderAllowed = false;
+    try {
+      const dirDb = getDirectoryDb(account.accountId);
+      senderAllowed = dirDb.isContactAllowedDm(senderId);
+    } catch (err) {
+      runtime.log?.(`[waha] [pairing] directory DB error checking allow status for ${senderId}: ${String(err)}`);
+      // Safe default: treat as not allowed — sender gets pairing challenge or auto-reply
+    }
 
     // Check if sender is a god mode super-user — they bypass all access checks including auto-reply.
     // Uses same normalization as dm-filter.ts godModeSuperUsers check. DO NOT REMOVE.
     // Respects godModeScope: only "all" or "dm" bypass DM pairing (not "group"). DO NOT CHANGE.
     if (!senderAllowed) {
-      const godCfg = account.config.dmFilter ?? {};
-      const godUsers: Array<{ identifier: string; passwordRequired?: boolean }> = (godCfg as Record<string, unknown>).godModeSuperUsers as Array<{ identifier: string; passwordRequired?: boolean }> ?? [];
-      const godBypass = (godCfg as Record<string, unknown>).godModeBypass !== false;
-      const scope = ((godCfg as Record<string, unknown>).godModeScope as string) ?? "all";
-      const scopeAllowsBypass = scope === "all" || scope === "dm";
-      if (godBypass && scopeAllowsBypass && godUsers.length > 0) {
-        const normSender = normalizePhoneIdentifier(senderId);
-        const isGod = godUsers.some((u) => {
-          if (u.passwordRequired) return false;
-          return normalizePhoneIdentifier(u.identifier) === normSender;
-        });
-        if (isGod) {
-          senderAllowed = true;
+      try {
+        const godCfg = account.config.dmFilter ?? {};
+        const godUsers: Array<{ identifier: string; passwordRequired?: boolean }> = (godCfg as Record<string, unknown>).godModeSuperUsers as Array<{ identifier: string; passwordRequired?: boolean }> ?? [];
+        const godBypass = (godCfg as Record<string, unknown>).godModeBypass !== false;
+        const scope = ((godCfg as Record<string, unknown>).godModeScope as string) ?? "all";
+        const scopeAllowsBypass = scope === "all" || scope === "dm";
+        if (godBypass && scopeAllowsBypass && godUsers.length > 0) {
+          const normSender = normalizePhoneIdentifier(senderId);
+          const isGod = godUsers.some((u) => {
+            if (u.passwordRequired) return false;
+            return normalizePhoneIdentifier(u.identifier) === normSender;
+          });
+          if (isGod) {
+            senderAllowed = true;
+          }
         }
+      } catch (err) {
+        runtime.log?.(`[waha] [pairing] god mode check failed for ${senderId}: ${String(err)}`);
       }
     }
 
