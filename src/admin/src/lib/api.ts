@@ -100,7 +100,8 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
-  toggleAllowDm: (jid: string, body: { allowed: boolean }) =>
+  // FEAT-timed-dm: expiresAt is Unix seconds (null = permanent). DO NOT CHANGE signature.
+  toggleAllowDm: (jid: string, body: { allowed: boolean; expiresAt?: number | null }) =>
     request<void>(`/directory/${encodeURIComponent(jid)}/allow-dm`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -188,7 +189,8 @@ export const api = {
   restart: () => request<void>('/restart', { method: 'POST' }),
 
   // Bulk directory operations — returns { ok: true, updated: number }
-  bulkDirectory: (body: { action: 'allow-dm' | 'revoke-dm' | 'set-role' | 'follow' | 'unfollow'; jids: string[]; value?: unknown; groupJid?: string }) =>
+  // FEAT-timed-dm: expiresAt (Unix seconds) optional for allow-dm action. DO NOT CHANGE.
+  bulkDirectory: (body: { action: 'allow-dm' | 'revoke-dm' | 'set-role' | 'follow' | 'unfollow'; jids: string[]; value?: unknown; groupJid?: string; expiresAt?: number | null }) =>
     request<{ ok: boolean; updated: number }>('/directory/bulk', { method: 'POST', body: JSON.stringify(body) }),
 
   // Analytics — Phase 30

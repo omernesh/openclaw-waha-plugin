@@ -137,19 +137,31 @@ export function ContactsTab({
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 
-  async function handleBulkAction(action: 'allow-dm' | 'revoke-dm' | 'follow' | 'unfollow') {
+  // FEAT-timed-dm: expiresAt is Unix seconds (null = permanent). Passed from BulkEditToolbar duration picker.
+  async function handleBulkAction(action: 'allow-dm' | 'revoke-dm' | 'follow' | 'unfollow', expiresAt?: number | null) {
     // Only allow-dm and revoke-dm are valid for contacts — ignore other action types
     if (action !== 'allow-dm' && action !== 'revoke-dm') return
     if (selectedJids.length === 0) return
     try {
-      const result = await api.bulkDirectory({ action, jids: selectedJids })
-      toast.success(`${action === 'allow-dm' ? 'Granted' : 'Revoked'} DM access for ${result.updated} contact(s)`)
+      const result = await api.bulkDirectory({ action, jids: selectedJids, expiresAt: action === 'allow-dm' ? expiresAt : undefined })
+      const durationLabel = action === 'allow-dm' && expiresAt != null
+        ? ` (${formatDuration(expiresAt)})`
+        : action === 'allow-dm' ? ' (permanent)' : ''
+      toast.success(`${action === 'allow-dm' ? 'Granted' : 'Revoked'} DM access for ${result.updated} contact(s)${durationLabel}`)
       setRowSelection({})
       onRefresh()
     } catch (err) {
       toast.error('Bulk action failed')
       console.error(err)
     }
+  }
+
+  function formatDuration(expiresAt: number): string {
+    const diff = expiresAt - Math.floor(Date.now() / 1000)
+    if (diff <= 0) return 'expired'
+    if (diff < 3600) return `${Math.ceil(diff / 60)}m`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+    return `${Math.floor(diff / 86400)}d`
   }
 
   function handleCancelBulk() {
