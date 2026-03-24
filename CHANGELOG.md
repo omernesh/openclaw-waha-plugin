@@ -2,6 +2,15 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.17] - 2026-03-24
+
+### Fixed
+- **Directory tab crash** — Fixed radix Select empty-value crash in GroupFilterOverride (replaced empty string with `__inherit__` sentinel)
+- **Log pause button** — Rewrote auto-scroll pause to buffer SSE events in memory instead of DOM save/restore. Paused logs are now truly frozen.
+- **Analytics name resolution** — Top Active Chats now resolves JIDs to display names via directory API with group/DM icons
+- **Avg API Latency label** — Renamed from "Avg Response" to clarify it tracks outbound WAHA API call duration, shows "N/A" when no outbound data
+- **Code review fixes** — Tightened godModeScope type, error differentiation in save handlers, fetchError state in LogTab, safe recharts casts
+
 ## [1.16.16] - 2026-03-24
 
 ### Fixed
