@@ -2,6 +2,16 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.21] - 2026-03-24
+
+### Fixed
+- **DM-only guards** — Auto-reply, passcode challenges, and DM keyword filters now use explicit `isDm` check (`@c.us` + `@lid`) instead of `!isGroup`. Prevents newsletters (`@newsletter`) from triggering outbound responses.
+- **Newsletter access control** — Newsletter messages now have their own access control path: dropped silently if not allowed, no auto-reply or passcode sent. Allowed newsletters flow through to the agent.
+- **Early pending selection leak** — `/shutup` interactive flow used `!isGroup` which could fire for newsletters. Now uses `_earlyIsDm`.
+- **LID mapping block** — Consistency fix: `!isGroup` replaced with `isDm` in LID-to-CUS mapping.
+- **Admin name resolution** — `dirDb` was out of scope (declared in a different try block), causing `ReferenceError` silently caught. Admin name always fell back to "the administrator". Now uses own `getDirectoryDb()` call.
+- **Gateway logging** — Two `console.warn` calls (LID mapping, admin name resolution) replaced with `runtime.error`/`runtime.log` for proper journalctl capture.
+
 ## [1.16.20] - 2026-03-24
 
 ### Fixed
