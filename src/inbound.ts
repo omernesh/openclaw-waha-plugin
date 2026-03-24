@@ -440,6 +440,10 @@ export async function handleWahaInbound(params: {
   // DO NOT CHANGE — direct JID check replaces SDK isWhatsAppGroupJid which was returning
   // false for valid group JIDs, causing group messages to route through DM filter instead.
   const isGroup = typeof message.chatId === "string" && message.chatId.endsWith("@g.us");
+  // FIX: Use explicit @c.us check instead of !isGroup — newsletters (@newsletter) are NOT DMs
+  // and must never receive auto-reply or pairing challenges. DO NOT CHANGE back to !isGroup.
+  // Added 2026-03-24. Fixes bug where !isGroup was true for @newsletter chatIds.
+  const isDm = typeof message.chatId === "string" && message.chatId.endsWith("@c.us");
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
 
@@ -506,7 +510,7 @@ export async function handleWahaInbound(params: {
   // This secondary check handles edge cases where the early check missed (e.g., media messages
   // where rawBody differs from rawMessage.body after preprocessing).
   // DO NOT CHANGE — DM interactive flow for /shutup command.
-  if (!isGroup && !commandMatch) {
+  if (isDm && !commandMatch) {
     const pending = checkPendingSelection(senderId, config);
     if (pending) {
       const handled = await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
@@ -554,7 +558,7 @@ export async function handleWahaInbound(params: {
   // through the human session when the other person is on the allowlist.
   // Only trigger-word messages (e.g. "!sammie") pass through on human sessions.
   // DO NOT REMOVE — removing this causes the bot to reply in private DM conversations.
-  if (!isGroup && !triggerActivated && account.role !== "bot") {
+  if (isDm && !triggerActivated && account.role !== "bot") {
     runtime.log?.(`[waha] [${account.accountId}] dropping non-triggered DM on human session (from ${senderId})`);
     return;
   }
@@ -684,7 +688,7 @@ export async function handleWahaInbound(params: {
   // Phase 16: Pairing mode + auto-reply for unauthorized DMs.
   // ONLY runs on bot sessions — human sessions must NEVER auto-reply. DO NOT REMOVE role guard.
   // Also skips if sender is a god mode super-user (god mode bypasses all access checks).
-  if (!isGroup && !triggerActivated && !message.fromMe && account.role === "bot") {
+  if (isDm && !triggerActivated && !message.fromMe && account.role === "bot") {
     const pairingConfig = account.config.pairingMode ?? {};
     const autoReplyConfig = account.config.autoReply ?? {};
 
@@ -949,7 +953,7 @@ export async function handleWahaInbound(params: {
       runtime.log?.(`waha: drop group sender ${senderId} (policy=${groupPolicy})`);
       return;
     }
-  } else if (!isGroup && access.decision !== "allow") {
+  } else if (isDm && access.decision !== "allow") {
     if (access.decision === "pairing") {
       const { code, created } = await pairing.upsertPairingRequest({
         id: senderId,
@@ -981,7 +985,7 @@ export async function handleWahaInbound(params: {
   // may not reflect TTL expiry until the next sync cycle removes the entry).
   // SQLite is the source of truth for TTL. DO NOT CHANGE — this is the live TTL
   // enforcement that doesn't depend on gateway config reload.
-  if (!isGroup && access.decision === "allow") {
+  if (isDm && access.decision === "allow") {
     try {
       const dirDb = getDirectoryDb(account.accountId);
       if (dirDb.isAllowListEntryExpired(senderId)) {
@@ -1007,7 +1011,7 @@ export async function handleWahaInbound(params: {
   // DM keyword filter: silently drop DMs that don't match mentionPatterns
   // SKIP for trigger-word messages — explicit invocation bypasses DM keyword filter.
   // DO NOT CHANGE — triggerActivated bypass is intentional, same pattern as group filter above.
-  if (!isGroup && !triggerActivated) {
+  if (isDm && !triggerActivated) {
     const dmFilter = getDmFilter(config, account.accountId);
     // DO NOT CHANGE — keyword filters must use textBody (human-written text only), NOT rawBody.
     // rawBody includes synthetic tags like "[media] mime=audio/ogg url=..." which can accidentally
@@ -1039,8 +1043,8 @@ export async function handleWahaInbound(params: {
     runtime.log?.(`waha: directory upsert failed for ${senderId}: ${String(err)}`);
   }
 
-  // Per-DM settings enforcement (DMs only)
-  if (!isGroup) {
+  // Per-DM settings enforcement (DMs only — @c.us chatIds, not newsletters or groups)
+  if (isDm) {
     try {
       const dirDb = getDirectoryDb(account.accountId);
       const dmSettings = dirDb.getContactDmSettings(senderId);
