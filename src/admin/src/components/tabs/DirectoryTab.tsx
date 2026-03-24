@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, RefreshCw, CheckCircle } from 'lucide-react'
+import { Search, RefreshCw, CheckCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { DirectoryResponse } from '@/types'
@@ -137,8 +137,17 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
             placeholder="Search directory..."
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-8"
+            className="pl-8 pr-8"
           />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => handleSearchChange('')}
+              className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <Button variant="outline" size="sm" onClick={handleRefreshAll} className="shrink-0 gap-1.5">
           <RefreshCw className="h-3.5 w-3.5" />
