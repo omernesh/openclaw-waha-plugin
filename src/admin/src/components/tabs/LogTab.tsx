@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { X, ChevronsDown, Pause, Play, Download } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { LogResponse } from '@/types'
@@ -86,7 +86,10 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
   pendingSearchRef.current = searchQuery
   const autoScrollRef = useRef(autoScroll)
   autoScrollRef.current = autoScroll
-  const savedScrollTopRef = useRef<number | null>(null)
+  // Buffer for SSE lines received while auto-scroll is paused.
+  // Lines accumulate here instead of updating logData, so the DOM doesn't change
+  // and the scroll position stays frozen. Flushed on resume. DO NOT REMOVE.
+  const pauseBufferRef = useRef<string[]>([])
 
   // Core fetch function
   const fetchLogs = useCallback(
@@ -136,15 +139,22 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
 
   // Phase 29, Plan 02: SSE live log streaming — append new lines from server events.
   // Caps buffer at LOG_LINE_LIMIT * 2 to prevent memory growth (trims from front).
-  // New lines received while user is scrolled up increment newLineCount badge. DO NOT REMOVE.
+  // When auto-scroll is paused, lines buffer in pauseBufferRef instead of updating
+  // logData — this freezes the DOM so scroll position stays put. DO NOT REMOVE.
   const { subscribe } = useSSE()
   useEffect(() => {
     return subscribe('log', (event) => {
-      // Save scroll position BEFORE setLogData triggers re-render so we can
-      // restore it in useLayoutEffect when auto-scroll is paused. DO NOT REMOVE.
-      if (!autoScrollRef.current && scrollRef.current) {
-        savedScrollTopRef.current = scrollRef.current.scrollTop
+      if (!autoScrollRef.current) {
+        // Paused: buffer the line, don't touch logData/DOM. DO NOT REMOVE.
+        pauseBufferRef.current.push(event.line)
+        // Cap buffer to prevent memory growth while paused
+        if (pauseBufferRef.current.length > LOG_LINE_LIMIT * 2) {
+          pauseBufferRef.current = pauseBufferRef.current.slice(-LOG_LINE_LIMIT)
+        }
+        setNewLineCount(n => n + 1)
+        return
       }
+      // Auto-scroll ON: update logData directly
       setLogData(prev => {
         if (!prev) return { lines: [event.line], total: 1, source: 'sse' as const }
         const newLines = [...prev.lines, event.line]
@@ -159,18 +169,6 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
     })
   }, [subscribe])
 
-  // Phase 29 fix: preserve scroll position when auto-scroll is paused.
-  // Without this, the browser's natural "stick to bottom" behavior keeps showing
-  // new content even when auto-scroll is disabled. The scroll position is saved
-  // in the SSE handler (before setLogData triggers re-render) and restored in
-  // useLayoutEffect (after DOM update, before paint). DO NOT REMOVE.
-  useLayoutEffect(() => {
-    if (!autoScroll && savedScrollTopRef.current !== null && scrollRef.current) {
-      scrollRef.current.scrollTop = savedScrollTopRef.current
-      savedScrollTopRef.current = null
-    }
-  }, [logData, autoScroll])
-
   // Auto-scroll to bottom after data loads (respects autoScroll toggle)
   useEffect(() => {
     if (loading || !logData) return
@@ -184,7 +182,6 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
     userScrolledUpRef.current = false
-    savedScrollTopRef.current = null
     setShowScrollToBottom(false)
     setNewLineCount(0)
   }
@@ -224,12 +221,24 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
   function toggleAutoScroll() {
     setAutoScroll((prev) => {
       if (!prev) {
-        // Re-enabling auto-scroll: jump to bottom immediately
-        scrollToBottom()
+        // Re-enabling: flush buffered SSE lines into logData, then scroll to bottom. DO NOT REMOVE.
+        if (pauseBufferRef.current.length > 0) {
+          const buffered = pauseBufferRef.current
+          pauseBufferRef.current = []
+          setLogData(prevData => {
+            if (!prevData) return { lines: buffered, total: buffered.length, source: 'sse' as const }
+            const merged = [...prevData.lines, ...buffered]
+            const trimmed = merged.length > LOG_LINE_LIMIT * 2
+              ? merged.slice(-LOG_LINE_LIMIT)
+              : merged
+            return { ...prevData, lines: trimmed }
+          })
+        }
+        // scrollToBottom runs after the flush re-render via the useEffect below
+        setTimeout(() => scrollToBottom(), 0)
       } else {
-        // Pausing: mark user as scrolled-up so new SSE lines don't chase the bottom.
-        // Without this, the browser's natural "stick to bottom" behavior keeps showing
-        // new content even though auto-scroll is disabled. DO NOT REMOVE.
+        // Pausing: clear buffer for fresh accumulation. DO NOT REMOVE.
+        pauseBufferRef.current = []
         userScrolledUpRef.current = true
       }
       return !prev

@@ -183,10 +183,10 @@ export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsT
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Avg Response</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide" title="Average WAHA API call duration for outbound actions">Avg API Latency</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.summary.avg_duration_ms > 0 ? formatDuration(data.summary.avg_duration_ms) : '—'}</div>
+            <div className="text-2xl font-bold">{data.summary.avg_duration_ms > 0 ? formatDuration(data.summary.avg_duration_ms) : (data.summary.outbound > 0 ? '< 1ms' : 'N/A')}</div>
           </CardContent>
         </Card>
       </div>
