@@ -731,6 +731,44 @@ describe("handleWahaInbound", () => {
       expect(autoReplyMock.shouldReply).toHaveBeenCalled();
     });
 
+    it("DM chatId (@lid) DOES enter Phase 16 block — NOWEB LID DMs", async () => {
+      const { getAutoReplyEngine } = await import("./auto-reply.js");
+      const { getDirectoryDb } = await import("./directory.js");
+      (getDirectoryDb as ReturnType<typeof vi.fn>)().isContactAllowedDm.mockReturnValueOnce(false);
+
+      const autoReplyMock = (getAutoReplyEngine as ReturnType<typeof vi.fn>)();
+      autoReplyMock.shouldReply.mockReturnValue(true);
+      autoReplyMock.sendRejection.mockResolvedValue(undefined);
+
+      const lidJid = "271862907039996@lid";
+      const message = makeWahaMessage({
+        body: "hello from LID",
+        from: lidJid,
+        chatId: lidJid,
+      });
+      const account = makeAccount({
+        config: {
+          session: "test-session",
+          baseUrl: "http://localhost:3004",
+          autoReply: { enabled: true, message: "Auto reply" },
+          dmFilter: { enabled: false },
+          groupFilter: { enabled: false },
+          allowFrom: [],
+          groupAllowFrom: [],
+          allowedGroups: [],
+          dmPolicy: "allowlist",
+          groupPolicy: "allowlist",
+        } as never,
+      });
+      const config = makeConfig({ autoReply: { enabled: true, message: "Auto reply" } });
+      const runtime = makeRuntime();
+
+      await handleWahaInbound({ message, account, config, runtime: runtime as never });
+
+      // Phase 16 auto-reply SHOULD fire for @lid DM chatIds too
+      expect(autoReplyMock.shouldReply).toHaveBeenCalled();
+    });
+
     it("group chatId (@g.us) still excluded from Phase 16 block (unchanged behavior)", async () => {
       const { getAutoReplyEngine } = await import("./auto-reply.js");
       const autoReplyMock = (getAutoReplyEngine as ReturnType<typeof vi.fn>)();

@@ -440,10 +440,11 @@ export async function handleWahaInbound(params: {
   // DO NOT CHANGE — direct JID check replaces SDK isWhatsAppGroupJid which was returning
   // false for valid group JIDs, causing group messages to route through DM filter instead.
   const isGroup = typeof message.chatId === "string" && message.chatId.endsWith("@g.us");
-  // FIX: Use explicit @c.us check instead of !isGroup — newsletters (@newsletter) are NOT DMs
+  // FIX: Use explicit @c.us / @lid check instead of !isGroup — newsletters (@newsletter) are NOT DMs
   // and must never receive auto-reply or pairing challenges. DO NOT CHANGE back to !isGroup.
+  // NOWEB engine sends DMs as @lid (LID JIDs). Both @c.us and @lid are personal chats.
   // Added 2026-03-24. Fixes bug where !isGroup was true for @newsletter chatIds.
-  const isDm = typeof message.chatId === "string" && message.chatId.endsWith("@c.us");
+  const isDm = typeof message.chatId === "string" && (message.chatId.endsWith("@c.us") || message.chatId.endsWith("@lid"));
   const senderId = message.participant || message.from;
   const chatId = message.chatId;
 
