@@ -440,6 +440,7 @@ export async function handleWahaInbound(params: {
   // DO NOT CHANGE — direct JID check replaces SDK isWhatsAppGroupJid which was returning
   // false for valid group JIDs, causing group messages to route through DM filter instead.
   const isGroup = typeof message.chatId === "string" && message.chatId.endsWith("@g.us");
+  const isNewsletter = typeof message.chatId === "string" && message.chatId.endsWith("@newsletter");
   // FIX: Use explicit @c.us / @lid check instead of !isGroup — newsletters (@newsletter) are NOT DMs
   // and must never receive auto-reply or pairing challenges. DO NOT CHANGE back to !isGroup.
   // NOWEB engine sends DMs as @lid (LID JIDs). Both @c.us and @lid are personal chats.
@@ -952,6 +953,14 @@ export async function handleWahaInbound(params: {
     });
     if (!groupAllow.allowed && groupPolicy !== "open") {
       runtime.log?.(`waha: drop group sender ${senderId} (policy=${groupPolicy})`);
+      return;
+    }
+  } else if (isNewsletter) {
+    // Newsletters are inbound-only: filter through access control but NEVER send auto-reply
+    // or passcode challenges. Silently drop if not allowed. DO NOT CHANGE — newsletters
+    // must never trigger outbound responses. Added 2026-03-24.
+    if (access.decision !== "allow") {
+      runtime.log?.(`waha: drop newsletter ${chatId} (reason=${access.reason})`);
       return;
     }
   } else if (isDm && access.decision !== "allow") {
