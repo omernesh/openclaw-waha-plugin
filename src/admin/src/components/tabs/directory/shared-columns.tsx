@@ -12,12 +12,12 @@ import { api } from '@/lib/api'
 import type { DirectoryContact } from '@/types'
 
 /**
- * Format a Unix-seconds timestamp as a readable date string.
- * DO NOT CHANGE: ts comes from WAHA API as Unix seconds, must multiply by 1000 for JS Date.
+ * Format a millisecond timestamp as a readable date string.
+ * DO NOT CHANGE: ts comes from DirectoryDb as Date.now() milliseconds — do NOT multiply by 1000.
  */
 export function formatDate(ts: number): string {
   if (!ts) return '\u2014'
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
+  return new Date(ts).toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
