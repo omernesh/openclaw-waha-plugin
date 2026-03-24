@@ -110,9 +110,7 @@ vi.mock("./media.js", () => ({
 }));
 
 vi.mock("./http-client.js", () => ({
-  warnOnError: vi.fn().mockReturnValue((err: unknown) => {
-    console.warn(String(err));
-  }),
+  warnOnError: vi.fn().mockReturnValue(vi.fn()),
 }));
 
 vi.mock("./rules-resolver.js", () => ({
@@ -675,13 +673,9 @@ describe("handleWahaInbound", () => {
       const config = makeConfig({ autoReply: { enabled: true, message: "I cannot reply here" } });
       const runtime = makeRuntime();
 
-      // Newsletter messages fall through all DM/group guards and may reach delivery.
-      // We catch errors from the incomplete delivery mock and verify Phase 16 didn't fire.
-      try {
-        await handleWahaInbound({ message, account, config, runtime: runtime as never });
-      } catch {
-        // ignore delivery-pipeline errors from incomplete mocks — we only care about Phase 16
-      }
+      // Newsletter should be dropped by isNewsletter access check (returns early).
+      // No try/catch — if this throws, the test should fail.
+      await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
       // Phase 16 auto-reply must NOT fire for newsletter chatIds
       // (even though sender is not allowed — newsletter is not a DM, isDm=false)
@@ -729,6 +723,7 @@ describe("handleWahaInbound", () => {
 
       // Phase 16 auto-reply SHOULD fire for DM chatIds (sender not allowed)
       expect(autoReplyMock.shouldReply).toHaveBeenCalled();
+      expect(autoReplyMock.sendRejection).toHaveBeenCalled();
     });
 
     it("DM chatId (@lid) DOES enter Phase 16 block — NOWEB LID DMs", async () => {
@@ -767,6 +762,7 @@ describe("handleWahaInbound", () => {
 
       // Phase 16 auto-reply SHOULD fire for @lid DM chatIds too
       expect(autoReplyMock.shouldReply).toHaveBeenCalled();
+      expect(autoReplyMock.sendRejection).toHaveBeenCalled();
     });
 
     it("group chatId (@g.us) still excluded from Phase 16 block (unchanged behavior)", async () => {

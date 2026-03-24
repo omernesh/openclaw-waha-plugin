@@ -218,8 +218,11 @@ export async function handleWahaInbound(params: {
   // ║  Added Phase 7 fix (2026-03-15).                                    ║
   // ╚══════════════════════════════════════════════════════════════════════╝
   const _earlyIsGroup = typeof rawMessage.chatId === "string" && rawMessage.chatId.endsWith("@g.us");
+  // Pending selection is a DM-only interactive flow — must NOT fire for newsletters or groups.
+  // DO NOT CHANGE back to !_earlyIsGroup — same fix as isDm below. Added 2026-03-24.
+  const _earlyIsDm = typeof rawMessage.chatId === "string" && (rawMessage.chatId.endsWith("@c.us") || rawMessage.chatId.endsWith("@lid"));
   const _earlySenderId = rawMessage.participant || rawMessage.from;
-  if (!_earlyIsGroup) {
+  if (_earlyIsDm) {
     const pending = checkPendingSelection(_earlySenderId, config);
     if (pending) {
       const earlyText = (rawMessage.body ?? "").trim();
@@ -465,7 +468,7 @@ export async function handleWahaInbound(params: {
   if (senderId.endsWith("@lid")) {
     try {
       const dirDb = getDirectoryDb(account.accountId);
-      if (!isGroup && chatId.endsWith("@c.us")) {
+      if (isDm && chatId.endsWith("@c.us")) {
         // DM: chatId IS the sender's @c.us JID
         dirDb.upsertLidMapping(senderId, chatId);
         runtime.log?.(`[waha] lid-map: ${senderId} → ${chatId} (from DM chatId)`);
@@ -480,7 +483,7 @@ export async function handleWahaInbound(params: {
           runtime.log?.(`[waha] lid-map: ${senderId} → ${authorCus} (from group _data)`);
         }
       }
-    } catch (lidErr) { console.warn("[waha] LID mapping failed:", lidErr instanceof Error ? lidErr.message : String(lidErr)); }
+    } catch (lidErr) { runtime.error?.(`[waha] LID mapping failed: ${lidErr instanceof Error ? lidErr.message : String(lidErr)}`); }
   }
 
   // === Slash command detection (regex-based, NOT LLM-dependent) ===
@@ -817,13 +820,15 @@ export async function handleWahaInbound(params: {
             const superUsers = dmFilterCfg?.godModeSuperUsers as Array<{ identifier: string }> | undefined;
             if (superUsers?.length) {
               const firstAdmin = superUsers[0];
-              const contact = dirDb.getContact(firstAdmin.identifier);
+              // FIX: dirDb must be fetched here — prior try-block scope ended. DO NOT CHANGE.
+              const adminDirDb = getDirectoryDb(account.accountId);
+              const contact = adminDirDb.getContact(firstAdmin.identifier);
               if (contact?.displayName) {
                 adminName = contact.displayName;
               }
             }
           } catch (adminErr) {
-            console.warn("[waha] admin name resolution failed:", adminErr instanceof Error ? adminErr.message : String(adminErr));
+            runtime.log?.(`[waha] admin name resolution failed: ${adminErr instanceof Error ? adminErr.message : String(adminErr)}`);
           }
 
           const messageTemplate = autoReplyConfig.message
@@ -959,6 +964,7 @@ export async function handleWahaInbound(params: {
     // Newsletters are inbound-only: filter through access control but NEVER send auto-reply
     // or passcode challenges. Silently drop if not allowed. DO NOT CHANGE — newsletters
     // must never trigger outbound responses. Added 2026-03-24.
+    // NOTE: no triggerActivated bypass — newsletters cannot invoke the bot via trigger words.
     if (access.decision !== "allow") {
       runtime.log?.(`waha: drop newsletter ${chatId} (reason=${access.reason})`);
       return;
@@ -1003,8 +1009,8 @@ export async function handleWahaInbound(params: {
         return;
       }
     } catch (err) {
-      runtime.error?.(`waha: TTL-03 check failed for ${senderId}: ${String(err)}`);
-      // On error, fall through — don't block if we can't check
+      // Non-fatal: fall through and allow — don't block if we can't check TTL.
+      runtime.error?.(`waha: TTL-03 check failed for ${senderId}, allowing fallthrough: ${String(err)}`);
     }
   }
 
