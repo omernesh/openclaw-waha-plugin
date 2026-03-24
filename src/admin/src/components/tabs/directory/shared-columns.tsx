@@ -185,6 +185,9 @@ export function makeDmAccessColumn(
           badgeClass = 'bg-amber-100 text-amber-800 border-amber-200'
           badgeText = 'Expired'
         } else {
+          // Timed access — show "Allowed" badge (not "Permanent") with remaining time underneath
+          badgeClass = 'bg-blue-100 text-blue-800 border-blue-200'
+          badgeText = 'Allowed'
           subText = formatTimeRemaining(expiresAt)
         }
       }
