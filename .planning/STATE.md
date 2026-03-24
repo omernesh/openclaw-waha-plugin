@@ -100,9 +100,11 @@ None.
 | 260320-u7x | Directory tab complete overhaul — avatars, stacked layout, pagination, action buttons | 2026-03-20 | a74432c | [260320-u7x-directory-tab-complete-overhaul-avatars-](./quick/260320-u7x-directory-tab-complete-overhaul-avatars-/) |
 | 260321-4i9 | Session-aware trigger reply routing — bot session used for groups where bot is a member | 2026-03-21 | 24aeafd | [260321-4i9-fix-operator-to-invoke-sammie-in-any-cha](./quick/260321-4i9-fix-operator-to-invoke-sammie-in-any-cha/) |
 | 260324-mbd | Fix bulk allow-dm not persisting + add timed DM access with duration picker | 2026-03-24 | 1d6481f | [260324-mbd-fix-bulk-allow-dm-not-persisting-add-tim](./quick/260324-mbd-fix-bulk-allow-dm-not-persisting-add-tim/) |
+| 260324-mxr | Add 1h+5h expiry to contact card + push v1.16.18 | 2026-03-24 | 0f888a1 | [260324-mxr-add-1h-5h-expiry-to-contact-card-push-it](./quick/260324-mxr-add-1h-5h-expiry-to-contact-card-push-it/) |
+| 260324-sl3 | Fix unauthorized DM response firing on newsletter chatIds | 2026-03-24 | dfa4035 | [260324-sl3-fix-unauthorized-dm-response-when-enable](./quick/260324-sl3-fix-unauthorized-dm-response-when-enable/) |
 
 ## Session Continuity
 
 Last session: 2026-03-24T00:00:00Z
-Stopped at: Completed quick task 260324-mbd
+Stopped at: Completed quick task 260324-sl3
 Resume file: None
