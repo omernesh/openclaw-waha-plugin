@@ -2,7 +2,7 @@
 // DO NOT CHANGE: getAnalytics() is called with the selected range on every refreshKey change.
 // DO NOT CHANGE: direct color values (#22c55e green, #3b82f6 blue, #f59e0b amber) used instead of
 // CSS vars — shadcn chart theme vars may not be configured in all deployments.
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import type { AnalyticsResponse } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+
+const MAX_CHAT_ID_DISPLAY_LEN = 25
 
 const RANGE_OPTIONS = [
   { label: '1h', value: '1h' },
@@ -39,7 +41,8 @@ function formatPeriod(period: string, groupBy: 'minute' | 'hour' | 'day'): strin
     const timePart = period.includes('T') ? period.split('T')[1] : period
     if (groupBy === 'hour') return timePart.substring(0, 5) // "HH:00"
     return timePart.substring(0, 5) // "HH:MM"
-  } catch {
+  } catch (err) {
+    console.warn('formatPeriod:', period, err)
     return period
   }
 }
@@ -62,9 +65,24 @@ export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsT
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState('24h')
+  // Chat ID -> display name cache. Resolved via /api/admin/directory/resolve after analytics load.
+  const [chatNames, setChatNames] = useState<Record<string, string>>({})
+  const resolvedJidsRef = useRef<Set<string>>(new Set())
 
   // Report loading state to parent (drives TabHeader spinner)
   useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
+
+  // Resolve chat JIDs to display names after data loads. DO NOT REMOVE.
+  const resolveTopChatNames = useCallback((topChats: AnalyticsResponse['topChats']) => {
+    const jids = topChats.map((c) => c.chat_id).filter((jid) => !resolvedJidsRef.current.has(jid))
+    if (jids.length === 0) return
+    api.resolveNames(jids)
+      .then(({ resolved }) => {
+        jids.forEach((jid) => resolvedJidsRef.current.add(jid))
+        setChatNames((prev) => ({ ...prev, ...resolved }))
+      })
+      .catch((err) => console.warn('Name resolution failed:', err))
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -73,8 +91,12 @@ export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsT
       .then((d) => {
         if (controller.signal.aborted) return
         setData(d)
+        if (d.topChats.length > 0) resolveTopChatNames(d.topChats)
       })
-      .catch((err) => console.error('Analytics fetch failed:', err))
+      .catch((err) => {
+        console.error('Analytics fetch failed:', err)
+        if (!controller.signal.aborted) setData(null)
+      })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
@@ -188,7 +210,7 @@ export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsT
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
                     contentStyle={{ fontSize: 12 }}
-                    formatter={(value: unknown, name: unknown) => [(value as number).toLocaleString(), name as string]}
+                    formatter={(value: unknown, name: unknown) => [Number(value).toLocaleString(), name as string]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="inbound" name="Inbound" stackId="a" fill="#22c55e" />
@@ -212,7 +234,7 @@ export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsT
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
                     contentStyle={{ fontSize: 12 }}
-                    formatter={(value: unknown) => [`${Math.round(value as number)}ms`, 'Avg Response']}
+                    formatter={(value: unknown) => [`${Math.round(Number(value))}ms`, 'Avg Response']}
                   />
                   <Line
                     type="monotone"
@@ -239,23 +261,36 @@ export default function AnalyticsTab({ refreshKey, onLoadingChange }: AnalyticsT
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="pb-2 text-left font-medium text-muted-foreground">Chat ID</th>
+                      <th className="pb-2 text-left font-medium text-muted-foreground">Chat</th>
                       <th className="pb-2 text-right font-medium text-muted-foreground">Total</th>
                       <th className="pb-2 text-right font-medium text-muted-foreground">Inbound</th>
                       <th className="pb-2 text-right font-medium text-muted-foreground">Outbound</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.topChats.map((chat) => (
-                      <tr key={chat.chat_id} className="border-b last:border-0">
-                        <td className="py-2 font-mono text-xs text-muted-foreground" title={chat.chat_id}>
-                          {chat.chat_id.length > 25 ? chat.chat_id.slice(0, 25) + '...' : chat.chat_id}
-                        </td>
-                        <td className="py-2 text-right font-medium">{chat.total.toLocaleString()}</td>
-                        <td className="py-2 text-right text-green-600 dark:text-green-400">{chat.inbound.toLocaleString()}</td>
-                        <td className="py-2 text-right text-blue-600 dark:text-blue-400">{chat.outbound.toLocaleString()}</td>
-                      </tr>
-                    ))}
+                    {data.topChats.map((chat) => {
+                      const name = chatNames[chat.chat_id]
+                      const isGroup = chat.chat_id.endsWith('@g.us')
+                      return (
+                        <tr key={chat.chat_id} className="border-b last:border-0">
+                          <td className="py-2" title={chat.chat_id}>
+                            {name ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground">{isGroup ? '👥' : '💬'}</span>
+                                <span className="text-sm font-medium truncate max-w-[200px]">{name}</span>
+                              </div>
+                            ) : (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {chat.chat_id.length > MAX_CHAT_ID_DISPLAY_LEN ? chat.chat_id.slice(0, MAX_CHAT_ID_DISPLAY_LEN) + '...' : chat.chat_id}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 text-right font-medium">{chat.total.toLocaleString()}</td>
+                          <td className="py-2 text-right text-green-600 dark:text-green-400">{chat.inbound.toLocaleString()}</td>
+                          <td className="py-2 text-right text-blue-600 dark:text-blue-400">{chat.outbound.toLocaleString()}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )}

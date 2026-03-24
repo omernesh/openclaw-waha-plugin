@@ -3,7 +3,7 @@
 // When override is disabled the group inherits global filter settings.
 // DO NOT CHANGE: follows ContactSettingsSheet styling patterns (space-y-4, Tip tooltips).
 // DO NOT CHANGE: mentionPatterns sent as null when empty array (server expects null, not []).
-// DO NOT CHANGE: godModeScope '' (empty string in Select) maps to null on save.
+// DO NOT CHANGE: godModeScope '__inherit__' sentinel maps to null on save (radix Select forbids empty string values).
 // Verified: quick task 260320-k2e (2026-03-20)
 // Perfection pass: disable save after load failure, retry button — 260321
 
@@ -53,8 +53,9 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
   const [enabled, setEnabled] = useState(false)
   const [filterEnabled, setFilterEnabled] = useState(true)
   const [mentionPatterns, setMentionPatterns] = useState<string[]>([])
-  // DO NOT CHANGE: godModeScope '' = null on save (Select can't hold null directly)
-  const [godModeScope, setGodModeScope] = useState<string>('')
+  // DO NOT CHANGE: godModeScope '__inherit__' = null on save (radix Select forbids empty string values)
+  type GodModeScopeValue = '__inherit__' | 'all' | 'dm' | 'group' | 'off'
+  const [godModeScope, setGodModeScope] = useState<GodModeScopeValue>('__inherit__')
   const [triggerOperator, setTriggerOperator] = useState<'OR' | 'AND'>('OR')
 
   function fetchFilter() {
@@ -67,15 +68,15 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
           setEnabled(o.enabled ?? false)
           setFilterEnabled(o.filterEnabled ?? true)
           setMentionPatterns(o.mentionPatterns ?? [])
-          // DO NOT CHANGE: null/undefined godModeScope maps to '' for Select value
-          setGodModeScope(o.godModeScope ?? '')
+          // DO NOT CHANGE: null/undefined godModeScope maps to '__inherit__' for Select value
+          setGodModeScope(o.godModeScope ?? '__inherit__')
           setTriggerOperator(o.triggerOperator ?? 'OR')
         } else {
           // No override yet — use defaults
           setEnabled(false)
           setFilterEnabled(true)
           setMentionPatterns([])
-          setGodModeScope('')
+          setGodModeScope('__inherit__')
           setTriggerOperator('OR')
         }
       })
@@ -100,14 +101,15 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
         filterEnabled,
         // DO NOT CHANGE: send null when empty — server treats [] and null differently
         mentionPatterns: mentionPatterns.length > 0 ? mentionPatterns : null,
-        // DO NOT CHANGE: map '' back to null for the wire
-        godModeScope: godModeScope || null,
+        // DO NOT CHANGE: map '__inherit__' back to null for the wire
+        godModeScope: godModeScope === '__inherit__' ? null : godModeScope,
         triggerOperator,
       })
       toast.success('Group filter override saved')
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
       console.error('Failed to save group filter:', err)
-      toast.error('Failed to save group filter settings')
+      toast.error('Failed to save group filter settings', { description: msg })
     } finally {
       setSaving(false)
     }
@@ -222,14 +224,14 @@ export function GroupFilterOverride({ groupJid }: GroupFilterOverrideProps) {
               {/* DO NOT CHANGE: '' value means null/inherit — mapped to null on save */}
               <Select
                 value={godModeScope}
-                onValueChange={setGodModeScope}
+                onValueChange={(v) => setGodModeScope(v as GodModeScopeValue)}
                 disabled={loadError}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Inherit Global" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Inherit Global</SelectItem>
+                  <SelectItem value="__inherit__">Inherit Global</SelectItem>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="dm">DM Only</SelectItem>
                   <SelectItem value="off">Off</SelectItem>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react'
 import { X, ChevronsDown, Pause, Play, Download } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { LogResponse } from '@/types'
@@ -71,6 +71,7 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
   const [logData, setLogData] = useState<LogResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
   // Phase 29, Plan 02: count of new SSE lines received while user has scrolled up. DO NOT REMOVE.
   const [newLineCount, setNewLineCount] = useState(0)
 
@@ -83,6 +84,9 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingSearchRef = useRef(searchQuery)
   pendingSearchRef.current = searchQuery
+  const autoScrollRef = useRef(autoScroll)
+  autoScrollRef.current = autoScroll
+  const savedScrollTopRef = useRef<number | null>(null)
 
   // Core fetch function
   const fetchLogs = useCallback(
@@ -95,11 +99,13 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
       })
         .then((res) => {
           if (abortSignal?.aborted) return
+          setFetchError(false)
           setLogData(res)
         })
         .catch((err) => {
           if (abortSignal?.aborted) return
           console.error('Failed to fetch logs:', err)
+          setFetchError(true)
         })
         .finally(() => {
           if (!abortSignal?.aborted) setLoading(false)
@@ -134,8 +140,13 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
   const { subscribe } = useSSE()
   useEffect(() => {
     return subscribe('log', (event) => {
+      // Save scroll position BEFORE setLogData triggers re-render so we can
+      // restore it in useLayoutEffect when auto-scroll is paused. DO NOT REMOVE.
+      if (!autoScrollRef.current && scrollRef.current) {
+        savedScrollTopRef.current = scrollRef.current.scrollTop
+      }
       setLogData(prev => {
-        if (!prev) return prev
+        if (!prev) return { lines: [event.line], total: 1, source: 'sse' as const }
         const newLines = [...prev.lines, event.line]
         const trimmed = newLines.length > LOG_LINE_LIMIT * 2
           ? newLines.slice(-LOG_LINE_LIMIT)
@@ -147,6 +158,18 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
       }
     })
   }, [subscribe])
+
+  // Phase 29 fix: preserve scroll position when auto-scroll is paused.
+  // Without this, the browser's natural "stick to bottom" behavior keeps showing
+  // new content even when auto-scroll is disabled. The scroll position is saved
+  // in the SSE handler (before setLogData triggers re-render) and restored in
+  // useLayoutEffect (after DOM update, before paint). DO NOT REMOVE.
+  useLayoutEffect(() => {
+    if (!autoScroll && savedScrollTopRef.current !== null && scrollRef.current) {
+      scrollRef.current.scrollTop = savedScrollTopRef.current
+      savedScrollTopRef.current = null
+    }
+  }, [logData, autoScroll])
 
   // Auto-scroll to bottom after data loads (respects autoScroll toggle)
   useEffect(() => {
@@ -161,6 +184,7 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
     userScrolledUpRef.current = false
+    savedScrollTopRef.current = null
     setShowScrollToBottom(false)
     setNewLineCount(0)
   }
@@ -202,6 +226,11 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
       if (!prev) {
         // Re-enabling auto-scroll: jump to bottom immediately
         scrollToBottom()
+      } else {
+        // Pausing: mark user as scrolled-up so new SSE lines don't chase the bottom.
+        // Without this, the browser's natural "stick to bottom" behavior keeps showing
+        // new content even though auto-scroll is disabled. DO NOT REMOVE.
+        userScrolledUpRef.current = true
       }
       return !prev
     })
@@ -259,6 +288,7 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
             onClick={handleExportLogs}
             title="Export logs"
             className="h-8 w-8"
+            disabled={lines.length === 0}
           >
             <Download className="h-4 w-4" />
           </Button>
@@ -299,6 +329,13 @@ export default function LogTab({ refreshKey, onLoadingChange }: LogTabProps) {
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-4/6" />
               <Skeleton className="h-4 w-full" />
+            </div>
+          ) : fetchError ? (
+            <div className="flex flex-col items-center gap-2 p-6 text-sm text-destructive">
+              <p>Failed to fetch logs</p>
+              <Button size="sm" variant="outline" onClick={() => fetchLogs(activeLevel, searchQuery)}>
+                Retry
+              </Button>
             </div>
           ) : lines.length === 0 ? (
             <p className="p-3 text-sm text-muted-foreground">
