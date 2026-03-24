@@ -2,6 +2,11 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.20] - 2026-03-24
+
+### Fixed
+- **DM Access badge** — Timed access now shows blue "Allowed" badge with countdown (e.g., "48m left") instead of incorrectly showing green "Permanent".
+
 ## [1.16.19] - 2026-03-24
 
 ### Added
