@@ -2,6 +2,13 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.16] - 2026-03-24
+
+### Fixed
+- **Human session DM guard** — Human sessions now drop all non-triggered DMs, preventing the bot from hijacking private conversations. Only `!`-triggered messages pass through.
+- **Pipeline crash protection** — `getDirectoryDb` and god mode checks in Phase 16 wrapped in try-catch. SQLite errors no longer crash the entire inbound pipeline.
+- **Analytics error logging** — Empty analytics catch block now logs failures instead of silently swallowing them.
+
 ## [1.16.15] - 2026-03-24
 
 ### Fixed
