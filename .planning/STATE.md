@@ -99,9 +99,10 @@ None.
 | 260320-rii | Restore all missing old GUI features to React admin panel | 2026-03-20 | be3c87e | [260320-rii-restore-all-missing-old-gui-features-to-](./quick/260320-rii-restore-all-missing-old-gui-features-to-/) |
 | 260320-u7x | Directory tab complete overhaul — avatars, stacked layout, pagination, action buttons | 2026-03-20 | a74432c | [260320-u7x-directory-tab-complete-overhaul-avatars-](./quick/260320-u7x-directory-tab-complete-overhaul-avatars-/) |
 | 260321-4i9 | Session-aware trigger reply routing — bot session used for groups where bot is a member | 2026-03-21 | 24aeafd | [260321-4i9-fix-operator-to-invoke-sammie-in-any-cha](./quick/260321-4i9-fix-operator-to-invoke-sammie-in-any-cha/) |
+| 260324-mbd | Fix bulk allow-dm not persisting + add timed DM access with duration picker | 2026-03-24 | 1d6481f | [260324-mbd-fix-bulk-allow-dm-not-persisting-add-tim](./quick/260324-mbd-fix-bulk-allow-dm-not-persisting-add-tim/) |
 
 ## Session Continuity
 
-Last session: 2026-03-21T01:28:34Z
-Stopped at: Completed quick task 260321-4i9
+Last session: 2026-03-24T00:00:00Z
+Stopped at: Completed quick task 260324-mbd
 Resume file: None
