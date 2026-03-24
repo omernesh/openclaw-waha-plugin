@@ -45,6 +45,7 @@ function Tip({ text }: { text: string }) {
   )
 }
 
+const SECONDS_PER_HOUR = 3_600
 const SECONDS_PER_DAY = 86_400
 
 interface ContactSettingsSheetProps {
@@ -225,6 +226,20 @@ export function ContactSettingsSheet({
           <div className="space-y-2">
             <Label className="text-sm font-medium">Access Expiry <Tip text="Set how long this contact's DM access lasts. After expiry, access is automatically revoked." /></Label>
             <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSetTtl(Math.floor(Date.now() / 1000) + SECONDS_PER_HOUR)}
+              >
+                Grant 1h
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSetTtl(Math.floor(Date.now() / 1000) + 5 * SECONDS_PER_HOUR)}
+              >
+                Grant 5h
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

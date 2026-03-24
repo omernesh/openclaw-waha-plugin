@@ -2,6 +2,17 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.18] - 2026-03-24
+
+### Fixed
+- **Bulk allow-DM not persisting** — Directory enrichment now uses `db.isContactAllowedDm()` (database) instead of `configAllowFrom.includes()` (config file). Config sync failures no longer cause phantom "not allowed" status.
+
+### Added
+- **Timed DM access** — All allow-DM endpoints (individual, bulk, participant) accept optional `expiresAt` timestamp for time-limited access.
+- **Duration picker in bulk edit** — "Allow DM" button replaced with dropdown offering 1h, 24h, 7d, 30d, and permanent options.
+- **Duration picker in DM Access column** — Individual contacts show duration dropdown when not allowed, expiry badge with remaining time when allowed.
+- **Contact card expiry options** — Added "Grant 1h" and "Grant 5h" buttons to Access Expiry section alongside existing 24h/7d/Revoke.
+
 ## [1.16.17] - 2026-03-24
 
 ### Fixed
