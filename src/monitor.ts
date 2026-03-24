@@ -1161,8 +1161,10 @@ export function createWahaWebhookServer(opts: {
         const dms = db.getDmCount();
         const groups = db.getGroupCount();
         const newsletters = db.getNewsletterCount();
-        // Enrich with allowedDm status from config
-        const configAllowFrom: string[] = account.config.allowFrom ?? [];
+        // BUG-allowdm-persist: DO NOT CHANGE — enrichment uses DB as source of truth, NOT config.
+        // allowFrom config may be stale (partial syncs, race conditions). DB is ALWAYS written correctly.
+        // Previously used configAllowFrom.includes(c.jid) which caused allow-dm to appear reverted on refresh.
+        // Fixed 2026-03-24. DO NOT revert to config-based enrichment.
         // DIR-01 (12-05): Exclude bot's own JIDs from contacts listing. Fetch bot JIDs from WAHA /me (cached 5min).
         // Post-query filter — safe because bot accounts are few (1-3 entries), so LIMIT/OFFSET drift is negligible.
         // DO NOT REMOVE — bot contacts appearing in their own directory is confusing to the admin.
@@ -1219,7 +1221,8 @@ export function createWahaWebhookServer(opts: {
           const ttl = db.getContactTtl(c.jid);
           return {
             ...c,
-            allowedDm: configAllowFrom.includes(c.jid),
+            // BUG-allowdm-persist: Use DB (isContactAllowedDm) not config — DB is source of truth. DO NOT CHANGE.
+            allowedDm: db.isContactAllowedDm(c.jid),
             expiresAt: ttl?.expiresAt ?? null,
             expired: ttl?.expired ?? false,
             // Phase 16: include allow_list source for pairing badge in Directory tab. DO NOT REMOVE.
@@ -1526,11 +1529,12 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/api/admin/directory/bulk" && req.method === "POST") {
       try {
         const bodyStr = await readBody(req, maxBodyBytes);
-        const { jids, action, value, groupJid } = JSON.parse(bodyStr) as {
+        const { jids, action, value, groupJid, expiresAt } = JSON.parse(bodyStr) as {
           jids: string[];
           action: string;
           value?: string;
           groupJid?: string;
+          expiresAt?: number | null;
         };
         if (!Array.isArray(jids) || jids.length === 0) {
           writeJsonResponse(res, 400, { error: "jids must be a non-empty array" });
@@ -1572,7 +1576,8 @@ export function createWahaWebhookServer(opts: {
         const revokeGroupJids: string[] = [];
         for (const jid of jids) {
           if (action === "allow-dm") {
-            db.setContactAllowDm(jid, true);
+            // FEAT-timed-dm: pass expiresAt so bulk allow can be timed. DO NOT CHANGE.
+            db.setContactAllowDm(jid, true, expiresAt ?? null);
             allowDmJids.push(jid);
             updated++;
           } else if (action === "revoke-dm") {
@@ -1653,19 +1658,21 @@ export function createWahaWebhookServer(opts: {
 
 
     // POST /api/admin/directory/:jid/allow-dm
+    // FEAT-timed-dm: accepts optional expiresAt (Unix seconds) alongside allowed. DB is source of truth.
+    // Config sync is best-effort only — do NOT rely on config for enrichment. DO NOT CHANGE.
     {
       const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/([^/]+)\/allow-dm$/);
       if (m) {
         try {
           const jid = decodeURIComponent(m[1]);
           const bodyStr = await readBody(req, maxBodyBytes);
-          const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          const { allowed, expiresAt } = JSON.parse(bodyStr) as { allowed: boolean; expiresAt?: number | null };
           if (typeof allowed !== "boolean") {
             writeJsonResponse(res, 400, { error: "allowed must be a boolean" });
             return;
           }
           const db = getDirectoryDb(opts.accountId);
-          db.setContactAllowDm(jid, allowed);
+          db.setContactAllowDm(jid, allowed, expiresAt ?? null);
           syncAllowList(getConfigPath(), "allowFrom", jid, allowed);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
@@ -1848,6 +1855,8 @@ export function createWahaWebhookServer(opts: {
     }
 
     // POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-dm
+    // FEAT-timed-dm: accepts optional expiresAt (Unix seconds). setParticipantAllowDm does not support expiresAt
+    // so we also call setContactAllowDm with expiresAt to persist TTL in allow_list. DO NOT CHANGE.
     {
       const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/group\/([^/]+)\/participants\/([^/]+)\/allow-dm$/);
       if (m) {
@@ -1855,13 +1864,15 @@ export function createWahaWebhookServer(opts: {
           const groupJid = decodeURIComponent(m[1]);
           const participantJid = decodeURIComponent(m[2]);
           const bodyStr = await readBody(req, maxBodyBytes);
-          const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
+          const { allowed, expiresAt } = JSON.parse(bodyStr) as { allowed: boolean; expiresAt?: number | null };
           if (typeof allowed !== "boolean") {
             writeJsonResponse(res, 400, { error: "allowed must be a boolean" });
             return;
           }
           const db = getDirectoryDb(opts.accountId);
           db.setParticipantAllowDm(groupJid, participantJid, allowed);
+          // Also update allow_list with TTL — setParticipantAllowDm doesn't support expiresAt. DO NOT REMOVE.
+          db.setContactAllowDm(participantJid, allowed, expiresAt ?? null);
           syncAllowList(getConfigPath(), "allowFrom", participantJid, allowed);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
