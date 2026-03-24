@@ -217,6 +217,7 @@ export function ContactsTab({
         displayName={selectedContact?.displayName ?? null}
         dmSettings={selectedContact?.dmSettings}
         allowedDm={selectedContact?.allowedDm ?? false}
+        expiresAt={selectedContact?.expiresAt ?? null}
         onClose={() => setSelectedJid(null)}
         // DO NOT CHANGE: onSaved refreshes data but does NOT close the sheet
         onSaved={() => { onRefresh() }}

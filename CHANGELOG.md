@@ -2,6 +2,12 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.16.19] - 2026-03-24
+
+### Added
+- **Contact card expiry indicator** — Access Expiry section now shows current status: "Expires in Xh Ym" (amber), "Permanent" (green), or "Expired" (red) when DM access is active.
+- **Search bar clear button** — X button appears when search input has text, clears with one click.
+
 ## [1.16.18] - 2026-03-24
 
 ### Fixed

@@ -53,6 +53,7 @@ interface ContactSettingsSheetProps {
   displayName: string | null
   dmSettings?: ContactDmSettings
   allowedDm: boolean
+  expiresAt?: number | null     // Unix seconds — current access expiry (null = permanent)
   onClose: () => void
   onSaved: () => void           // called after successful save to trigger data refresh — sheet stays open
 }
@@ -62,6 +63,7 @@ export function ContactSettingsSheet({
   displayName,
   dmSettings,
   allowedDm: initialAllowedDm,
+  expiresAt,
   onClose,
   onSaved,
 }: ContactSettingsSheetProps) {
@@ -225,6 +227,19 @@ export function ContactSettingsSheet({
           {/* TTL / Access Expiry */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Access Expiry <Tip text="Set how long this contact's DM access lasts. After expiry, access is automatically revoked." /></Label>
+            {/* Current expiry status — shows remaining time or "Permanent" */}
+            {allowedDm && (
+              <div className="text-sm">
+                {expiresAt != null ? (() => {
+                  const diff = expiresAt - Math.floor(Date.now() / 1000)
+                  if (diff <= 0) return <span className="text-red-500 font-medium">Expired</span>
+                  const h = Math.floor(diff / 3600)
+                  const m = Math.floor((diff % 3600) / 60)
+                  const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`
+                  return <span className="text-amber-600 font-medium">Expires in {timeStr}</span>
+                })() : <span className="text-green-600 font-medium">Permanent</span>}
+              </div>
+            )}
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
