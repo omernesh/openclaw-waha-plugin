@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.13
-milestone_name: Close All Gaps
-status: unknown
-stopped_at: Completed 32-03-PLAN.md
-last_updated: "2026-03-20T11:30:00.000Z"
+milestone: v1.14
+milestone_name: Enterprise Hardening
+status: active
+stopped_at: null
+last_updated: "2026-03-25T00:00:00.000Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 19
-  completed_plans: 19
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-20)
+See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 32 — Platform Abstraction (COMPLETE)
+**Current focus:** Defining requirements for v1.14 Enterprise Hardening
 
 ## Current Position
 
-Phase: 32 (Platform Abstraction) — COMPLETE
-Plan: 3 of 3
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-25 — Milestone v1.14 started
 
 ## Accumulated Context
 

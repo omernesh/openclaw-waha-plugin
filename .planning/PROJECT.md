@@ -75,7 +75,7 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 
 ### Active
 
-(No active requirements — next milestone will define them.)
+(Defined in REQUIREMENTS.md for v1.14)
 
 ### Out of Scope
 
@@ -88,9 +88,21 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone
+## Current Milestone: v1.14 Enterprise Hardening
 
-v1.13 shipped 2026-03-20. Next milestone is TBD.
+**Goal:** Close all 27 security, resilience, observability, concurrency, and lifecycle gaps to make the plugin production-safe for internet-facing deployment.
+
+**Target features:**
+- Admin API authentication (Bearer token)
+- Config file write serialization (mutex + atomic writes)
+- Structured logging module (JSON format)
+- Metrics endpoint (/metrics)
+- Graceful shutdown with request drain
+- Media/fetch timeout coverage (all bare fetch() calls)
+- Admin API rate limiting
+- SQLite hardening (busy_timeout, WAL checkpoints, temp cleanup)
+- Config validation tightening (bounds, import scope, HMAC defaults)
+- SSE connection cap, circuit breaker, JID validation
 
 ## Context
 
@@ -152,4 +164,4 @@ v1.13 shipped 2026-03-20. Next milestone is TBD.
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-20 — v1.13 shipped*
+*Last updated: 2026-03-25 — v1.14 milestone started*
