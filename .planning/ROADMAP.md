@@ -109,7 +109,10 @@ Plans:
   2. Config import endpoint rejects payloads with unknown top-level keys (HTTP 400 with descriptive error)
   3. URL path segments containing JIDs are validated against the allowed JID regex before any database or API operation
   4. When `webhookHmacKey` is not configured, a random secret is generated on startup and logged; `webhookHmacKey: "disabled"` explicitly disables verification
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 34-01-PLAN.md — Bearer token auth on admin routes + HMAC default secret generation
+- [ ] 34-02-PLAN.md — Config import key validation + JID path segment validation
 
 ### Phase 35: Structured Logging
 **Goal**: All log output is machine-parseable JSON with consistent fields, enabling log aggregation and filtering
@@ -192,7 +195,7 @@ Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 ->
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 33. Config Infrastructure | v1.14 | 1/2 | Complete    | 2026-03-25 |
-| 34. Security | v1.14 | 0/TBD | Not started | - |
+| 34. Security | v1.14 | 0/2 | Not started | - |
 | 35. Structured Logging | v1.14 | 0/TBD | Not started | - |
 | 36. Timeout & Error Hardening | v1.14 | 0/TBD | Not started | - |
 | 37. SQLite Hardening | v1.14 | 0/TBD | Not started | - |
