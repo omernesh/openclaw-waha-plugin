@@ -26,7 +26,7 @@
 
 ### Observability
 
-- [ ] **OBS-01**: A `logger` module provides structured JSON logging with consistent fields (level, timestamp, component, sessionId, chatId) replacing all freeform `console.*` calls
+- [x] **OBS-01**: A `logger` module provides structured JSON logging with consistent fields (level, timestamp, component, sessionId, chatId) replacing all freeform `console.*` calls
 - [ ] **OBS-02**: A `/metrics` endpoint exposes process-level metrics in Prometheus format: heap usage, event loop lag, HTTP request rates, SQLite query latency, queue depth, processing latency P95, error rate
 - [ ] **OBS-03**: `sseClients` Set has a maximum cap (50); new SSE connections beyond the cap are rejected with HTTP 503
 
@@ -91,7 +91,7 @@ None — this milestone covers all identified gaps.
 | SEC-02 | Phase 34 | Complete |
 | SEC-03 | Phase 34 | Complete |
 | SEC-04 | Phase 34 | Complete |
-| OBS-01 | Phase 35 | Pending |
+| OBS-01 | Phase 35 | Complete |
 | EH-01 | Phase 36 | Pending |
 | EH-02 | Phase 36 | Pending |
 | EH-03 | Phase 36 | Pending |
