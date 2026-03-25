@@ -59,32 +59,32 @@ None deferred — all features in scope for v1.18.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | — | Pending |
-| CMD-02 | — | Pending |
-| CMD-03 | — | Pending |
-| CMD-04 | — | Pending |
-| CMD-05 | — | Pending |
-| CMD-06 | — | Pending |
-| INV-01 | — | Pending |
-| INV-02 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| SKL-01 | — | Pending |
-| SKL-02 | — | Pending |
-| SKL-03 | — | Pending |
-| TST-01 | — | Pending |
-| TST-02 | — | Pending |
-| TST-03 | — | Pending |
-| TST-04 | — | Pending |
-| TST-05 | — | Pending |
-| TST-06 | — | Pending |
+| CMD-01 | Phase 43 | Pending |
+| CMD-02 | Phase 43 | Pending |
+| CMD-03 | Phase 43 | Pending |
+| CMD-04 | Phase 43 | Pending |
+| CMD-05 | Phase 43 | Pending |
+| CMD-06 | Phase 43 | Pending |
+| INV-01 | Phase 44 | Pending |
+| INV-02 | Phase 44 | Pending |
+| UI-01 | Phase 45 | Pending |
+| UI-02 | Phase 45 | Pending |
+| UI-03 | Phase 45 | Pending |
+| SKL-01 | Phase 46 | Pending |
+| SKL-02 | Phase 46 | Pending |
+| SKL-03 | Phase 46 | Pending |
+| TST-01 | Phase 47 | Pending |
+| TST-02 | Phase 47 | Pending |
+| TST-03 | Phase 47 | Pending |
+| TST-04 | Phase 47 | Pending |
+| TST-05 | Phase 47 | Pending |
+| TST-06 | Phase 47 | Pending |
 
 **Coverage:**
 - v1.18 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after initial definition*
+*Last updated: 2026-03-25 after roadmap creation*

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness
-status: defining_requirements
-stopped_at: Milestone started
-last_updated: "2026-03-25T17:00:00Z"
+status: roadmap_ready
+stopped_at: Roadmap created, ready to plan Phase 43
+last_updated: "2026-03-25T17:30:00Z"
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,14 +19,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Defining requirements for v1.18
+**Current focus:** Phase 43 — Slash Commands (/join, /leave, /list) in inbound.ts
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 43 (Slash Commands) — Not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-25 — Milestone v1.18 started
+Status: Roadmap ready, awaiting phase planning
+Last activity: 2026-03-25 — Roadmap created for v1.18
+
+```
+[          ] 0% — 0/5 phases complete
+```
 
 ## Accumulated Context
 
@@ -42,6 +46,10 @@ Last activity: 2026-03-25 — Milestone v1.18 started
 - Admin UI adds Leave button + Join by Link input to directory tab
 - Skill audit excludes "hijacked" endpoints (e.g., sendText used for human behavior mimicry)
 - getInviteCode action already exists but SKILL.md doesn't document it clearly
+- Phase 44 (docs) is independent of Phase 43 (code) — can run in parallel
+- Phase 45 (Admin UI) is independent — React SPA addition to src/admin/
+- Phase 46 depends on Phase 44 for audit scope completeness
+- Phase 47 (testing) depends on all prior phases
 
 ### Pending Todos
 
@@ -67,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:00:00Z
-Stopped at: Milestone v1.18 started — defining requirements
+Last session: 2026-03-25T17:30:00Z
+Stopped at: Roadmap created — ready to plan Phase 43
 Resume file: None
