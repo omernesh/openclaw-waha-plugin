@@ -75,7 +75,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 **Milestone Goal:** Close all 27 security, resilience, observability, concurrency, and lifecycle gaps to make the plugin production-safe for internet-facing deployment.
 
 - [x] **Phase 33: Config Infrastructure** - Config write mutex, async I/O, and atomic writes (completed 2026-03-25)
-- [ ] **Phase 34: Security** - Admin auth, config import validation, JID validation, HMAC defaults
+- [x] **Phase 34: Security** - Admin auth, config import validation, JID validation, HMAC defaults (completed 2026-03-25)
 - [ ] **Phase 35: Structured Logging** - JSON logger module replacing all freeform console.* calls
 - [ ] **Phase 36: Timeout & Error Hardening** - AbortSignal timeouts on all bare fetch calls
 - [ ] **Phase 37: SQLite Hardening** - busy_timeout, WAL checkpoints, temp file cleanup
@@ -111,7 +111,7 @@ Plans:
   4. When `webhookHmacKey` is not configured, a random secret is generated on startup and logged; `webhookHmacKey: "disabled"` explicitly disables verification
 **Plans**: 2 plans
 Plans:
-- [ ] 34-01-PLAN.md — Bearer token auth on admin routes + HMAC default secret generation
+- [x] 34-01-PLAN.md — Bearer token auth on admin routes + HMAC default secret generation
 - [ ] 34-02-PLAN.md — Config import key validation + JID path segment validation
 
 ### Phase 35: Structured Logging
@@ -195,7 +195,7 @@ Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 ->
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 33. Config Infrastructure | v1.14 | 1/2 | Complete    | 2026-03-25 |
-| 34. Security | v1.14 | 0/2 | Not started | - |
+| 34. Security | v1.14 | 1/2 | Complete    | 2026-03-25 |
 | 35. Structured Logging | v1.14 | 0/TBD | Not started | - |
 | 36. Timeout & Error Hardening | v1.14 | 0/TBD | Not started | - |
 | 37. SQLite Hardening | v1.14 | 0/TBD | Not started | - |

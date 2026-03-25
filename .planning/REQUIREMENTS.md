@@ -7,10 +7,10 @@
 
 ### Security
 
-- [ ] **SEC-01**: Admin API requires Bearer token authentication on all `/api/admin/*` routes; token read from config or environment variable
-- [ ] **SEC-02**: Config import endpoint validates the entire config structure, not just the `waha` sub-section; rejects unknown top-level keys
-- [ ] **SEC-03**: JID values extracted from URL path segments are validated against `/@(c\.us|g\.us|lid|newsletter)$/` regex before processing
-- [ ] **SEC-04**: Webhook HMAC verification defaults to a randomly-generated secret (logged on startup) when `webhookHmacKey` is not configured; opt-out requires explicit `webhookHmacKey: "disabled"`
+- [x] **SEC-01**: Admin API requires Bearer token authentication on all `/api/admin/*` routes; token read from config or environment variable
+- [x] **SEC-02**: Config import endpoint validates the entire config structure, not just the `waha` sub-section; rejects unknown top-level keys
+- [x] **SEC-03**: JID values extracted from URL path segments are validated against `/@(c\.us|g\.us|lid|newsletter)$/` regex before processing
+- [x] **SEC-04**: Webhook HMAC verification defaults to a randomly-generated secret (logged on startup) when `webhookHmacKey` is not configured; opt-out requires explicit `webhookHmacKey: "disabled"`
 
 ### Error Handling
 
@@ -83,10 +83,10 @@ None — this milestone covers all identified gaps.
 | CON-01 | Phase 33 | Complete |
 | MEM-01 | Phase 33 | Complete |
 | DI-02 | Phase 33 | Complete |
-| SEC-01 | Phase 34 | Pending |
-| SEC-02 | Phase 34 | Pending |
-| SEC-03 | Phase 34 | Pending |
-| SEC-04 | Phase 34 | Pending |
+| SEC-01 | Phase 34 | Complete |
+| SEC-02 | Phase 34 | Complete |
+| SEC-03 | Phase 34 | Complete |
+| SEC-04 | Phase 34 | Complete |
 | OBS-01 | Phase 35 | Pending |
 | EH-01 | Phase 36 | Pending |
 | EH-02 | Phase 36 | Pending |

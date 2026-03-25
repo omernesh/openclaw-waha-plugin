@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.14
 milestone_name: Enterprise Hardening
 status: Ready to plan
-stopped_at: Completed 33-02-PLAN.md
-last_updated: "2026-03-25T01:20:05.777Z"
+stopped_at: Completed 34-02-PLAN.md
+last_updated: "2026-03-25T01:50:24.230Z"
 progress:
   total_phases: 9
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures.
-**Current focus:** Phase 33 — Config Infrastructure
+**Current focus:** Phase 34 — Security
 
 ## Current Position
 
-Phase: 34
+Phase: 35
 Plan: Not started
 
 ## Performance Metrics
@@ -48,6 +48,8 @@ Plan: Not started
 *Updated after each plan completion*
 | Phase 33 P01 | 3min | 1 tasks | 2 files |
 | Phase 33 P02 | 6min | 2 tasks | 2 files |
+| Phase 34 P01 | 3min | 1 tasks | 3 files |
+| Phase 34 P02 | 4min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -61,6 +63,10 @@ Recent decisions affecting current work:
 - [Phase 33]: Promise-chain mutex for config write serialization — no external deps
 - [Phase 33]: Async stat() for backup existence checks instead of existsSync
 - [Phase 33]: POST /api/admin/config wrapped in withConfigMutex for concurrent save protection
+- [Phase 34]: adminToken is global (WahaConfigSchema root), not per-account
+- [Phase 34]: Auto-generated HMAC cached in module-level Map, not persisted across restarts
+- [Phase 34]: JID regex allows @c.us, @g.us, @lid, @newsletter suffixes only
+- [Phase 34]: Config import allows only channels, providers, agents, tools, profiles, settings top-level keys
 
 ### Pending Todos
 
@@ -86,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T01:14:47.316Z
-Stopped at: Completed 33-02-PLAN.md
+Last session: 2026-03-25T01:44:53.262Z
+Stopped at: Completed 34-02-PLAN.md
 Resume file: None
