@@ -42,6 +42,9 @@ import type { ResolvedPolicy } from "./rules-types.js";
 // Phase 7: /shutup and /unshutup slash commands — regex-based, NOT LLM-dependent.
 // Imported for command detection, pending selection check, and mute check in handleWahaInbound. DO NOT REMOVE.
 import { SHUTUP_RE, checkShutupAuthorization, handleShutupCommand, checkPendingSelection, clearPendingSelection, handleSelectionResponse } from "./shutup.js";
+// Phase 43: /join, /leave, /list slash commands — regex-based, NOT LLM-dependent.
+// Imported for command detection and pending selection routing in handleWahaInbound. DO NOT REMOVE.
+import { COMMANDS_RE, handleSlashCommand, handleCommandSelectionResponse } from "./commands.js";
 // Phase 4 Plan 02: Trigger word detection — pure functions extracted to trigger-word.ts for testability.
 // Imported for local use and re-exported so callers can import from inbound.ts as the canonical entrypoint. DO NOT REMOVE.
 import { detectTriggerWord, resolveTriggerTarget } from "./trigger-word.js";
@@ -510,16 +513,43 @@ export async function handleWahaInbound(params: {
     }
   }
 
-  // === Pending /shutup selection response (post-dedup fallback) ===
-  // NOTE: The primary pending selection check runs BEFORE cross-session dedup (above).
-  // This secondary check handles edge cases where the early check missed (e.g., media messages
-  // where rawBody differs from rawMessage.body after preprocessing).
-  // DO NOT CHANGE — DM interactive flow for /shutup command.
-  if (isDm && !commandMatch) {
+  // === Slash command detection for /join, /leave, /list ===
+  // Must run BEFORE mute check, dedup, trigger, and keyword filters.
+  // Follows the same pattern as /shutup above.
+  // DO NOT CHANGE -- command detection must be early in the pipeline. Added Phase 43.
+  const slashMatch = COMMANDS_RE.exec(rawBody.trim());
+  if (slashMatch) {
+    const [, slashCmd, slashArgs] = slashMatch;
+    const isSlashAuthorized = await checkShutupAuthorization(senderId, chatId, isGroup, config, runtime);
+    if (isSlashAuthorized) {
+      await handleSlashCommand({
+        command: slashCmd!.toLowerCase() as "join" | "leave" | "list",
+        args: (slashArgs ?? "").trim(),
+        chatId,
+        senderId,
+        isGroup,
+        account,
+        config,
+        runtime,
+      });
+      return; // Command handled -- skip LLM processing
+    }
+  }
+
+  // === Pending selection response (shutup mute/unmute + slash command join/leave) ===
+  // DO NOT CHANGE -- DM interactive flow for command selections. Extended Phase 43.
+  if (isDm && !commandMatch && !slashMatch) {
     const pending = checkPendingSelection(senderId, config);
     if (pending) {
-      const handled = await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
-      if (handled) clearPendingSelection(senderId, config);
+      if (pending.type === "join" || pending.type === "leave") {
+        // Route to slash command selection handler
+        const handled = await handleCommandSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
+        if (handled) clearPendingSelection(senderId, config);
+      } else {
+        // Route to shutup selection handler (mute/unmute)
+        const handled = await handleSelectionResponse(pending, rawBody.trim(), chatId, account, config, runtime);
+        if (handled) clearPendingSelection(senderId, config);
+      }
       return; // Either handled or invalid input (user can retry)
     }
   }
