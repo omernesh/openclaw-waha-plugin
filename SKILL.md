@@ -130,24 +130,47 @@ Alternative: `sendContactVcard` action (requires explicit chatId).
 
 ## Group Management
 
-| Action | Parameters |
-|--------|-----------|
-| `createGroup` | name, participants[] |
-| `getGroups` / `getGroupsCount` | (none) |
-| `getGroup` | groupId |
-| `deleteGroup` / `leaveGroup` | groupId |
-| `joinGroup` | inviteCode |
-| `getGroupJoinInfo` | groupId — preview group details before joining via invite link |
-| `refreshGroups` | (none) — force-refresh groups list from WAHA server |
-| `setGroupSubject` | groupId, subject |
-| `setGroupDescription` | groupId, description |
-| `setGroupPicture` / `deleteGroupPicture` / `getGroupPicture` | groupId, file? |
-| `addParticipants` / `removeParticipants` | groupId, participants[] |
-| `promoteToAdmin` / `demoteFromAdmin` | groupId, participants[] |
-| `getParticipants` | groupId |
-| `setInfoAdminOnly` / `getInfoAdminOnly` | groupId, adminOnly? |
-| `setMessagesAdminOnly` / `getMessagesAdminOnly` | groupId, adminOnly? |
-| `getInviteCode` / `revokeInviteCode` | groupId |
+| Action | Parameters | Notes |
+|--------|-----------|-------|
+| `createGroup` | name, participants[] | |
+| `getGroups` / `getGroupsCount` | (none) | |
+| `getGroup` | groupId | |
+| `deleteGroup` / `leaveGroup` | groupId | |
+| `getGroupJoinInfo` | groupId | Preview group details before joining via invite link |
+| `refreshGroups` | (none) | Force-refresh groups list from WAHA server |
+| `setGroupSubject` | groupId, subject | |
+| `setGroupDescription` | groupId, description | |
+| `setGroupPicture` / `deleteGroupPicture` / `getGroupPicture` | groupId, file? | |
+| `addParticipants` / `removeParticipants` | groupId, participants[] | |
+| `promoteToAdmin` / `demoteFromAdmin` | groupId, participants[] | |
+| `getParticipants` | groupId | |
+| `setInfoAdminOnly` / `getInfoAdminOnly` | groupId, adminOnly? | |
+| `setMessagesAdminOnly` / `getMessagesAdminOnly` | groupId, adminOnly? | |
+| `getInviteCode` | groupId | Returns `{ inviteCode, inviteLink }` — inviteLink is the full `https://chat.whatsapp.com/...` URL ready to share |
+| `revokeInviteCode` | groupId | Revokes current link and returns a new `{ inviteCode, inviteLink }` |
+| `joinGroup` | inviteCode | inviteCode is the part AFTER `chat.whatsapp.com/` (e.g. `"AbcXyz123..."`) — NOT the full URL |
+
+### Invite Links — Examples
+
+```
+// Get the invite link for a group (use getGroup or search first to find the groupId)
+Action: getInviteCode
+Parameters: { "groupId": "120363421825201386@g.us" }
+// Returns: { "inviteCode": "AbcXyz123...", "inviteLink": "https://chat.whatsapp.com/AbcXyz123..." }
+
+// Share the link with a user
+Action: send
+Target: zeev nesher
+Parameters: { "text": "Here's the link: https://chat.whatsapp.com/AbcXyz123..." }
+
+// Revoke (invalidate) the current link and get a fresh one
+Action: revokeInviteCode
+Parameters: { "groupId": "120363421825201386@g.us" }
+
+// Join a group using the invite code (extract from URL: everything after chat.whatsapp.com/)
+Action: joinGroup
+Parameters: { "inviteCode": "AbcXyz123..." }
+```
 
 ## Contacts
 
