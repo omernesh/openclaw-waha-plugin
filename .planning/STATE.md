@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness
-status: Ready to execute
-stopped_at: Completed 43-01-PLAN.md
-last_updated: "2026-03-25T19:30:24.015Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 43-02-PLAN.md
+last_updated: "2026-03-25T19:35:24.461Z"
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -46,6 +46,8 @@ Plan: 2 of 2
 - Phase 47 (testing) depends on all prior phases
 - [Phase 43-slash-commands]: name-based /join returns Already a member (resolveWahaTarget only finds groups bot already belongs to)
 - [Phase 43-slash-commands]: PendingSelectionRecord type extended with join/leave (SQLite TEXT column, no migration needed)
+- [Phase 43-slash-commands]: Reuse checkShutupAuthorization for /join /leave /list authorization (same admin gate)
+- [Phase 43-slash-commands]: Guard pending selection block with !slashMatch to prevent slash commands being treated as numbered replies
 
 ### Pending Todos
 
@@ -71,6 +73,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T19:30:24.010Z
-Stopped at: Completed 43-01-PLAN.md
+Last session: 2026-03-25T19:35:24.456Z
+Stopped at: Completed 43-02-PLAN.md
 Resume file: None
