@@ -95,7 +95,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   2. Config writes do not block the event loop (async fs/promises used throughout)
   3. Config writes use write-to-temp-then-rename so a crash mid-write leaves the previous valid file intact
   4. A promise-based mutex serializes all read-modify-write config operations
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 33-01-PLAN.md — Create config-io module with mutex, async I/O, and atomic writes
+- [ ] 33-02-PLAN.md — Replace all config I/O callsites in monitor.ts and sync.ts
 
 ### Phase 34: Security
 **Goal**: Admin API and webhook endpoints are protected against unauthorized access and injection
@@ -188,7 +191,7 @@ Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 ->
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 33. Config Infrastructure | v1.14 | 0/TBD | Not started | - |
+| 33. Config Infrastructure | v1.14 | 0/2 | Planning complete | - |
 | 34. Security | v1.14 | 0/TBD | Not started | - |
 | 35. Structured Logging | v1.14 | 0/TBD | Not started | - |
 | 36. Timeout & Error Hardening | v1.14 | 0/TBD | Not started | - |
