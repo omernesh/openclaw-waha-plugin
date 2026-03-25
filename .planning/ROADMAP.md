@@ -136,7 +136,9 @@ Plans:
   1. whatsapp-messenger skill lists all implemented endpoints grouped by category (messaging, groups, contacts, channels, labels, status, presence, profile, media, calls)
   2. No implemented action is undocumented (audit confirms zero gaps)
   3. Skill documents /join, /leave, /list slash commands with syntax and behavior description
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 46-01-PLAN.md — Rewrite whatsapp-messenger SKILL.md with all ~100+ endpoints in 14 categories
 
 ### Phase 47: Live WhatsApp Testing
 **Goal**: All v1.18 features are verified working end-to-end on real WhatsApp via WAHA API
@@ -149,7 +151,9 @@ Plans:
   4. /list, /list groups, /list channels each return correct filtered membership lists
   5. Invite link retrieval works: agent receives the link when asked via LLM action
   6. Admin UI Leave and Join by Link both complete successfully and show correct feedback in browser
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 46-01-PLAN.md — Rewrite whatsapp-messenger SKILL.md with all ~100+ endpoints in 14 categories
 
 ## Progress
 
@@ -158,5 +162,5 @@ Plans:
 | 43. Slash Commands | 2/2 | Complete    | 2026-03-25 |
 | 44. Invite Link Documentation | 1/1 | Complete    | 2026-03-25 |
 | 45. Admin UI Join/Leave | 2/2 | Complete    | 2026-03-25 |
-| 46. Skill Completeness Audit | 0/? | Not started | - |
+| 46. Skill Completeness Audit | 0/1 | Not started | - |
 | 47. Live WhatsApp Testing | 0/? | Not started | - |
