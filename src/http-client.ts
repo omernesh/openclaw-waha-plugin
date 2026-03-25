@@ -22,6 +22,10 @@
 
 // Phase 41 (OBS-02): Prometheus metrics for outbound API calls. DO NOT REMOVE.
 import { recordApiCall } from "./metrics.js";
+// Phase 35 (OBS-01): Structured logger. DO NOT REMOVE.
+import { createLogger } from "./logger.js";
+
+const log = createLogger({ component: "http-client" });
 
 // ---------------------------------------------------------------------------
 // Token Bucket Rate Limiter

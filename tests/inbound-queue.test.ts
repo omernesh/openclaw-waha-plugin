@@ -140,13 +140,16 @@ describe("InboundQueue", () => {
       processed.push(item);
     };
     const q = new InboundQueue(50, 50, errorProcessor);
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Logger outputs errors to stderr (structured JSON), not console.error
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     q.enqueue(makeItem("fail@c.us"), false);
     q.enqueue(makeItem("ok@c.us"), false);
     await new Promise((r) => setTimeout(r, 100));
     expect(processed.length).toBe(1);
     expect(processed[0].message.chatId).toBe("ok@c.us");
-    expect(consoleError).toHaveBeenCalled();
-    consoleError.mockRestore();
+    // Verify error was logged via structured logger
+    const errorOutput = stderrSpy.mock.calls.map((c) => String(c[0]));
+    expect(errorOutput.some((msg) => msg.includes("boom") || msg.includes("processor error"))).toBe(true);
+    stderrSpy.mockRestore();
   });
 });

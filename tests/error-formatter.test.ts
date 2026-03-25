@@ -63,11 +63,13 @@ describe("formatActionError", () => {
     expect(result).not.toContain("undefined");
   });
 
-  it("logs full original error with console.warn before formatting", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("logs full original error with structured logger before formatting", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const err = new Error("Some error");
     formatActionError(err, { action: "send", target: "test" });
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toContain("send");
+    // Logger outputs structured JSON to stderr for warn level
+    const output = stderrSpy.mock.calls.map((c) => String(c[0]));
+    expect(output.some((msg) => msg.includes("send"))).toBe(true);
+    stderrSpy.mockRestore();
   });
 });
