@@ -122,7 +122,10 @@ Plans:
   1. A `logger` module exists that outputs JSON lines with `level`, `timestamp`, `component`, and optional `sessionId`/`chatId` fields
   2. All `console.log`, `console.warn`, `console.error` calls in production code are replaced with `logger.*` calls
   3. Log level is configurable (debug/info/warn/error) and respects the configured level at runtime
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ### Phase 36: Timeout & Error Hardening
 **Goal**: Every outbound HTTP call has an explicit timeout — no fetch() can hang indefinitely
@@ -134,7 +137,10 @@ Plans:
   3. Gemini video polling fetch calls have `AbortSignal.timeout(5_000)`
   4. Nominatim geocode call has `AbortSignal.timeout(5_000)` and a 1-req/sec rate limit
   5. `RateLimiter` constructor accepts `maxQueue` and throws when queue exceeds it
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ### Phase 37: SQLite Hardening
 **Goal**: SQLite databases handle concurrent access gracefully and do not leak temp files
@@ -144,7 +150,10 @@ Plans:
   1. Both `DirectoryDb` and `AnalyticsDb` set `PRAGMA busy_timeout = 5000` on initialization
   2. Both databases run periodic `PRAGMA wal_checkpoint(PASSIVE)` (every sync cycle or every 30 minutes)
   3. On startup, orphaned `/tmp/openclaw/waha-media-*` files older than 10 minutes are deleted
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ### Phase 38: Resilience & Health
 **Goal**: Outbound calls fail fast when a session is unhealthy, recovery is verified, and queue drains never throw unhandled rejections
@@ -154,7 +163,10 @@ Plans:
   1. `callWahaApi` checks `sessionHealthStates` and fast-fails with a descriptive error when session status is `unhealthy`, skipping the full retry cycle
   2. Auto-recovery in health.ts polls session status after restart and only marks `outcome = "success"` when session reaches CONNECTED (with 30s timeout)
   3. The `finally` block in `InboundQueue.drain()` wraps both `onQueueChange?.()` and the recursive `drain()` in try/catch — no unhandled rejections escape
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ### Phase 39: Graceful Shutdown & SSE
 **Goal**: Server shutdown is clean — in-flight requests complete, SSE connections close, no leaked timers
@@ -164,7 +176,10 @@ Plans:
   1. `server.close()` tracks in-flight requests and waits for completion (10s hard timeout) before resolving
   2. SSE keep-alive `setInterval` is `.unref()`'d; abort handler clears all SSE intervals and closes all client connections
   3. `sseClients` Set has a max cap of 50; connections beyond the cap are rejected with HTTP 503
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ### Phase 40: API & Config Polish
 **Goal**: Admin API is rate-limited, request handling is side-effect-free, and config values have enforced bounds
@@ -175,7 +190,10 @@ Plans:
   2. Static file serving uses a local variable for URL rewriting — `req.url` is never mutated
   3. `healthCheckIntervalMs` enforces minimum 10000ms and `syncIntervalMinutes` enforces minimum 1 minute via Zod `.min()` transforms
   4. `configureReliability()` is called once globally or uses per-account token buckets — no last-account-wins race
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ### Phase 41: Metrics Endpoint
 **Goal**: Operational health is observable via a standard Prometheus-compatible endpoint
@@ -185,7 +203,10 @@ Plans:
   1. `GET /metrics` returns Prometheus text format with heap usage, event loop lag, HTTP request rate counters
   2. `/metrics` includes SQLite query latency, queue depth, processing latency P95, and error rate
   3. `/metrics` endpoint is accessible without admin auth (or with a separate metrics token) for scraper compatibility
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
+- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
 
 ## Progress
 
