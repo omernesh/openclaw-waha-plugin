@@ -2,6 +2,11 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.17.1] - 2026-03-25
+
+### Fixed
+- **Test suite: 44/44 files passing** — Added `openclaw` as devDependency, fixing 11 test files that failed due to missing SDK imports. Fixed monitor.test.ts mocks for Phase 39 in-flight tracking (`res.on`, `req.socket`). Fixed read-messages.test.ts field name (`text` → `body`). Fixed health.test.ts module-level side effect mock. Total: 594 tests passing, 0 failures.
+
 ## [1.17.0] - 2026-03-25 — Enterprise Hardening
 
 ### Added

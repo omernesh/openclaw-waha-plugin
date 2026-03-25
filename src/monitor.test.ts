@@ -164,13 +164,40 @@ vi.mock("./config-schema.js", () => ({
   validateWahaConfig: vi.fn().mockReturnValue({ valid: true, errors: [] }),
 }));
 
-vi.mock("openclaw/plugin-sdk", async () => ({
+vi.mock("./config-io.js", () => ({
+  getConfigPath: vi.fn().mockReturnValue("/mock/openclaw.json"),
+  readConfig: vi.fn().mockResolvedValue({
+    channels: {
+      waha: {
+        session: "test-session",
+        baseUrl: "http://localhost:3004",
+        dmFilter: { enabled: false },
+        groupFilter: { enabled: false },
+      },
+    },
+  }),
+  writeConfig: vi.fn().mockResolvedValue(undefined),
+  modifyConfig: vi.fn().mockResolvedValue(undefined),
+  withConfigMutex: vi.fn().mockImplementation(async (fn: () => Promise<unknown>) => fn()),
+}));
+
+const { mockReadRequestBodyWithLimit } = vi.hoisted(() => ({
+  mockReadRequestBodyWithLimit: vi.fn().mockResolvedValue(""),
+}));
+
+vi.mock("openclaw/plugin-sdk", () => ({
   createLoggerBackedRuntime: vi.fn().mockReturnValue({ log: vi.fn() }),
   isRequestBodyLimitError: vi.fn().mockReturnValue(false),
-  readRequestBodyWithLimit: vi.fn().mockResolvedValue(""),
+  readRequestBodyWithLimit: mockReadRequestBodyWithLimit,
   requestBodyErrorToText: vi.fn().mockReturnValue("error"),
   isWhatsAppGroupJid: vi.fn().mockImplementation((jid: string) => jid?.endsWith("@g.us") ?? false),
   DEFAULT_ACCOUNT_ID: "__default__",
+}));
+
+vi.mock("openclaw/plugin-sdk/webhook-ingress", () => ({
+  isRequestBodyLimitError: vi.fn().mockReturnValue(false),
+  readRequestBodyWithLimit: mockReadRequestBodyWithLimit,
+  requestBodyErrorToText: vi.fn().mockReturnValue("error"),
 }));
 
 // ── fs mocks (config file I/O) ──────────────────────────────────────────────
@@ -230,6 +257,7 @@ interface MockRes {
   end: ReturnType<typeof vi.fn>;
   setHeader: ReturnType<typeof vi.fn>;
   write: ReturnType<typeof vi.fn>;
+  on: ReturnType<typeof vi.fn>;
   headersSent: boolean;
 }
 
@@ -242,6 +270,8 @@ function makeReq(overrides: {
   emitter.url = overrides.url ?? "/";
   emitter.method = overrides.method ?? "GET";
   emitter.headers = overrides.headers ?? {};
+  (emitter as any).socket = { remoteAddress: "127.0.0.1" };
+  (emitter as any).destroy = vi.fn();
   return emitter;
 }
 
@@ -263,6 +293,7 @@ function makeRes(): MockRes {
       res.headers[name] = value;
     }),
     write: vi.fn(),
+    on: vi.fn(),
   };
   return res;
 }
@@ -305,13 +336,13 @@ async function callRoute(
 
 describe("readWahaWebhookBody", () => {
   it("delegates to readRequestBodyWithLimit with correct maxBytes", async () => {
-    const { readRequestBodyWithLimit } = await import("openclaw/plugin-sdk");
-    (readRequestBodyWithLimit as ReturnType<typeof vi.fn>).mockResolvedValueOnce("hello");
+    mockReadRequestBodyWithLimit.mockReset();
+    mockReadRequestBodyWithLimit.mockResolvedValueOnce("hello");
 
     const req = makeReq({});
     const result = await readWahaWebhookBody(req, 512);
 
-    expect(readRequestBodyWithLimit).toHaveBeenCalledWith(req, expect.objectContaining({ maxBytes: 512 }));
+    expect(mockReadRequestBodyWithLimit).toHaveBeenCalledWith(req, expect.objectContaining({ maxBytes: 512 }));
     expect(result).toBe("hello");
   });
 });

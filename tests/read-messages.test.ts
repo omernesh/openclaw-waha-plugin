@@ -3,7 +3,7 @@
  * Tests for Phase 4 Plan 03: readMessages utility action in channel.ts.
  *
  * Covers:
- *  - readMessages maps API response to lean format {from, text, timestamp}
+ *  - readMessages maps API response to lean format {from, body, timestamp, fromMe, hasMedia, type}
  *  - Default limit is 10
  *  - Limit is capped at 50
  *  - Limit minimum is 1
@@ -247,7 +247,7 @@ describe("readMessages action", () => {
     vi.clearAllMocks();
   });
 
-  it("maps WAHA API response to lean format {from, text, timestamp}", async () => {
+  it("maps WAHA API response to lean format {from, body, timestamp, fromMe, hasMedia, type}", async () => {
     const rawMessages = [
       { from: "alice@c.us", body: "Hello", timestamp: 1700000001 },
       { from: "bob@c.us", body: "World", timestamp: 1700000002 },
@@ -264,8 +264,8 @@ describe("readMessages action", () => {
     // Result is wrapped in content array
     const parsed = JSON.parse((result as any).content[0].text);
     expect(parsed).toEqual([
-      { from: "alice@c.us", text: "Hello", timestamp: 1700000001 },
-      { from: "bob@c.us", text: "World", timestamp: 1700000002 },
+      { from: "alice@c.us", body: "Hello", timestamp: 1700000001, fromMe: false, hasMedia: false, type: "chat" },
+      { from: "bob@c.us", body: "World", timestamp: 1700000002, fromMe: false, hasMedia: false, type: "chat" },
     ]);
   });
 

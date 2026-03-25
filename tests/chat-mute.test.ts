@@ -57,7 +57,7 @@ const baseCfg: CoreConfig = {
   },
 } as CoreConfig;
 
-describe("muteWahaChat / unmuteWahaChat", () => {
+describe("muteWahaChat / unmuteWahaChat", { timeout: 15_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

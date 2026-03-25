@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockCallWahaApi = vi.fn();
 vi.mock("../src/http-client.js", () => ({
   callWahaApi: (...args: any[]) => mockCallWahaApi(...args),
+  setSessionHealthChecker: vi.fn(),
 }));
 
 import { startHealthCheck, getHealthState, type HealthState } from "../src/health.js";
