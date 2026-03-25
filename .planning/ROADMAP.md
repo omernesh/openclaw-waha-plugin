@@ -151,7 +151,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 43. Slash Commands | 2/2 | Complete   | 2026-03-25 |
+| 43. Slash Commands | 2/2 | Complete    | 2026-03-25 |
 | 44. Invite Link Documentation | 0/? | Not started | - |
 | 45. Admin UI Join/Leave | 0/? | Not started | - |
 | 46. Skill Completeness Audit | 0/? | Not started | - |
