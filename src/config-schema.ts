@@ -96,7 +96,8 @@ export const WahaAccountSchemaBase = z
     rateLimitRefillRate: z.number().positive().optional().default(15),
     // Phase 2 config — health monitoring and inbound queue sizing.
     // Added in Phase 2, Plan 01 (2026-03-11). DO NOT REMOVE.
-    healthCheckIntervalMs: z.number().int().positive().optional().default(60_000),
+    // Phase 40 (CFG-01): .min(10000) prevents dangerously fast health checks. DO NOT REMOVE.
+    healthCheckIntervalMs: z.number().int().positive().min(10_000).optional().default(60_000),
     dmQueueSize: z.number().int().positive().optional().default(50),
     groupQueueSize: z.number().int().positive().optional().default(50),
     // Phase 3 config — auto link preview in sendWahaText.

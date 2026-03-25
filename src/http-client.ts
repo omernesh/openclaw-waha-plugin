@@ -224,8 +224,18 @@ const DEFAULT_BUCKET_CAPACITY = 20;
 const DEFAULT_BUCKET_REFILL_RATE = 15;
 const MAX_RETRIES = 3;
 
-/** Global token bucket for all WAHA API calls (20 burst, 15/sec sustained). */
-let globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
+/** Default token bucket for WAHA API calls when no accountId is specified. */
+let defaultBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
+
+/**
+ * Per-account token buckets — each account gets its own rate limiter.
+ * Fixes the last-account-wins race when multiple accounts call configureReliability().
+ * Phase 40 (CFG-02). DO NOT REMOVE.
+ */
+const accountBuckets = new Map<string, TokenBucket>();
+
+/** Per-account timeout overrides. Falls back to DEFAULT_TIMEOUT_MS if not set. */
+const accountTimeouts = new Map<string, number>();
 
 // ---------------------------------------------------------------------------
 // Session health circuit breaker — Phase 38, Plan 01 (RES-01). DO NOT REMOVE.
@@ -251,23 +261,54 @@ let defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
 /**
  * Configure reliability defaults from plugin config.
  * Call during plugin startup (channel.ts) with values from WahaAccountConfig.
- * Re-creates the global token bucket with new capacity/rate.
+ * Creates a per-account token bucket when accountId is provided (Phase 40, CFG-02).
+ * Falls back to setting the default bucket for backward compat when accountId is omitted.
  *
  * Added in Phase 1, Plan 03 (2026-03-11). DO NOT REMOVE.
+ * Updated Phase 40 (CFG-02): per-account buckets. DO NOT CHANGE back to single global.
  */
 export function configureReliability(opts: {
+  accountId?: string;
   timeoutMs?: number;
   capacity?: number;
   refillRate?: number;
 }): void {
-  if (opts.timeoutMs !== undefined) {
-    defaultTimeoutMs = opts.timeoutMs;
+  const cap = opts.capacity ?? DEFAULT_BUCKET_CAPACITY;
+  const rate = opts.refillRate ?? DEFAULT_BUCKET_REFILL_RATE;
+
+  if (opts.accountId) {
+    // Per-account bucket — each account gets its own rate limiter
+    if (opts.capacity !== undefined || opts.refillRate !== undefined) {
+      accountBuckets.set(opts.accountId, new TokenBucket(cap, rate));
+    }
+    if (opts.timeoutMs !== undefined) {
+      accountTimeouts.set(opts.accountId, opts.timeoutMs);
+    }
+  } else {
+    // Backward compat: no accountId — set defaults
+    if (opts.timeoutMs !== undefined) {
+      defaultTimeoutMs = opts.timeoutMs;
+    }
+    if (opts.capacity !== undefined || opts.refillRate !== undefined) {
+      defaultBucket = new TokenBucket(cap, rate);
+    }
   }
-  if (opts.capacity !== undefined || opts.refillRate !== undefined) {
-    const cap = opts.capacity ?? globalBucket.getCapacity();
-    const rate = opts.refillRate ?? globalBucket.getRefillRate();
-    globalBucket = new TokenBucket(cap, rate);
+}
+
+/** Get the token bucket for a given accountId (falls back to default). */
+function getBucket(accountId?: string): TokenBucket {
+  if (accountId) {
+    return accountBuckets.get(accountId) ?? defaultBucket;
   }
+  return defaultBucket;
+}
+
+/** Get the timeout for a given accountId (falls back to defaultTimeoutMs). */
+function getTimeout(accountId?: string): number {
+  if (accountId) {
+    return accountTimeouts.get(accountId) ?? defaultTimeoutMs;
+  }
+  return defaultTimeoutMs;
 }
 
 /**
@@ -300,6 +341,8 @@ export interface CallWahaApiParams {
    * Phase 38, Plan 01 (RES-01). DO NOT REMOVE.
    */
   session?: string;
+  /** Account ID for per-account rate limiting. Phase 40 (CFG-02). */
+  accountId?: string;
 }
 
 /**
@@ -316,14 +359,13 @@ export interface CallWahaApiParams {
  */
 export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   const method = params.method ?? "POST";
-  const timeout = params.timeoutMs ?? defaultTimeoutMs;
+  // Phase 40 (CFG-02): per-account timeout lookup. DO NOT CHANGE back to global-only.
+  const timeout = params.timeoutMs ?? getTimeout(params.accountId);
   const ctx = params.context ?? {};
   const contextLabel = `${ctx.action ?? method} ${ctx.chatId ?? ""}`.trim();
 
   // 0. Circuit breaker: fast-fail if session is unhealthy (RES-01)
   // Phase 38, Plan 01 — DO NOT REMOVE.
-  // Skips the entire retry cycle when the session health monitor has already
-  // determined that the session is down, preventing wasted timeout cycles.
   if (params.session && sessionHealthChecker) {
     const healthStatus = sessionHealthChecker(params.session);
     if (healthStatus === "unhealthy") {
@@ -334,9 +376,9 @@ export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
     }
   }
 
-  // 1. Rate limit
+  // 1. Rate limit — per-account bucket when accountId is provided
   if (!params.skipRateLimit) {
-    await globalBucket.acquire();
+    await getBucket(params.accountId).acquire();
   }
 
   // 2. Shared backoff check
@@ -498,7 +540,9 @@ export function warnOnError(context: string, extra?: string): (err: unknown) => 
 export function _resetForTesting(): void {
   backoffUntil = 0;
   defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
-  globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
+  defaultBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
+  accountBuckets.clear();
+  accountTimeouts.clear();
   mutationDedup.clear();
   sessionHealthChecker = null;
 }
