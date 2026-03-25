@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 32-03-PLAN.md
-last_updated: "2026-03-20T11:30:00.000Z"
+stopped_at: Completed 36-01-PLAN.md
+last_updated: "2026-03-25T02:48:00.000Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 19
-  completed_plans: 19
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 20
+  completed_plans: 20
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 32 — Platform Abstraction (COMPLETE)
+**Current focus:** Phase 36 — Timeout & Error Hardening (COMPLETE)
 
 ## Current Position
 
-Phase: 32 (Platform Abstraction) — COMPLETE
-Plan: 3 of 3
+Phase: 36 (Timeout & Error Hardening) — COMPLETE
+Plan: 1 of 1
 
 ## Accumulated Context
 
@@ -81,6 +81,9 @@ Plan: 3 of 3
 - [Phase 32-03]: Default tenant 'default' uses legacy DB path (no subdirectory) — no migration required for existing installs
 - [Phase 32-03]: tenantId extracted from coreCfg.channels.waha.tenantId in handleAction — config-driven, not call-site-driven
 - [Phase 32-03]: Cache key changed from safeId to 'safeTenant:safeId' to allow same accountId in different tenants
+- [Phase 36-01]: Timeout tiers: 30s WAHA API, 60s vision/upload/generate, 5s polling/nominatim
+- [Phase 36-01]: RateLimiter maxQueue throws Error on overflow (not silent rejection)
+- [Phase 36-01]: nominatimLimiter module-level singleton with 1100ms delay for Nominatim 1-req/sec policy
 
 ### Pending Todos
 
@@ -106,6 +109,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T00:00:00Z
-Stopped at: Completed quick task 260324-sl3
+Last session: 2026-03-25T02:48:00Z
+Stopped at: Completed 36-01-PLAN.md
 Resume file: None

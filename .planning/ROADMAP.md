@@ -68,3 +68,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] Phase 32: Platform Abstraction (3/3 plans) — completed 2026-03-20
 
 </details>
+
+## Standalone Phases
+
+- [x] Phase 36: Timeout & Error Hardening (1/1 plans) — completed 2026-03-25
