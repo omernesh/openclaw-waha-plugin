@@ -28,7 +28,7 @@
 
 - [x] **OBS-01**: A `logger` module provides structured JSON logging with consistent fields (level, timestamp, component, sessionId, chatId) replacing all freeform `console.*` calls
 - [ ] **OBS-02**: A `/metrics` endpoint exposes process-level metrics in Prometheus format: heap usage, event loop lag, HTTP request rates, SQLite query latency, queue depth, processing latency P95, error rate
-- [ ] **OBS-03**: `sseClients` Set has a maximum cap (50); new SSE connections beyond the cap are rejected with HTTP 503
+- [x] **OBS-03**: `sseClients` Set has a maximum cap (50); new SSE connections beyond the cap are rejected with HTTP 503
 
 ### Memory & Resources
 
@@ -48,8 +48,8 @@
 
 ### Graceful Shutdown
 
-- [ ] **GS-01**: `server.close()` tracks in-flight request count and waits for all to complete (with a 10s hard timeout) before resolving
-- [ ] **GS-02**: SSE keep-alive `setInterval` is `.unref()`'d, and the abort handler clears all remaining SSE intervals and closes all SSE client connections
+- [x] **GS-01**: `server.close()` tracks in-flight request count and waits for all to complete (with a 10s hard timeout) before resolving
+- [x] **GS-02**: SSE keep-alive `setInterval` is `.unref()`'d, and the abort handler clears all remaining SSE intervals and closes all SSE client connections
 
 ### Configuration
 
@@ -103,9 +103,9 @@ None — this milestone covers all identified gaps.
 | RES-01 | Phase 38 | Pending |
 | RES-02 | Phase 38 | Pending |
 | CON-02 | Phase 38 | Pending |
-| GS-01 | Phase 39 | Pending |
-| GS-02 | Phase 39 | Pending |
-| OBS-03 | Phase 39 | Pending |
+| GS-01 | Phase 39 | Complete |
+| GS-02 | Phase 39 | Complete |
+| OBS-03 | Phase 39 | Complete |
 | API-01 | Phase 40 | Pending |
 | API-02 | Phase 40 | Pending |
 | CFG-01 | Phase 40 | Pending |

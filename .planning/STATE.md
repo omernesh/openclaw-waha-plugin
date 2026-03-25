@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 38 — Resilience & Health (COMPLETE)
+**Current focus:** Phase 39 — Graceful Shutdown & SSE (COMPLETE)
 
 ## Current Position
 
-Phase: 38 (Resilience & Health) — COMPLETE
+Phase: 39 (Graceful Shutdown & SSE) — COMPLETE
 Plan: 1 of 1
 
 ## Accumulated Context
@@ -84,6 +84,10 @@ Plan: 1 of 1
 
 - [Phase 38]: Health checker uses callback pattern (setSessionHealthChecker) to avoid circular dependency between http-client.ts and health.ts
 - [Phase 38]: Recovery timeout keeps outcome='failed' with descriptive error message — avoids type changes across RecoveryEvent/RecoveryState
+- [Phase 39]: In-flight counter uses res 'close' event (fires for both normal and aborted requests)
+- [Phase 39]: Drain hard timeout at 10s with .unref() so it doesn't hold the process
+- [Phase 39]: SSE keep-alive intervals tracked in Set for bulk cleanup on shutdown
+- [Phase 39]: SSE cap at 50 returns 503 with JSON error body
 
 ### Pending Todos
 
@@ -109,6 +113,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T03:11:00Z
-Stopped at: Completed 38-01-PLAN.md
+Last session: 2026-03-25T03:18:00Z
+Stopped at: Completed 39-01-PLAN.md
 Resume file: None
