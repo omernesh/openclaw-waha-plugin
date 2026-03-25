@@ -503,6 +503,62 @@ When a message arrives, the system determines which agent handles it using this 
 
 ---
 
+# /join, /leave, /list Commands
+
+Owner-only slash commands to join/leave groups and channels and list memberships — processed **before** the LLM, no AI involvement.
+
+**Authorization:** Same gate as `/shutup` — godModeSuperUsers and allowFrom. Unauthorized callers receive "You are not authorized to use this command."
+
+## /join
+
+Join a group by invite link or by name.
+
+| Variant | Syntax | Behavior |
+|---------|--------|----------|
+| Invite link | `/join https://chat.whatsapp.com/AbcXyz123` | Extracts the code, calls joinGroup API, replies "Joined group ✓" |
+| Raw invite code | `/join AbcXyz123...` (22+ alphanumeric chars) | Same as above |
+| By name | `/join test group` | Fuzzy-searches groups the bot already belongs to — if found, replies "Already a member of <name>" |
+| Ambiguous name | `/join dev` (multiple matches) | Lists numbered candidates; user replies with a number to confirm |
+
+> **Note:** Name-based `/join` only finds groups the bot already belongs to (WAHA only returns visible groups). To join a truly new group, always use the invite link.
+
+## /leave
+
+Leave a group or channel by name.
+
+| Syntax | Behavior |
+|--------|----------|
+| `/leave test group` | Fuzzy-searches groups and channels; leaves immediately on single high-confidence match |
+| `/leave dev` (ambiguous) | Lists numbered candidates; user replies with a number to confirm |
+
+- Groups: calls `leaveGroup` API
+- Channels/newsletters: calls `unfollowChannel` API
+- On success: replies `Left "<name>" ✓`
+
+## /list
+
+List groups and channels the bot is a member of.
+
+| Command | Output |
+|---------|--------|
+| `/list` | All groups + all channels |
+| `/list groups` | Groups only |
+| `/list channels` | Channels/newsletters only |
+
+Results are sorted alphabetically and numbered. Example:
+
+```
+Groups (3):
+1. Dev Team
+2. Family Chat
+3. Test Group
+
+Channels (1):
+1. Announcements
+```
+
+---
+
 # /shutup and /unshutup Commands
 
 Owner-only commands to mute/unmute the bot in groups.
