@@ -116,6 +116,8 @@ export type WahaChannelConfig = WahaAccountConfig & {
   defaultAccount?: string;
   presence?: PresenceConfig;
   dmFilter?: DmFilterConfig;
+  // Phase 34 (SEC-01): Bearer token for admin API authentication. DO NOT REMOVE.
+  adminToken?: string;
 };
 
 export type CoreConfig = OpenClawConfig & {
