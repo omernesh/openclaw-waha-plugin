@@ -157,6 +157,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 43. Slash Commands | 2/2 | Complete    | 2026-03-25 |
 | 44. Invite Link Documentation | 1/1 | Complete    | 2026-03-25 |
-| 45. Admin UI Join/Leave | 2/2 | Complete   | 2026-03-25 |
+| 45. Admin UI Join/Leave | 2/2 | Complete    | 2026-03-25 |
 | 46. Skill Completeness Audit | 0/? | Not started | - |
 | 47. Live WhatsApp Testing | 0/? | Not started | - |
