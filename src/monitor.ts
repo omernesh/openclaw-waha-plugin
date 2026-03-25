@@ -1,6 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
+import { readdir, stat, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { getConfigPath, readConfig, writeConfig, modifyConfig, withConfigMutex } from "./config-io.js";
 import { join, extname, dirname, resolve as pathResolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -2406,6 +2408,30 @@ function resolveWebhookHmacSecret(account: ReturnType<typeof resolveWahaAccount>
   return secret;
 }
 
+// Phase 37 (MEM-02): Sweep orphaned media temp files on startup. DO NOT REMOVE.
+// Files matching /tmp/openclaw/waha-media-* older than 10 min are deleted.
+// Fire-and-forget — never blocks startup.
+async function sweepOrphanedMediaFiles(): Promise<void> {
+  const mediaDir = join(tmpdir(), "openclaw");
+  try {
+    const entries = await readdir(mediaDir);
+    const cutoff = Date.now() - 10 * 60 * 1000;
+    let cleaned = 0;
+    for (const entry of entries) {
+      if (!entry.startsWith("waha-media-")) continue;
+      const filePath = join(mediaDir, entry);
+      try {
+        const st = await stat(filePath);
+        if (st.mtimeMs < cutoff) {
+          await unlink(filePath);
+          cleaned++;
+        }
+      } catch { /* file may have been removed concurrently */ }
+    }
+    if (cleaned > 0) log.info(`Swept ${cleaned} orphaned media temp file(s)`);
+  } catch { /* directory may not exist yet */ }
+}
+
 export async function monitorWahaProvider(params: {
   accountId: string;
   config: CoreConfig;
@@ -2413,6 +2439,9 @@ export async function monitorWahaProvider(params: {
   abortSignal?: AbortSignal;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number; running?: boolean }) => void;
 }) {
+  // Phase 37 (MEM-02): clean up orphaned temp files before starting server
+  sweepOrphanedMediaFiles().catch(() => {});
+
   const server = createWahaWebhookServer({
     accountId: params.accountId,
     config: params.config,

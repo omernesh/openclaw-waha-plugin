@@ -19,15 +19,30 @@ export type AnalyticsTopChat = { chat_id: string; total: number; inbound: number
 export class AnalyticsDb {
   private db: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   private _stmtInsert: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  private _walTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(dbPath: string) {
     mkdirSync(join(dbPath, ".."), { recursive: true });
     const Database = require("better-sqlite3") as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     this.db = new Database(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
+    // Phase 37 (MEM-03): Prevent SQLITE_BUSY errors under concurrent access. DO NOT REMOVE.
+    this.db.pragma("busy_timeout = 5000");
     this._createSchema();
     this._stmtInsert = this.db.prepare("INSERT INTO message_events (timestamp, direction, chat_type, action, duration_ms, status, chat_id, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     this.prune(90);
+    this._startWalCheckpoint();
+  }
+  // Phase 37 (DI-01): Periodic WAL checkpoint to prevent unbounded WAL growth. DO NOT REMOVE.
+  private _startWalCheckpoint(): void {
+    const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+    const tick = () => {
+      try { this.db.pragma("wal_checkpoint(PASSIVE)"); } catch { /* db may be closed */ }
+      this._walTimer = setTimeout(tick, INTERVAL_MS);
+      this._walTimer.unref();
+    };
+    this._walTimer = setTimeout(tick, INTERVAL_MS);
+    this._walTimer.unref();
   }
   private _createSchema(): void {
     const io = "CHECK(direction IN ('inbound', 'outbound'))"; const ct = "CHECK(chat_type IN ('dm', 'group', 'channel', 'status'))"; const st = "CHECK(status IN ('success', 'error'))";
@@ -50,6 +65,10 @@ export class AnalyticsDb {
   getSummary(p: { startTime: number; endTime: number }): AnalyticsSummary {
     const row = this.db.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN direction = 'inbound' THEN 1 ELSE 0 END) AS inbound, SUM(CASE WHEN direction = 'outbound' THEN 1 ELSE 0 END) AS outbound, SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS errors, COALESCE(AVG(CASE WHEN duration_ms IS NOT NULL THEN duration_ms END), 0) AS avg_duration_ms FROM message_events WHERE timestamp >= ? AND timestamp <= ?").get(p.startTime, p.endTime) as { total: number; inbound: number; outbound: number; errors: number; avg_duration_ms: number; };
     return { total: Number(row.total), inbound: Number(row.inbound), outbound: Number(row.outbound), errors: Number(row.errors), avg_duration_ms: Math.round(Number(row.avg_duration_ms)) };
+  }
+  close(): void {
+    if (this._walTimer) { clearTimeout(this._walTimer); this._walTimer = null; }
+    this.db.close();
   }
   prune(maxAgeDays: number): void {
     const cutoff = Date.now() - maxAgeDays * 86400000;

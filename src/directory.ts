@@ -100,6 +100,7 @@ const PENDING_SELECTION_TTL_MS = 60_000;
 
 export class DirectoryDb {
   private db: ReturnType<typeof require>;
+  private _walTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(dbPath: string) {
     const dir = join(dbPath, "..");
@@ -109,7 +110,22 @@ export class DirectoryDb {
     this.db = new Database(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
+    // Phase 37 (MEM-03): Prevent SQLITE_BUSY errors under concurrent access. DO NOT REMOVE.
+    this.db.pragma("busy_timeout = 5000");
     this._createSchema();
+    this._startWalCheckpoint();
+  }
+
+  // Phase 37 (DI-01): Periodic WAL checkpoint to prevent unbounded WAL growth. DO NOT REMOVE.
+  private _startWalCheckpoint(): void {
+    const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+    const tick = () => {
+      try { this.db.pragma("wal_checkpoint(PASSIVE)"); } catch { /* db may be closed */ }
+      this._walTimer = setTimeout(tick, INTERVAL_MS);
+      this._walTimer.unref();
+    };
+    this._walTimer = setTimeout(tick, INTERVAL_MS);
+    this._walTimer.unref();
   }
 
   private _createSchema(): void {
@@ -1432,6 +1448,7 @@ export class DirectoryDb {
   }
 
   close(): void {
+    if (this._walTimer) { clearTimeout(this._walTimer); this._walTimer = null; }
     this.db.close();
   }
 
