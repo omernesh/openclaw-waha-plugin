@@ -138,10 +138,9 @@ Plans:
   3. Gemini video polling fetch calls have `AbortSignal.timeout(5_000)`
   4. Nominatim geocode call has `AbortSignal.timeout(5_000)` and a 1-req/sec rate limit
   5. `RateLimiter` constructor accepts `maxQueue` and throws when queue exceeds it
-**Plans**: 2 plans
+**Plans**: 1 plan
 Plans:
-- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
-- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
+- [ ] 36-01-PLAN.md — Add AbortSignal.timeout to all bare fetch calls + RateLimiter maxQueue + Nominatim rate limit
 
 ### Phase 37: SQLite Hardening
 **Goal**: SQLite databases handle concurrent access gracefully and do not leak temp files
