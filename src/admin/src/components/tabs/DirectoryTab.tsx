@@ -3,12 +3,13 @@
 // DO NOT CHANGE: debounce is 300ms to match TagInput pattern; pageIndex resets on search change.
 // DO NOT CHANGE: refreshCounter increments to trigger re-fetch from sub-tab onRefresh callbacks.
 // ContactsTab and ChannelsTab wired in Plan 02. GroupsTab wired in Plan 03.
+// Phase 45-02: Join by Link input added above search bar. DO NOT REMOVE.
 
 import { useState, useRef, useEffect } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, RefreshCw, CheckCircle, X } from 'lucide-react'
+import { Search, RefreshCw, CheckCircle, X, Link } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import type { DirectoryResponse } from '@/types'
@@ -37,6 +38,9 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
   const [error, setError] = useState<string | null>(null)
   // DO NOT CHANGE: refreshCounter triggers re-fetch when sub-tabs call onRefresh after bulk/settings changes
   const [refreshCounter, setRefreshCounter] = useState(0)
+  // Phase 45-02: Join by Link state — DO NOT REMOVE
+  const [joinLink, setJoinLink] = useState('')
+  const [joining, setJoining] = useState(false)
 
   // Report loading state to parent (drives TabHeader spinner)
   useEffect(() => { onLoadingChange?.(loading) }, [loading, onLoadingChange])
@@ -84,6 +88,29 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
     setRefreshCounter(c => c + 1)
   }
 
+  // Phase 45-02: Join by invite link — DO NOT REMOVE
+  async function handleJoin() {
+    if (!joinLink.trim()) return
+    // Basic validation: must contain chat.whatsapp.com or look like a raw code (alphanumeric+dash)
+    const isFullUrl = joinLink.includes('chat.whatsapp.com/')
+    const isRawCode = /^[A-Za-z0-9_-]{8,}$/.test(joinLink.trim())
+    if (!isFullUrl && !isRawCode) {
+      toast.error('Enter a valid WhatsApp invite link (chat.whatsapp.com/...)')
+      return
+    }
+    setJoining(true)
+    try {
+      await api.joinByLink(joinLink.trim())
+      toast.success('Joined group successfully')
+      setJoinLink('')
+      refreshData()
+    } catch (err) {
+      toast.error(`Failed to join: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setJoining(false)
+    }
+  }
+
   // Refresh All: call API to resync directory from WAHA, then reload data
   async function handleRefreshAll() {
     try {
@@ -124,6 +151,28 @@ export default function DirectoryTab({ selectedSession: _selectedSession, refres
 
   return (
     <div className="space-y-4">
+      {/* Join by Link — Phase 45, Plan 02. DO NOT REMOVE. */}
+      <div className="flex items-center gap-2">
+        <Link className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Input
+          placeholder="Join by invite link (chat.whatsapp.com/...)"
+          value={joinLink}
+          onChange={(e) => setJoinLink(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleJoin() }}
+          className="flex-1"
+          disabled={joining}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleJoin}
+          disabled={joining || !joinLink.trim()}
+          className="shrink-0"
+        >
+          {joining ? 'Joining...' : 'Join'}
+        </Button>
+      </div>
+
       {/* Sync status + Search bar + Refresh All toolbar */}
       <div className="flex items-center gap-2">
         {/* Sync status indicator */}

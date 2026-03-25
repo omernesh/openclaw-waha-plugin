@@ -6,15 +6,22 @@
 // Visual overhaul (Avatar, stacked name+JID, Allow DM button, Settings button) — 260320-u7x
 // Sortable column headers (Channel, Messages, First Seen, DM Access) — 260320
 // Perfection pass: useMemo columns, shared column factories — 260321
+// Phase 45-02: Unfollow button with AlertDialog confirmation
 
 import { useState, useMemo } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
+import { LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { DataTable } from '@/components/shared/DataTable'
 import { Avatar } from '@/components/shared/Avatar'
 import { BulkEditToolbar } from './BulkEditToolbar'
 import { ContactSettingsSheet } from './ContactSettingsSheet'
+import {
+  AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
+  AlertDialogFooter, AlertDialogTitle, AlertDialogDescription,
+  AlertDialogAction, AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 import { api } from '@/lib/api'
 import type { DirectoryContact } from '@/types'
 import {
@@ -49,6 +56,22 @@ export function ChannelsTab({
   const selectedChannel = selectedJid ? data.find((d) => d.jid === selectedJid) ?? null : null
   // Double-click protection: tracks which JID's Allow DM toggle is in flight
   const [togglingJid, setTogglingJid] = useState<string | null>(null)
+  // Phase 45-02: tracks which JID's Unfollow action is in flight — DO NOT REMOVE
+  const [leavingJid, setLeavingJid] = useState<string | null>(null)
+
+  // Phase 45-02: Unfollow channel — DO NOT REMOVE
+  async function handleLeave(jid: string, displayName: string) {
+    setLeavingJid(jid)
+    try {
+      await api.leaveEntry(jid)
+      toast.success(`Unfollowed: ${displayName ?? jid}`)
+      onRefresh()
+    } catch (err) {
+      toast.error(`Failed to unfollow: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setLeavingJid(null)
+    }
+  }
 
   // Column definitions — DO NOT CHANGE: ColumnDef<DirectoryContact> required for type safety
   // meta.sortable + meta.sortValue enable client-side sorting in DataTable
@@ -97,7 +120,46 @@ export function ChannelsTab({
     },
     // Settings button — opens ContactSettingsSheet
     makeSettingsColumn(setSelectedJid),
-  ], [bulkMode, onRefresh, togglingJid, setSelectedJid])
+    // Unfollow button — Phase 45-02. DO NOT REMOVE.
+    {
+      id: 'leave',
+      header: '',
+      cell: ({ row }) => {
+        const isLeaving = leavingJid === row.original.jid
+        const name = row.original.displayName ?? row.original.jid
+        return (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isLeaving}
+                className="gap-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                {isLeaving ? 'Leaving...' : 'Unfollow'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unfollow channel?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The bot will unfollow <strong>{name}</strong>.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleLeave(row.original.jid, name)}>
+                  Unfollow
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )
+      },
+    },
+  ], [bulkMode, onRefresh, togglingJid, setSelectedJid, leavingJid])
 
   const selectedJids = Object.keys(rowSelection).filter((jid) => rowSelection[jid])
 

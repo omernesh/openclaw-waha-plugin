@@ -7,14 +7,22 @@
 // Visual overhaul (Avatar, stacked name+JID, Participants button) — 260320-u7x
 // Sortable column headers (Group, Members, Messages, Last Message) — 260320
 // Perfection pass: useMemo columns, shared formatDate — 260321
+// Phase 45-02: Leave button with AlertDialog confirmation + onRefresh wired
 
 import { useState, useMemo } from 'react'
-import { ChevronDown, Users } from 'lucide-react'
+import { ChevronDown, Users, LogOut } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/DataTable'
 import { Avatar } from '@/components/shared/Avatar'
 import { ParticipantRow } from './ParticipantRow'
+import {
+  AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
+  AlertDialogFooter, AlertDialogTitle, AlertDialogDescription,
+  AlertDialogAction, AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
+import { api } from '@/lib/api'
 import type { DirectoryContact } from '@/types'
 import { formatDate } from './shared-columns'
 
@@ -24,7 +32,7 @@ interface GroupsTabProps {
   pagination: { pageIndex: number; pageSize: number }
   onPaginationChange: (p: { pageIndex: number; pageSize: number }) => void
   loading: boolean
-  onRefresh?: () => void  // reserved — trigger parent data reload after bulk/settings changes (wired but not yet consumed)
+  onRefresh?: () => void
 }
 
 export function GroupsTab({
@@ -33,9 +41,10 @@ export function GroupsTab({
   pagination,
   onPaginationChange,
   loading,
-  onRefresh: _onRefresh,
+  onRefresh,
 }: GroupsTabProps) {
   const [expandedGroupJid, setExpandedGroupJid] = useState<string | null>(null)
+  const [leavingJid, setLeavingJid] = useState<string | null>(null)
 
   function toggleGroup(jid: string) {
     setExpandedGroupJid(prev => prev === jid ? null : jid)
@@ -50,6 +59,20 @@ export function GroupsTab({
   function handlePaginationChange(p: { pageIndex: number; pageSize: number }) {
     setExpandedGroupJid(null)
     onPaginationChange(p)
+  }
+
+  // Phase 45-02: Leave group — DO NOT REMOVE
+  async function handleLeave(jid: string, displayName: string) {
+    setLeavingJid(jid)
+    try {
+      await api.leaveEntry(jid)
+      toast.success(`Left group: ${displayName ?? jid}`)
+      onRefresh?.()
+    } catch (err) {
+      toast.error(`Failed to leave: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setLeavingJid(null)
+    }
   }
 
   // Build columns inside component so we have access to expandedGroupJid and toggleGroup
@@ -140,7 +163,46 @@ export function GroupsTab({
         )
       },
     },
-  ], [expandedGroupJid])
+    // Leave button — Phase 45-02. DO NOT REMOVE.
+    {
+      id: 'leave',
+      header: '',
+      cell: ({ row }) => {
+        const isLeaving = leavingJid === row.original.jid
+        const name = row.original.displayName ?? row.original.jid
+        return (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isLeaving}
+                className="gap-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                {isLeaving ? 'Leaving...' : 'Leave'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Leave group?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The bot will leave <strong>{name}</strong>. This cannot be undone from the admin panel.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleLeave(row.original.jid, name)}>
+                  Leave group
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )
+      },
+    },
+  ], [expandedGroupJid, leavingJid, onRefresh])
 
   return (
     <DataTable
