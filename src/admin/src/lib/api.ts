@@ -113,6 +113,12 @@ export const api = {
     }),
   refreshDirectory: () =>
     request<void>('/directory/refresh', { method: 'POST' }),
+  // Phase 45: Join group by invite link. inviteLink can be full URL or raw code.
+  joinByLink: (inviteLink: string) =>
+    request<{ ok: boolean }>('/directory/join', { method: 'POST', body: JSON.stringify({ inviteLink }) }),
+  // Phase 45: Leave group or unfollow channel by JID. JID determines operation server-side.
+  leaveEntry: (jid: string) =>
+    request<{ ok: boolean }>(`/directory/leave/${encodeURIComponent(jid)}`, { method: 'POST' }),
   // Server returns { resolved: Record<string, string> } — use response.resolved to access names.
   resolveNames: (jids: string[]) =>
     request<{ resolved: Record<string, string> }>(`/directory/resolve?jids=${encodeURIComponent(jids.join(','))}`),
