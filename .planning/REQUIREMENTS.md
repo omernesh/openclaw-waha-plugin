@@ -62,6 +62,10 @@
 - [ ] **API-02**: `req.url` mutation in static file serving is replaced with a local variable; the original `req.url` is never modified
 - [ ] **API-03**: Nominatim geocode call uses `AbortSignal.timeout(5_000)` and a 1-request-per-second rate limit to respect free tier limits
 
+### Regression Testing
+
+- [ ] **REG-01**: Full regression test suite validates all v1.14 hardening changes work correctly together and no existing functionality is broken; all 460+ existing tests pass, new tests cover all v1.14 features, integration tests verify cross-feature interactions
+
 ## Future Requirements
 
 None — this milestone covers all identified gaps.
@@ -107,10 +111,11 @@ None — this milestone covers all identified gaps.
 | CFG-01 | Phase 40 | Pending |
 | CFG-02 | Phase 40 | Pending |
 | OBS-02 | Phase 41 | Pending |
+| REG-01 | Phase 42 | Pending |
 
 **Coverage:**
-- v1.14 requirements: 27 total
-- Mapped to phases: 27
+- v1.14 requirements: 28 total
+- Mapped to phases: 28
 - Unmapped: 0
 
 ---

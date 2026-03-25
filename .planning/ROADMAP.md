@@ -83,6 +83,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [ ] **Phase 39: Graceful Shutdown & SSE** - Request drain, SSE cleanup, SSE connection cap
 - [ ] **Phase 40: API & Config Polish** - Admin rate limiting, req.url fix, config bounds, per-account reliability
 - [ ] **Phase 41: Metrics Endpoint** - Prometheus /metrics with heap, event loop, request, SQLite, queue stats
+- [ ] **Phase 42: Full Regression Testing** - Comprehensive test suite covering all v1.14 changes + existing functionality
 
 ## Phase Details
 
@@ -203,20 +204,29 @@ Plans:
   1. `GET /metrics` returns Prometheus text format with heap usage, event loop lag, HTTP request rate counters
   2. `/metrics` includes SQLite query latency, queue depth, processing latency P95, and error rate
   3. `/metrics` endpoint is accessible without admin auth (or with a separate metrics token) for scraper compatibility
-**Plans**: 2 plans
-Plans:
-- [ ] 35-01-PLAN.md — Create logger module with child pattern + tests + logLevel config
-- [ ] 35-02-PLAN.md — Replace all 151 console.* calls across 21 source files
+**Plans**: TBD
+
+### Phase 42: Full Regression Testing
+**Goal**: Comprehensive regression test suite validates all v1.14 hardening changes work correctly together and no existing functionality is broken
+**Depends on**: All prior phases (33-41)
+**Requirements**: REG-01
+**Success Criteria** (what must be TRUE):
+  1. All existing tests pass (460+ tests from prior milestones)
+  2. New tests cover all v1.14 features: config mutex, admin auth, HMAC default, JID validation, structured logging, timeouts, SQLite hardening, circuit breaker, graceful shutdown, SSE cap, admin rate limiting, config bounds, metrics endpoint
+  3. Integration tests verify cross-feature interactions (e.g., admin auth + rate limiting, config mutex + atomic writes)
+  4. TypeScript compiles clean with zero errors
+  5. Build produces valid output (npm pack succeeds)
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 -> 41
+Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 -> 41 -> 42
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 33. Config Infrastructure | v1.14 | 1/2 | Complete    | 2026-03-25 |
-| 34. Security | v1.14 | 1/2 | Complete    | 2026-03-25 |
+| 33. Config Infrastructure | v1.14 | 2/2 | Complete    | 2026-03-25 |
+| 34. Security | v1.14 | 2/2 | Complete    | 2026-03-25 |
 | 35. Structured Logging | v1.14 | 0/TBD | Not started | - |
 | 36. Timeout & Error Hardening | v1.14 | 0/TBD | Not started | - |
 | 37. SQLite Hardening | v1.14 | 0/TBD | Not started | - |
@@ -224,3 +234,4 @@ Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 ->
 | 39. Graceful Shutdown & SSE | v1.14 | 0/TBD | Not started | - |
 | 40. API & Config Polish | v1.14 | 0/TBD | Not started | - |
 | 41. Metrics Endpoint | v1.14 | 0/TBD | Not started | - |
+| 42. Full Regression Testing | v1.14 | 0/TBD | Not started | - |
