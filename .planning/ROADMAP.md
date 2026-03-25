@@ -111,7 +111,9 @@ Plans:
   1. Agent can ask for a group's invite link and receive it without guessing the action name
   2. SKILL.md lists getInviteCode and revokeInviteCode with correct parameters and examples
   3. SKILL.md documents joinGroup action with both invite-link and group-name variants
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 44-01-PLAN.md — Expand Group Management invite-code docs + add Slash Commands section in SKILL.md
 
 ### Phase 45: Admin UI Join/Leave
 **Goal**: Users can leave any group/channel or join a new one directly from the directory tab in the admin panel
@@ -152,7 +154,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 43. Slash Commands | 2/2 | Complete    | 2026-03-25 |
-| 44. Invite Link Documentation | 0/? | Not started | - |
+| 44. Invite Link Documentation | 0/1 | Not started | - |
 | 45. Admin UI Join/Leave | 0/? | Not started | - |
 | 46. Skill Completeness Audit | 0/? | Not started | - |
 | 47. Live WhatsApp Testing | 0/? | Not started | - |
