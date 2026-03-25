@@ -120,7 +120,7 @@ export class DirectoryDb {
   private _startWalCheckpoint(): void {
     const INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
     const tick = () => {
-      try { this.db.pragma("wal_checkpoint(PASSIVE)"); } catch { /* db may be closed */ }
+      try { this.db.pragma("wal_checkpoint(PASSIVE)"); } catch (err) { log.warn("WAL checkpoint failed", { error: String(err) }); }
       this._walTimer = setTimeout(tick, INTERVAL_MS);
       this._walTimer.unref();
     };

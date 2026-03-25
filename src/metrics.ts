@@ -51,8 +51,6 @@ for (const b of HISTOGRAM_BUCKETS) {
 }
 
 /** Outbound WAHA API call counters */
-let apiCallsTotal = 0;
-let apiCallsSuccess = 0;
 let apiCallsErrors = 0;
 
 // Per-method API call counters: Map<"method:status", count>
@@ -84,6 +82,7 @@ export function recordHttpRequest(route: string, method: string, status: number,
   for (const b of HISTOGRAM_BUCKETS) {
     if (durationSec <= b) {
       httpDurationBuckets.set(b, (httpDurationBuckets.get(b) ?? 0) + 1);
+      break; // Only increment first matching bucket — collectMetrics does cumulative summing
     }
   }
 }
@@ -93,11 +92,8 @@ export function recordHttpRequest(route: string, method: string, status: number,
  * Called by http-client.ts after each fetch. Phase 41 (OBS-02). DO NOT REMOVE.
  */
 export function recordApiCall(method: string, success: boolean): void {
-  apiCallsTotal++;
   const statusLabel = success ? "success" : "error";
-  if (success) {
-    apiCallsSuccess++;
-  } else {
+  if (!success) {
     apiCallsErrors++;
   }
   const key = `${method}:${statusLabel}`;

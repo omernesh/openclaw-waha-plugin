@@ -93,7 +93,7 @@ export async function downloadWahaMedia(
   return {
     path: tmpPath,
     cleanup: async () => {
-      try { await unlink(tmpPath); } catch { /* ignore */ }
+      try { await unlink(tmpPath); } catch (err) { log.warn("media temp cleanup failed", { path: tmpPath, error: String(err) }); }
     },
   };
 }
@@ -332,8 +332,8 @@ export async function preprocessLocation(
         const geo = (await res.json()) as { display_name?: string };
         address = geo.display_name || "";
       }
-    } catch {
-      // ignore geocoding failure
+    } catch (err) {
+      log.warn("geocoding failed", { error: String(err) });
     }
   }
 

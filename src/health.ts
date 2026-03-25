@@ -328,8 +328,8 @@ async function attemptRecovery(
           connected = true;
           break;
         }
-      } catch {
-        // Poll failure is expected while session is restarting — keep polling
+      } catch (err) {
+        log.debug("recovery poll attempt failed (expected during restart)", { error: String(err) });
       }
     }
 

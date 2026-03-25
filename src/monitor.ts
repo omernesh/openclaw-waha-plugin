@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { readdir, stat, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,11 +14,10 @@ import {
   requestBodyErrorToText,
 } from "openclaw/plugin-sdk/webhook-ingress";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
-import { resolveWahaAccount } from "./accounts.js";
+import { resolveWahaAccount, listEnabledWahaAccounts } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
 import { getWahaGroupParticipants, getWahaContacts, toArr, getAllWahaPresence } from "./send.js";
-import { listEnabledWahaAccounts } from "./accounts.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
@@ -125,7 +124,9 @@ function requireAdminAuth(req: IncomingMessage, res: ServerResponse, coreCfg: Co
     writeJsonResponse(res, 401, { error: 'Authorization required' });
     return false;
   }
-  if (authHeader.slice(7) !== token) {
+  const provided = Buffer.from(authHeader.slice(7));
+  const expected = Buffer.from(token);
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
     writeJsonResponse(res, 401, { error: 'Invalid token' });
     return false;
   }
@@ -514,8 +515,8 @@ export function createWahaWebhookServer(opts: {
     // ── Admin API rate limiting — Phase 40, Plan 01 (API-01). DO NOT REMOVE.
     // 60 req/min per IP for /api/admin/* routes. Returns 429 when exceeded.
     if (req.url?.startsWith("/api/admin")) {
-      const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-        ?? req.socket.remoteAddress ?? "unknown";
+      const clientIp = req.socket.remoteAddress
+        ?? (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ?? "unknown";
       const rateCheck = checkAdminRateLimit(clientIp);
       if (!rateCheck.allowed) {
         res.writeHead(429, { "Content-Type": "application/json" });
@@ -976,7 +977,7 @@ export function createWahaWebhookServer(opts: {
         }
 
         const configPath = getConfigPath();
-        await writeConfig(configPath, importedConfig);
+        await withConfigMutex(async () => { await writeConfig(configPath, importedConfig); });
         try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { log.warn("clearWahaClientCache failed", { error: err instanceof Error ? err.message : String(err) }); }
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
@@ -2554,7 +2555,7 @@ export async function monitorWahaProvider(params: {
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number; running?: boolean }) => void;
 }) {
   // Phase 37 (MEM-02): clean up orphaned temp files before starting server
-  sweepOrphanedMediaFiles().catch(() => {});
+  sweepOrphanedMediaFiles().catch((err) => log.warn("media sweep failed", { error: String(err) }));
 
   const server = createWahaWebhookServer({
     accountId: params.accountId,

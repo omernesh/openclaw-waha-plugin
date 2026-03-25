@@ -158,7 +158,7 @@ export class InboundQueue {
       try {
         onQueueChange?.(this.getStats());
       } catch (err) {
-        console.error(`[WAHA] InboundQueue onQueueChange error in finally: ${String(err)}`);
+        log.error("InboundQueue onQueueChange error in finally", { error: String(err) });
       }
 
       // Re-check: items may have been enqueued while we were in the finally block
@@ -166,7 +166,7 @@ export class InboundQueue {
         try {
           this.drain();
         } catch (err) {
-          console.error(`[WAHA] InboundQueue recursive drain error: ${String(err)}`);
+          log.error("InboundQueue recursive drain error", { error: String(err) });
         }
       }
     }

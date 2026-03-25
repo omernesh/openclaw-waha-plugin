@@ -25,10 +25,6 @@ import {
 } from "./rules-loader.js";
 import { policyCache } from "./policy-cache.js";
 import { OWNER_ID } from "./rules-types.js";
-import { createLogger } from "./logger.js";
-
-
-const log = createLogger({ component: "policy-edit" });
 // -- Allowed fields per scope (derived from ContactRuleSchema / GroupRuleSchema) --
 // DO NOT CHANGE without updating the zod schemas in rules-types.ts.
 
