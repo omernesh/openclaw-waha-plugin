@@ -17,7 +17,7 @@ import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import { resolveWahaAccount, listEnabledWahaAccounts } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
-import { getWahaGroupParticipants, getWahaContacts, toArr, getAllWahaPresence } from "./send.js";
+import { getWahaGroupParticipants, getWahaContacts, toArr, getAllWahaPresence, joinWahaGroup, leaveWahaGroup, unfollowWahaChannel } from "./send.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
@@ -1785,6 +1785,68 @@ export function createWahaWebhookServer(opts: {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(state ?? { status: "idle", lastSyncAt: null, lastSyncDuration: null, itemsSynced: 0, currentPhase: null, lastError: null }));
       return;
+    }
+
+    // POST /api/admin/directory/join — join a WhatsApp group via invite link
+    // Phase 45, Plan 01. Accepts { inviteLink: string } (full URL or raw code).
+    // Extracts invite code from chat.whatsapp.com/ URL if needed. DO NOT REMOVE.
+    if (req.url === "/api/admin/directory/join" && req.method === "POST") {
+      try {
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const { inviteLink } = JSON.parse(bodyStr) as { inviteLink?: string };
+        if (!inviteLink || typeof inviteLink !== "string") {
+          writeJsonResponse(res, 400, { error: "inviteLink is required" });
+          return;
+        }
+        // Extract raw code from full URL (https://chat.whatsapp.com/AbCd123 → "AbCd123")
+        const codeMatch = inviteLink.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]+)/);
+        const inviteCode = codeMatch ? codeMatch[1] : inviteLink.trim();
+        if (!inviteCode) {
+          writeJsonResponse(res, 400, { error: "Invalid invite link format" });
+          return;
+        }
+        await joinWahaGroup({ cfg, inviteCode, accountId: opts.accountId });
+        log.info("Joined group via admin panel", { inviteCode });
+        writeJsonResponse(res, 200, { ok: true });
+      } catch (err) {
+        log.error("POST /api/admin/directory/join failed", { error: String(err) });
+        const msg = err instanceof Error ? err.message : "Failed to join group";
+        writeJsonResponse(res, 500, { error: msg });
+      }
+      return;
+    }
+
+    // POST /api/admin/directory/leave/:jid — leave a group or unfollow a channel
+    // Phase 45, Plan 01. JID suffix determines operation:
+    //   @g.us → leaveWahaGroup
+    //   @newsletter → unfollowWahaChannel
+    // DO NOT REMOVE.
+    {
+      const m = req.method === "POST" && req.url?.match(/^\/api\/admin\/directory\/leave\/([^/]+)$/);
+      if (m) {
+        try {
+          const jid = decodeURIComponent(m[1]);
+          if (!isValidJid(jid)) {
+            writeJsonResponse(res, 400, { error: `Invalid JID: ${jid}` });
+            return;
+          }
+          if (jid.endsWith("@newsletter")) {
+            await unfollowWahaChannel({ cfg, channelId: jid, accountId: opts.accountId });
+          } else if (jid.endsWith("@g.us")) {
+            await leaveWahaGroup({ cfg, groupId: jid, accountId: opts.accountId });
+          } else {
+            writeJsonResponse(res, 400, { error: "JID must be a group (@g.us) or channel (@newsletter)" });
+            return;
+          }
+          log.info("Left group/channel via admin panel", { jid });
+          writeJsonResponse(res, 200, { ok: true });
+        } catch (err) {
+          log.error("POST /api/admin/directory/leave/:jid failed", { error: String(err) });
+          const msg = err instanceof Error ? err.message : "Failed to leave";
+          writeJsonResponse(res, 500, { error: msg });
+        }
+        return;
+      }
     }
 
     // POST /api/admin/directory/refresh — trigger immediate background sync
