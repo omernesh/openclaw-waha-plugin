@@ -10,9 +10,7 @@
 // (Phase 13, 2026-03-17). Both must stay in sync — if the pipeline changes here,
 // update the monitor.ts handler too (or better: have monitor.ts call triggerImmediateSync).
 
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
+import { getConfigPath, modifyConfig } from "./config-io.js";
 import { getDirectoryDb } from "./directory.js";
 import {
   getWahaChats, getWahaContacts, getWahaGroups, getWahaAllLids,
@@ -183,28 +181,27 @@ async function tick(opts: SyncOptions, state: SyncState): Promise<void> {
  * Without this, expired entries remain in allowFrom and inbound continues to grant access.
  * DO NOT REMOVE — closing this gap is what makes TTL enforcement actually work.
  */
-function syncExpiredToConfig(expiredJids: string[]): number {
+async function syncExpiredToConfig(expiredJids: string[]): Promise<number> {
   if (expiredJids.length === 0) return 0;
-  const configPath = process.env.OPENCLAW_CONFIG_PATH ?? join(homedir(), ".openclaw", "openclaw.json");
+  const configPath = getConfigPath();
+  let removed = 0;
   try {
-    const raw = readFileSync(configPath, "utf-8");
-    const config = JSON.parse(raw) as Record<string, unknown>;
-    const channels = (config.channels as Record<string, unknown>) ?? {};
-    const waha = (channels.waha as Record<string, unknown>) ?? {};
-    const allowFrom = (Array.isArray(waha.allowFrom) ? waha.allowFrom : []).filter((x): x is string => typeof x === 'string');
-    let removed = 0;
-    for (const jid of expiredJids) {
-      const idx = allowFrom.indexOf(jid);
-      if (idx >= 0) {
-        allowFrom.splice(idx, 1);
-        removed++;
+    await modifyConfig(configPath, (config) => {
+      const channels = (config.channels as Record<string, unknown>) ?? {};
+      const waha = (channels.waha as Record<string, unknown>) ?? {};
+      const allowFrom = (Array.isArray(waha.allowFrom) ? waha.allowFrom : []).filter((x): x is string => typeof x === 'string');
+      for (const jid of expiredJids) {
+        const idx = allowFrom.indexOf(jid);
+        if (idx >= 0) {
+          allowFrom.splice(idx, 1);
+          removed++;
+        }
       }
-    }
-    if (removed > 0) {
-      waha.allowFrom = allowFrom;
-      config.channels = { ...channels, waha };
-      writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-    }
+      if (removed > 0) {
+        waha.allowFrom = allowFrom;
+        config.channels = { ...channels, waha };
+      }
+    });
     return removed;
   } catch (err) {
     console.error(`[waha] sync: syncExpiredToConfig failed: ${String(err)}`);
@@ -506,7 +503,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   // DO NOT REMOVE — this is what makes TTL actually block expired contacts.
   try {
     const expiredJids = db.getExpiredJids();
-    const configRemoved = syncExpiredToConfig(expiredJids);
+    const configRemoved = await syncExpiredToConfig(expiredJids);
     if (configRemoved < 0) {
       state.lastError = "TTL config sync failed";
     } else if (configRemoved > 0) {
