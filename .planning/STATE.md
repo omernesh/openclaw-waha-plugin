@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness
-status: Ready to plan
-stopped_at: Completed 44-01-PLAN.md
-last_updated: "2026-03-25T19:58:27.821Z"
+status: Ready to execute
+stopped_at: Completed 45-01-PLAN.md
+last_updated: "2026-03-25T20:11:36.474Z"
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 44 — invite-link-documentation
+**Current focus:** Phase 45 — admin-ui-join-leave
 
 ## Current Position
 
-Phase: 45
-Plan: Not started
+Phase: 45 (admin-ui-join-leave) — EXECUTING
+Plan: 2 of 2
 
 ## Accumulated Context
 
@@ -50,6 +50,8 @@ Plan: Not started
 - [Phase 43-slash-commands]: Guard pending selection block with !slashMatch to prevent slash commands being treated as numbered replies
 - [Phase 44-invite-link-documentation]: Expanded Group Management table to 3-column format to accommodate return value descriptions
 - [Phase 44-invite-link-documentation]: Placed /join /leave /list section before /shutup section per plan ordering requirement
+- [Phase 45]: invite code extraction from full chat.whatsapp.com URL handled server-side — client sends raw link
+- [Phase 45]: JID suffix (@g.us vs @newsletter) determines backend call — no separate endpoints needed
 
 ### Pending Todos
 
@@ -75,6 +77,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T19:55:28.483Z
-Stopped at: Completed 44-01-PLAN.md
+Last session: 2026-03-25T20:11:36.469Z
+Stopped at: Completed 45-01-PLAN.md
 Resume file: None

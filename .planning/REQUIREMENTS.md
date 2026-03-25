@@ -23,9 +23,9 @@ Requirements for Join/Leave/List & Skill Completeness milestone.
 
 ### Admin UI
 
-- [ ] **UI-01**: Directory tab shows a "Leave" action button on each group/channel row
-- [ ] **UI-02**: Directory tab has a "Join by Link" input field for joining groups via invite URL
-- [ ] **UI-03**: Leave/Join actions provide success/error feedback in the UI
+- [x] **UI-01**: Directory tab shows a "Leave" action button on each group/channel row
+- [x] **UI-02**: Directory tab has a "Join by Link" input field for joining groups via invite URL
+- [x] **UI-03**: Leave/Join actions provide success/error feedback in the UI
 
 ### Skill Completeness
 
@@ -67,9 +67,9 @@ None deferred — all features in scope for v1.18.
 | CMD-06 | Phase 43 | Complete |
 | INV-01 | Phase 44 | Complete |
 | INV-02 | Phase 44 | Complete |
-| UI-01 | Phase 45 | Pending |
-| UI-02 | Phase 45 | Pending |
-| UI-03 | Phase 45 | Pending |
+| UI-01 | Phase 45 | Complete |
+| UI-02 | Phase 45 | Complete |
+| UI-03 | Phase 45 | Complete |
 | SKL-01 | Phase 46 | Pending |
 | SKL-02 | Phase 46 | Pending |
 | SKL-03 | Phase 46 | Pending |

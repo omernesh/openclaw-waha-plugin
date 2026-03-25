@@ -123,9 +123,9 @@ Plans:
   1. Every group and channel row in the directory tab shows a "Leave" button that triggers the WAHA leave API
   2. Directory tab has a "Join by Link" input field that accepts a WhatsApp invite URL and executes join on submit
   3. Leave and Join actions display a success toast or inline error — no silent failures
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 45-01-PLAN.md — Backend routes (monitor.ts) + API client methods (api.ts)
+- [x] 45-01-PLAN.md — Backend routes (monitor.ts) + API client methods (api.ts)
 - [ ] 45-02-PLAN.md — UI components: AlertDialog, Leave buttons, Join by Link input
 
 ### Phase 46: Skill Completeness Audit
@@ -157,6 +157,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 43. Slash Commands | 2/2 | Complete    | 2026-03-25 |
 | 44. Invite Link Documentation | 1/1 | Complete    | 2026-03-25 |
-| 45. Admin UI Join/Leave | 0/2 | Not started | - |
+| 45. Admin UI Join/Leave | 1/2 | In Progress|  |
 | 46. Skill Completeness Audit | 0/? | Not started | - |
 | 47. Live WhatsApp Testing | 0/? | Not started | - |
