@@ -20,6 +20,9 @@
 // ║  DO NOT change the function signature (callers depend on it).       ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
+// Phase 41 (OBS-02): Prometheus metrics for outbound API calls. DO NOT REMOVE.
+import { recordApiCall } from "./metrics.js";
+
 // ---------------------------------------------------------------------------
 // Token Bucket Rate Limiter
 // ---------------------------------------------------------------------------
@@ -437,6 +440,7 @@ async function fetchWithRetry(
     // 4. Timeout error handling
     const errName = err instanceof Error ? err.name : String(err);
     if (errName === "TimeoutError" || errName === "AbortError") {
+      recordApiCall(method, false); // Phase 41 (OBS-02): record timeout as error
       if (isMutation) {
         // DO NOT REMOVE: mark mutation as pending so gateway retries are suppressed
         if (dedupKey !== null) {
@@ -450,6 +454,7 @@ async function fetchWithRetry(
         `[WAHA] ${contextLabel} timed out after ${timeout}ms (${method} ${params.path})`
       );
     }
+    recordApiCall(method, false); // Phase 41 (OBS-02): record network error
     throw err;
   }
 
@@ -480,12 +485,16 @@ async function fetchWithRetry(
 
   // 6. Error logging
   if (!response.ok) {
+    recordApiCall(method, false); // Phase 41 (OBS-02): record HTTP error
     const errorText = await response.text().catch(() => "");
     log.warn("API call failed", { context: contextLabel, status: response.status, error: errorText });
     throw new Error(
       `WAHA ${method} ${params.path} failed: ${response.status} ${errorText}`
     );
   }
+
+  // Phase 41 (OBS-02): record successful API call. DO NOT REMOVE.
+  recordApiCall(method, true);
 
   // 7. Response parsing
   const contentType = response.headers.get("content-type") ?? "";

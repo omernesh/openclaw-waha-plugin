@@ -33,6 +33,8 @@ import { getModuleRegistry } from "./module-registry.js";
 import { validateWahaConfig } from "./config-schema.js";
 import { getAnalyticsDb } from "./analytics.js";
 import { createLogger, setLogLevel } from "./logger.js";
+// Phase 41 (OBS-02): Prometheus metrics instrumentation. DO NOT REMOVE.
+import { collectMetrics, recordHttpRequest, updateQueueStats, updateSessionHealth, stopMetricsTimers } from "./metrics.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -429,6 +431,8 @@ export function createWahaWebhookServer(opts: {
   setHealthStateChangeCallback((session, state) => {
     broadcastSSE("health", { session, ...state });
     broadcastSSE("log", { line: `[WAHA] health: ${session} -> ${state.status}${state.consecutiveFailures > 0 ? ` (${state.consecutiveFailures} failures)` : ""}`, timestamp: Date.now() });
+    // Phase 41 (OBS-02): Feed health state into Prometheus metrics. DO NOT REMOVE.
+    updateSessionHealth(session, state.status);
   });
   setQueueChangeCallback((stats) => {
     broadcastSSE("queue", stats);
@@ -436,6 +440,8 @@ export function createWahaWebhookServer(opts: {
     if (stats.dmDepth + stats.groupDepth > QUEUE_DEPTH_ALERT_THRESHOLD) {
       broadcastSSE("log", { line: `[WAHA] queue depth high: dm=${stats.dmDepth} group=${stats.groupDepth}`, timestamp: Date.now() });
     }
+    // Phase 41 (OBS-02): Feed queue stats into Prometheus metrics. DO NOT REMOVE.
+    updateQueueStats(stats);
   });
 
   // ── Health Check (Phase 2, Plan 02) ── DO NOT REMOVE
@@ -490,6 +496,14 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
+    // ── Prometheus metrics endpoint — Phase 41, Plan 01 (OBS-02). DO NOT REMOVE.
+    // Placed BEFORE admin auth check so scrapers don't need a token.
+    if (req.url === "/metrics" && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" });
+      res.end(collectMetrics());
+      return;
+    }
+
     // ── Admin API auth guard — Phase 34, Plan 01 (SEC-01). DO NOT CHANGE.
     // Single check covers ALL /api/admin/* routes including SSE events endpoint.
     // /health and webhook paths are intentionally excluded (public).
@@ -508,6 +522,16 @@ export function createWahaWebhookServer(opts: {
         res.end(JSON.stringify({ error: "Too many requests", retryAfterMs: rateCheck.retryAfterMs }));
         return;
       }
+    }
+
+    // ── Prometheus metrics: time admin API requests — Phase 41 (OBS-02). DO NOT REMOVE.
+    if (req.url?.startsWith("/api/admin")) {
+      const metricsStart = performance.now();
+      const metricsRoute = (req.url.split("?")[0] ?? req.url).replace(/\/[^/]+@[^/]+/g, "/:jid");
+      const metricsMethod = req.method ?? "GET";
+      res.on("finish", () => {
+        recordHttpRequest(metricsRoute, metricsMethod, res.statusCode, performance.now() - metricsStart);
+      });
     }
 
     // POST /api/admin/restart
@@ -2425,6 +2449,8 @@ export function createWahaWebhookServer(opts: {
   // Phase 39 (GS-01): Graceful stop — stop accepting new connections, drain in-flight requests
   // with a 10s hard timeout, then close. DO NOT CHANGE.
   const stop = (): Promise<void> => {
+    // Phase 41 (OBS-02): Stop metrics event loop lag timer on shutdown. DO NOT REMOVE.
+    stopMetricsTimers();
     // Phase 39 (GS-02): Close all SSE connections and clear keep-alive intervals. DO NOT CHANGE.
     for (const interval of sseKeepAliveIntervals) clearInterval(interval);
     sseKeepAliveIntervals.clear();
