@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, existsSync, copyFileSync, renameSync } from "node:fs";
-import { homedir } from "node:os";
+import { readFileSync, existsSync } from "node:fs";
+import { getConfigPath, readConfig, writeConfig, modifyConfig, withConfigMutex } from "./config-io.js";
+// homedir removed (Phase 33) — getConfigPath moved to config-io.ts
 import { join, extname, dirname, resolve as pathResolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
@@ -239,30 +240,9 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
   return result;
 }
 
-function getConfigPath(): string {
-  // Config save path: must write to ~/.openclaw/openclaw.json (NOT workspace subfolder)
-  return process.env.OPENCLAW_CONFIG_PATH ?? join(homedir(), ".openclaw", "openclaw.json");
-}
+// getConfigPath moved to config-io.ts (Phase 33). Imported at top of file.
 
-// rotateConfigBackups — creates a rolling backup of openclaw.json before each save.
-// Keeps at most 3 backups: .bak.1 (newest), .bak.2, .bak.3 (oldest).
-// Rotation: delete .bak.3, shift .bak.2->.bak.3, .bak.1->.bak.2, copy current->.bak.1.
-// Failure is non-fatal: logs a warning but does NOT block the save.
-// Added Phase 26 (CFG-03). DO NOT REMOVE.
-function rotateConfigBackups(configPath: string): void {
-  try {
-    const bak1 = configPath + ".bak.1";
-    const bak2 = configPath + ".bak.2";
-    const bak3 = configPath + ".bak.3";
-    // Shift existing backups: .bak.2 -> .bak.3, .bak.1 -> .bak.2
-    if (existsSync(bak2)) renameSync(bak2, bak3);
-    if (existsSync(bak1)) renameSync(bak1, bak2);
-    // Copy current config as newest backup
-    if (existsSync(configPath)) copyFileSync(configPath, bak1);
-  } catch (err) {
-    console.warn(`[waha] rotateConfigBackups: backup failed (non-fatal): ${String(err)}`);
-  }
-}
+// rotateConfigBackups moved to config-io.ts (Phase 33). Called internally by writeConfig().
 
 // Legacy buildAdminHtml and escapeHtml removed in Phase 24 — React SPA serves /admin now.
 
@@ -274,33 +254,33 @@ export function readWahaWebhookBody(req: IncomingMessage, maxBodyBytes: number):
   });
 }
 
-function syncAllowListBatch(configPath: string, field: "allowFrom" | "groupAllowFrom", jids: string[], add: boolean): void {
+async function syncAllowListBatch(configPath: string, field: "allowFrom" | "groupAllowFrom", jids: string[], add: boolean): Promise<void> {
   // DB state is already committed before this call. Config sync failure should not crash the request.
   // Log the error but don't rethrow — the DB state is correct, config will resync on next save.
+  // Phase 33: converted to async config-io (modifyConfig gives mutex protection). DO NOT CHANGE.
   try {
-    const raw = readFileSync(configPath, "utf-8");
-    const config = JSON.parse(raw) as Record<string, unknown>;
-    const channels = (config.channels as Record<string, unknown>) ?? {};
-    const waha = (channels.waha as Record<string, unknown>) ?? {};
-    const list: string[] = Array.isArray(waha[field]) ? (waha[field] as string[]) : [];
-    for (const jid of jids) {
-      if (add && !list.includes(jid)) {
-        list.push(jid);
-      } else if (!add) {
-        const idx = list.indexOf(jid);
-        if (idx >= 0) list.splice(idx, 1);
+    await modifyConfig(configPath, (config) => {
+      const channels = (config.channels as Record<string, unknown>) ?? {};
+      const waha = (channels.waha as Record<string, unknown>) ?? {};
+      const list: string[] = Array.isArray(waha[field]) ? (waha[field] as string[]) : [];
+      for (const jid of jids) {
+        if (add && !list.includes(jid)) {
+          list.push(jid);
+        } else if (!add) {
+          const idx = list.indexOf(jid);
+          if (idx >= 0) list.splice(idx, 1);
+        }
       }
-    }
-    waha[field] = list;
-    config.channels = { ...channels, waha };
-    writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+      waha[field] = list;
+      config.channels = { ...channels, waha };
+    });
   } catch (err) {
     console.error(`[waha] syncAllowListBatch: failed to sync ${field} config at ${configPath}: ${String(err)}`);
   }
 }
 
-function syncAllowList(configPath: string, field: "allowFrom" | "groupAllowFrom", jid: string, add: boolean): void {
-  syncAllowListBatch(configPath, field, [jid], add);
+async function syncAllowList(configPath: string, field: "allowFrom" | "groupAllowFrom", jid: string, add: boolean): Promise<void> {
+  await syncAllowListBatch(configPath, field, [jid], add);
 }
 
 // DIR-01 (12-05): Cache for bot session JIDs — maps session name to @c.us JID fetched from WAHA /api/{session}/me.
@@ -811,12 +791,12 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/api/admin/config/export" && req.method === "GET") {
       try {
         const configPath = getConfigPath();
-        const raw = readFileSync(configPath, "utf-8");
+        const config = await readConfig(configPath);
         res.writeHead(200, {
           "Content-Type": "application/json",
           "Content-Disposition": 'attachment; filename="openclaw-config.json"',
         });
-        res.end(raw);
+        res.end(JSON.stringify(config, null, 2));
       } catch (err) {
         console.error(`[waha] GET /api/admin/config/export failed: ${String(err)}`);
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
@@ -849,8 +829,7 @@ export function createWahaWebhookServer(opts: {
         }
 
         const configPath = getConfigPath();
-        rotateConfigBackups(configPath);
-        writeFileSync(configPath, JSON.stringify(importedConfig, null, 2), "utf-8");
+        await writeConfig(configPath, importedConfig);
         try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { console.warn("[waha] clearWahaClientCache failed:", err); }
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
@@ -867,60 +846,67 @@ export function createWahaWebhookServer(opts: {
         const incoming = JSON.parse(bodyStr) as Record<string, unknown>;
 
         const configPath = getConfigPath();
-        const currentConfigStr = readFileSync(configPath, "utf-8");
-        const currentConfig = JSON.parse(currentConfigStr) as Record<string, unknown>;
-
-        // Deep merge incoming.waha into channels.waha
-        const currentChannels = (currentConfig.channels as Record<string, unknown>) ?? {};
-        const currentWaha = (currentChannels.waha as Record<string, unknown>) ?? {};
         const incomingWaha = (incoming.waha as Record<string, unknown>) ?? {};
 
-        // Preserve session and apiKey/webhookHmacKey (sensitive fields not in form)
-        const merged = deepMerge(currentWaha, incomingWaha);
-        if (currentWaha.session) merged.session = currentWaha.session;
-        if (currentWaha.apiKey) merged.apiKey = currentWaha.apiKey;
-        if (currentWaha.webhookHmacKey) merged.webhookHmacKey = currentWaha.webhookHmacKey;
-        if (currentWaha.webhookHmacKeyFile) merged.webhookHmacKeyFile = currentWaha.webhookHmacKeyFile;
-        // godModeSuperUsers are now editable via the admin panel UI
+        // Phase 33: wrap read-modify-write in withConfigMutex to prevent concurrent config saves from racing.
+        // DO NOT CHANGE — mutex serialization is critical for concurrent admin API calls.
+        const result = await withConfigMutex(async () => {
+          const currentConfig = await readConfig(configPath);
 
-        // Validate merged waha config against Zod schema before writing to disk.
-        // Returns 400 with field-level errors on failure — does NOT modify config file.
-        // Added Phase 26 (CFG-01, CFG-02). DO NOT REMOVE.
-        const validationResult = validateWahaConfig(merged);
-        if (!validationResult.valid) {
-          writeJsonResponse(res, 400, {
-            error: "validation_failed",
-            fields: validationResult.errors.map((e) => ({
-              path: e.path.join("."),
-              message: e.message,
-            })),
-          });
-          return;
-        }
+          // Deep merge incoming.waha into channels.waha
+          const currentChannels = (currentConfig.channels as Record<string, unknown>) ?? {};
+          const currentWaha = (currentChannels.waha as Record<string, unknown>) ?? {};
 
-        const updatedConfig = {
-          ...currentConfig,
-          channels: {
-            ...currentChannels,
-            waha: merged,
-          },
-        };
+          // Preserve session and apiKey/webhookHmacKey (sensitive fields not in form)
+          const merged = deepMerge(currentWaha, incomingWaha);
+          if (currentWaha.session) merged.session = currentWaha.session;
+          if (currentWaha.apiKey) merged.apiKey = currentWaha.apiKey;
+          if (currentWaha.webhookHmacKey) merged.webhookHmacKey = currentWaha.webhookHmacKey;
+          if (currentWaha.webhookHmacKeyFile) merged.webhookHmacKeyFile = currentWaha.webhookHmacKeyFile;
+          // godModeSuperUsers are now editable via the admin panel UI
 
-        // Check if restart is required (connection settings changed)
-        const restartRequired =
-          incomingWaha.baseUrl !== undefined ||
-          incomingWaha.webhookPort !== undefined ||
-          incomingWaha.webhookPath !== undefined;
+          // Validate merged waha config against Zod schema before writing to disk.
+          // Returns 400 with field-level errors on failure — does NOT modify config file.
+          // Added Phase 26 (CFG-01, CFG-02). DO NOT REMOVE.
+          const validationResult = validateWahaConfig(merged);
+          if (!validationResult.valid) {
+            writeJsonResponse(res, 400, {
+              error: "validation_failed",
+              fields: validationResult.errors.map((e) => ({
+                path: e.path.join("."),
+                message: e.message,
+              })),
+            });
+            return null; // validation failed, response already sent
+          }
 
-        // Rotate backups before writing — keeps last 3 copies as safety net.
-        // Backup failure is non-fatal (logged as warning). Added Phase 26 (CFG-03).
-        rotateConfigBackups(configPath);
-        writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
+          const updatedConfig = {
+            ...currentConfig,
+            channels: {
+              ...currentChannels,
+              waha: merged,
+            },
+          };
+
+          // Check if restart is required (connection settings changed)
+          const restartRequired =
+            incomingWaha.baseUrl !== undefined ||
+            incomingWaha.webhookPort !== undefined ||
+            incomingWaha.webhookPath !== undefined;
+
+          // writeConfig handles backup rotation + atomic write. Added Phase 33.
+          await writeConfig(configPath, updatedConfig);
+          return { restartRequired };
+        });
+
+        // If validation failed inside the mutex, response was already sent — skip.
+        if (result === null) return;
+
         try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { console.warn("[waha] clearWahaClientCache failed:", err); }
         // Phase 29, Plan 02: emit log SSE event on config save. DO NOT REMOVE.
-        broadcastSSE("log", { line: `[WAHA] config saved${restartRequired ? " (restart required)" : ""}`, timestamp: Date.now() });
+        broadcastSSE("log", { line: `[WAHA] config saved${result.restartRequired ? " (restart required)" : ""}`, timestamp: Date.now() });
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, restartRequired }));
+        res.end(JSON.stringify({ ok: true, restartRequired: result.restartRequired }));
       } catch (err) {
         console.error(`[waha] config save failed: ${String(err)}`);
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
@@ -1375,26 +1361,28 @@ export function createWahaWebhookServer(opts: {
           return;
         }
 
-        // Read-modify-write config file
+        // Phase 33: read-modify-write via modifyConfig (mutex-protected, async, atomic). DO NOT CHANGE.
         const configPath = getConfigPath();
-        const currentConfigStr = readFileSync(configPath, "utf-8");
-        const currentConfig = JSON.parse(currentConfigStr) as Record<string, unknown>;
-        const channels = (currentConfig.channels as Record<string, unknown>) ?? {};
-        const wahaSection = (channels.waha as Record<string, unknown>) ?? {};
+        const _matchedAccId = matchedAcc.accountId;
+        const _bodyRole = body.role;
+        const _bodySubRole = body.subRole;
+        await modifyConfig(configPath, (currentConfig) => {
+          const channels = (currentConfig.channels as Record<string, unknown>) ?? {};
+          const wahaSection = (channels.waha as Record<string, unknown>) ?? {};
 
-        const accounts = wahaSection.accounts as Record<string, Record<string, unknown>> | undefined;
-        if (matchedAcc.accountId === "__default__" || !accounts || !accounts[matchedAcc.accountId]) {
-          // Default account -- write role/subRole to channels.waha directly
-          if (body.role !== undefined) wahaSection.role = body.role;
-          if (body.subRole !== undefined) wahaSection.subRole = body.subRole;
-        } else {
-          // Named account -- write to channels.waha.accounts[accountId]
-          if (body.role !== undefined) accounts[matchedAcc.accountId].role = body.role;
-          if (body.subRole !== undefined) accounts[matchedAcc.accountId].subRole = body.subRole;
-        }
+          const accounts = wahaSection.accounts as Record<string, Record<string, unknown>> | undefined;
+          if (_matchedAccId === "__default__" || !accounts || !accounts[_matchedAccId]) {
+            // Default account -- write role/subRole to channels.waha directly
+            if (_bodyRole !== undefined) wahaSection.role = _bodyRole;
+            if (_bodySubRole !== undefined) wahaSection.subRole = _bodySubRole;
+          } else {
+            // Named account -- write to channels.waha.accounts[accountId]
+            if (_bodyRole !== undefined) accounts[_matchedAccId].role = _bodyRole;
+            if (_bodySubRole !== undefined) accounts[_matchedAccId].subRole = _bodySubRole;
+          }
 
-        const updatedConfig = { ...currentConfig, channels: { ...channels, waha: wahaSection } };
-        writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), "utf-8");
+          currentConfig.channels = { ...channels, waha: wahaSection };
+        });
 
         writeJsonResponse(res, 200, { ok: true });
         console.log(`[waha] Session role updated: ${sessionId} -> role=${body.role ?? "(unchanged)"} subRole=${body.subRole ?? "(unchanged)"}`);
@@ -1620,10 +1608,10 @@ export function createWahaWebhookServer(opts: {
           }
         }
         // Batch config sync — single file read+write per action type instead of per-JID
-        if (allowDmJids.length) syncAllowListBatch(configPath, "allowFrom", allowDmJids, true);
-        if (revokeDmJids.length) syncAllowListBatch(configPath, "allowFrom", revokeDmJids, false);
-        if (allowGroupJids.length) syncAllowListBatch(configPath, "groupAllowFrom", allowGroupJids, true);
-        if (revokeGroupJids.length) syncAllowListBatch(configPath, "groupAllowFrom", revokeGroupJids, false);
+        if (allowDmJids.length) await syncAllowListBatch(configPath, "allowFrom", allowDmJids, true);
+        if (revokeDmJids.length) await syncAllowListBatch(configPath, "allowFrom", revokeDmJids, false);
+        if (allowGroupJids.length) await syncAllowListBatch(configPath, "groupAllowFrom", allowGroupJids, true);
+        if (revokeGroupJids.length) await syncAllowListBatch(configPath, "groupAllowFrom", revokeGroupJids, false);
         writeJsonResponse(res, 200, { ok: true, updated });
       } catch (err) {
         console.error(`[waha] POST /api/admin/directory/bulk failed: ${String(err)}`);
@@ -1673,7 +1661,7 @@ export function createWahaWebhookServer(opts: {
           }
           const db = getDirectoryDb(opts.accountId);
           db.setContactAllowDm(jid, allowed, expiresAt ?? null);
-          syncAllowList(getConfigPath(), "allowFrom", jid, allowed);
+          await syncAllowList(getConfigPath(), "allowFrom", jid, allowed);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
@@ -1843,7 +1831,7 @@ export function createWahaWebhookServer(opts: {
           }
           const db = getDirectoryDb(opts.accountId);
           db.setParticipantAllowInGroup(groupJid, participantJid, allowed);
-          syncAllowList(getConfigPath(), "groupAllowFrom", participantJid, allowed);
+          await syncAllowList(getConfigPath(), "groupAllowFrom", participantJid, allowed);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
@@ -1873,7 +1861,7 @@ export function createWahaWebhookServer(opts: {
           db.setParticipantAllowDm(groupJid, participantJid, allowed);
           // Also update allow_list with TTL — setParticipantAllowDm doesn't support expiresAt. DO NOT REMOVE.
           db.setContactAllowDm(participantJid, allowed, expiresAt ?? null);
-          syncAllowList(getConfigPath(), "allowFrom", participantJid, allowed);
+          await syncAllowList(getConfigPath(), "allowFrom", participantJid, allowed);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
@@ -1928,7 +1916,7 @@ export function createWahaWebhookServer(opts: {
           db.setGroupAllowAll(groupJid, allowed);
           const participants = db.getGroupParticipants(groupJid);
           const configPath = getConfigPath();
-          syncAllowListBatch(configPath, "groupAllowFrom", participants.map(p => p.participantJid), allowed);
+          await syncAllowListBatch(configPath, "groupAllowFrom", participants.map(p => p.participantJid), allowed);
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
@@ -1986,7 +1974,7 @@ export function createWahaWebhookServer(opts: {
         const jid = decodeURIComponent(req.url.replace("/api/admin/pairing/grant/", ""));
         const db = getDirectoryDb(opts.accountId);
         db.revokePairingGrant(jid);
-        syncAllowList(getConfigPath(), "allowFrom", jid, false);
+        await syncAllowList(getConfigPath(), "allowFrom", jid, false);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
       } catch (err) {
