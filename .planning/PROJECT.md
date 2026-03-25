@@ -88,21 +88,17 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone: v1.14 Enterprise Hardening
+## Current Milestone: v1.18 Join/Leave/List & Skill Completeness
 
-**Goal:** Close all 27 security, resilience, observability, concurrency, and lifecycle gaps to make the plugin production-safe for internet-facing deployment.
+**Goal:** Make it dead simple for users and agents to join/leave groups and channels, list memberships, and get invite links — all without wasting LLM tokens. Ensure the WhatsApp skill documents ALL available WAHA API endpoints.
 
 **Target features:**
-- Admin API authentication (Bearer token)
-- Config file write serialization (mutex + atomic writes)
-- Structured logging module (JSON format)
-- Metrics endpoint (/metrics)
-- Graceful shutdown with request drain
-- Media/fetch timeout coverage (all bare fetch() calls)
-- Admin API rate limiting
-- SQLite hardening (busy_timeout, WAL checkpoints, temp cleanup)
-- Config validation tightening (bounds, import scope, HMAC defaults)
-- SSE connection cap, circuit breaker, JID validation
+- Slash commands (/join, /leave, /list) that bypass the LLM entirely
+- Fuzzy name resolution for join/leave with LLM confirmation on ambiguous matches
+- Invite link retrieval and sharing (existing API, documentation gap)
+- Admin UI: Leave button per group/channel row, Join by Link input in directory tab
+- Full WAHA API endpoint audit in whatsapp-messenger skill (excluding hijacked endpoints)
+- Live WhatsApp testing of all new features
 
 ## Context
 
@@ -164,4 +160,4 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-25 — v1.14 milestone started*
+*Last updated: 2026-03-25 — v1.18 milestone started*
