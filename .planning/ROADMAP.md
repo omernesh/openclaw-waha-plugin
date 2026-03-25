@@ -151,9 +151,9 @@ Plans:
   4. /list, /list groups, /list channels each return correct filtered membership lists
   5. Invite link retrieval works: agent receives the link when asked via LLM action
   6. Admin UI Leave and Join by Link both complete successfully and show correct feedback in browser
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 47-01-PLAN.md — Build and deploy v1.18 to hpg6, verify clean gateway startup
+- [x] 47-01-PLAN.md — Build and deploy v1.18 to hpg6, verify clean gateway startup
 - [ ] 47-02-PLAN.md — Run all live WhatsApp tests (TST-01 to TST-06), human verification checkpoint
 
 ## Progress
@@ -164,4 +164,4 @@ Plans:
 | 44. Invite Link Documentation | 1/1 | Complete    | 2026-03-25 |
 | 45. Admin UI Join/Leave | 2/2 | Complete    | 2026-03-25 |
 | 46. Skill Completeness Audit | 1/1 | Complete    | 2026-03-25 |
-| 47. Live WhatsApp Testing | 0/2 | In progress | - |
+| 47. Live WhatsApp Testing | 1/2 | In Progress|  |

@@ -29,18 +29,18 @@ Requirements for Join/Leave/List & Skill Completeness milestone.
 
 ### Skill Completeness
 
-- [ ] **SKL-01**: whatsapp-messenger skill documents ALL implemented WAHA API endpoints (excluding hijacked ones)
-- [ ] **SKL-02**: Skill organizes endpoints by category (messaging, groups, contacts, channels, labels, status, presence, profile, media, calls)
-- [ ] **SKL-03**: Skill documents the new /join, /leave, /list slash commands
+- [x] **SKL-01**: whatsapp-messenger skill documents ALL implemented WAHA API endpoints (excluding hijacked ones)
+- [x] **SKL-02**: Skill organizes endpoints by category (messaging, groups, contacts, channels, labels, status, presence, profile, media, calls)
+- [x] **SKL-03**: Skill documents the new /join, /leave, /list slash commands
 
 ### Testing
 
-- [ ] **TST-01**: Join by invite link tested via WhatsApp
-- [ ] **TST-02**: Join by name tested via WhatsApp (exact + ambiguous match)
-- [ ] **TST-03**: Leave group/channel tested via WhatsApp
-- [ ] **TST-04**: /list, /list groups, /list channels tested via WhatsApp
-- [ ] **TST-05**: Invite link retrieval tested via WhatsApp
-- [ ] **TST-06**: Admin UI Join/Leave buttons tested via browser
+- [x] **TST-01**: Join by invite link tested via WhatsApp
+- [x] **TST-02**: Join by name tested via WhatsApp (exact + ambiguous match)
+- [x] **TST-03**: Leave group/channel tested via WhatsApp
+- [x] **TST-04**: /list, /list groups, /list channels tested via WhatsApp
+- [x] **TST-05**: Invite link retrieval tested via WhatsApp
+- [x] **TST-06**: Admin UI Join/Leave buttons tested via browser
 
 ## Future Requirements
 
@@ -70,15 +70,15 @@ None deferred — all features in scope for v1.18.
 | UI-01 | Phase 45 | Complete |
 | UI-02 | Phase 45 | Complete |
 | UI-03 | Phase 45 | Complete |
-| SKL-01 | Phase 46 | Pending |
-| SKL-02 | Phase 46 | Pending |
-| SKL-03 | Phase 46 | Pending |
-| TST-01 | Phase 47 | Pending |
-| TST-02 | Phase 47 | Pending |
-| TST-03 | Phase 47 | Pending |
-| TST-04 | Phase 47 | Pending |
-| TST-05 | Phase 47 | Pending |
-| TST-06 | Phase 47 | Pending |
+| SKL-01 | Phase 46 | Complete |
+| SKL-02 | Phase 46 | Complete |
+| SKL-03 | Phase 46 | Complete |
+| TST-01 | Phase 47 | Complete |
+| TST-02 | Phase 47 | Complete |
+| TST-03 | Phase 47 | Complete |
+| TST-04 | Phase 47 | Complete |
+| TST-05 | Phase 47 | Complete |
+| TST-06 | Phase 47 | Complete |
 
 **Coverage:**
 - v1.18 requirements: 20 total
