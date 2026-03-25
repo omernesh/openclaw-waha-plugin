@@ -26,7 +26,10 @@ import { policyCache } from "./policy-cache.js";
 import { buildDmPayload, buildGroupPayload } from "./resolved-payload-builder.js";
 import type { ContactRule, GroupRule, ResolvedPolicy } from "./rules-types.js";
 import { SYSTEM_CONTACT_DEFAULTS } from "./rules-types.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "rules-resolver" });
 // -- Internal helpers --
 
 /**
@@ -38,7 +41,7 @@ function getMtime(filePath: string): number {
     return fs.statSync(filePath).mtimeMs;
   } catch (err: unknown) {
     if (err && typeof err === "object" && "code" in err && (err as {code:string}).code !== "ENOENT") {
-      console.warn(`[waha] rules: failed to stat ${filePath}:`, err);
+      log.warn("rules: failed to stat file", { filePath, error: err instanceof Error ? err.message : String(err) });
     }
     return 0;
   }
@@ -282,7 +285,7 @@ export function resolveInboundPolicy(params: {
     }
   } catch (err) {
     const errName = err instanceof Error ? err.constructor.name : "unknown";
-    console.warn(`[waha] rules resolution failed (${errName}):`, err);
+    log.warn("rules resolution failed", { errorType: errName, error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -312,7 +315,7 @@ export function resolveOutboundPolicy(params: {
     }
   } catch (err) {
     const errName = err instanceof Error ? err.constructor.name : "unknown";
-    console.warn(`[waha] rules resolution failed (${errName}):`, err);
+    log.warn("rules resolution failed", { errorType: errName, error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }

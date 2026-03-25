@@ -21,7 +21,10 @@ import {
   type ContactRule,
   type GroupRule,
 } from "./rules-types.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "rules-loader" });
 /**
  * Generic rule file loader — reads YAML, parses, and validates against a zod schema.
  * Returns null (never throws) on missing or malformed files.
@@ -32,7 +35,7 @@ function loadRule<T>(filePath: string, schema: z.ZodType<T>, label: string): Par
     raw = fs.readFileSync(filePath, "utf8");
   } catch (err: unknown) {
     if (isEnoentError(err)) return null;
-    console.warn(`[waha] rules: error reading ${label} rule ${filePath}:`, err);
+    log.warn("rules: error reading rule file", { label, filePath, error: err instanceof Error ? (err as Error).message : String(err) });
     return null;
   }
 
@@ -40,15 +43,13 @@ function loadRule<T>(filePath: string, schema: z.ZodType<T>, label: string): Par
   try {
     parsed = parseYaml(raw);
   } catch (err) {
-    console.warn(`[waha] rules: malformed YAML in ${label} rule ${filePath}:`, err);
+    log.warn("rules: malformed YAML in rule file", { label, filePath, error: err instanceof Error ? (err as Error).message : String(err) });
     return null;
   }
 
   const result = schema.safeParse(parsed);
   if (!result.success) {
-    console.warn(
-      `[waha] rules: malformed override ${filePath}: ${result.error.message}`
-    );
+    log.warn("rules: malformed override", { filePath, error: result.error.message });
     return null;
   }
 
@@ -87,9 +88,7 @@ export function loadDefaultContactRule(basePath: string): ContactRule {
   const filePath = path.join(basePath, "contacts", "_default.yaml");
   const partial = loadContactRule(filePath);
   if (partial === null) {
-    console.error(
-      `[waha] rules: global contact default missing or malformed at ${filePath}. Using system defaults.`
-    );
+    log.error("rules: global contact default missing or malformed, using system defaults", { filePath });
     return { ...SYSTEM_CONTACT_DEFAULTS };
   }
   // Merge with system defaults to fill any gaps in the default file
@@ -107,9 +106,7 @@ export function loadDefaultGroupRule(basePath: string): GroupRule {
   const filePath = path.join(basePath, "groups", "_default.yaml");
   const partial = loadGroupRule(filePath);
   if (partial === null) {
-    console.error(
-      `[waha] rules: global group default missing or malformed at ${filePath}. Using system defaults.`
-    );
+    log.error("rules: global group default missing or malformed, using system defaults", { filePath });
     return { ...SYSTEM_GROUP_DEFAULTS };
   }
   // Merge with system defaults to fill any gaps in the default file

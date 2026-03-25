@@ -11,6 +11,10 @@
 // ║  DO NOT change the output format — LLM prompts depend on it.       ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
+import { createLogger } from "./logger.js";
+
+const log = createLogger({ component: "error-formatter" });
+
 /**
  * Error pattern → suggestion mapping.
  * Order matters: first match wins. More specific patterns go first.
@@ -39,7 +43,7 @@ const DEFAULT_SUGGESTION = "try again or use a different approach";
  *
  * Output format: "Failed to {action} {target}: {cleanMsg}. Try: {suggestion}"
  *
- * Logs the full original error with console.warn BEFORE formatting,
+ * Logs the full original error with log.warn BEFORE formatting,
  * so operators can see the raw error in logs while the LLM gets clean guidance.
  *
  * @param err - The caught error (unknown type)
@@ -53,7 +57,7 @@ export function formatActionError(
   const rawMsg = err instanceof Error ? err.message : (err ? String(err) : "unknown error (no details provided)");
 
   // Log full original error for operators BEFORE formatting — raw context helps debug issues that the cleaned LLM message omits
-  console.warn(`[WAHA] Action error in ${ctx.action}${ctx.target ? ` (${ctx.target})` : ""}: ${rawMsg}`);
+  log.warn("Action error", { action: ctx.action, target: ctx.target, error: rawMsg });
 
   // Strip [WAHA] prefix for clean LLM output
   const cleanMsg = rawMsg.replace(/^\[WAHA\]\s*/i, "").trim();

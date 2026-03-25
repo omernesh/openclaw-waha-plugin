@@ -8,8 +8,11 @@ import {
 import { LRUCache } from "lru-cache";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, WahaAccountConfig } from "./types.js";
+import { createLogger } from "./logger.js";
 
 
+
+const log = createLogger({ component: "accounts" });
 function normalizeOptionalAccountId(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
@@ -102,7 +105,7 @@ function resolveWahaApiKey(cfg: CoreConfig, opts: { accountId?: string }): {
         return { apiKey: fileKey, source: "secretFile" };
       }
     } catch (err) {
-      console.warn(`[waha] apiKeyFile "${merged.apiKeyFile}" unreadable: ${err}, falling back to inline apiKey`);
+      log.warn("apiKeyFile unreadable, falling back to inline apiKey", { apiKeyFile: merged.apiKeyFile, error: String(err) });
     }
   }
 

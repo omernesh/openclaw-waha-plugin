@@ -13,6 +13,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { checkManagerAuthorization } from "./manager-authorizer.js";
+import { createLogger } from "./logger.js";
+
+const log = createLogger({ component: "policy-edit" });
 import { normalizeToStableId, findOverrideFile } from "./identity-resolver.js";
 import {
   loadDefaultContactRule,
@@ -22,7 +25,10 @@ import {
 } from "./rules-loader.js";
 import { policyCache } from "./policy-cache.js";
 import { OWNER_ID } from "./rules-types.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "policy-edit" });
 // -- Allowed fields per scope (derived from ContactRuleSchema / GroupRuleSchema) --
 // DO NOT CHANGE without updating the zod schemas in rules-types.ts.
 
@@ -160,7 +166,7 @@ export function executePolicyEdit(params: PolicyEditParams): PolicyEditResult {
         existingData = parsed as Record<string, unknown>;
       }
     } catch (err) {
-      console.warn(`[waha] policy-edit: failed to parse existing override ${overrideFilePath}, starting fresh:`, err);
+      log.warn("policy-edit: failed to parse existing override, starting fresh", { overrideFilePath, error: err instanceof Error ? err.message : String(err) });
       existingData = {};
     }
   }

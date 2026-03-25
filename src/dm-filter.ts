@@ -13,6 +13,10 @@
  */
 export type GodModeScope = "all" | "dm" | "group" | "off";
 
+import { createLogger } from "./logger.js";
+
+const moduleLog = createLogger({ component: "dm-filter" });
+
 /**
  * Filter type identifies whether this filter instance is used for DM or group filtering.
  * Used in conjunction with godModeScope to determine if god mode bypass applies.
@@ -84,7 +88,7 @@ export class DmFilter {
     try {
       return this._check(params);
     } catch (err) {
-      (params.log ?? console.warn)(`[waha] DmFilter.check() error (fail-open): ${String(err)}`);
+      (params.log ?? ((m: string) => moduleLog.warn(m)))(`DmFilter.check() error (fail-open): ${String(err)}`);
       return { pass: true, reason: "error" };
     }
   }
@@ -148,7 +152,7 @@ export class DmFilter {
         try {
           acc.push(new RegExp(p, "i"));
         } catch (err) {
-          (log ?? this.log ?? console.warn)(`[waha] DmFilter: invalid regex pattern "${p}": ${String(err)}, skipping`);
+          (log ?? this.log ?? ((m: string) => moduleLog.warn(m)))(`DmFilter: invalid regex pattern "${p}": ${String(err)}, skipping`);
         }
         return acc;
       }, []);

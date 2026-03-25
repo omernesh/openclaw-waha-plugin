@@ -25,7 +25,10 @@ import { getRulesBasePath } from "./identity-resolver.js";
 import { resolveOutboundPolicy } from "./rules-resolver.js";
 import type { ResolvedPolicy } from "./rules-types.js";
 import type { CoreConfig } from "./types.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "policy-enforcer" });
 /**
  * Assert that the current outbound policy allows sending to the given chatId.
  *
@@ -45,7 +48,7 @@ export function assertPolicyCanSend(chatId: string, cfg: CoreConfig): void {
       return;
     }
   } catch (err) {
-    console.warn("[waha] policy-enforcer: failed to check rules directory:", err);
+    log.warn("policy-enforcer: failed to check rules directory", { error: err instanceof Error ? err.message : String(err) });
     return;
   }
 
@@ -54,7 +57,7 @@ export function assertPolicyCanSend(chatId: string, cfg: CoreConfig): void {
   try {
     policy = resolveOutboundPolicy({ chatId, basePath });
   } catch (err) {
-    console.warn("[waha] policy-enforcer: outbound resolution failed, allowing send:", err);
+    log.warn("policy-enforcer: outbound resolution failed, allowing send", { error: err instanceof Error ? err.message : String(err) });
     return;
   }
 

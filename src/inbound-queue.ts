@@ -17,7 +17,10 @@
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
 import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
 import type { resolveWahaAccount } from "./accounts.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "inbound-queue" });
 /** Stats exposed via admin panel Queue tab and /api/admin/queue endpoint. */
 export interface QueueStats {
   dmDepth: number;
@@ -92,18 +95,14 @@ export class InboundQueue {
       if (this.groupQueue.length >= this.groupCapacity) {
         const dropped = this.groupQueue.shift(); // drop oldest
         this.groupOverflowDrops++;
-        console.warn(
-          `[WAHA] InboundQueue group overflow: dropped message from ${dropped?.message?.chatId ?? "unknown"} (queue depth: ${this.groupCapacity})`
-        );
+        log.warn("InboundQueue group overflow: dropped message", { chatId: dropped?.message?.chatId ?? "unknown", queueDepth: this.groupCapacity });
       }
       this.groupQueue.push(item);
     } else {
       if (this.dmQueue.length >= this.dmCapacity) {
         const dropped = this.dmQueue.shift(); // drop oldest
         this.dmOverflowDrops++;
-        console.warn(
-          `[WAHA] InboundQueue DM overflow: dropped message from ${dropped?.message?.chatId ?? "unknown"} (queue depth: ${this.dmCapacity})`
-        );
+        log.warn("InboundQueue DM overflow: dropped message", { chatId: dropped?.message?.chatId ?? "unknown", queueDepth: this.dmCapacity });
       }
       this.dmQueue.push(item);
     }
@@ -146,9 +145,7 @@ export class InboundQueue {
           this.totalProcessed++;
         } catch (err) {
           this.totalErrors++;
-          console.error(
-            `[WAHA] InboundQueue processor error for ${item.message.chatId}: ${String(err)}`
-          );
+          log.error("InboundQueue processor error", { chatId: item.message.chatId, error: String(err) });
         }
         // Phase 29: Emit queue stats after each item processed for SSE real-time updates. DO NOT REMOVE.
         onQueueChange?.(this.getStats());

@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "signature" });
 export function verifyWahaWebhookHmac(params: {
   body: string;
   secret: string;
@@ -22,7 +25,7 @@ export function verifyWahaWebhookHmac(params: {
     try {
       return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
     } catch (err) {
-      console.warn(`[waha] timingSafeEqual failed, rejecting: ${String(err)}`);
+      log.warn("timingSafeEqual failed, rejecting", { error: String(err) });
       return false;
     }
   };

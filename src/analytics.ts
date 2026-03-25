@@ -2,7 +2,10 @@ import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "analytics" });
 const require = createRequire(import.meta.url);
 
 export type AnalyticsEventDirection = "inbound" | "outbound";
@@ -51,7 +54,7 @@ export class AnalyticsDb {
   prune(maxAgeDays: number): void {
     const cutoff = Date.now() - maxAgeDays * 86400000;
     const r = this.db.prepare("DELETE FROM message_events WHERE timestamp < ?").run(cutoff) as { changes: number };
-    if (r.changes > 0) console.log("[waha] analytics: pruned " + r.changes + " events older than " + maxAgeDays + " days");
+    if (r.changes > 0) log.info("analytics: pruned " + r.changes + " events older than " + maxAgeDays + " days");
   }
 }
 let _analyticsDb: AnalyticsDb | null = null;

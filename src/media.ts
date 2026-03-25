@@ -30,7 +30,10 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import type { WahaInboundMessage } from "./types.js";
 import type { ResolvedWahaAccount } from "./accounts.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "media" });
 // ---------------------------------------------------------------------------
 // Config types (mirrors types.ts MediaPreprocessingConfig)
 // ---------------------------------------------------------------------------
@@ -114,7 +117,7 @@ export async function preprocessAudio(
     }
     return "[Voice Message]: (transcription returned empty)";
   } catch (err) {
-    console.warn(`[waha] audio transcription failed: ${err}`);
+    log.warn("audio transcription failed", { error: String(err) });
     return "[Voice Message]: (transcription failed)";
   }
 }
@@ -173,7 +176,7 @@ export async function preprocessImage(
     }
     return result;
   } catch (err) {
-    console.warn(`[waha] image preprocessing failed: ${err}`);
+    log.warn("image preprocessing failed", { error: String(err) });
     let result = "[Image]: (analysis failed)";
     if (caption) result += `\n\nCaption: "${caption}"`;
     return result;
@@ -276,7 +279,7 @@ export async function preprocessVideo(
     const description = genData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "(no description)";
     return `[Video Description]: "${description}"`;
   } catch (err) {
-    console.warn(`[waha] video preprocessing failed: ${err}`);
+    log.warn("video preprocessing failed", { error: String(err) });
     return "[Video]: (analysis failed)";
   }
 }
@@ -489,7 +492,7 @@ export async function preprocessInboundMessage(params: {
       }
     }
   } catch (err) {
-    console.warn(`[waha] media preprocessing error: ${err}`);
+    log.warn("media preprocessing error", { error: String(err) });
   }
 
   if (prefix) {

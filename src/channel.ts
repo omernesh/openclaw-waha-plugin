@@ -91,7 +91,10 @@ import { getRulesBasePath } from "./identity-resolver.js";
 import { getDirectoryDb } from "./directory.js";
 // Phase 30, Plan 01: Analytics instrumentation. DO NOT REMOVE.
 import { recordAnalyticsEvent } from "./analytics.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "channel" });
 // Cached config for outbound adapter — handleAction receives cfg as a param
 // and caches it here so outbound methods (sendText, sendMedia, sendPoll) can
 // access config without calling readConfigFile() which may crash.
@@ -535,7 +538,7 @@ export async function checkGroupMembership(
       (err instanceof Error && "status" in err && (err as any).status === 404) ||
       /not found|404|does not exist/i.test(msg);
     if (isNotFound) {
-      console.warn(`[waha] checkGroupMembership: session=${session} not in group=${groupId}`);
+      log.warn("checkGroupMembership: session not in group", { session, groupId });
       return false;
     }
     throw err;
@@ -578,7 +581,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
         const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
         const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
         recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "success", chat_id: _chatId, account_id: aid });
-      } catch (analyticsErr) { console.warn("[waha] analytics recording failed:", analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr)); }
+      } catch (analyticsErr) { log.warn("analytics recording failed", { error: analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr) }); }
       return actionResult;
     };
 
@@ -661,9 +664,9 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
         } catch (routeErr) {
           const msg = routeErr instanceof Error ? routeErr.message : String(routeErr);
           if (/No full-access sessions|No session is a member/i.test(msg)) {
-            console.warn(`[waha] cross-session routing — no reachable session for ${chatId}, using default account`);
+            log.warn("cross-session routing — no reachable session, using default account", { chatId });
           } else {
-            console.error(`[waha] cross-session routing unexpected error for ${chatId}: ${msg}`);
+            log.error("cross-session routing unexpected error", { chatId, error: msg });
           }
         }
       }
@@ -776,7 +779,7 @@ const wahaMessageActions: ChannelMessageActionAdapter = {
         const _chatId = typeof p.chatId === "string" ? p.chatId : (typeof p.to === "string" ? p.to : undefined);
         const _chatType = _chatId?.endsWith("@g.us") ? "group" : (_chatId?.endsWith("@newsletter") ? "channel" : "dm");
         recordAnalyticsEvent({ direction: "outbound", chat_type: _chatType, action, duration_ms: Date.now() - _analyticsStart, status: "error", chat_id: _chatId, account_id: aid });
-      } catch (analyticsErr) { console.warn("[waha] analytics recording failed:", analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr)); }
+      } catch (analyticsErr) { log.warn("analytics recording failed", { error: analyticsErr instanceof Error ? analyticsErr.message : String(analyticsErr) }); }
 
       return {
         content: [{ type: "text" as const, text: formatActionError(err, { action, target }) }],
@@ -800,7 +803,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
     idLabel: "whatsappUserId",
     normalizeAllowEntry: (entry) => normalizeWahaAllowEntry(entry),
     notifyApproval: async ({ id }) => {
-      console.log(`[waha] user ${id} approved for pairing`);
+      log.info(`user ${id} approved for pairing`);
     },
   },
   capabilities: {

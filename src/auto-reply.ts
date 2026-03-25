@@ -17,7 +17,10 @@
 import { getDirectoryDb } from "./directory.js";
 import { sendWahaText } from "./send.js";
 import type { CoreConfig } from "./types.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "auto-reply" });
 // ── AutoReplyEngine ───────────────────────────────────────────────────────────
 
 export class AutoReplyEngine {
@@ -78,7 +81,7 @@ export class AutoReplyEngine {
     } catch (err) {
       // Log but don't throw — rejection send failure is non-fatal.
       // The contact simply won't receive a rejection message.
-      console.warn(`[waha] auto-reply send failed for ${jid}: ${String(err)}`);
+      log.warn("auto-reply send failed", { jid, error: String(err) });
       return;
     }
 

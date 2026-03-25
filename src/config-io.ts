@@ -13,7 +13,10 @@
 import { readFile, writeFile, rename, copyFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "config-io" });
 // ──────────────────────────────────────────────────────────────────────────────
 // Config path
 // ──────────────────────────────────────────────────────────────────────────────
@@ -95,7 +98,7 @@ async function rotateConfigBackups(configPath: string): Promise<void> {
     // Copy current config as newest backup
     if (await exists(configPath)) await copyFile(configPath, bak1);
   } catch (err) {
-    console.warn(`[waha] rotateConfigBackups: backup failed (non-fatal): ${String(err)}`);
+    log.warn("rotateConfigBackups: backup failed (non-fatal)", { error: String(err) });
   }
 }
 

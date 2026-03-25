@@ -17,7 +17,10 @@ import { callWahaApi, warnOnError } from "./http-client.js";
 import { resolveWahaAccount, listEnabledWahaAccounts } from "./accounts.js";
 import type { CoreConfig } from "./types.js";
 import type { ResolvedWahaAccount } from "./accounts.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "shutup" });
 // ── Regex for /shutup and /unshutup commands ──
 // DO NOT CHANGE — must match: /shutup, /shutup all, /shutup 5m, /shutup all 2h,
 // /unshutup, /unshutup all, /unmute, /unmute all
@@ -77,7 +80,7 @@ export function checkPendingSelection(senderId: string, config?: CoreConfig): Pe
         const pending = dirDb.getPendingSelection(senderId);
         if (pending) return pending;
       } catch (err) {
-        console.warn(`[waha] checkPendingSelection failed for account: ${String(err)}`);
+        log.warn("checkPendingSelection failed for account", { error: String(err) });
       }
     }
     return null;
@@ -98,7 +101,7 @@ export function clearPendingSelection(senderId: string, config?: CoreConfig): vo
         const dirDb = getDirectoryDb(acct.accountId);
         dirDb.clearPendingSelection(senderId);
       } catch (err) {
-        console.warn(`[waha] clearPendingSelection failed for account: ${String(err)}`);
+        log.warn("clearPendingSelection failed for account", { error: String(err) });
       }
     }
   }
@@ -591,7 +594,7 @@ async function getGroupsForAccount(account: ResolvedWahaAccount, config: CoreCon
       }
       if (result.length > 0) return result; // Got groups from this account, done
     } catch (err) {
-      console.warn(`[waha] getGroupsForAccount failed for session ${acct.session}: ${String(err)}`);
+      log.warn("getGroupsForAccount failed", { session: acct.session, error: String(err) });
     }
   }
   return result;
