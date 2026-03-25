@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness
-status: Ready to plan
-stopped_at: Completed 43-02-PLAN.md
-last_updated: "2026-03-25T19:44:02.476Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 44-01-PLAN.md
+last_updated: "2026-03-25T19:55:28.488Z"
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 43 — slash-commands
+**Current focus:** Phase 44 — invite-link-documentation
 
 ## Current Position
 
-Phase: 44
-Plan: Not started
+Phase: 44 (invite-link-documentation) — EXECUTING
+Plan: 1 of 1
 
 ## Accumulated Context
 
@@ -48,6 +48,8 @@ Plan: Not started
 - [Phase 43-slash-commands]: PendingSelectionRecord type extended with join/leave (SQLite TEXT column, no migration needed)
 - [Phase 43-slash-commands]: Reuse checkShutupAuthorization for /join /leave /list authorization (same admin gate)
 - [Phase 43-slash-commands]: Guard pending selection block with !slashMatch to prevent slash commands being treated as numbered replies
+- [Phase 44-invite-link-documentation]: Expanded Group Management table to 3-column format to accommodate return value descriptions
+- [Phase 44-invite-link-documentation]: Placed /join /leave /list section before /shutup section per plan ordering requirement
 
 ### Pending Todos
 
@@ -73,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T19:35:24.456Z
-Stopped at: Completed 43-02-PLAN.md
+Last session: 2026-03-25T19:55:28.483Z
+Stopped at: Completed 44-01-PLAN.md
 Resume file: None

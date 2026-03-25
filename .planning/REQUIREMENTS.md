@@ -18,8 +18,8 @@ Requirements for Join/Leave/List & Skill Completeness milestone.
 
 ### Invite Links
 
-- [ ] **INV-01**: Agent can retrieve and share a group's invite link when asked
-- [ ] **INV-02**: SKILL.md clearly documents getInviteCode, revokeInviteCode, and joinGroup actions
+- [x] **INV-01**: Agent can retrieve and share a group's invite link when asked
+- [x] **INV-02**: SKILL.md clearly documents getInviteCode, revokeInviteCode, and joinGroup actions
 
 ### Admin UI
 
@@ -65,8 +65,8 @@ None deferred — all features in scope for v1.18.
 | CMD-04 | Phase 43 | Complete |
 | CMD-05 | Phase 43 | Complete |
 | CMD-06 | Phase 43 | Complete |
-| INV-01 | Phase 44 | Pending |
-| INV-02 | Phase 44 | Pending |
+| INV-01 | Phase 44 | Complete |
+| INV-02 | Phase 44 | Complete |
 | UI-01 | Phase 45 | Pending |
 | UI-02 | Phase 45 | Pending |
 | UI-03 | Phase 45 | Pending |
