@@ -1,153 +1,118 @@
-# Requirements: WAHA OpenClaw Plugin
+# Requirements: WAHA OpenClaw Plugin — v1.14 Enterprise Hardening
 
-**Defined:** 2026-03-20
+**Defined:** 2026-03-25
 **Core Value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
 
-## v1.13 Requirements
+## v1.14 Requirements
 
-### Reliability & Recovery
+### Security
 
-- [x] **REC-01**: Unhealthy sessions auto-restart via WAHA API after 5 consecutive health check failures
-- [x] **REC-02**: Cooldown between restart attempts (5 minute minimum) to prevent restart storms
-- [x] **REC-03**: Recovery events surfaced in admin Dashboard health cards (attempt count, last recovery, outcome)
-- [x] **REC-04**: Alert god mode users via WhatsApp when session goes unhealthy (using healthy session)
+- [ ] **SEC-01**: Admin API requires Bearer token authentication on all `/api/admin/*` routes; token read from config or environment variable
+- [ ] **SEC-02**: Config import endpoint validates the entire config structure, not just the `waha` sub-section; rejects unknown top-level keys
+- [ ] **SEC-03**: JID values extracted from URL path segments are validated against `/@(c\.us|g\.us|lid|newsletter)$/` regex before processing
+- [ ] **SEC-04**: Webhook HMAC verification defaults to a randomly-generated secret (logged on startup) when `webhookHmacKey` is not configured; opt-out requires explicit `webhookHmacKey: "disabled"`
 
-### Config Safety
+### Error Handling
 
-- [x] **CFG-01**: Admin config POST validated against Zod schema before saving to disk
-- [x] **CFG-02**: Validation errors returned as structured field-level response to admin panel
-- [x] **CFG-03**: Config backup before save (rotate last 3 backups)
-- [x] **CFG-04**: Config export endpoint (GET /api/admin/config/export — full JSON download)
-- [x] **CFG-05**: Config import endpoint (POST /api/admin/config/import) with schema validation
+- [ ] **EH-01**: All bare `fetch()` calls in monitor.ts (fetchBotJids, /api/admin/sessions, follow/unfollow bulk) are routed through `callWahaApi()` or use `AbortSignal.timeout(30_000)`
+- [ ] **EH-02**: Media download in `downloadWahaMedia()` uses `AbortSignal.timeout(30_000)` on the fetch call
+- [ ] **EH-03**: Gemini video polling loop uses `AbortSignal.timeout(5_000)` on each status fetch call
+- [ ] **EH-04**: `RateLimiter` in rate-limiter.ts accepts a `maxQueue` constructor parameter and throws when the queue exceeds it
 
-### Pairing Cleanup
+### Resilience
 
-- [x] **PAIR-01**: Remove or integrate plugin PairingEngine (currently dead code — gateway pairing runs instead)
-- [x] **PAIR-02**: Fix bot echo triggering pairing challenges for itself (fromMe messages creating pairing requests)
-- [x] **PAIR-03**: Ensure pairing.ts is always included in deploy artifacts
+- [ ] **RES-01**: `callWahaApi` integrates with `sessionHealthStates` to fast-fail outbound calls when session status is `unhealthy`, instead of attempting full retry cycle
+- [ ] **RES-02**: Auto-recovery in health.ts polls session status after restart and only marks `outcome = "success"` when the session reaches CONNECTED state (with a 30s timeout)
 
-### API Coverage
+### Observability
 
-- [x] **API-01**: Channel search by view (POST /channels/search/by-view)
-- [x] **API-02**: Channel search metadata endpoints (GET views, countries, categories)
-- [x] **API-03**: Bulk presence GET (GET /presence — all subscribed presence info)
-- [x] **API-04**: Group join-info (GET /groups/{id}/join-info — preview before joining)
-- [x] **API-05**: Group refresh (POST /groups/refresh — force refresh from server)
-- [x] **API-06**: Group join/leave/participant-change webhook event handlers
-- [x] **API-07**: API Keys CRUD (create, list, update, delete via /api/keys endpoints)
+- [ ] **OBS-01**: A `logger` module provides structured JSON logging with consistent fields (level, timestamp, component, sessionId, chatId) replacing all freeform `console.*` calls
+- [ ] **OBS-02**: A `/metrics` endpoint exposes process-level metrics in Prometheus format: heap usage, event loop lag, HTTP request rates, SQLite query latency, queue depth, processing latency P95, error rate
+- [ ] **OBS-03**: `sseClients` Set has a maximum cap (50); new SSE connections beyond the cap are rejected with HTTP 503
 
-### Presence
+### Memory & Resources
 
-- [x] **PRES-01**: Verify all 4 presence endpoints work end-to-end (set, get, get-all, subscribe)
-- [x] **PRES-02**: Surface presence data in admin panel (contact online/offline status in directory)
+- [ ] **MEM-01**: Config file writes use async `fs/promises` instead of blocking `readFileSync`/`writeFileSync`, with a promise-based write lock to serialize concurrent writes
+- [ ] **MEM-02**: On startup, a sweep deletes orphaned media temp files older than 10 minutes from `/tmp/openclaw/waha-media-*`
+- [ ] **MEM-03**: Both `DirectoryDb` and `AnalyticsDb` set `PRAGMA busy_timeout = 5000` on database initialization
 
-### Real-Time Admin
+### Concurrency
 
-- [x] **RT-01**: SSE endpoint (GET /api/admin/events) for live admin panel push
-- [x] **RT-02**: Dashboard auto-updates on health state changes and queue depth changes
-- [x] **RT-03**: Log tab auto-scrolls on new log entries via SSE
-- [x] **RT-04**: Connection indicator in admin sidebar (connected/reconnecting/disconnected)
+- [ ] **CON-01**: Config file read-modify-write operations are serialized through a promise-based mutex, preventing concurrent write corruption
+- [ ] **CON-02**: The `finally` block in `InboundQueue.drain()` wraps both the `onQueueChange?.()` call and the recursive `drain()` call in try/catch to prevent unhandled rejections
 
-### Analytics
+### Data Integrity
 
-- [x] **ANL-01**: SQLite analytics table (message_events: timestamp, direction, chat_type, action, duration_ms, status)
-- [x] **ANL-02**: Analytics API endpoint (GET /api/admin/analytics?range=24h&groupBy=hour)
-- [x] **ANL-03**: Analytics tab in admin panel with charts (recharts — messages/hour, response times, top chats)
+- [ ] **DI-01**: Both `DirectoryDb` and `AnalyticsDb` run periodic `PRAGMA wal_checkpoint(PASSIVE)` (e.g., every sync cycle or every 30 minutes)
+- [ ] **DI-02**: Config file writes use atomic write-to-temp-then-rename pattern (`writeFile` to `.tmp` then `rename` over target)
 
-### Test Coverage
+### Graceful Shutdown
 
-- [x] **TST-01**: monitor.ts admin API route tests (mock HTTP req/res, test each endpoint)
-- [x] **TST-02**: inbound.ts pipeline tests (mock SDK imports, test filter/dedup/queue flow)
-- [x] **TST-03**: directory.ts CRUD tests (contacts, participants, overrides, LID mapping)
-- [x] **TST-04**: shutup.ts interactive flow tests (mute/unmute with pending selections)
-- [x] **TST-05**: React admin panel component tests (vitest + testing-library)
+- [ ] **GS-01**: `server.close()` tracks in-flight request count and waits for all to complete (with a 10s hard timeout) before resolving
+- [ ] **GS-02**: SSE keep-alive `setInterval` is `.unref()`'d, and the abort handler clears all remaining SSE intervals and closes all SSE client connections
 
-### Code Quality
+### Configuration
 
-- [x] **CQ-01**: Fix remaining .catch(() => {}) in shutup.ts:239
-- [x] **CQ-02**: Resolve inbound.ts:704 TODO (admin name resolution from Bot Admin role contacts)
-- [x] **CQ-03**: Add guard for _cachedConfig singleton in channel.ts (fail-safe when called before handleAction)
-- [x] **CQ-04**: Add prefers-color-scheme auto-detect to admin panel theme toggle
-- [x] **CQ-05**: Log tab export/download button (CSV or plain text)
+- [ ] **CFG-01**: `healthCheckIntervalMs` has a minimum bound of 10000ms and `syncIntervalMinutes` has a minimum bound of 1 minute, enforced in config-schema.ts via Zod `.min()` transforms
+- [ ] **CFG-02**: `configureReliability()` is called once with global config, not per-account; or per-account token buckets are used to prevent last-account-wins behavior
 
-### Platform Abstraction
+### API Robustness
 
-- [x] **PLAT-01**: Extract WahaClient class (stateful client with config, retry, caching built in)
-- [x] **PLAT-02**: Define adapter interface for platform-agnostic plugin integration
-- [x] **PLAT-03**: Multi-tenant config isolation groundwork (per-tenant config, session, directory separation for future SaaS)
+- [ ] **API-01**: Admin API routes have IP-based or token-based request rate limiting (reusing `RateLimiter` from rate-limiter.ts) to prevent event loop denial-of-service
+- [ ] **API-02**: `req.url` mutation in static file serving is replaced with a local variable; the original `req.url` is never modified
+- [ ] **API-03**: Nominatim geocode call uses `AbortSignal.timeout(5_000)` and a 1-request-per-second rate limit to respect free tier limits
 
 ## Future Requirements
 
-### v1.14+
-
-- **Conversation analytics dashboards** — deeper insights beyond basic message counts
-- **Webhook retry/dead-letter queue** — failed inbound recovery
-- **Config diff/history** — audit trail with rollback
-- **Mobile push notifications** — browser notification API for health alerts
-- **Media multi-send** — sendMulti v2 with media support
+None — this milestone covers all identified gaps.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Scheduled messages | WAHA has no scheduled message API |
-| WhatsApp Business templates | Not applicable for personal/bot use |
-| Broadcast lists | WAHA API limitation |
-| Call initiation | WAHA limitation |
-| Disappearing messages | Low priority |
-| Hot-reload | Gateway requires restart, not worth engineering around |
+| Full APM integration (Datadog, New Relic) | Prometheus `/metrics` is sufficient; APM agents are env-specific |
+| mTLS between plugin and WAHA | WAHA runs on localhost; TLS adds complexity for no gain |
+| RBAC for admin panel (role-based access) | Single admin token is sufficient for current deployment |
+| Database encryption at rest | SQLite data is non-sensitive contact metadata; OS-level encryption suffices |
+| Log rotation/shipping | OS-level concern (logrotate/journald); plugin outputs structured logs |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REC-01 | Phase 25 | Complete |
-| REC-02 | Phase 25 | Complete |
-| REC-03 | Phase 25 | Complete |
-| REC-04 | Phase 25 | Complete |
-| CFG-01 | Phase 26 | Complete |
-| CFG-02 | Phase 26 | Complete |
-| CFG-03 | Phase 26 | Complete |
-| CFG-04 | Phase 26 | Complete |
-| CFG-05 | Phase 26 | Complete |
-| PAIR-01 | Phase 27 | Complete |
-| PAIR-02 | Phase 27 | Complete |
-| PAIR-03 | Phase 27 | Complete |
-| CQ-01 | Phase 27 | Complete |
-| CQ-02 | Phase 27 | Complete |
-| CQ-03 | Phase 27 | Complete |
-| CQ-04 | Phase 27 | Complete |
-| CQ-05 | Phase 27 | Complete |
-| API-01 | Phase 28 | Complete |
-| API-02 | Phase 28 | Complete |
-| API-03 | Phase 28 | Complete |
-| API-04 | Phase 28 | Complete |
-| API-05 | Phase 28 | Complete |
-| API-06 | Phase 28 | Complete |
-| API-07 | Phase 28 | Complete |
-| PRES-01 | Phase 28 | Complete |
-| PRES-02 | Phase 28 | Complete |
-| RT-01 | Phase 29 | Complete |
-| RT-02 | Phase 29 | Complete |
-| RT-03 | Phase 29 | Complete |
-| RT-04 | Phase 29 | Complete |
-| ANL-01 | Phase 30 | Complete |
-| ANL-02 | Phase 30 | Complete |
-| ANL-03 | Phase 30 | Complete |
-| TST-01 | Phase 31 | Complete |
-| TST-02 | Phase 31 | Complete |
-| TST-03 | Phase 31 | Complete |
-| TST-04 | Phase 31 | Complete |
-| TST-05 | Phase 31 | Complete |
-| PLAT-01 | Phase 32 | Complete |
-| PLAT-02 | Phase 32 | Complete |
-| PLAT-03 | Phase 32 | Complete |
+| SEC-01 | TBD | Pending |
+| SEC-02 | TBD | Pending |
+| SEC-03 | TBD | Pending |
+| SEC-04 | TBD | Pending |
+| EH-01 | TBD | Pending |
+| EH-02 | TBD | Pending |
+| EH-03 | TBD | Pending |
+| EH-04 | TBD | Pending |
+| RES-01 | TBD | Pending |
+| RES-02 | TBD | Pending |
+| OBS-01 | TBD | Pending |
+| OBS-02 | TBD | Pending |
+| OBS-03 | TBD | Pending |
+| MEM-01 | TBD | Pending |
+| MEM-02 | TBD | Pending |
+| MEM-03 | TBD | Pending |
+| CON-01 | TBD | Pending |
+| CON-02 | TBD | Pending |
+| DI-01 | TBD | Pending |
+| DI-02 | TBD | Pending |
+| GS-01 | TBD | Pending |
+| GS-02 | TBD | Pending |
+| CFG-01 | TBD | Pending |
+| CFG-02 | TBD | Pending |
+| API-01 | TBD | Pending |
+| API-02 | TBD | Pending |
+| API-03 | TBD | Pending |
 
 **Coverage:**
-- v1.13 requirements: 38 total
-- Mapped to phases: 38
-- Unmapped: 0
+- v1.14 requirements: 27 total
+- Mapped to phases: 0
+- Unmapped: 27
 
 ---
-*Requirements defined: 2026-03-20*
-*Last updated: 2026-03-20 — traceability filled after roadmap creation*
+*Requirements defined: 2026-03-25*
+*Last updated: 2026-03-25 after initial definition*
