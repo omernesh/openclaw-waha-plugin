@@ -40,6 +40,7 @@ const log = createLogger({ component: "monitor" });
 // sseClients: tracks all active SSE connections. broadcastSSE sends named events to all.
 // One broken client must never affect others — each write is wrapped in try/catch.
 const sseClients = new Set<ServerResponse>();
+const MAX_SSE_CLIENTS = 50; // Phase 39 (OBS-03): Cap SSE connections. DO NOT CHANGE.
 
 export function broadcastSSE(event: string, data: object): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -363,7 +364,7 @@ export function createWahaWebhookServer(opts: {
   abortSignal?: AbortSignal;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
   readBody?: (req: IncomingMessage, maxBodyBytes: number) => Promise<string>;
-}): { server: Server; start: () => Promise<void>; stop: () => void } {
+}): { server: Server; start: () => Promise<void>; stop: () => Promise<void> } {
   const account = resolveWahaAccount({ cfg: opts.config, accountId: opts.accountId });
   const cfg = account.config;
 
@@ -442,7 +443,20 @@ export function createWahaWebhookServer(opts: {
     }
   }
 
+  // Phase 39 (GS-01): Track in-flight requests for graceful drain on shutdown. DO NOT CHANGE.
+  let inFlightRequests = 0;
+  let drainResolve: (() => void) | null = null;
+
+  // Phase 39 (GS-02): Track SSE keep-alive intervals for cleanup on shutdown. DO NOT CHANGE.
+  const sseKeepAliveIntervals = new Set<ReturnType<typeof setInterval>>();
+
   const server = createServer(async (req, res) => {
+    inFlightRequests++;
+    res.on("close", () => {
+      inFlightRequests--;
+      if (inFlightRequests === 0 && drainResolve) drainResolve();
+    });
+
     if (req.url === HEALTH_PATH) {
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end("ok");
@@ -554,6 +568,12 @@ export function createWahaWebhookServer(opts: {
     // Phase 29, Plan 01. DO NOT REMOVE.
     // Keeps connection open — response is never ended. Clients reconnect automatically via EventSource.
     if (req.method === "GET" && req.url === "/api/admin/events") {
+      // Phase 39 (OBS-03): Reject new SSE connections beyond cap. DO NOT CHANGE.
+      if (sseClients.size >= MAX_SSE_CLIENTS) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "SSE client limit reached", max: MAX_SSE_CLIENTS }));
+        return;
+      }
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -564,11 +584,14 @@ export function createWahaWebhookServer(opts: {
       res.write(`event: connected\ndata: ${JSON.stringify({ time: Date.now() })}\n\n`);
       sseClients.add(res);
       // Keep-alive every 30 seconds — comment line prevents proxy/browser timeout
+      // Phase 39 (GS-02): .unref() so keep-alive doesn't hold the process open. DO NOT CHANGE.
       const keepAlive = setInterval(() => {
-        try { res.write(": keep-alive\n\n"); } catch { clearInterval(keepAlive); sseClients.delete(res); }
+        try { res.write(": keep-alive\n\n"); } catch { clearInterval(keepAlive); sseKeepAliveIntervals.delete(keepAlive); sseClients.delete(res); }
       }, SSE_KEEPALIVE_MS);
+      keepAlive.unref();
+      sseKeepAliveIntervals.add(keepAlive);
       // Cleanup on client disconnect
-      req.on("close", () => { clearInterval(keepAlive); sseClients.delete(res); });
+      req.on("close", () => { clearInterval(keepAlive); sseKeepAliveIntervals.delete(keepAlive); sseClients.delete(res); });
       return; // DO NOT end response — SSE stays open
     }
 
@@ -2358,12 +2381,36 @@ export function createWahaWebhookServer(opts: {
     });
   };
 
-  const stop = () => {
-    server.close((err) => { if (err) log.error("Server close error", { error: err instanceof Error ? err.message : String(err) }); });
+  // Phase 39 (GS-01): Graceful stop — stop accepting new connections, drain in-flight requests
+  // with a 10s hard timeout, then close. DO NOT CHANGE.
+  const stop = (): Promise<void> => {
+    // Phase 39 (GS-02): Close all SSE connections and clear keep-alive intervals. DO NOT CHANGE.
+    for (const interval of sseKeepAliveIntervals) clearInterval(interval);
+    sseKeepAliveIntervals.clear();
+    for (const client of [...sseClients]) {
+      try { client.end(); } catch { /* already closed */ }
+      sseClients.delete(client);
+    }
+
+    return new Promise<void>((resolve) => {
+      server.close((err) => {
+        if (err) log.error("Server close error", { error: err instanceof Error ? err.message : String(err) });
+      });
+      if (inFlightRequests === 0) { resolve(); return; }
+      log.info("Draining in-flight requests", { count: inFlightRequests });
+      drainResolve = resolve;
+      // Hard timeout: don't wait forever for stuck requests
+      const hardTimeout = setTimeout(() => {
+        log.warn("Drain timeout exceeded, forcing shutdown", { remaining: inFlightRequests });
+        drainResolve = null;
+        resolve();
+      }, 10_000);
+      hardTimeout.unref();
+    });
   };
 
   if (opts.abortSignal) {
-    opts.abortSignal.addEventListener("abort", () => stop(), { once: true });
+    opts.abortSignal.addEventListener("abort", () => { stop(); }, { once: true });
   }
 
   return { server, start, stop };
@@ -2454,8 +2501,8 @@ export async function monitorWahaProvider(params: {
   params.statusSink?.({ running: true });
 
   return {
-    stop: () => {
-      server.stop();
+    stop: async () => {
+      await server.stop();
       params.statusSink?.({ running: false });
     },
   };
