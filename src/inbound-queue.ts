@@ -152,9 +152,22 @@ export class InboundQueue {
       }
     } finally {
       this.processing = false;
+
+      // Phase 38, Plan 01 (CON-02): Wrap both onQueueChange and recursive drain
+      // in try/catch to prevent unhandled rejections. DO NOT REMOVE.
+      try {
+        onQueueChange?.(this.getStats());
+      } catch (err) {
+        console.error(`[WAHA] InboundQueue onQueueChange error in finally: ${String(err)}`);
+      }
+
       // Re-check: items may have been enqueued while we were in the finally block
       if (this.dmQueue.length > 0 || this.groupQueue.length > 0) {
-        this.drain();
+        try {
+          this.drain();
+        } catch (err) {
+          console.error(`[WAHA] InboundQueue recursive drain error: ${String(err)}`);
+        }
       }
     }
   }

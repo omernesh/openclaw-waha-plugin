@@ -72,3 +72,4 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 ## Standalone Phases
 
 - [x] Phase 36: Timeout & Error Hardening (1/1 plans) — completed 2026-03-25
+- [x] Phase 38: Resilience & Health (1/1 plans) — completed 2026-03-25

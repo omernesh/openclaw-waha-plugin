@@ -227,6 +227,24 @@ const MAX_RETRIES = 3;
 /** Global token bucket for all WAHA API calls (20 burst, 15/sec sustained). */
 let globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
 
+// ---------------------------------------------------------------------------
+// Session health circuit breaker — Phase 38, Plan 01 (RES-01). DO NOT REMOVE.
+// ---------------------------------------------------------------------------
+// Callback returns "healthy" | "degraded" | "unhealthy" | undefined.
+// Registered by health.ts via setSessionHealthChecker() to avoid circular imports.
+// When session status is "unhealthy", callWahaApi fast-fails instead of retrying.
+// ---------------------------------------------------------------------------
+type SessionHealthChecker = (session: string) => "healthy" | "degraded" | "unhealthy" | undefined;
+let sessionHealthChecker: SessionHealthChecker | null = null;
+
+/**
+ * Register a callback to check session health status.
+ * Called by health.ts on startup. Phase 38, Plan 01 (RES-01). DO NOT REMOVE.
+ */
+export function setSessionHealthChecker(checker: SessionHealthChecker): void {
+  sessionHealthChecker = checker;
+}
+
 /** Default timeout for API calls (ms). Overridable via configureReliability(). */
 let defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
 
@@ -275,6 +293,13 @@ export interface CallWahaApiParams {
   skipRateLimit?: boolean;
   /** Timeout in milliseconds. Default: 30000 (30s). */
   timeoutMs?: number;
+  /**
+   * WAHA session name for circuit breaker check.
+   * When provided, callWahaApi fast-fails if the session is unhealthy
+   * instead of attempting the full retry cycle.
+   * Phase 38, Plan 01 (RES-01). DO NOT REMOVE.
+   */
+  session?: string;
 }
 
 /**
@@ -294,6 +319,20 @@ export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   const timeout = params.timeoutMs ?? defaultTimeoutMs;
   const ctx = params.context ?? {};
   const contextLabel = `${ctx.action ?? method} ${ctx.chatId ?? ""}`.trim();
+
+  // 0. Circuit breaker: fast-fail if session is unhealthy (RES-01)
+  // Phase 38, Plan 01 — DO NOT REMOVE.
+  // Skips the entire retry cycle when the session health monitor has already
+  // determined that the session is down, preventing wasted timeout cycles.
+  if (params.session && sessionHealthChecker) {
+    const healthStatus = sessionHealthChecker(params.session);
+    if (healthStatus === "unhealthy") {
+      throw new Error(
+        `[WAHA] ${contextLabel} aborted — session "${params.session}" is unhealthy (circuit breaker). ` +
+        `Fix the session before retrying.`
+      );
+    }
+  }
 
   // 1. Rate limit
   if (!params.skipRateLimit) {
@@ -461,4 +500,5 @@ export function _resetForTesting(): void {
   defaultTimeoutMs = DEFAULT_TIMEOUT_MS;
   globalBucket = new TokenBucket(DEFAULT_BUCKET_CAPACITY, DEFAULT_BUCKET_REFILL_RATE);
   mutationDedup.clear();
+  sessionHealthChecker = null;
 }

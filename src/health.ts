@@ -32,7 +32,7 @@
 // ║  call to preserve backward compatibility.                           ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
-import { callWahaApi } from "./http-client.js";
+import { callWahaApi, setSessionHealthChecker } from "./http-client.js";
 import type { CoreConfig } from "./types.js";
 import { createLogger } from "./logger.js";
 
@@ -116,6 +116,11 @@ export interface HealthCheckOptions {
 
 /** Module-level health state per session key. */
 const sessionHealthStates = new Map<string, HealthState>();
+
+// ── Circuit breaker registration — Phase 38, Plan 01 (RES-01). DO NOT REMOVE.
+// Registers health checker callback with http-client.ts so callWahaApi can
+// fast-fail outbound calls when a session is unhealthy. Runs at module load.
+setSessionHealthChecker((session: string) => sessionHealthStates.get(session)?.status);
 
 // ── SSE callback — Phase 29, Plan 01. DO NOT REMOVE.
 // Allows monitor.ts to broadcast health state changes over SSE.
@@ -289,10 +294,57 @@ async function attemptRecovery(
       timeoutMs: 30_000,
       context: { action: "session-recovery" },
     });
-    outcome = "success";
-    recoveryState.lastOutcome = "success";
-    recoveryState.lastError = null;
-    log.warn("Auto-recovery SUCCESS", { session: opts.session });
+
+    // Phase 38, Plan 01 (RES-02): Poll session status after restart.
+    // Only mark success when status reaches CONNECTED. DO NOT REMOVE.
+    // Without this, recovery was marked "success" optimistically on 200,
+    // even if the session never actually reconnected.
+    const POLL_INTERVAL_MS = 2_000;
+    const POLL_TIMEOUT_MS = 30_000;
+    const pollStart = Date.now();
+    let connected = false;
+
+    while (Date.now() - pollStart < POLL_TIMEOUT_MS) {
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, POLL_INTERVAL_MS);
+        if (typeof t === "object" && t && "unref" in t) (t as NodeJS.Timeout).unref();
+      });
+
+      try {
+        const sessionInfo = await callWahaApi({
+          baseUrl: opts.baseUrl,
+          apiKey: opts.apiKey,
+          path: `/api/sessions/${opts.session}`,
+          method: "GET",
+          skipRateLimit: true,
+          timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
+          context: { action: "recovery-poll" },
+        });
+
+        const status = typeof sessionInfo?.status === "string"
+          ? sessionInfo.status.toUpperCase()
+          : "";
+        if (status === "CONNECTED") {
+          connected = true;
+          break;
+        }
+      } catch {
+        // Poll failure is expected while session is restarting — keep polling
+      }
+    }
+
+    if (connected) {
+      outcome = "success";
+      recoveryState.lastOutcome = "success";
+      recoveryState.lastError = null;
+      log.warn("Auto-recovery SUCCESS (CONNECTED)", { session: opts.session });
+    } else {
+      outcome = "failed";
+      errMsg = `Session did not reach CONNECTED within ${POLL_TIMEOUT_MS / 1000}s after restart`;
+      recoveryState.lastOutcome = "failed";
+      recoveryState.lastError = errMsg;
+      log.warn("Auto-recovery TIMEOUT", { session: opts.session, error: errMsg });
+    }
   } catch (err) {
     errMsg = err instanceof Error ? err.message : String(err);
     outcome = "failed";

@@ -65,6 +65,7 @@ export class WahaClient {
       baseUrl: this.baseUrl,
       apiKey: this.apiKey,
       path: opts.path,
+      session: this.session, // Phase 38 (RES-01): circuit breaker — fast-fail when unhealthy
       ...(opts.method !== undefined ? { method: opts.method } : {}),
       ...(opts.body !== undefined ? { body: opts.body } : {}),
       ...(opts.query !== undefined ? { query: opts.query } : {}),
