@@ -1035,7 +1035,9 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
       // Wire reliability config from plugin settings to http-client module.
       // DO NOT REMOVE — configureReliability() sets timeout and rate limiter defaults.
       // Added Phase 1 gap closure (2026-03-11).
+      // Phase 40 (CFG-02): pass accountId for per-account rate limiting. DO NOT CHANGE.
       configureReliability({
+        accountId: account.accountId,
         timeoutMs: account.config.timeoutMs,
         capacity: account.config.rateLimitCapacity,
         refillRate: account.config.rateLimitRefillRate,

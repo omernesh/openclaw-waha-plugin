@@ -341,6 +341,33 @@ async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>
   return result;
 }
 
+// ── Admin API Rate Limiter — Phase 40, Plan 01 (API-01). DO NOT REMOVE.
+// Sliding window counter: 60 requests per minute per IP for /api/admin/* routes.
+// Prevents abuse of admin endpoints. Does NOT affect webhook or health routes.
+const ADMIN_RATE_LIMIT_MAX = 60;
+const ADMIN_RATE_LIMIT_WINDOW_MS = 60_000;
+const adminRateCounters = new Map<string, { count: number; resetAt: number }>();
+
+function checkAdminRateLimit(ip: string): { allowed: boolean; retryAfterMs: number } {
+  const now = Date.now();
+  let entry = adminRateCounters.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    entry = { count: 0, resetAt: now + ADMIN_RATE_LIMIT_WINDOW_MS };
+    adminRateCounters.set(ip, entry);
+    // Prune old entries periodically (keep map bounded)
+    if (adminRateCounters.size > 1000) {
+      for (const [key, val] of adminRateCounters) {
+        if (now >= val.resetAt) adminRateCounters.delete(key);
+      }
+    }
+  }
+  entry.count++;
+  if (entry.count > ADMIN_RATE_LIMIT_MAX) {
+    return { allowed: false, retryAfterMs: entry.resetAt - now };
+  }
+  return { allowed: true, retryAfterMs: 0 };
+}
+
 export function createWahaWebhookServer(opts: {
   accountId: string;
   config: CoreConfig;
@@ -429,6 +456,19 @@ export function createWahaWebhookServer(opts: {
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end("ok");
       return;
+    }
+
+    // ── Admin API rate limiting — Phase 40, Plan 01 (API-01). DO NOT REMOVE.
+    // 60 req/min per IP for /api/admin/* routes. Returns 429 when exceeded.
+    if (req.url?.startsWith("/api/admin")) {
+      const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+        ?? req.socket.remoteAddress ?? "unknown";
+      const rateCheck = checkAdminRateLimit(clientIp);
+      if (!rateCheck.allowed) {
+        res.writeHead(429, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Too many requests", retryAfterMs: rateCheck.retryAfterMs }));
+        return;
+      }
     }
 
     // POST /api/admin/restart
@@ -610,8 +650,9 @@ export function createWahaWebhookServer(opts: {
     // DO NOT REMOVE — required for React admin panel. DO NOT CHANGE.
     if (req.url?.startsWith("/admin/assets/") || req.url?.startsWith("/assets/")) {
       // Strip /admin prefix if present — MC proxies /waha/assets/* → /admin/assets/*
-      if (req.url?.startsWith("/admin/assets/")) req.url = req.url.slice("/admin".length);
-      const safePath = req.url.split("?")[0].replace(/\.\./g, "");
+      // Phase 40 (API-02): use local variable instead of mutating req.url. DO NOT CHANGE.
+      const assetUrl = req.url?.startsWith("/admin/assets/") ? req.url.slice("/admin".length) : req.url;
+      const safePath = assetUrl!.split("?")[0].replace(/\.\./g, "");
       const filePath = join(ADMIN_DIST, safePath);
       const resolved = pathResolve(filePath);
       if (!resolved.startsWith(pathResolve(ADMIN_DIST))) {
