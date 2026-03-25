@@ -9,12 +9,12 @@ Requirements for Join/Leave/List & Skill Completeness milestone.
 
 ### Slash Commands
 
-- [ ] **CMD-01**: User can send `/join <invite-link>` to join a group via WhatsApp invite link without LLM involvement
-- [ ] **CMD-02**: User can send `/join <group-name>` to join a group by fuzzy name search, with LLM confirmation on ambiguous matches
-- [ ] **CMD-03**: User can send `/leave <group-or-channel-name>` to leave a group/channel by fuzzy name match
-- [ ] **CMD-04**: User can send `/list` to see all groups and channels the agent is a member of
-- [ ] **CMD-05**: User can send `/list groups` to see only groups
-- [ ] **CMD-06**: User can send `/list channels` to see only channels/newsletters
+- [x] **CMD-01**: User can send `/join <invite-link>` to join a group via WhatsApp invite link without LLM involvement
+- [x] **CMD-02**: User can send `/join <group-name>` to join a group by fuzzy name search, with LLM confirmation on ambiguous matches
+- [x] **CMD-03**: User can send `/leave <group-or-channel-name>` to leave a group/channel by fuzzy name match
+- [x] **CMD-04**: User can send `/list` to see all groups and channels the agent is a member of
+- [x] **CMD-05**: User can send `/list groups` to see only groups
+- [x] **CMD-06**: User can send `/list channels` to see only channels/newsletters
 
 ### Invite Links
 
@@ -59,12 +59,12 @@ None deferred — all features in scope for v1.18.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | Phase 43 | Pending |
-| CMD-02 | Phase 43 | Pending |
-| CMD-03 | Phase 43 | Pending |
-| CMD-04 | Phase 43 | Pending |
-| CMD-05 | Phase 43 | Pending |
-| CMD-06 | Phase 43 | Pending |
+| CMD-01 | Phase 43 | Complete |
+| CMD-02 | Phase 43 | Complete |
+| CMD-03 | Phase 43 | Complete |
+| CMD-04 | Phase 43 | Complete |
+| CMD-05 | Phase 43 | Complete |
+| CMD-06 | Phase 43 | Complete |
 | INV-01 | Phase 44 | Pending |
 | INV-02 | Phase 44 | Pending |
 | UI-01 | Phase 45 | Pending |

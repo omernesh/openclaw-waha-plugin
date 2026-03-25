@@ -98,9 +98,9 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. Sending `/leave <name>` fuzzy-matches and leaves the matching group or channel with a confirmation reply
   4. Sending `/list` returns a formatted list of all groups and channels the bot is a member of
   5. Sending `/list groups` or `/list channels` returns a filtered subset of the membership list
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 43-01-PLAN.md — Create src/commands.ts with /join, /leave, /list handlers
+- [x] 43-01-PLAN.md — Create src/commands.ts with /join, /leave, /list handlers
 - [ ] 43-02-PLAN.md — Wire commands into inbound.ts pipeline
 
 ### Phase 44: Invite Link Documentation
@@ -151,7 +151,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 43. Slash Commands | 0/2 | Planned | - |
+| 43. Slash Commands | 1/2 | In Progress|  |
 | 44. Invite Link Documentation | 0/? | Not started | - |
 | 45. Admin UI Join/Leave | 0/? | Not started | - |
 | 46. Skill Completeness Audit | 0/? | Not started | - |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness
-status: roadmap_ready
-stopped_at: Roadmap created, ready to plan Phase 43
-last_updated: "2026-03-25T17:30:00Z"
+status: Ready to execute
+stopped_at: Completed 43-01-PLAN.md
+last_updated: "2026-03-25T19:30:24.015Z"
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -19,18 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 43 — Slash Commands (/join, /leave, /list) in inbound.ts
+**Current focus:** Phase 43 — slash-commands
 
 ## Current Position
 
-Phase: 43 (Slash Commands) — Not started
-Plan: —
-Status: Roadmap ready, awaiting phase planning
-Last activity: 2026-03-25 — Roadmap created for v1.18
-
-```
-[          ] 0% — 0/5 phases complete
-```
+Phase: 43 (slash-commands) — EXECUTING
+Plan: 2 of 2
 
 ## Accumulated Context
 
@@ -50,6 +44,8 @@ Last activity: 2026-03-25 — Roadmap created for v1.18
 - Phase 45 (Admin UI) is independent — React SPA addition to src/admin/
 - Phase 46 depends on Phase 44 for audit scope completeness
 - Phase 47 (testing) depends on all prior phases
+- [Phase 43-slash-commands]: name-based /join returns Already a member (resolveWahaTarget only finds groups bot already belongs to)
+- [Phase 43-slash-commands]: PendingSelectionRecord type extended with join/leave (SQLite TEXT column, no migration needed)
 
 ### Pending Todos
 
@@ -75,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T17:30:00Z
-Stopped at: Roadmap created — ready to plan Phase 43
+Last session: 2026-03-25T19:30:24.010Z
+Stopped at: Completed 43-01-PLAN.md
 Resume file: None
