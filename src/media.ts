@@ -31,6 +31,10 @@ import { randomBytes } from "node:crypto";
 import type { WahaInboundMessage } from "./types.js";
 import type { ResolvedWahaAccount } from "./accounts.js";
 import { createLogger } from "./logger.js";
+import { RateLimiter } from "./rate-limiter.js";
+
+// API-03: Nominatim requires max 1 request/second — enforce with rate limiter
+const nominatimLimiter = new RateLimiter(1, 1100);
 
 
 const log = createLogger({ component: "media" });
@@ -64,9 +68,11 @@ export async function downloadWahaMedia(
   mediaUrl: string,
   apiKey: string,
 ): Promise<DownloadResult> {
+  // EH-02: Timeout prevents hang if WAHA media endpoint is unresponsive
   const response = await fetch(mediaUrl, {
     method: "GET",
     headers: { "x-api-key": apiKey },
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
@@ -141,12 +147,14 @@ export async function preprocessImage(
     // Detect mime type from file signature
     const mime = detectImageMime(imageBuffer) || "image/jpeg";
 
+    // EH-02: 60s timeout — vision analysis can be slow for large images
     const response = await fetch(`${endpoint}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
+      signal: AbortSignal.timeout(60_000),
       body: JSON.stringify({
         model,
         messages: [
@@ -215,6 +223,7 @@ export async function preprocessVideo(
 
     // Upload to Gemini Files API
     const fileBuffer = await readFile(filePath);
+    // EH-02: 60s timeout — video uploads can be large
     const uploadResponse = await fetch(
       `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`,
       {
@@ -223,6 +232,7 @@ export async function preprocessVideo(
           "Content-Type": "video/mp4",
           "X-Goog-Upload-Protocol": "raw",
         },
+        signal: AbortSignal.timeout(60_000),
         body: fileBuffer,
       },
     );
@@ -239,8 +249,10 @@ export async function preprocessVideo(
     const fileName = uploadData.file?.name;
     if (fileName) {
       for (let i = 0; i < 30; i++) {
+        // EH-03: 5s timeout per poll — quick check, fail fast
         const statusRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${apiKey}`,
+          { signal: AbortSignal.timeout(5_000) },
         );
         if (statusRes.ok) {
           const statusData = (await statusRes.json()) as { state?: string };
@@ -251,11 +263,13 @@ export async function preprocessVideo(
     }
 
     // Generate description
+    // EH-02: 60s timeout — video content generation can be slow
     const genResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(60_000),
         body: JSON.stringify({
           contents: [
             {
@@ -307,9 +321,12 @@ export async function preprocessLocation(
 
   if (!address) {
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
-        { headers: { "User-Agent": "OpenClaw-WAHA/1.0" } },
+      // API-03: Nominatim rate limited to 1 req/sec; EH-02: 5s timeout
+      const res = await nominatimLimiter.run(() =>
+        fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+          { headers: { "User-Agent": "OpenClaw-WAHA/1.0" }, signal: AbortSignal.timeout(5_000) },
+        ),
       );
       if (res.ok) {
         const geo = (await res.json()) as { display_name?: string };

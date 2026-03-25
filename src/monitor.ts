@@ -333,8 +333,10 @@ async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>
       continue;
     }
     try {
+      // EH-01: Timeout prevents hang if WAHA is unresponsive
       const r = await fetch(`${acc.baseUrl}/api/sessions/${encodeURIComponent(acc.session)}/me`, {
         headers: { "x-api-key": acc.apiKey },
+        signal: AbortSignal.timeout(30_000),
       });
       if (r.ok) {
         const me = await r.json() as { id?: string };
@@ -1347,8 +1349,10 @@ export function createWahaWebhookServer(opts: {
         // Fetch raw WAHA session list (array of session objects with .name/.status)
         let wahaSessionMap: Record<string, string> = {};
         try {
+          // EH-01: Timeout prevents hang if WAHA is unresponsive
           const response = await fetch(`${baseUrl}/api/sessions/`, {
             headers: { "x-api-key": apiKey },
+            signal: AbortSignal.timeout(30_000),
           });
           if (response.ok) {
             const raw = await response.json() as Array<Record<string, unknown>>;
@@ -1659,9 +1663,10 @@ export function createWahaWebhookServer(opts: {
             try {
               const channelId = encodeURIComponent(jid);
               const followPath = action === "follow" ? "follow" : "unfollow";
+              // EH-01: Timeout prevents hang if WAHA is unresponsive
               const resp = await fetch(
                 `${wahaBaseUrl}/api/${encodeURIComponent(session)}/channels/${channelId}/${followPath}`,
-                { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": wahaApiKey }, body: "{}" }
+                { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": wahaApiKey }, body: "{}", signal: AbortSignal.timeout(30_000) }
               );
               if (resp.ok) updated++;
             } catch (err) {
