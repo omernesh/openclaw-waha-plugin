@@ -2,6 +2,47 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.17.0] - 2026-03-25 — Enterprise Hardening
+
+### Added
+- **Admin API authentication** — Bearer token auth on all `/api/admin/*` routes. Configure via `adminToken` config field or `WAHA_ADMIN_TOKEN` env var. Backward-compatible: no token = no auth.
+- **Structured JSON logging** — New `logger` module replaces all `console.log/warn/error` with machine-parseable JSON lines. Fields: `level`, `ts`, `component`, `sessionId`, `chatId`. Configurable via `logLevel` config field or `WAHA_LOG_LEVEL` env var.
+- **Prometheus metrics endpoint** — `GET /metrics` exposes heap usage, event loop lag, HTTP request rates, queue depth, API call counts, processing latency. No auth required (scraper-accessible).
+- **Config write mutex** — Promise-based mutex serializes all config file read-modify-write operations. Prevents concurrent write corruption from admin panel.
+- **Atomic config writes** — Write-to-temp-then-rename pattern prevents zero-byte config on crash.
+- **Circuit breaker** — `callWahaApi` fast-fails when session health is `unhealthy` instead of wasting 90s on retry cycles.
+- **Recovery verification** — Auto-recovery polls session status after restart, only marks success when CONNECTED (30s timeout).
+- **Graceful shutdown** — Tracks in-flight requests and waits for drain (10s timeout) before closing server.
+- **SSE connection cap** — Max 50 SSE clients; new connections beyond cap rejected with 503.
+- **Admin API rate limiting** — 60 req/min per IP sliding window on all `/api/admin/*` routes.
+- **SQLite busy_timeout** — Both DirectoryDb and AnalyticsDb set `PRAGMA busy_timeout = 5000` to handle concurrent writers.
+- **WAL checkpointing** — Periodic `PRAGMA wal_checkpoint(PASSIVE)` every 30 minutes on both databases.
+- **Media temp cleanup** — Startup sweep deletes orphaned `/tmp/openclaw/waha-media-*` files older than 10 minutes.
+- **JID path validation** — All URL path JID parameters validated against `@c.us|@g.us|@lid|@newsletter` regex.
+- **Config import validation** — Rejects unknown top-level keys beyond the known allowlist.
+- **HMAC auto-generation** — Random webhook HMAC secret generated and logged on startup when not configured. Opt-out via `webhookHmacKey: "disabled"`.
+- **Config schema bounds** — `healthCheckIntervalMs` minimum 10s, prevents flooding WAHA with health pings.
+- **Per-account rate limiting** — Each account gets its own token bucket instead of last-account-wins.
+- **RateLimiter maxQueue** — Bounded queue prevents unbounded memory growth during WAHA degradation.
+- **Timeout coverage** — All 9 bare `fetch()` calls now have `AbortSignal.timeout()`. Covers media downloads, Gemini polling, Nominatim geocoding, admin session checks.
+- **Nominatim rate limiting** — 1 req/sec enforced for geocoding calls.
+
+### Fixed
+- **Timing-safe auth** — Admin token comparison uses `crypto.timingSafeEqual` instead of `===`.
+- **Config import mutex** — Import endpoint now wrapped in `withConfigMutex` to prevent race conditions.
+- **Bare catch blocks** — 8 silent `catch {}` blocks replaced with structured `log.warn/debug` calls.
+- **Histogram double-counting** — Prometheus histogram buckets now increment only the first matching bucket.
+- **Dead metrics code** — Removed unused `apiCallsTotal`/`apiCallsSuccess` counters.
+- **InboundQueue drain safety** — `finally` block wraps recursive drain and callbacks in try/catch.
+- **SSE timer cleanup** — Keep-alive intervals `.unref()`'d and cleared on shutdown.
+- **req.url immutability** — Static file serving no longer mutates `req.url` in-place.
+- **IP source priority** — Admin rate limiter uses `remoteAddress` as primary, `X-Forwarded-For` as fallback.
+
+### New Files
+- `src/config-io.ts` — Async config I/O with mutex, atomic writes, backup rotation
+- `src/logger.ts` — Structured JSON logger with child pattern and runtime level control
+- `src/metrics.ts` — Prometheus metrics collection and `/metrics` endpoint
+
 ## [1.16.21] - 2026-03-24
 
 ### Fixed
