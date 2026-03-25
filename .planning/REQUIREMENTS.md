@@ -80,39 +80,39 @@ None — this milestone covers all identified gaps.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| EH-01 | TBD | Pending |
-| EH-02 | TBD | Pending |
-| EH-03 | TBD | Pending |
-| EH-04 | TBD | Pending |
-| RES-01 | TBD | Pending |
-| RES-02 | TBD | Pending |
-| OBS-01 | TBD | Pending |
-| OBS-02 | TBD | Pending |
-| OBS-03 | TBD | Pending |
-| MEM-01 | TBD | Pending |
-| MEM-02 | TBD | Pending |
-| MEM-03 | TBD | Pending |
-| CON-01 | TBD | Pending |
-| CON-02 | TBD | Pending |
-| DI-01 | TBD | Pending |
-| DI-02 | TBD | Pending |
-| GS-01 | TBD | Pending |
-| GS-02 | TBD | Pending |
-| CFG-01 | TBD | Pending |
-| CFG-02 | TBD | Pending |
-| API-01 | TBD | Pending |
-| API-02 | TBD | Pending |
-| API-03 | TBD | Pending |
+| CON-01 | Phase 33 | Pending |
+| MEM-01 | Phase 33 | Pending |
+| DI-02 | Phase 33 | Pending |
+| SEC-01 | Phase 34 | Pending |
+| SEC-02 | Phase 34 | Pending |
+| SEC-03 | Phase 34 | Pending |
+| SEC-04 | Phase 34 | Pending |
+| OBS-01 | Phase 35 | Pending |
+| EH-01 | Phase 36 | Pending |
+| EH-02 | Phase 36 | Pending |
+| EH-03 | Phase 36 | Pending |
+| EH-04 | Phase 36 | Pending |
+| API-03 | Phase 36 | Pending |
+| MEM-03 | Phase 37 | Pending |
+| DI-01 | Phase 37 | Pending |
+| MEM-02 | Phase 37 | Pending |
+| RES-01 | Phase 38 | Pending |
+| RES-02 | Phase 38 | Pending |
+| CON-02 | Phase 38 | Pending |
+| GS-01 | Phase 39 | Pending |
+| GS-02 | Phase 39 | Pending |
+| OBS-03 | Phase 39 | Pending |
+| API-01 | Phase 40 | Pending |
+| API-02 | Phase 40 | Pending |
+| CFG-01 | Phase 40 | Pending |
+| CFG-02 | Phase 40 | Pending |
+| OBS-02 | Phase 41 | Pending |
 
 **Coverage:**
 - v1.14 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27
+- Mapped to phases: 27
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after initial definition*
+*Last updated: 2026-03-25 — traceability updated after roadmap creation*
