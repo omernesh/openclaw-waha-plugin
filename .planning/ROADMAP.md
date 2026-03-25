@@ -84,7 +84,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 44: Invite Link Documentation** - Document invite code actions in SKILL.md (completed 2026-03-25)
 - [x] **Phase 45: Admin UI Join/Leave** - Leave button and Join by Link in directory tab (completed 2026-03-25)
 - [x] **Phase 46: Skill Completeness Audit** - whatsapp-messenger skill documents all endpoints (completed 2026-03-25)
-- [ ] **Phase 47: Live WhatsApp Testing** - End-to-end validation of all v1.18 features
+- [x] **Phase 47: Live WhatsApp Testing** - End-to-end validation of all v1.18 features (completed 2026-03-25)
 
 ## Phase Details
 
@@ -151,7 +151,7 @@ Plans:
   4. /list, /list groups, /list channels each return correct filtered membership lists
   5. Invite link retrieval works: agent receives the link when asked via LLM action
   6. Admin UI Leave and Join by Link both complete successfully and show correct feedback in browser
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 47-01-PLAN.md — Build and deploy v1.18 to hpg6, verify clean gateway startup
 - [ ] 47-02-PLAN.md — Run all live WhatsApp tests (TST-01 to TST-06), human verification checkpoint
@@ -164,4 +164,4 @@ Plans:
 | 44. Invite Link Documentation | 1/1 | Complete    | 2026-03-25 |
 | 45. Admin UI Join/Leave | 2/2 | Complete    | 2026-03-25 |
 | 46. Skill Completeness Audit | 1/1 | Complete    | 2026-03-25 |
-| 47. Live WhatsApp Testing | 1/2 | In Progress|  |
+| 47. Live WhatsApp Testing | 1/2 | Complete    | 2026-03-25 |
