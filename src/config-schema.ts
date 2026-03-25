@@ -146,6 +146,11 @@ export const WahaAccountSchemaBase = z
       ),
     }).optional().default({}),
 
+    // Phase 35 (OBS-01): Structured log level. Overrides WAHA_LOG_LEVEL env var.
+    // Accepted values: "debug", "info", "warn", "error". Default: "info".
+    // DO NOT REMOVE — used by logger.ts to configure runtime log verbosity.
+    logLevel: z.enum(["debug", "info", "warn", "error"]).optional(),
+
     autoReply: z.object({
       enabled: z.boolean().optional().default(false),
       message: z.string().optional().default(
