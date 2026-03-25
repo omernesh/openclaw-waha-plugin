@@ -1028,8 +1028,9 @@ export async function joinWahaGroup(params: {
 }) {
   const client = getClient(params.cfg, params.accountId);
   assertCanSend(client.session, params.cfg);
+  // WAHA expects the field name "code", NOT "inviteCode". DO NOT CHANGE — verified 2026-03-26.
   return client.post(client.sessionPath("/api/{session}/groups/join"), {
-    inviteCode: params.inviteCode,
+    code: params.inviteCode,
   });
 }
 

@@ -128,29 +128,33 @@ export async function checkShutupAuthorization(
 
   // Check if sender matches a superuser — exact match on normalized phone number.
   // DO NOT CHANGE to substring matching — would allow unauthorized users to execute commands.
-  const senderNormalized = senderId.replace(/@.*$/, "");
+  // Strip both @domain suffix AND :N device suffix (e.g. 972544329000:26@s.whatsapp.net → 972544329000).
+  // The :N device suffix appears in group messages where WAHA uses @s.whatsapp.net JIDs. DO NOT REMOVE.
+  const senderNormalized = senderId.replace(/@.*$/, "").replace(/:.*$/, "");
   for (const su of superUsers) {
     if (senderNormalized === su.identifier || su.identifier === senderNormalized) {
       return true;
     }
   }
 
-  // Check groupAllowFrom (admin-configured senders)
+  // Check groupAllowFrom (admin-configured senders).
+  // Also normalize the sender JID to base phone (strip @domain and :device) for comparison,
+  // since group messages arrive as @s.whatsapp.net JIDs but config stores @c.us JIDs.
   const groupAllowFrom = (wahaConfig?.groupAllowFrom ?? []) as string[];
-  if (groupAllowFrom.includes(senderId)) return true;
+  if (groupAllowFrom.some(entry => entry.replace(/@.*$/, "").replace(/:.*$/, "") === senderNormalized)) return true;
 
   // Check allowFrom
   const allowFrom = (wahaConfig?.allowFrom ?? []) as string[];
-  if (allowFrom.includes(senderId)) return true;
+  if (allowFrom.some(entry => entry.replace(/@.*$/, "").replace(/:.*$/, "") === senderNormalized)) return true;
 
   // Also check per-account allowFrom/groupAllowFrom
   const accounts = wahaConfig?.accounts as Record<string, Record<string, unknown>> | undefined;
   if (accounts) {
     for (const acctCfg of Object.values(accounts)) {
       const acctAllowFrom = (acctCfg.allowFrom ?? []) as string[];
-      if (acctAllowFrom.includes(senderId)) return true;
+      if (acctAllowFrom.some(entry => entry.replace(/@.*$/, "").replace(/:.*$/, "") === senderNormalized)) return true;
       const acctGroupAllowFrom = (acctCfg.groupAllowFrom ?? []) as string[];
-      if (acctGroupAllowFrom.includes(senderId)) return true;
+      if (acctGroupAllowFrom.some(entry => entry.replace(/@.*$/, "").replace(/:.*$/, "") === senderNormalized)) return true;
     }
   }
 

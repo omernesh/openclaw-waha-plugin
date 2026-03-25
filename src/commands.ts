@@ -35,7 +35,9 @@ export const COMMANDS_RE = /^\/(join|leave|list)\s*(.*)?$/i;
 
 /** Detect if a string looks like a WhatsApp invite link or raw invite code. */
 function isInviteLink(str: string): boolean {
-  return str.includes("chat.whatsapp.com/") || /^[A-Za-z0-9]{22,}$/.test(str);
+  // WhatsApp invite links: full URL or exact 22-char alphanumeric code.
+  // DO NOT use {22,} (22+) — group names can be 22+ chars and would falsely match. DO NOT CHANGE.
+  return str.includes("chat.whatsapp.com/") || /^[A-Za-z0-9]{22}$/.test(str);
 }
 
 /** Extract invite code from a WhatsApp invite link or raw code. */
