@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness
-status: Ready to plan
-stopped_at: Completed 45-02-PLAN.md
-last_updated: "2026-03-25T20:26:20.759Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 46-01-PLAN.md
+last_updated: "2026-03-25T20:38:16.752Z"
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 45 — admin-ui-join-leave
+**Current focus:** Phase 46 — skill-completeness-audit
 
 ## Current Position
 
-Phase: 46
-Plan: Not started
+Phase: 46 (skill-completeness-audit) — EXECUTING
+Plan: 1 of 1
 
 ## Accumulated Context
 
@@ -53,6 +53,7 @@ Plan: Not started
 - [Phase 45]: invite code extraction from full chat.whatsapp.com URL handled server-side — client sends raw link
 - [Phase 45]: JID suffix (@g.us vs @newsletter) determines backend call — no separate endpoints needed
 - [Phase 45-admin-ui-join-leave]: AlertDialog built on @radix-ui/react-dialog — no new install needed
+- [Phase 46-skill-completeness-audit]: SKILL.md rewritten from 6 endpoints to 109 actions across 14 categories; excluded hijacked/internal endpoints
 
 ### Pending Todos
 
@@ -78,6 +79,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T20:19:47.755Z
-Stopped at: Completed 45-02-PLAN.md
+Last session: 2026-03-25T20:38:16.746Z
+Stopped at: Completed 46-01-PLAN.md
 Resume file: None
