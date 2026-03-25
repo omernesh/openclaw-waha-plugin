@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.14
-milestone_name: Enterprise Hardening
-status: Executing Phase 35
-stopped_at: Completed 34-02-PLAN.md
-last_updated: "2026-03-25T01:57:30.991Z"
+milestone: v1.10
+milestone_name: milestone
+status: Phase complete — ready for verification
+stopped_at: Completed 37-01-PLAN.md
+last_updated: "2026-03-25T03:02:49.463Z"
 progress:
-  total_phases: 10
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 4
+  total_phases: 42
+  completed_phases: 37
+  total_plans: 87
+  completed_plans: 87
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures.
-**Current focus:** Phase 35 — Structured Logging
+**Current focus:** Phase 36 — Timeout & Error Hardening
 
 ## Current Position
 
-Phase: 35 (Structured Logging) — EXECUTING
-Plan: 1 of 2
+Phase: 36 (Timeout & Error Hardening) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Plan: 1 of 2
 | Phase 33 P02 | 6min | 2 tasks | 2 files |
 | Phase 34 P01 | 3min | 1 tasks | 3 files |
 | Phase 34 P02 | 4min | 1 tasks | 1 files |
+| Phase 37 P01 | 2min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,7 @@ Recent decisions affecting current work:
 - [Phase 34]: Auto-generated HMAC cached in module-level Map, not persisted across restarts
 - [Phase 34]: JID regex allows @c.us, @g.us, @lid, @newsletter suffixes only
 - [Phase 34]: Config import allows only channels, providers, agents, tools, profiles, settings top-level keys
+- [Phase 37]: WAL checkpoint uses setTimeout chain with .unref() to avoid blocking process exit
 
 ### Pending Todos
 
@@ -92,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T01:44:53.262Z
-Stopped at: Completed 34-02-PLAN.md
+Last session: 2026-03-25T03:02:49.453Z
+Stopped at: Completed 37-01-PLAN.md
 Resume file: None

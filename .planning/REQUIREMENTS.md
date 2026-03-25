@@ -33,8 +33,8 @@
 ### Memory & Resources
 
 - [x] **MEM-01**: Config file writes use async `fs/promises` instead of blocking `readFileSync`/`writeFileSync`, with a promise-based write lock to serialize concurrent writes
-- [ ] **MEM-02**: On startup, a sweep deletes orphaned media temp files older than 10 minutes from `/tmp/openclaw/waha-media-*`
-- [ ] **MEM-03**: Both `DirectoryDb` and `AnalyticsDb` set `PRAGMA busy_timeout = 5000` on database initialization
+- [x] **MEM-02**: On startup, a sweep deletes orphaned media temp files older than 10 minutes from `/tmp/openclaw/waha-media-*`
+- [x] **MEM-03**: Both `DirectoryDb` and `AnalyticsDb` set `PRAGMA busy_timeout = 5000` on database initialization
 
 ### Concurrency
 
@@ -43,7 +43,7 @@
 
 ### Data Integrity
 
-- [ ] **DI-01**: Both `DirectoryDb` and `AnalyticsDb` run periodic `PRAGMA wal_checkpoint(PASSIVE)` (e.g., every sync cycle or every 30 minutes)
+- [x] **DI-01**: Both `DirectoryDb` and `AnalyticsDb` run periodic `PRAGMA wal_checkpoint(PASSIVE)` (e.g., every sync cycle or every 30 minutes)
 - [x] **DI-02**: Config file writes use atomic write-to-temp-then-rename pattern (`writeFile` to `.tmp` then `rename` over target)
 
 ### Graceful Shutdown
@@ -97,9 +97,9 @@ None — this milestone covers all identified gaps.
 | EH-03 | Phase 36 | Pending |
 | EH-04 | Phase 36 | Pending |
 | API-03 | Phase 36 | Pending |
-| MEM-03 | Phase 37 | Pending |
-| DI-01 | Phase 37 | Pending |
-| MEM-02 | Phase 37 | Pending |
+| MEM-03 | Phase 37 | Complete |
+| DI-01 | Phase 37 | Complete |
+| MEM-02 | Phase 37 | Complete |
 | RES-01 | Phase 38 | Pending |
 | RES-02 | Phase 38 | Pending |
 | CON-02 | Phase 38 | Pending |
