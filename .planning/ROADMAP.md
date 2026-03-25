@@ -74,7 +74,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 **Milestone Goal:** Close all 27 security, resilience, observability, concurrency, and lifecycle gaps to make the plugin production-safe for internet-facing deployment.
 
-- [ ] **Phase 33: Config Infrastructure** - Config write mutex, async I/O, and atomic writes
+- [x] **Phase 33: Config Infrastructure** - Config write mutex, async I/O, and atomic writes (completed 2026-03-25)
 - [ ] **Phase 34: Security** - Admin auth, config import validation, JID validation, HMAC defaults
 - [ ] **Phase 35: Structured Logging** - JSON logger module replacing all freeform console.* calls
 - [ ] **Phase 36: Timeout & Error Hardening** - AbortSignal timeouts on all bare fetch calls
@@ -97,7 +97,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   4. A promise-based mutex serializes all read-modify-write config operations
 **Plans**: 2 plans
 Plans:
-- [ ] 33-01-PLAN.md — Create config-io module with mutex, async I/O, and atomic writes
+- [x] 33-01-PLAN.md — Create config-io module with mutex, async I/O, and atomic writes
 - [ ] 33-02-PLAN.md — Replace all config I/O callsites in monitor.ts and sync.ts
 
 ### Phase 34: Security
@@ -191,7 +191,7 @@ Phases execute in numeric order: 33 -> 34 -> 35 -> 36 -> 37 -> 38 -> 39 -> 40 ->
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 33. Config Infrastructure | v1.14 | 0/2 | Planning complete | - |
+| 33. Config Infrastructure | v1.14 | 1/2 | Complete    | 2026-03-25 |
 | 34. Security | v1.14 | 0/TBD | Not started | - |
 | 35. Structured Logging | v1.14 | 0/TBD | Not started | - |
 | 36. Timeout & Error Hardening | v1.14 | 0/TBD | Not started | - |
