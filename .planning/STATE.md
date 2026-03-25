@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 40-01-PLAN.md
+stopped_at: Completed 41-01-PLAN.md
 last_updated: "2026-03-25T03:29:00Z"
 progress:
   total_phases: 8
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 40 — API & Config Polish (COMPLETE)
+**Current focus:** Phase 41 — Metrics Endpoint (COMPLETE)
 
 ## Current Position
 
-Phase: 40 (API & Config Polish) — COMPLETE
+Phase: 41 (Metrics Endpoint) — COMPLETE
 Plan: 1 of 1
 
 ## Accumulated Context
@@ -84,6 +84,9 @@ Plan: 1 of 1
 - [Phase 40-01]: Used sliding-window counter for admin rate limiting (count-based, not concurrency-based)
 - [Phase 40-01]: Per-account token buckets in http-client.ts keyed by accountId with default fallback
 - [Phase 40-01]: healthCheckIntervalMs min set to 10000ms
+- [Phase 41-01]: No external prometheus library — hand-formatted text exposition format
+- [Phase 41-01]: /metrics placed before admin auth for scraper compatibility
+- [Phase 41-01]: JID path segments normalized to :jid in route labels for cardinality control
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T03:24:33Z
-Stopped at: Completed 40-01-PLAN.md
+Last session: 2026-03-25T03:42:00Z
+Stopped at: Completed 41-01-PLAN.md
 Resume file: None

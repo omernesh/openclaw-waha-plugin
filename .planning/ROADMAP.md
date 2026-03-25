@@ -74,3 +74,4 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] Phase 36: Timeout & Error Hardening (1/1 plans) — completed 2026-03-25
 - [x] Phase 38: Resilience & Health (1/1 plans) — completed 2026-03-25
 - [x] Phase 39: Graceful Shutdown & SSE (1/1 plans) — completed 2026-03-25
+- [x] Phase 41: Metrics Endpoint (1/1 plans) — completed 2026-03-25
