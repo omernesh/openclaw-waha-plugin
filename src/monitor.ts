@@ -104,6 +104,15 @@ function writeWebhookError(res: ServerResponse, status: number, error: string) {
   writeJsonResponse(res, status, { error });
 }
 
+/** SEC-03: Validate JID format from URL path segments before any DB/API operation.
+ * Only allows JIDs ending with @c.us, @g.us, @lid, or @newsletter.
+ * Prevents malformed/injected values from reaching database or WAHA API calls.
+ * DO NOT CHANGE — security validation gate for all admin directory routes. */
+const JID_PATTERN = /^.+@(c\.us|g\.us|lid|newsletter)$/;
+function isValidJid(jid: string): boolean {
+  return JID_PATTERN.test(jid);
+}
+
 function parseWebhookPayload(body: string): WahaWebhookEnvelope | null {
   try {
     const data = JSON.parse(body);
@@ -832,6 +841,20 @@ export function createWahaWebhookServer(opts: {
       try {
         const bodyStr = await readBody(req, maxBodyBytes);
         const importedConfig = JSON.parse(bodyStr) as Record<string, unknown>;
+
+        // SEC-02: Reject unknown top-level keys — prevents injection of arbitrary config that could
+        // alter gateway behavior. Only known OpenClaw config sections are permitted. DO NOT CHANGE.
+        const allowedTopLevelKeys = new Set(['channels', 'providers', 'agents', 'tools', 'profiles', 'settings']);
+        const unknownKeys = Object.keys(importedConfig).filter(k => !allowedTopLevelKeys.has(k));
+        if (unknownKeys.length > 0) {
+          writeJsonResponse(res, 400, {
+            error: 'unknown_top_level_keys',
+            keys: unknownKeys,
+            message: `Config contains unknown top-level keys: ${unknownKeys.join(', ')}. Allowed: ${[...allowedTopLevelKeys].join(', ')}`
+          });
+          return;
+        }
+
         const importedChannels = (importedConfig.channels as Record<string, unknown>) ?? {};
         const importedWaha = (importedChannels.waha as Record<string, unknown>) ?? {};
 
@@ -935,6 +958,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const jid = decodeURIComponent(m[1]);
+          if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
           const db = getDirectoryDb(opts.accountId);
           const override = db.getGroupFilterOverride(jid);
           writeJsonResponse(res, 200, { override: override ?? null });
@@ -953,6 +977,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const jid = decodeURIComponent(m[1]);
+          if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
           console.log(`[waha] PUT group filter override for ${jid}`);
           const bodyStr = await readBody(req, maxBodyBytes);
           const body = JSON.parse(bodyStr) as {
@@ -1086,6 +1111,7 @@ export function createWahaWebhookServer(opts: {
       // GET /api/admin/directory/:jid
       if (pathParts.length === 1 && pathParts[0]) {
         const jid = decodeURIComponent(pathParts[0]);
+        if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
         try {
           const db = getDirectoryDb(opts.accountId);
           let contact = db.getContact(jid);
@@ -1243,6 +1269,7 @@ export function createWahaWebhookServer(opts: {
       const pathMatch = req.url.match(/^\/api\/admin\/directory\/([^/]+)\/settings$/);
       if (pathMatch) {
         const jid = decodeURIComponent(pathMatch[1]);
+        if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
         try {
           const bodyStr = await readBody(req, maxBodyBytes);
           const settings = JSON.parse(bodyStr) as {
@@ -1514,6 +1541,7 @@ export function createWahaWebhookServer(opts: {
           writeJsonResponse(res, 400, { error: "Missing module id or jid" });
           return;
         }
+        if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
         const db = getDirectoryDb(opts.accountId);
         db.unassignModule(moduleId, jid);
         writeJsonResponse(res, 200, { ok: true });
@@ -1665,6 +1693,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const jid = decodeURIComponent(m[1]);
+          if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed, expiresAt } = JSON.parse(bodyStr) as { allowed: boolean; expiresAt?: number | null };
           if (typeof allowed !== "boolean") {
@@ -1691,6 +1720,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const jid = decodeURIComponent(m[1]);
+          if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
           const bodyStr = await readBody(req, maxBodyBytes);
           const body = JSON.parse(bodyStr) as { expiresAt: number | null };
           // Validate: expiresAt must be null (never) or a positive Unix timestamp (seconds)
@@ -1723,6 +1753,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const groupJid = decodeURIComponent(m[1]);
+          if (!isValidJid(groupJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${groupJid}` }); return; }
           const db = getDirectoryDb(opts.accountId);
           let participants = db.getGroupParticipants(groupJid);
 
@@ -1835,6 +1866,8 @@ export function createWahaWebhookServer(opts: {
         try {
           const groupJid = decodeURIComponent(m[1]);
           const participantJid = decodeURIComponent(m[2]);
+          if (!isValidJid(groupJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${groupJid}` }); return; }
+          if (!isValidJid(participantJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${participantJid}` }); return; }
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
           if (typeof allowed !== "boolean") {
@@ -1863,6 +1896,8 @@ export function createWahaWebhookServer(opts: {
         try {
           const groupJid = decodeURIComponent(m[1]);
           const participantJid = decodeURIComponent(m[2]);
+          if (!isValidJid(groupJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${groupJid}` }); return; }
+          if (!isValidJid(participantJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${participantJid}` }); return; }
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed, expiresAt } = JSON.parse(bodyStr) as { allowed: boolean; expiresAt?: number | null };
           if (typeof allowed !== "boolean") {
@@ -1891,6 +1926,8 @@ export function createWahaWebhookServer(opts: {
         try {
           const groupJid = decodeURIComponent(m[1]);
           const participantJid = decodeURIComponent(m[2]);
+          if (!isValidJid(groupJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${groupJid}` }); return; }
+          if (!isValidJid(participantJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${participantJid}` }); return; }
           const bodyStr = await readBody(req, maxBodyBytes);
           const { role } = JSON.parse(bodyStr) as { role: string };
           if (!["bot_admin", "manager", "participant"].includes(role)) {
@@ -1918,6 +1955,7 @@ export function createWahaWebhookServer(opts: {
       if (m) {
         try {
           const groupJid = decodeURIComponent(m[1]);
+          if (!isValidJid(groupJid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${groupJid}` }); return; }
           const bodyStr = await readBody(req, maxBodyBytes);
           const { allowed } = JSON.parse(bodyStr) as { allowed: boolean };
           if (typeof allowed !== "boolean") {
@@ -1984,6 +2022,7 @@ export function createWahaWebhookServer(opts: {
     if (req.method === "DELETE" && req.url?.startsWith("/api/admin/pairing/grant/")) {
       try {
         const jid = decodeURIComponent(req.url.replace("/api/admin/pairing/grant/", ""));
+        if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
         const db = getDirectoryDb(opts.accountId);
         db.revokePairingGrant(jid);
         syncAllowList(getConfigPath(), "allowFrom", jid, false);
