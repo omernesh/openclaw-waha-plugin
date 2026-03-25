@@ -78,7 +78,7 @@ export type MutedGroup = {
  * Added Phase 7 fix (2026-03-15).
  */
 export type PendingSelectionRecord = {
-  type: "mute" | "unmute";
+  type: "mute" | "unmute" | "join" | "leave";
   groups: { jid: string; name: string }[];
   senderId: string;
   durationStr: string | null;
