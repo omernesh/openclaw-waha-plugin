@@ -1,7 +1,7 @@
 ---
 name: whatsapp-actions
 description: Use when the user asks to send a WhatsApp message, create a poll, share a location, manage groups, send a contact card, forward a message, react to a message, pin a message, edit or delete a message, create an event, manage labels, post a status/story, manage channels, join a group, follow a channel, change profile, block/unblock contacts, or perform any WhatsApp action through WAHA.
-version: 4.0.0
+version: 5.0.0
 ---
 
 > **IMPORTANT — Standard Action Names**: For targeted actions, use: `poll`, `send`, `edit`, `unsend`, `pin`/`unpin`, `read`, `react`. Do NOT use custom names like sendPoll, editMessage — they will be rejected.
@@ -235,8 +235,9 @@ Alternative: `sendContactVcard` action (requires explicit chatId).
 | `"Could not resolve '...' to a WhatsApp JID"` | Name not found | Run `search` first, retry with exact JID |
 | `"Ambiguous target '...'. Possible matches: ..."` | Multiple matches | Ask user which one, or use exact JID |
 | `"WAHA API rate limited (429)"` | Too many requests | Plugin auto-retries 3x with backoff (1s/2s/4s). If still failing, wait 5-10s |
-| `"timed out after 30000ms"` | WAHA unresponsive | Check admin panel Status tab. Mutation ops may have succeeded despite timeout |
-| `"Session health: unhealthy"` | WhatsApp disconnected | Reconnect in WAHA dashboard. No messages processed until healthy |
+| `"timed out after Xms"` | WAHA unresponsive | Timeout is configurable via `timeoutMs` config (default 30s). Mutation ops may have succeeded despite timeout |
+| `"aborted — session ... is unhealthy (circuit breaker)"` | Session disconnected | No retries attempted. Reconnect session in WAHA dashboard first |
+| `"Session health: unhealthy"` | WhatsApp disconnected | All outbound calls fast-fail until session reconnects. Check admin panel Status tab |
 
 **General:** Failed sends → verify JID with `search`. Multiple failures → check Status tab. Many timeouts → space out actions.
 
@@ -249,6 +250,8 @@ Token-bucket rate limiter: 20 tokens capacity, 15 tokens/sec refill. Each API ca
 Config: `rateLimitCapacity` (default 20), `rateLimitRefillRate` (default 15) in `channels.waha`.
 
 **For the agent:** Rate limiting is automatic. No delays needed between actions. For bulk sends, use `sendMulti` instead of looping.
+
+**Multi-account:** Each account has its own independent token bucket. One busy account cannot starve others.
 
 ---
 
