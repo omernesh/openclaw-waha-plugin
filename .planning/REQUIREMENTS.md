@@ -64,7 +64,7 @@
 
 ### Regression Testing
 
-- [ ] **REG-01**: Full regression test suite validates all v1.14 hardening changes work correctly together and no existing functionality is broken; all 460+ existing tests pass, new tests cover all v1.14 features, integration tests verify cross-feature interactions
+- [x] **REG-01**: Full regression test suite validates all v1.14 hardening changes work correctly together and no existing functionality is broken; all 460+ existing tests pass, new tests cover all v1.14 features, integration tests verify cross-feature interactions
 
 ## Future Requirements
 
@@ -111,7 +111,7 @@ None — this milestone covers all identified gaps.
 | CFG-01 | Phase 40 | Pending |
 | CFG-02 | Phase 40 | Pending |
 | OBS-02 | Phase 41 | Complete |
-| REG-01 | Phase 42 | Pending |
+| REG-01 | Phase 42 | Complete |
 
 **Coverage:**
 - v1.14 requirements: 28 total

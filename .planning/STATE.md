@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.13
 milestone_name: Close All Gaps
 status: unknown
-stopped_at: Completed 41-01-PLAN.md
-last_updated: "2026-03-25T03:29:00Z"
+stopped_at: Completed 42-01-PLAN.md
+last_updated: "2026-03-25T03:51:00Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 41 — Metrics Endpoint (COMPLETE)
+**Current focus:** Phase 42 — Full Regression Testing (COMPLETE)
 
 ## Current Position
 
-Phase: 41 (Metrics Endpoint) — COMPLETE
+Phase: 42 (Full Regression Testing) — COMPLETE
 Plan: 1 of 1
 
 ## Accumulated Context
@@ -87,6 +87,9 @@ Plan: 1 of 1
 - [Phase 41-01]: No external prometheus library — hand-formatted text exposition format
 - [Phase 41-01]: /metrics placed before admin auth for scraper compatibility
 - [Phase 41-01]: JID path segments normalized to :jid in route labels for cardinality control
+- [Phase 42-01]: http-client.ts missing createLogger import fixed — log was undefined at runtime
+- [Phase 42-01]: Test spy pattern: process.stderr.write replaces console.warn for structured logger output
+- [Phase 42-01]: 12 test files with openclaw/plugin-sdk import failures are pre-existing — not v1.14 regressions
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T03:42:00Z
-Stopped at: Completed 41-01-PLAN.md
+Last session: 2026-03-25T03:51:00Z
+Stopped at: Completed 42-01-PLAN.md
 Resume file: None
