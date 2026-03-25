@@ -1,123 +1,90 @@
-# Requirements: WAHA OpenClaw Plugin — v1.14 Enterprise Hardening
+# Requirements: WAHA OpenClaw Plugin — v1.18 Join/Leave/List & Skill Completeness
 
 **Defined:** 2026-03-25
 **Core Value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
 
-## v1.14 Requirements
+## v1.18 Requirements
 
-### Security
+Requirements for Join/Leave/List & Skill Completeness milestone.
 
-- [x] **SEC-01**: Admin API requires Bearer token authentication on all `/api/admin/*` routes; token read from config or environment variable
-- [x] **SEC-02**: Config import endpoint validates the entire config structure, not just the `waha` sub-section; rejects unknown top-level keys
-- [x] **SEC-03**: JID values extracted from URL path segments are validated against `/@(c\.us|g\.us|lid|newsletter)$/` regex before processing
-- [x] **SEC-04**: Webhook HMAC verification defaults to a randomly-generated secret (logged on startup) when `webhookHmacKey` is not configured; opt-out requires explicit `webhookHmacKey: "disabled"`
+### Slash Commands
 
-### Error Handling
+- [ ] **CMD-01**: User can send `/join <invite-link>` to join a group via WhatsApp invite link without LLM involvement
+- [ ] **CMD-02**: User can send `/join <group-name>` to join a group by fuzzy name search, with LLM confirmation on ambiguous matches
+- [ ] **CMD-03**: User can send `/leave <group-or-channel-name>` to leave a group/channel by fuzzy name match
+- [ ] **CMD-04**: User can send `/list` to see all groups and channels the agent is a member of
+- [ ] **CMD-05**: User can send `/list groups` to see only groups
+- [ ] **CMD-06**: User can send `/list channels` to see only channels/newsletters
 
-- [ ] **EH-01**: All bare `fetch()` calls in monitor.ts (fetchBotJids, /api/admin/sessions, follow/unfollow bulk) are routed through `callWahaApi()` or use `AbortSignal.timeout(30_000)`
-- [ ] **EH-02**: Media download in `downloadWahaMedia()` uses `AbortSignal.timeout(30_000)` on the fetch call
-- [ ] **EH-03**: Gemini video polling loop uses `AbortSignal.timeout(5_000)` on each status fetch call
-- [ ] **EH-04**: `RateLimiter` in rate-limiter.ts accepts a `maxQueue` constructor parameter and throws when the queue exceeds it
+### Invite Links
 
-### Resilience
+- [ ] **INV-01**: Agent can retrieve and share a group's invite link when asked
+- [ ] **INV-02**: SKILL.md clearly documents getInviteCode, revokeInviteCode, and joinGroup actions
 
-- [ ] **RES-01**: `callWahaApi` integrates with `sessionHealthStates` to fast-fail outbound calls when session status is `unhealthy`, instead of attempting full retry cycle
-- [ ] **RES-02**: Auto-recovery in health.ts polls session status after restart and only marks `outcome = "success"` when the session reaches CONNECTED state (with a 30s timeout)
+### Admin UI
 
-### Observability
+- [ ] **UI-01**: Directory tab shows a "Leave" action button on each group/channel row
+- [ ] **UI-02**: Directory tab has a "Join by Link" input field for joining groups via invite URL
+- [ ] **UI-03**: Leave/Join actions provide success/error feedback in the UI
 
-- [x] **OBS-01**: A `logger` module provides structured JSON logging with consistent fields (level, timestamp, component, sessionId, chatId) replacing all freeform `console.*` calls
-- [x] **OBS-02**: A `/metrics` endpoint exposes process-level metrics in Prometheus format: heap usage, event loop lag, HTTP request rates, SQLite query latency, queue depth, processing latency P95, error rate
-- [x] **OBS-03**: `sseClients` Set has a maximum cap (50); new SSE connections beyond the cap are rejected with HTTP 503
+### Skill Completeness
 
-### Memory & Resources
+- [ ] **SKL-01**: whatsapp-messenger skill documents ALL implemented WAHA API endpoints (excluding hijacked ones)
+- [ ] **SKL-02**: Skill organizes endpoints by category (messaging, groups, contacts, channels, labels, status, presence, profile, media, calls)
+- [ ] **SKL-03**: Skill documents the new /join, /leave, /list slash commands
 
-- [x] **MEM-01**: Config file writes use async `fs/promises` instead of blocking `readFileSync`/`writeFileSync`, with a promise-based write lock to serialize concurrent writes
-- [x] **MEM-02**: On startup, a sweep deletes orphaned media temp files older than 10 minutes from `/tmp/openclaw/waha-media-*`
-- [x] **MEM-03**: Both `DirectoryDb` and `AnalyticsDb` set `PRAGMA busy_timeout = 5000` on database initialization
+### Testing
 
-### Concurrency
-
-- [x] **CON-01**: Config file read-modify-write operations are serialized through a promise-based mutex, preventing concurrent write corruption
-- [ ] **CON-02**: The `finally` block in `InboundQueue.drain()` wraps both the `onQueueChange?.()` call and the recursive `drain()` call in try/catch to prevent unhandled rejections
-
-### Data Integrity
-
-- [x] **DI-01**: Both `DirectoryDb` and `AnalyticsDb` run periodic `PRAGMA wal_checkpoint(PASSIVE)` (e.g., every sync cycle or every 30 minutes)
-- [x] **DI-02**: Config file writes use atomic write-to-temp-then-rename pattern (`writeFile` to `.tmp` then `rename` over target)
-
-### Graceful Shutdown
-
-- [x] **GS-01**: `server.close()` tracks in-flight request count and waits for all to complete (with a 10s hard timeout) before resolving
-- [x] **GS-02**: SSE keep-alive `setInterval` is `.unref()`'d, and the abort handler clears all remaining SSE intervals and closes all SSE client connections
-
-### Configuration
-
-- [ ] **CFG-01**: `healthCheckIntervalMs` has a minimum bound of 10000ms and `syncIntervalMinutes` has a minimum bound of 1 minute, enforced in config-schema.ts via Zod `.min()` transforms
-- [ ] **CFG-02**: `configureReliability()` is called once with global config, not per-account; or per-account token buckets are used to prevent last-account-wins behavior
-
-### API Robustness
-
-- [ ] **API-01**: Admin API routes have IP-based or token-based request rate limiting (reusing `RateLimiter` from rate-limiter.ts) to prevent event loop denial-of-service
-- [ ] **API-02**: `req.url` mutation in static file serving is replaced with a local variable; the original `req.url` is never modified
-- [ ] **API-03**: Nominatim geocode call uses `AbortSignal.timeout(5_000)` and a 1-request-per-second rate limit to respect free tier limits
-
-### Regression Testing
-
-- [x] **REG-01**: Full regression test suite validates all v1.14 hardening changes work correctly together and no existing functionality is broken; all 460+ existing tests pass, new tests cover all v1.14 features, integration tests verify cross-feature interactions
+- [ ] **TST-01**: Join by invite link tested via WhatsApp
+- [ ] **TST-02**: Join by name tested via WhatsApp (exact + ambiguous match)
+- [ ] **TST-03**: Leave group/channel tested via WhatsApp
+- [ ] **TST-04**: /list, /list groups, /list channels tested via WhatsApp
+- [ ] **TST-05**: Invite link retrieval tested via WhatsApp
+- [ ] **TST-06**: Admin UI Join/Leave buttons tested via browser
 
 ## Future Requirements
 
-None — this milestone covers all identified gaps.
+None deferred — all features in scope for v1.18.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Full APM integration (Datadog, New Relic) | Prometheus `/metrics` is sufficient; APM agents are env-specific |
-| mTLS between plugin and WAHA | WAHA runs on localhost; TLS adds complexity for no gain |
-| RBAC for admin panel (role-based access) | Single admin token is sufficient for current deployment |
-| Database encryption at rest | SQLite data is non-sensitive contact metadata; OS-level encryption suffices |
-| Log rotation/shipping | OS-level concern (logrotate/journald); plugin outputs structured logs |
+| Join by QR code scan | Requires device camera, not applicable for server-side agent |
+| Group creation from slash command | Already available via LLM action, no need to duplicate |
+| Bulk join/leave | Edge case, can be added later if needed |
+| Newsletter creation from slash command | Low demand, follow/unfollow sufficient |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CON-01 | Phase 33 | Complete |
-| MEM-01 | Phase 33 | Complete |
-| DI-02 | Phase 33 | Complete |
-| SEC-01 | Phase 34 | Complete |
-| SEC-02 | Phase 34 | Complete |
-| SEC-03 | Phase 34 | Complete |
-| SEC-04 | Phase 34 | Complete |
-| OBS-01 | Phase 35 | Complete |
-| EH-01 | Phase 36 | Pending |
-| EH-02 | Phase 36 | Pending |
-| EH-03 | Phase 36 | Pending |
-| EH-04 | Phase 36 | Pending |
-| API-03 | Phase 36 | Pending |
-| MEM-03 | Phase 37 | Complete |
-| DI-01 | Phase 37 | Complete |
-| MEM-02 | Phase 37 | Complete |
-| RES-01 | Phase 38 | Pending |
-| RES-02 | Phase 38 | Pending |
-| CON-02 | Phase 38 | Pending |
-| GS-01 | Phase 39 | Complete |
-| GS-02 | Phase 39 | Complete |
-| OBS-03 | Phase 39 | Complete |
-| API-01 | Phase 40 | Pending |
-| API-02 | Phase 40 | Pending |
-| CFG-01 | Phase 40 | Pending |
-| CFG-02 | Phase 40 | Pending |
-| OBS-02 | Phase 41 | Complete |
-| REG-01 | Phase 42 | Complete |
+| CMD-01 | — | Pending |
+| CMD-02 | — | Pending |
+| CMD-03 | — | Pending |
+| CMD-04 | — | Pending |
+| CMD-05 | — | Pending |
+| CMD-06 | — | Pending |
+| INV-01 | — | Pending |
+| INV-02 | — | Pending |
+| UI-01 | — | Pending |
+| UI-02 | — | Pending |
+| UI-03 | — | Pending |
+| SKL-01 | — | Pending |
+| SKL-02 | — | Pending |
+| SKL-03 | — | Pending |
+| TST-01 | — | Pending |
+| TST-02 | — | Pending |
+| TST-03 | — | Pending |
+| TST-04 | — | Pending |
+| TST-05 | — | Pending |
+| TST-06 | — | Pending |
 
 **Coverage:**
-- v1.14 requirements: 28 total
-- Mapped to phases: 28
-- Unmapped: 0
+- v1.18 requirements: 20 total
+- Mapped to phases: 0
+- Unmapped: 20
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 — traceability updated after roadmap creation*
+*Last updated: 2026-03-25 after initial definition*
