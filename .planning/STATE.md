@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 32 — Platform Abstraction (COMPLETE)
+**Current focus:** Phase 35 — Structured Logging (IN PROGRESS)
 
 ## Current Position
 
-Phase: 32 (Platform Abstraction) — COMPLETE
-Plan: 3 of 3
+Phase: 35 (Structured Logging) — IN PROGRESS
+Plan: 1 of 2
 
 ## Accumulated Context
 
@@ -81,6 +81,9 @@ Plan: 3 of 3
 - [Phase 32-03]: Default tenant 'default' uses legacy DB path (no subdirectory) — no migration required for existing installs
 - [Phase 32-03]: tenantId extracted from coreCfg.channels.waha.tenantId in handleAction — config-driven, not call-site-driven
 - [Phase 32-03]: Cache key changed from safeId to 'safeTenant:safeId' to allow same accountId in different tenants
+- [Phase 35-01]: stdout for debug/info, stderr for warn/error — Unix convention
+- [Phase 35-01]: setLogLevel mutates logger._level directly — avoids re-creating child loggers
+- [Phase 35-01]: logLevel on WahaAccountSchemaBase — auto-included in validateWahaConfig knownKeys
 
 ### Pending Todos
 
@@ -106,6 +109,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24T00:00:00Z
-Stopped at: Completed quick task 260324-sl3
+Last session: 2026-03-25T02:02:08Z
+Stopped at: Completed 35-01-PLAN.md
 Resume file: None
