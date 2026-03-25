@@ -34,7 +34,10 @@
 
 import { callWahaApi } from "./http-client.js";
 import type { CoreConfig } from "./types.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "health" });
 // ── Named constants (no magic numbers) ──────────────────────────────
 /** Timeout for the health check fetch call. */
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
@@ -195,9 +198,7 @@ async function alertGodModeUsers(
   );
 
   if (!healthySender) {
-    console.warn(
-      `[WAHA] Cannot alert god mode users — no healthy session available`,
-    );
+    log.warn("Cannot alert god mode users — no healthy session available");
     return;
   }
 
@@ -234,9 +235,7 @@ async function alertGodModeUsers(
         bypassPolicy: true, // system alert — must bypass policy filters
       });
     } catch (err) {
-      console.warn(
-        `[WAHA] Failed to send recovery alert to ${jid}: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      log.warn("Failed to send recovery alert", { jid, error: err instanceof Error ? err.message : String(err) });
     }
   }
 }
@@ -266,9 +265,7 @@ async function attemptRecovery(
   // Check cooldown — prevent restart storms
   const now = Date.now();
   if (recoveryState.cooldownUntil !== null && now < recoveryState.cooldownUntil) {
-    console.warn(
-      `[WAHA] Recovery skipped for session ${opts.session} — cooldown until ${new Date(recoveryState.cooldownUntil).toISOString()}`,
-    );
+    log.warn("Recovery skipped — cooldown active", { session: opts.session, cooldownUntil: new Date(recoveryState.cooldownUntil).toISOString() });
     return;
   }
 
@@ -278,9 +275,7 @@ async function attemptRecovery(
   recoveryState.lastAttemptAt = now;
 
   const attemptCount = recoveryState.attemptCount;
-  console.warn(
-    `[WAHA] Attempting auto-recovery for session ${opts.session} (attempt #${attemptCount}, ${state.consecutiveFailures} consecutive failures)`,
-  );
+  log.warn("Attempting auto-recovery", { session: opts.session, attempt: attemptCount, consecutiveFailures: state.consecutiveFailures });
 
   let outcome: "success" | "failed";
   let errMsg: string | null = null;
@@ -297,13 +292,13 @@ async function attemptRecovery(
     outcome = "success";
     recoveryState.lastOutcome = "success";
     recoveryState.lastError = null;
-    console.warn(`[WAHA] Auto-recovery SUCCESS for session ${opts.session}`);
+    log.warn("Auto-recovery SUCCESS", { session: opts.session });
   } catch (err) {
     errMsg = err instanceof Error ? err.message : String(err);
     outcome = "failed";
     recoveryState.lastOutcome = "failed";
     recoveryState.lastError = errMsg;
-    console.warn(`[WAHA] Auto-recovery FAILED for session ${opts.session}: ${errMsg}`);
+    log.warn("Auto-recovery FAILED", { session: opts.session, error: errMsg });
   }
 
   // Push to history ring buffer (cap at RECOVERY_HISTORY_MAX)
@@ -321,9 +316,7 @@ async function attemptRecovery(
 
   // Alert god mode users — fire and forget
   alertGodModeUsers(opts, state, recoveryState).catch((err) => {
-    console.warn(
-      `[WAHA] alertGodModeUsers error for ${opts.session}: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    log.warn("alertGodModeUsers error", { session: opts.session, error: err instanceof Error ? err.message : String(err) });
   });
 }
 
@@ -401,27 +394,19 @@ async function tick(opts: HealthCheckOptions, state: HealthState): Promise<void>
 
     if (state.consecutiveFailures >= UNHEALTHY_THRESHOLD) {
       state.status = "unhealthy";
-      console.warn(
-        `[WAHA] Health check UNHEALTHY for session ${opts.session} ` +
-        `(${state.consecutiveFailures} consecutive failures): ${msg}`
-      );
+      log.warn("Health check UNHEALTHY", { session: opts.session, consecutiveFailures: state.consecutiveFailures, error: msg });
 
       // Phase 25, Plan 01: Auto-recovery on 5+ consecutive failures.
       // Fire-and-forget — recovery runs async, doesn't block next health tick.
       // DO NOT REMOVE — this is the core recovery trigger.
       if (opts.enableRecovery && state.consecutiveFailures >= AUTO_RECOVERY_THRESHOLD) {
         attemptRecovery(opts, state).catch((err) => {
-          console.warn(
-            `[WAHA] Recovery attempt error for ${opts.session}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          log.warn("Recovery attempt error", { session: opts.session, error: err instanceof Error ? err.message : String(err) });
         });
       }
     } else {
       state.status = "degraded";
-      console.warn(
-        `[WAHA] Health check DEGRADED for session ${opts.session} ` +
-        `(${state.consecutiveFailures} consecutive failure(s)): ${msg}`
-      );
+      log.warn("Health check DEGRADED", { session: opts.session, consecutiveFailures: state.consecutiveFailures, error: msg });
     }
   }
 

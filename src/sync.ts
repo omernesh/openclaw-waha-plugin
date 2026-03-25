@@ -20,7 +20,10 @@ import type { CoreConfig } from "./types.js";
 
 // RateLimiter extracted to src/rate-limiter.ts (Phase review, 2026-03-17). DO NOT DUPLICATE.
 import { RateLimiter } from "./rate-limiter.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "sync" });
 // ── Types ────────────────────────────────────────────────────────────
 
 /** Live sync state for one account — updated in-place by tick(). */
@@ -159,7 +162,7 @@ async function tick(opts: SyncOptions, state: SyncState): Promise<void> {
     state.status = "error";
     state.lastError = err instanceof Error ? err.message : String(err);
     state.lastSyncDuration = Date.now() - startTime;
-    console.warn(`[waha] sync: cycle failed for account ${opts.accountId}: ${state.lastError}`);
+    log.warn("sync: cycle failed", { accountId: opts.accountId, error: state.lastError });
   }
 
   state.currentPhase = null;
@@ -204,7 +207,7 @@ async function syncExpiredToConfig(expiredJids: string[]): Promise<number> {
     });
     return removed;
   } catch (err) {
-    console.error(`[waha] sync: syncExpiredToConfig failed: ${String(err)}`);
+    log.error("sync: syncExpiredToConfig failed", { error: String(err) });
     return -1;
   }
 }
@@ -229,10 +232,10 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   // Track API failures so we can report partial sync errors. DO NOT CHANGE.
   let apiFailures = 0;
   const [rawChats, rawContacts, rawGroups, rawLids] = await Promise.all([
-    rateLimiter.run(() => getWahaChats({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaChats failed: ${String(err)}`); return []; })),
-    rateLimiter.run(() => getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaContacts failed: ${String(err)}`); return []; })),
-    rateLimiter.run(() => getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaGroups failed: ${String(err)}`); return []; })),
-    rateLimiter.run(() => getWahaAllLids({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; console.warn(`[waha] sync: getWahaAllLids failed: ${String(err)}`); return []; })),
+    rateLimiter.run(() => getWahaChats({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; log.warn("sync: getWahaChats failed", { error: String(err) }); return []; })),
+    rateLimiter.run(() => getWahaContacts({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; log.warn("sync: getWahaContacts failed", { error: String(err) }); return []; })),
+    rateLimiter.run(() => getWahaGroups({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; log.warn("sync: getWahaGroups failed", { error: String(err) }); return []; })),
+    rateLimiter.run(() => getWahaAllLids({ cfg: opts.config, accountId: opts.accountId }).catch((err: unknown) => { apiFailures++; log.warn("sync: getWahaAllLids failed", { error: String(err) }); return []; })),
   ]);
   if (apiFailures > 0) {
     state.lastError = `${apiFailures} of 4 API calls failed`;
@@ -383,7 +386,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
       }
     }
   } catch (mergeErr) {
-    console.warn(`[waha] sync: LID merge partially failed: ${String(mergeErr)}`);
+    log.warn("sync: LID merge partially failed", { error: String(mergeErr) });
   }
 
   // Participants are loaded lazily when user clicks a group (not during bulk refresh)
@@ -401,7 +404,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   try {
     const rawChannels = await rateLimiter.run(() =>
       getWahaChannels({ cfg: opts.config, accountId: opts.accountId })
-        .catch((err: unknown) => { console.warn(`[waha] sync: getWahaChannels failed: ${String(err)}`); return []; })
+        .catch((err: unknown) => { log.warn("sync: getWahaChannels failed", { error: String(err) }); return []; })
     );
     const channelsArr = toArr(rawChannels);
     const newsletterEntries = channelsArr
@@ -419,7 +422,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
       newsletterCount = newsletterEntries.length;
     }
   } catch (newsletterErr) {
-    console.warn(`[waha] sync: newsletter sync failed: ${String(newsletterErr)}`);
+    log.warn("sync: newsletter sync failed", { error: String(newsletterErr) });
   }
 
   if (opts.abortSignal.aborted) return mappedContacts.length + mappedGroups.length + newsletterCount;
@@ -494,7 +497,7 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
       }
     }
   } catch (err) {
-    console.warn(`[waha] sync: per-contact name resolution partially failed: ${String(err)}`);
+    log.warn("sync: per-contact name resolution partially failed", { error: String(err) });
   }
 
   // TTL-03: Remove expired JIDs from config file allowFrom BEFORE cleanup.
@@ -507,10 +510,10 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
     if (configRemoved < 0) {
       state.lastError = "TTL config sync failed";
     } else if (configRemoved > 0) {
-      console.log(`[waha] sync: removed ${configRemoved} expired JIDs from config allowFrom`);
+      log.info(`sync: removed ${configRemoved} expired JIDs from config allowFrom`);
     }
   } catch (err) {
-    console.warn(`[waha] sync: syncExpiredToConfig failed: ${String(err)}`);
+    log.warn("sync: syncExpiredToConfig failed", { error: String(err) });
   }
 
   // TTL-02: Cleanup allow_list entries expired > 24h ago (keeps recently expired for admin visual feedback)
@@ -518,18 +521,22 @@ async function runSyncCycle(opts: SyncOptions, state: SyncState): Promise<number
   try {
     const cleaned = db.cleanupExpiredAllowList();
     if (cleaned > 0) {
-      console.log(`[waha] sync: cleaned ${cleaned} expired allow_list entries`);
+      log.info(`sync: cleaned ${cleaned} expired allow_list entries`);
     }
   } catch (err) {
-    console.warn(`[waha] sync: cleanupExpiredAllowList failed: ${String(err)}`);
+    log.warn("sync: cleanupExpiredAllowList failed", { error: String(err) });
   }
 
-  console.log(
-    `[waha] sync: cycle complete for ${opts.accountId} — ` +
-    `${mappedContacts.length} contacts, ${mappedGroups.length} groups, ` +
-    `${newsletterCount} newsletters, ${namesResolved} names resolved, ` +
-    `${lidsMerged} LIDs merged, ${lidToCus.size} LIDs from bulk API (${imported} upserted)`
-  );
+  log.info("sync: cycle complete", {
+    accountId: opts.accountId,
+    contacts: mappedContacts.length,
+    groups: mappedGroups.length,
+    newsletters: newsletterCount,
+    namesResolved,
+    lidsMerged,
+    lidsFromBulkApi: lidToCus.size,
+    upserted: imported,
+  });
 
   return mappedContacts.length + mappedGroups.length + newsletterCount + namesResolved;
 }

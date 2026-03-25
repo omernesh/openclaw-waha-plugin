@@ -199,7 +199,7 @@ class MutationDedup {
     try {
       stable = JSON.stringify(body, sortedReplacer);
     } catch {
-      console.warn("[WAHA] MutationDedup: could not hash body (circular reference or non-serializable value) — dedup skipped for this call");
+      log.warn("MutationDedup: could not hash body (circular reference or non-serializable value) — dedup skipped for this call");
       return "unstable";
     }
     let h = DJB2_SEED;
@@ -286,7 +286,7 @@ export interface CallWahaApiParams {
  * 3. Fetch with AbortSignal.timeout
  * 4. Timeout error handling — mutations get "may have succeeded" warning
  * 5. 429 handling — exponential backoff with jitter, max 3 retries
- * 6. Error logging — structured console.warn with context
+ * 6. Error logging — structured log.warn with context
  * 7. Response parsing — JSON or text
  */
 export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
@@ -309,11 +309,11 @@ export async function callWahaApi(params: CallWahaApiParams): Promise<any> {
   try {
     dedupKey = mutationDedup.buildKey(method, params.path, params.body);
   } catch {
-    console.warn(`[WAHA] MutationDedup: buildKey failed for ${method} ${params.path} — dedup skipped`);
+    log.warn("MutationDedup: buildKey failed — dedup skipped", { method, path: params.path });
   }
   if (dedupKey !== null && mutationDedup.isPending(dedupKey)) {
-    const warnMsg = `[WAHA] Duplicate mutation suppressed (original timed out, may have already succeeded): ${method} ${params.path}`;
-    try { console.warn(warnMsg); } catch { /* logging must not prevent throw */ }
+    const warnMsg = `Duplicate mutation suppressed (original timed out, may have already succeeded): ${method} ${params.path}`;
+    try { log.warn(warnMsg, { method, path: params.path }); } catch { /* logging must not prevent throw */ }
     throw new Error(warnMsg);
   }
 
@@ -375,7 +375,7 @@ async function fetchWithRetry(
   // 5. Handle 429 — retry with exponential backoff
   if (response.status === 429) {
     if (attempt >= MAX_RETRIES) {
-      console.warn(`[WAHA] ${contextLabel} rate limited after ${MAX_RETRIES} retries`);
+      log.warn("rate limited after max retries", { context: contextLabel, retries: MAX_RETRIES });
       throw new Error(
         `[WAHA] ${contextLabel} rate limited (429 Too Many Requests) after ${MAX_RETRIES} retries`
       );
@@ -391,9 +391,7 @@ async function fetchWithRetry(
     // Set shared backoff state so other calls wait
     backoffUntil = Date.now() + cappedDelay;
 
-    console.warn(
-      `[WAHA] ${contextLabel} got 429, retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(cappedDelay)}ms`
-    );
+    log.warn("got 429, retrying", { context: contextLabel, retry: attempt + 1, maxRetries: MAX_RETRIES, delayMs: Math.round(cappedDelay) });
 
     await sleep(cappedDelay);
     return fetchWithRetry(params, method, timeout, contextLabel, dedupKey, attempt + 1);
@@ -402,9 +400,7 @@ async function fetchWithRetry(
   // 6. Error logging
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
-    console.warn(
-      `[WAHA] ${contextLabel} failed: ${response.status} ${errorText}`
-    );
+    log.warn("API call failed", { context: contextLabel, status: response.status, error: errorText });
     throw new Error(
       `WAHA ${method} ${params.path} failed: ${response.status} ${errorText}`
     );
@@ -452,7 +448,7 @@ export function sleep(ms: number): Promise<void> {
 export function warnOnError(context: string, extra?: string): (err: unknown) => void {
   return (err: unknown) => {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[WAHA] ${context}${extra ? ` (${extra})` : ""}: ${msg}`);
+    log.warn(context, { detail: extra ?? undefined, error: msg });
   };
 }
 

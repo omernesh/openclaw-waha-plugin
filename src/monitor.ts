@@ -30,6 +30,9 @@ import { getPairingEngine } from "./pairing.js";
 import { getModuleRegistry } from "./module-registry.js";
 import { validateWahaConfig } from "./config-schema.js";
 import { getAnalyticsDb } from "./analytics.js";
+import { createLogger, setLogLevel } from "./logger.js";
+
+const log = createLogger({ component: "monitor" });
 
 // ── SSE (Server-Sent Events) infrastructure — Phase 29, Plan 01. DO NOT REMOVE.
 // sseClients: tracks all active SSE connections. broadcastSSE sends named events to all.
@@ -42,7 +45,7 @@ export function broadcastSSE(event: string, data: object): void {
     try {
       client.write(payload);
     } catch (err) {
-      console.warn("[waha] SSE client write failed, removing:", err instanceof Error ? err.message : String(err));
+      log.warn("SSE client write failed, removing", { error: err instanceof Error ? err.message : String(err) });
       sseClients.delete(client);
     }
   }
@@ -137,16 +140,16 @@ function parseWebhookPayload(body: string): WahaWebhookEnvelope | null {
   try {
     const data = JSON.parse(body);
     if (!data || typeof data !== "object") {
-      console.warn("[waha] Webhook payload is not an object");
+      log.warn("Webhook payload is not an object");
       return null;
     }
     if (typeof data.event !== "string" || typeof data.session !== "string" || !data.payload || typeof data.payload !== "object") {
-      console.warn(`[waha] Webhook payload missing required fields: event=${typeof data.event}, session=${typeof data.session}, payload=${typeof data.payload}`);
+      log.warn("Webhook payload missing required fields", { event: typeof data.event, session: typeof data.session, payload: typeof data.payload });
       return null;
     }
     return data as WahaWebhookEnvelope;
   } catch (err) {
-    console.warn(`[waha] JSON parse error: ${String(err)}, body preview: ${body.slice(0, 200)}`);
+    log.warn("JSON parse error", { error: String(err), bodyPreview: body.slice(0, 200) });
     return null;
   }
 }
@@ -303,7 +306,7 @@ async function syncAllowListBatch(configPath: string, field: "allowFrom" | "grou
       config.channels = { ...channels, waha };
     });
   } catch (err) {
-    console.error(`[waha] syncAllowListBatch: failed to sync ${field} config at ${configPath}: ${String(err)}`);
+    log.error("syncAllowListBatch: failed to sync config", { field, configPath, error: String(err) });
   }
 }
 
@@ -340,10 +343,10 @@ async function fetchBotJids(accounts: ReturnType<typeof listEnabledWahaAccounts>
           result.add(me.id);
         }
       } else {
-        console.warn(`fetchBotJids: ${acc.session} returned ${r.status}`);
+        log.warn("fetchBotJids: unexpected status", { session: acc.session, status: r.status });
       }
     } catch (err) {
-      console.warn(`[waha] fetchBotJids: failed to fetch me for ${acc.session}: ${String(err)}`);
+      log.warn("fetchBotJids: failed to fetch me", { session: acc.session, error: String(err) });
     }
   }
   return result;
@@ -359,6 +362,9 @@ export function createWahaWebhookServer(opts: {
 }): { server: Server; start: () => Promise<void>; stop: () => void } {
   const account = resolveWahaAccount({ cfg: opts.config, accountId: opts.accountId });
   const cfg = account.config;
+
+  // Phase 35: initialize log level from config on startup. DO NOT REMOVE.
+  if (cfg.logLevel) { setLogLevel(log, cfg.logLevel as "debug" | "info" | "warn" | "error"); }
 
   const port = cfg.webhookPort ?? DEFAULT_WEBHOOK_PORT;
   const host = cfg.webhookHost ?? DEFAULT_WEBHOOK_HOST;
@@ -406,12 +412,12 @@ export function createWahaWebhookServer(opts: {
   // DO NOT REMOVE — removing this causes non-default accounts to show "unknown" health.
   let healthState: HealthState | undefined; // keeps default account state for backward compat
   if (!opts.abortSignal) {
-    console.warn("[WAHA] Health check skipped: no abortSignal provided");
+    log.warn("Health check skipped: no abortSignal provided");
   } else {
     const allAccounts = listEnabledWahaAccounts(opts.config);
     for (const acct of allAccounts) {
       if (!acct.session) {
-        console.warn(`[WAHA] Health check skipped for account ${acct.accountId}: no session configured`);
+        log.warn("Health check skipped: no session configured", { accountId: acct.accountId });
         continue;
       }
       const state = startHealthCheck({
@@ -484,7 +490,7 @@ export function createWahaWebhookServer(opts: {
         } catch (journalErr: unknown) {
           // journalctl not available, try log file fallback
           const errMsg = journalErr instanceof Error ? journalErr.message : String(journalErr);
-          console.warn(`[waha] journalctl failed, falling back to log file: ${errMsg}`);
+          log.warn("journalctl failed, falling back to log file", { error: errMsg });
           try {
             const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
             const logPath = `/tmp/openclaw/openclaw-${today}.log`;
@@ -534,7 +540,7 @@ export function createWahaWebhookServer(opts: {
 
         writeJsonResponse(res, 200, { lines: logLines, source, total });
       } catch (err) {
-        console.error(`[waha] GET /api/admin/logs failed: ${String(err)}`);
+        log.error("GET /api/admin/logs failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to fetch logs", lines: [], source: "error", total: 0 });
       }
       return;
@@ -671,7 +677,7 @@ export function createWahaWebhookServer(opts: {
             const result = getDirectoryDb(acct.accountId).resolveLidToCus(lid);
             if (result) return result;
           }
-        } catch (err) { console.warn('Cross-account LID resolution failed:', err); }
+        } catch (err) { log.warn("Cross-account LID resolution failed", { error: err instanceof Error ? err.message : String(err) }); }
         // 2. Fall back to WAHA API — fetch the mapping and cache it
         try {
           const { findWahaPhoneByLid } = await import("./send.js");
@@ -684,7 +690,7 @@ export function createWahaWebhookServer(opts: {
               return cusJid;
             }
           }
-        } catch (err) { console.warn('WAHA LID fallback failed:', err); }
+        } catch (err) { log.warn("WAHA LID fallback failed", { error: err instanceof Error ? err.message : String(err) }); }
         return null;
       }
       async function dedupLidServerAsync(arr: string[]): Promise<string[]> {
@@ -770,7 +776,7 @@ export function createWahaWebhookServer(opts: {
         }),
       }));
       } catch (err) {
-        console.error(`[waha] GET /api/admin/stats failed: ${String(err)}`);
+        log.error("GET /api/admin/stats failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -814,7 +820,7 @@ export function createWahaWebhookServer(opts: {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ waha: wahaCfg, botJids: Array.from(expandedBotJids) }));
       } catch (err) {
-        console.error(`[waha] GET /api/admin/config failed: ${String(err)}`);
+        log.error("GET /api/admin/config failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -833,7 +839,7 @@ export function createWahaWebhookServer(opts: {
         });
         res.end(JSON.stringify(config, null, 2));
       } catch (err) {
-        console.error(`[waha] GET /api/admin/config/export failed: ${String(err)}`);
+        log.error("GET /api/admin/config/export failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -879,10 +885,10 @@ export function createWahaWebhookServer(opts: {
 
         const configPath = getConfigPath();
         await writeConfig(configPath, importedConfig);
-        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { console.warn("[waha] clearWahaClientCache failed:", err); }
+        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { log.warn("clearWahaClientCache failed", { error: err instanceof Error ? err.message : String(err) }); }
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
-        console.error(`[waha] POST /api/admin/config/import failed: ${String(err)}`);
+        log.error("POST /api/admin/config/import failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -951,13 +957,15 @@ export function createWahaWebhookServer(opts: {
         // If validation failed inside the mutex, response was already sent — skip.
         if (result === null) return;
 
-        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { console.warn("[waha] clearWahaClientCache failed:", err); }
+        try { const { clearWahaClientCache } = await import("./waha-client.js"); clearWahaClientCache(); } catch (err) { log.warn("clearWahaClientCache failed", { error: err instanceof Error ? err.message : String(err) }); }
+        // Phase 35: update logger level from saved config. DO NOT REMOVE.
+        if (typeof incomingWaha.logLevel === "string") { setLogLevel(log, incomingWaha.logLevel as "debug" | "info" | "warn" | "error"); }
         // Phase 29, Plan 02: emit log SSE event on config save. DO NOT REMOVE.
         broadcastSSE("log", { line: `[WAHA] config saved${result.restartRequired ? " (restart required)" : ""}`, timestamp: Date.now() });
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, restartRequired: result.restartRequired }));
       } catch (err) {
-        console.error(`[waha] config save failed: ${String(err)}`);
+        log.error("config save failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -975,7 +983,7 @@ export function createWahaWebhookServer(opts: {
           const override = db.getGroupFilterOverride(jid);
           writeJsonResponse(res, 200, { override: override ?? null });
         } catch (err) {
-          console.error(`[waha] GET /api/admin/directory/:jid/filter failed: ${String(err)}`);
+          log.error("GET /api/admin/directory/:jid/filter failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -990,7 +998,7 @@ export function createWahaWebhookServer(opts: {
         try {
           const jid = decodeURIComponent(m[1]);
           if (!isValidJid(jid)) { writeJsonResponse(res, 400, { error: `Invalid JID format: ${jid}` }); return; }
-          console.log(`[waha] PUT group filter override for ${jid}`);
+          log.info("PUT group filter override", { jid });
           const bodyStr = await readBody(req, maxBodyBytes);
           const body = JSON.parse(bodyStr) as {
             enabled?: boolean;
@@ -1032,7 +1040,7 @@ export function createWahaWebhookServer(opts: {
           try {
             accounts = listEnabledWahaAccounts(opts.config);
           } catch (accountErr) {
-            console.warn(`[waha] listEnabledWahaAccounts failed, fallback to primary account: ${String(accountErr)}`);
+            log.warn("listEnabledWahaAccounts failed, fallback to primary account", { error: String(accountErr) });
             accounts = [{ accountId: opts.accountId }];
           }
           let syncCount = 0;
@@ -1042,7 +1050,7 @@ export function createWahaWebhookServer(opts: {
               db.setGroupFilterOverride(jid, overrideData);
               syncCount++;
             } catch (dbErr) {
-              console.warn(`[waha] failed to write group filter override to ${acct.accountId} DB: ${String(dbErr)}`);
+              log.warn("failed to write group filter override to DB", { accountId: acct.accountId, error: String(dbErr) });
             }
           }
           // Return 500 if no account DB was updated
@@ -1052,7 +1060,7 @@ export function createWahaWebhookServer(opts: {
             writeJsonResponse(res, 200, { ok: true, syncedAccounts: syncCount });
           }
         } catch (err) {
-          console.error(`[waha] PUT /api/admin/directory/:jid/filter failed: ${String(err)}`);
+          log.error("PUT /api/admin/directory/:jid/filter failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1110,11 +1118,11 @@ export function createWahaWebhookServer(opts: {
                   resolved[jid] = name;
                 }
               }
-            } catch (err) { console.warn('Cross-account name resolution failed:', err); }
+            } catch (err) { log.warn("Cross-account name resolution failed", { error: err instanceof Error ? err.message : String(err) }); }
           }
           writeJsonResponse(res, 200, { resolved });
         } catch (err) {
-          console.error(`[waha] GET /api/admin/directory/resolve failed: ${String(err)}`);
+          log.error("GET /api/admin/directory/resolve failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1171,7 +1179,7 @@ export function createWahaWebhookServer(opts: {
                   }
                 }
               }
-            } catch (err) { console.warn('WAHA contact fallback failed:', err); }
+            } catch (err) { log.warn("WAHA contact fallback failed", { error: err instanceof Error ? err.message : String(err) }); }
           }
           if (!contact) {
             res.writeHead(404, { "Content-Type": "application/json" });
@@ -1181,7 +1189,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(contact));
         } catch (err) {
-          console.error(`[waha] GET /api/admin/directory/:jid failed: ${String(err)}`);
+          log.error("GET /api/admin/directory/:jid failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1215,7 +1223,7 @@ export function createWahaWebhookServer(opts: {
               total = Math.max(0, total - (before - contacts.length));
             }
           } catch (err) {
-            console.warn(`[waha] DIR-01: fetchBotJids failed, skipping bot exclusion: ${String(err)}`);
+            log.warn("DIR-01: fetchBotJids failed, skipping bot exclusion", { error: String(err) });
           }
         }
         // @lid and @s.whatsapp.net entries are now filtered at SQL level in directory.ts
@@ -1251,7 +1259,7 @@ export function createWahaWebhookServer(opts: {
               total = db.getContactCount(search, type);
             }
           } catch (apiErr) {
-            console.warn(`[waha] BUG-06: WAHA API fallback search failed: ${String(apiErr)}`);
+            log.warn("BUG-06: WAHA API fallback search failed", { error: String(apiErr) });
           }
         }
 
@@ -1270,7 +1278,7 @@ export function createWahaWebhookServer(opts: {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ contacts: enriched, total, dms, groups, newsletters }));
       } catch (err) {
-        console.error(`[waha] GET /api/admin/directory failed: ${String(err)}`);
+        log.error("GET /api/admin/directory failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -1319,7 +1327,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
-          console.error(`[waha] PUT /api/admin/directory/:jid/settings failed: ${String(err)}`);
+          log.error("PUT /api/admin/directory/:jid/settings failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
       } else {
@@ -1351,7 +1359,7 @@ export function createWahaWebhookServer(opts: {
             }
           }
         } catch (err) {
-          console.warn(`[waha] Failed to fetch WAHA sessions: ${err}`);
+          log.warn("Failed to fetch WAHA sessions", { error: String(err) });
         }
 
         // Build enriched session list from config accounts
@@ -1373,7 +1381,7 @@ export function createWahaWebhookServer(opts: {
 
         writeJsonResponse(res, 200, enriched);
       } catch (err) {
-        console.error(`[waha] GET /api/admin/sessions failed: ${String(err)}`);
+        log.error("GET /api/admin/sessions failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to fetch sessions" });
       }
       return;
@@ -1438,9 +1446,9 @@ export function createWahaWebhookServer(opts: {
         });
 
         writeJsonResponse(res, 200, { ok: true });
-        console.log(`[waha] Session role updated: ${sessionId} -> role=${body.role ?? "(unchanged)"} subRole=${body.subRole ?? "(unchanged)"}`);
+        log.info("Session role updated", { sessionId, role: body.role ?? "(unchanged)", subRole: body.subRole ?? "(unchanged)" });
       } catch (err) {
-        console.error(`[waha] PUT /api/admin/sessions role failed: ${String(err)}`);
+        log.error("PUT /api/admin/sessions role failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to save role" });
       }
       return;
@@ -1461,7 +1469,7 @@ export function createWahaWebhookServer(opts: {
         });
         writeJsonResponse(res, 200, { modules });
       } catch (err) {
-        console.error(`[waha] GET /api/admin/modules failed: ${String(err)}`);
+        log.error("GET /api/admin/modules failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to list modules" });
       }
       return;
@@ -1478,7 +1486,7 @@ export function createWahaWebhookServer(opts: {
         getModuleRegistry().enableModule(moduleId);
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
-        console.error(`[waha] PUT /api/admin/modules enable failed: ${String(err)}`);
+        log.error("PUT /api/admin/modules enable failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to enable module" });
       }
       return;
@@ -1495,7 +1503,7 @@ export function createWahaWebhookServer(opts: {
         getModuleRegistry().disableModule(moduleId);
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
-        console.error(`[waha] PUT /api/admin/modules disable failed: ${String(err)}`);
+        log.error("PUT /api/admin/modules disable failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to disable module" });
       }
       return;
@@ -1513,7 +1521,7 @@ export function createWahaWebhookServer(opts: {
         const assignments = db.getModuleAssignments(moduleId);
         writeJsonResponse(res, 200, { assignments });
       } catch (err) {
-        console.error(`[waha] GET /api/admin/modules assignments failed: ${String(err)}`);
+        log.error("GET /api/admin/modules assignments failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to list assignments" });
       }
       return;
@@ -1537,7 +1545,7 @@ export function createWahaWebhookServer(opts: {
         db.assignModule(moduleId, jid);
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
-        console.error(`[waha] POST /api/admin/modules assignments failed: ${String(err)}`);
+        log.error("POST /api/admin/modules assignments failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to add assignment" });
       }
       return;
@@ -1560,7 +1568,7 @@ export function createWahaWebhookServer(opts: {
         db.unassignModule(moduleId, jid);
         writeJsonResponse(res, 200, { ok: true });
       } catch (err) {
-        console.error(`[waha] DELETE /api/admin/modules assignment failed: ${String(err)}`);
+        log.error("DELETE /api/admin/modules assignment failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to remove assignment" });
       }
       return;
@@ -1657,7 +1665,7 @@ export function createWahaWebhookServer(opts: {
               );
               if (resp.ok) updated++;
             } catch (err) {
-              console.warn('Bulk follow/unfollow failed for channel:', err);
+              log.warn("Bulk follow/unfollow failed for channel", { error: err instanceof Error ? err.message : String(err) });
             }
           }
         }
@@ -1668,7 +1676,7 @@ export function createWahaWebhookServer(opts: {
         if (revokeGroupJids.length) await syncAllowListBatch(configPath, "groupAllowFrom", revokeGroupJids, false);
         writeJsonResponse(res, 200, { ok: true, updated });
       } catch (err) {
-        console.error(`[waha] POST /api/admin/directory/bulk failed: ${String(err)}`);
+        log.error("POST /api/admin/directory/bulk failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -1692,7 +1700,7 @@ export function createWahaWebhookServer(opts: {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ triggered: true, message: "Sync triggered" }));
       } catch (err) {
-        console.error(`[waha] sync trigger failed: ${String(err)}`);
+        log.error("sync trigger failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -1720,7 +1728,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
-          console.error(`[waha] POST /api/admin/directory/:jid/allow-dm failed: ${String(err)}`);
+          log.error("POST /api/admin/directory/:jid/allow-dm failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1754,7 +1762,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true, expiresAt: body.expiresAt }));
         } catch (err) {
-          console.error(`[waha] PUT /api/admin/directory/:jid/ttl failed: ${String(err)}`);
+          log.error("PUT /api/admin/directory/:jid/ttl failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1809,7 +1817,7 @@ export function createWahaWebhookServer(opts: {
                 participants = db.getGroupParticipants(groupJid);
               }
             } catch (fetchErr) {
-              console.warn(`[waha] Failed to lazy-fetch participants for ${groupJid}: ${String(fetchErr)}`);
+              log.warn("Failed to lazy-fetch participants", { groupJid, error: String(fetchErr) });
             }
           }
 
@@ -1866,7 +1874,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ participants: enrichedParticipants, allowAll }));
         } catch (err) {
-          console.error(`[waha] GET /api/admin/directory/group/:groupJid/participants failed: ${String(err)}`);
+          log.error("GET /api/admin/directory/group/:groupJid/participants failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1894,7 +1902,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
-          console.error(`[waha] POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-group failed: ${String(err)}`);
+          log.error("POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-group failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1926,7 +1934,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
-          console.error(`[waha] POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-dm failed: ${String(err)}`);
+          log.error("POST /api/admin/directory/group/:groupJid/participants/:participantJid/allow-dm failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1956,7 +1964,7 @@ export function createWahaWebhookServer(opts: {
             writeJsonResponse(res, 200, { ok: true });
           }
         } catch (err) {
-          console.error(`[waha] PUT participant role failed: ${String(err)}`);
+          log.error("PUT participant role failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -1984,7 +1992,7 @@ export function createWahaWebhookServer(opts: {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: true }));
         } catch (err) {
-          console.error(`[waha] POST /api/admin/directory/group/:groupJid/allow-all failed: ${String(err)}`);
+          log.error("POST /api/admin/directory/group/:groupJid/allow-all failed", { error: String(err) });
           writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
         }
         return;
@@ -2025,7 +2033,7 @@ export function createWahaWebhookServer(opts: {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ link: `https://wa.me/${phone}?text=PAIR-${token}` }));
       } catch (err) {
-        console.error(`[waha] GET /api/admin/pairing/deeplink failed: ${String(err)}`);
+        log.error("GET /api/admin/pairing/deeplink failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -2043,7 +2051,7 @@ export function createWahaWebhookServer(opts: {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
       } catch (err) {
-        console.error(`[waha] DELETE /api/admin/pairing/grant failed: ${String(err)}`);
+        log.error("DELETE /api/admin/pairing/grant failed", { error: String(err) });
         writeWebhookError(res, 500, WEBHOOK_ERRORS.internalServerError);
       }
       return;
@@ -2274,7 +2282,7 @@ export function createWahaWebhookServer(opts: {
             // For group.leave: no removal method on DirectoryDb — row stays as historical record.
             // A future directory sync will clean stale entries.
           } catch (dirErr) {
-            console.warn(`[waha-webhook] Failed to update directory for ${action}:`, (dirErr as Error).message);
+            log.warn("Failed to update directory", { action, error: (dirErr as Error).message });
           }
 
           inboundQueue.enqueue({
@@ -2323,7 +2331,7 @@ export function createWahaWebhookServer(opts: {
         writeJsonResponse(res, 200, { range, groupBy: effectiveGroupBy, timeseries, summary, topChats });
         return;
       } catch (err) {
-        console.error(`[waha] GET /api/admin/analytics failed: ${String(err)}`);
+        log.error("GET /api/admin/analytics failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Analytics query failed" });
         return;
       }
@@ -2344,7 +2352,7 @@ export function createWahaWebhookServer(opts: {
   };
 
   const stop = () => {
-    server.close((err) => { if (err) console.error("[waha] Server close error:", err); });
+    server.close((err) => { if (err) log.error("Server close error", { error: err instanceof Error ? err.message : String(err) }); });
   };
 
   if (opts.abortSignal) {
@@ -2389,7 +2397,7 @@ function resolveWebhookHmacSecret(account: ReturnType<typeof resolveWahaAccount>
   if (cached) return cached;
   const secret = randomBytes(32).toString("hex");
   autoGeneratedHmacSecrets.set(account.accountId, secret);
-  console.log(`[waha] Auto-generated webhook HMAC secret for account ${account.accountId}: ${secret}`);
+  log.info("Auto-generated webhook HMAC secret", { accountId: account.accountId, secret });
   return secret;
 }
 

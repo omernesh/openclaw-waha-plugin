@@ -11,7 +11,10 @@ import { assertPolicyCanSend } from "./policy-enforcer.js";
 import type { CoreConfig } from "./types.js";
 import { getDirectoryDb } from "./directory.js";
 import { getWahaClient, type WahaClient } from "./waha-client.js";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "send" });
 const HEAD_DETECT_TIMEOUT_MS = 5000;
 const RESOLVE_FETCH_DELAY_MS = 200;
 
@@ -38,7 +41,7 @@ export function assertCanSend(session: string, cfg: CoreConfig): void {
   const accounts = listEnabledWahaAccounts(cfg);
   const match = accounts.find(a => a.session === session);
   if (!match) {
-    console.warn(`[waha] assertCanSend: session "${session}" not found in config, defaulting to full-access`);
+    log.warn("assertCanSend: session not found in config, defaulting to full-access", { session });
   }
   const subRole = match?.subRole ?? "full-access";
   if (subRole === "listener") {
@@ -233,7 +236,7 @@ export async function sendWahaText(params: {
       }
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("Outbound blocked:")) throw err;
-      console.warn(`[waha] mute check DB error for ${chatId}, proceeding with send: ${String(err)}`);
+      log.warn("mute check DB error, proceeding with send", { chatId, error: String(err) });
     }
   }
 
@@ -277,7 +280,7 @@ async function detectMimeViaHead(url: string): Promise<string> {
     // Extract just the MIME type (before any ;charset= or parameters)
     return ct.split(";")[0].trim().toLowerCase();
   } catch (err) {
-    console.warn(`[waha] MIME HEAD detection failed for ${url}: ${String(err)}`);
+    log.warn("MIME HEAD detection failed", { url, error: String(err) });
     return "";
   }
 }
@@ -395,7 +398,7 @@ export async function sendWahaMediaBatch(params: {
       });
     },
     onError: (err, mediaUrl) => {
-      console.warn(`[waha] failed to send media ${mediaUrl}: ${String(err)}`);
+      log.warn("failed to send media", { mediaUrl, error: String(err) });
     },
   });
 }
@@ -1349,7 +1352,7 @@ export async function getWahaNewsletter(params: { cfg: CoreConfig; newsletterId:
     const result = await getWahaChannel({ cfg: params.cfg, channelId: params.newsletterId, accountId: params.accountId });
     return result as Record<string, unknown>;
   } catch (err) {
-    console.warn(`[waha] getWahaNewsletter failed: ${String(err)}`);
+    log.warn("getWahaNewsletter failed", { error: String(err) });
     return null;
   }
 }
@@ -1601,7 +1604,7 @@ export async function resolveWahaTarget(params: {
         if (score > 0) matches.push({ jid, name, type: "group", confidence: score });
       }
     } catch (err) {
-      console.warn("[resolveWahaTarget] groups fetch failed:", (err as Error).message);
+      log.warn("resolveWahaTarget: groups fetch failed", { error: (err as Error).message });
     }
   };
 
@@ -1620,7 +1623,7 @@ export async function resolveWahaTarget(params: {
         if (score > 0) matches.push({ jid, name, type: "contact", confidence: score });
       }
     } catch (err) {
-      console.warn("[resolveWahaTarget] contacts fetch failed:", (err as Error).message);
+      log.warn("resolveWahaTarget: contacts fetch failed", { error: (err as Error).message });
     }
   };
 
@@ -1637,7 +1640,7 @@ export async function resolveWahaTarget(params: {
         if (score > 0) matches.push({ jid, name, type: "channel", confidence: score });
       }
     } catch (err) {
-      console.warn("[resolveWahaTarget] channels fetch failed:", (err as Error).message);
+      log.warn("resolveWahaTarget: channels fetch failed", { error: (err as Error).message });
     }
   };
 

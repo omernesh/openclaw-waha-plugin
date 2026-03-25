@@ -2,7 +2,10 @@ import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createLogger } from "./logger.js";
 
+
+const log = createLogger({ component: "directory" });
 // Dynamic import of better-sqlite3 (CommonJS module, use createRequire)
 const require = createRequire(import.meta.url);
 
@@ -302,12 +305,12 @@ export class DirectoryDb {
       this.db.exec("INSERT INTO contacts_fts(contacts_fts) VALUES('integrity-check')");
     } catch {
       // FTS5 index corrupted — rebuild it
-      console.warn('[waha] [directory] FTS5 index corrupted, rebuilding...');
+      log.warn("FTS5 index corrupted, rebuilding...");
       try {
         this.db.exec("INSERT INTO contacts_fts(contacts_fts) VALUES('rebuild')");
-        console.warn('[waha] [directory] FTS5 index rebuilt successfully');
+        log.info("FTS5 index rebuilt successfully");
       } catch (rebuildErr) {
-        console.error('[waha] [directory] FTS5 rebuild failed:', rebuildErr);
+        log.error("FTS5 rebuild failed", { error: rebuildErr instanceof Error ? rebuildErr.message : String(rebuildErr) });
       }
     }
 
@@ -319,10 +322,10 @@ export class DirectoryDb {
       const contactsCount = (this.db.prepare("SELECT COUNT(*) as cnt FROM contacts").get() as { cnt: number }).cnt;
       if (ftsCount < contactsCount) {
         this.db.prepare("INSERT INTO contacts_fts(contacts_fts) VALUES('rebuild')").run();
-        console.log(`[waha] FTS5 index rebuilt: ${contactsCount} contacts indexed`);
+        log.info(`FTS5 index rebuilt: ${contactsCount} contacts indexed`);
       }
     } catch (ftsErr: unknown) {
-      console.warn(`[waha] FTS5 rebuild skipped: ${String(ftsErr)}`);
+      log.warn("FTS5 rebuild skipped", { error: String(ftsErr) });
     }
   }
 
@@ -1141,7 +1144,7 @@ export class DirectoryDb {
         const parsed = JSON.parse(row.mention_patterns as string);
         mentionPatterns = Array.isArray(parsed) ? parsed : null;
       } catch (parseErr) {
-        console.warn(`[waha] corrupt mention_patterns JSON for group ${groupJid}: ${String(parseErr)}`);
+        log.warn("corrupt mention_patterns JSON", { groupJid, error: String(parseErr) });
         mentionPatterns = null;
       }
     }
@@ -1214,9 +1217,9 @@ export class DirectoryDb {
           }
         }
       } catch (expireErr) {
-        // Use console.error — DM settings restore failure is a data integrity issue,
+        // Use log.error — DM settings restore failure is a data integrity issue,
         // not just a warning. Participants may be permanently blocked if this fails.
-        console.error(`[waha] isGroupMuted: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
+        log.error("isGroupMuted: auto-expiry restore failed", { groupJid, error: String(expireErr) });
       }
       return false;
     }
@@ -1233,7 +1236,7 @@ export class DirectoryDb {
     if (!row) return null;
     let dmBackup: Record<string, boolean> | null = null;
     if (typeof row.dm_backup === "string") {
-      try { dmBackup = JSON.parse(row.dm_backup as string); } catch (err) { console.warn(`[waha] corrupt dm_backup JSON for group ${row.group_jid}: ${String(err)}`); }
+      try { dmBackup = JSON.parse(row.dm_backup as string); } catch (err) { log.warn("corrupt dm_backup JSON", { groupJid: row.group_jid, error: String(err) }); }
     }
     return {
       groupJid: row.group_jid as string,
@@ -1265,16 +1268,16 @@ export class DirectoryDb {
           }
         }
       } catch (expireErr) {
-        // Use console.error — DM settings restore failure is a data integrity issue,
+        // Use log.error — DM settings restore failure is a data integrity issue,
         // not just a warning. Participants may be permanently blocked if this fails.
-        console.error(`[waha] getAllMutedGroups: auto-expiry restore failed for ${groupJid}: ${String(expireErr)}`);
+        log.error("getAllMutedGroups: auto-expiry restore failed", { groupJid, error: String(expireErr) });
       }
     }
     const rows = this.db.prepare("SELECT * FROM muted_groups").all() as Array<Record<string, unknown>>;
     return rows.map((row) => {
       let dmBackup: Record<string, boolean> | null = null;
       if (typeof row.dm_backup === "string") {
-        try { dmBackup = JSON.parse(row.dm_backup as string); } catch (err) { console.warn(`[waha] corrupt dm_backup JSON for group ${row.group_jid}: ${String(err)}`); }
+        try { dmBackup = JSON.parse(row.dm_backup as string); } catch (err) { log.warn("corrupt dm_backup JSON", { groupJid: row.group_jid, error: String(err) }); }
       }
       return {
         groupJid: row.group_jid as string,
@@ -1339,7 +1342,7 @@ export class DirectoryDb {
       groups = JSON.parse(row.groups_json as string);
       if (!Array.isArray(groups)) groups = [];
     } catch (err) {
-      console.warn(`[waha] corrupt groups_json for pending selection ${senderJid}: ${String(err)}`);
+      log.warn("corrupt groups_json for pending selection", { senderJid, error: String(err) });
       this.db.prepare("DELETE FROM pending_selections WHERE sender_jid = ?").run(senderJid);
       return null;
     }
@@ -1511,7 +1514,7 @@ export class DirectoryDb {
     try {
       return JSON.parse(row.config_json) as Record<string, unknown>;
     } catch (err) {
-      console.warn('[waha] [modules] corrupt config JSON for module ' + moduleId + ':', err);
+      log.warn("corrupt config JSON for module", { moduleId, error: err instanceof Error ? err.message : String(err) });
       return {};
     }
   }
