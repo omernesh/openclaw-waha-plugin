@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.20
-milestone_name: Human Mimicry Hardening
-status: active
-stopped_at: "Roadmap created — ready to plan Phase 53"
-last_updated: "2026-03-26"
+milestone: v1.18
+milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
+status: executing
+stopped_at: Phase 53 Plan 01 complete -- MimicryGate core infrastructure
+last_updated: "2026-03-26T18:02:13.412Z"
 last_activity: 2026-03-26
 progress:
-  total_phases: 5
+  total_phases: 1
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 0
 ---
 
 # Project State
@@ -24,16 +25,17 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 53 of 57 (MimicryGate Core)
-Plan: — of — in current phase
-Status: Ready to plan
-Last activity: 2026-03-26 — Roadmap created, 5 phases defined, 26/26 requirements mapped
+Phase: 53 (MimicryGate Core) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-03-26
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: —
@@ -47,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | 55. Claude Code Integration | - | - | - |
 | 56. Adaptive Activity Patterns | - | - | - |
 | 57. Admin UI & Observability | - | - | - |
+| Phase 53 P01 | 9 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -57,6 +60,9 @@ Progress: [░░░░░░░░░░] 0%
 - **2026-03-26 (Roadmap)**: Phase 53 is the hard dependency for all others — no live deploy needed until Phase 54
 - **2026-03-26 (Roadmap)**: Phases 54, 55, 56 are all independent after Phase 53 (can be sequenced in any order; Phase 55 is highest ban-risk gap)
 - **2026-03-26 (Roadmap)**: Cap keyed by WAHA session name, not plugin accountId — logan and Omer sends share the same hourly bucket per session
+- [Phase 53]: Rolling window via per-row timestamps (not fixed buckets) prevents 2x burst at hour boundary
+- [Phase 53]: Reject-not-queue as default onBlock policy eliminates queue complexity and message loss on restart
+- [Phase 53]: 3-level config merge (global -> session -> target) for both gate and cap; most-specific wins
 
 ### Architecture Notes
 
@@ -82,6 +88,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Roadmap written — all 26 requirements mapped to Phases 53-57
+Last session: 2026-03-26T18:02:13.405Z
+Stopped at: Phase 53 Plan 01 complete -- MimicryGate core infrastructure
 Resume file: None
