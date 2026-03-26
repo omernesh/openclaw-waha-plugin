@@ -89,7 +89,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 ## v1.19 Full WAHA Capabilities & Modular Skill Architecture
 
-- [ ] **Phase 48: Action Exposure** - Add all missing actions to UTILITY_ACTIONS in channel.ts (ACT-01 through ACT-08)
+- [x] **Phase 48: Action Exposure** - Add all missing actions to UTILITY_ACTIONS in channel.ts (ACT-01 through ACT-08) (completed 2026-03-26)
 - [ ] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07)
 - [ ] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05)
 - [ ] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06)
@@ -175,9 +175,9 @@ Plans:
   3. Agent can invoke contact actions (getContactAbout, getContactPicture, blockContact, unblockContact, createOrUpdateContact) without errors
   4. Agent can invoke status, presence, and profile actions (sendVoiceStatus, sendVideoStatus, deleteStatus, getNewMessageId, setPresence, getPresence, subscribePresence, getProfile, setProfileName, setProfileStatus, setProfilePicture, deleteProfilePicture) without errors
   5. Session management and API key CRUD actions are NOT in UTILITY_ACTIONS and cannot be invoked by the agent
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 48-01-PLAN.md — Add send.ts functions, ACTION_HANDLERS aliases, update UTILITY_ACTIONS
+- [x] 48-01-PLAN.md — Add send.ts functions, ACTION_HANDLERS aliases, update UTILITY_ACTIONS
 
 ### Phase 49: Modular Skill Architecture
 **Goal**: SKILL.md is a concise index and each action category has its own instruction file with full parameter tables, examples, and gotchas
@@ -235,7 +235,7 @@ Plans:
 | 45. Admin UI Join/Leave | 2/2 | Complete | 2026-03-25 |
 | 46. Skill Completeness Audit | 1/1 | Complete | 2026-03-25 |
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
-| 48. Action Exposure | 0/1 | Not started | - |
+| 48. Action Exposure | 1/1 | Complete   | 2026-03-26 |
 | 49. Modular Skill Architecture | 0/TBD | Not started | - |
 | 50. Skill Creator & Evals | 0/TBD | Not started | - |
 | 51. Claude Code Skill Update | 0/TBD | Not started | - |

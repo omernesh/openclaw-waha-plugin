@@ -7,14 +7,14 @@
 
 ### Action Exposure
 
-- [ ] **ACT-01**: All group admin actions exposed in UTILITY_ACTIONS (addParticipants, removeParticipants, promoteToAdmin, demoteToMember, setGroupSubject, setGroupDescription, setGroupPicture, deleteGroupPicture, getGroupPicture, setInfoAdminOnly, setMessagesAdminOnly, getInviteCode, revokeInviteCode, deleteGroup, leaveGroup)
-- [ ] **ACT-02**: All chat management actions exposed (archiveChat, unarchiveChat, clearMessages, unreadChat, getChatPicture, getMessageById)
-- [ ] **ACT-03**: All contact actions exposed (getContactAbout, getContactPicture, blockContact, unblockContact, createOrUpdateContact)
-- [ ] **ACT-04**: All status/stories actions exposed (sendVoiceStatus, sendVideoStatus, deleteStatus, getNewMessageId)
-- [ ] **ACT-05**: Presence actions exposed (setPresence, getPresence, subscribePresence)
-- [ ] **ACT-06**: Profile actions exposed (getProfile, setProfileName, setProfileStatus, setProfilePicture, deleteProfilePicture)
-- [ ] **ACT-07**: Media actions exposed (convertVoice, convertVideo)
-- [ ] **ACT-08**: Session management and API key CRUD remain excluded from UTILITY_ACTIONS (admin-only)
+- [x] **ACT-01**: All group admin actions exposed in UTILITY_ACTIONS (addParticipants, removeParticipants, promoteToAdmin, demoteToMember, setGroupSubject, setGroupDescription, setGroupPicture, deleteGroupPicture, getGroupPicture, setInfoAdminOnly, setMessagesAdminOnly, getInviteCode, revokeInviteCode, deleteGroup, leaveGroup)
+- [x] **ACT-02**: All chat management actions exposed (archiveChat, unarchiveChat, clearMessages, unreadChat, getChatPicture, getMessageById)
+- [x] **ACT-03**: All contact actions exposed (getContactAbout, getContactPicture, blockContact, unblockContact, createOrUpdateContact)
+- [x] **ACT-04**: All status/stories actions exposed (sendVoiceStatus, sendVideoStatus, deleteStatus, getNewMessageId)
+- [x] **ACT-05**: Presence actions exposed (setPresence, getPresence, subscribePresence)
+- [x] **ACT-06**: Profile actions exposed (getProfile, setProfileName, setProfileStatus, setProfilePicture, deleteProfilePicture)
+- [x] **ACT-07**: Media actions exposed (convertVoice, convertVideo)
+- [x] **ACT-08**: Session management and API key CRUD remain excluded from UTILITY_ACTIONS (admin-only)
 
 ### Modular Skill Architecture
 
@@ -59,14 +59,14 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ACT-01 | Phase 48 | Pending |
-| ACT-02 | Phase 48 | Pending |
-| ACT-03 | Phase 48 | Pending |
-| ACT-04 | Phase 48 | Pending |
-| ACT-05 | Phase 48 | Pending |
-| ACT-06 | Phase 48 | Pending |
-| ACT-07 | Phase 48 | Pending |
-| ACT-08 | Phase 48 | Pending |
+| ACT-01 | Phase 48 | Complete |
+| ACT-02 | Phase 48 | Complete |
+| ACT-03 | Phase 48 | Complete |
+| ACT-04 | Phase 48 | Complete |
+| ACT-05 | Phase 48 | Complete |
+| ACT-06 | Phase 48 | Complete |
+| ACT-07 | Phase 48 | Complete |
+| ACT-08 | Phase 48 | Complete |
 | SKL-01 | Phase 49 | Pending |
 | SKL-02 | Phase 49 | Pending |
 | SKL-03 | Phase 49 | Pending |
