@@ -19,12 +19,12 @@
 ### Modular Skill Architecture
 
 - [ ] **SKL-01**: SKILL.md restructured as concise index referencing per-category instruction files
-- [ ] **SKL-02**: Per-category files created: groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md
-- [ ] **SKL-03**: Each sub-file has action table with parameters, task-oriented examples, and gotchas
+- [x] **SKL-02**: Per-category files created: groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md
+- [x] **SKL-03**: Each sub-file has action table with parameters, task-oriented examples, and gotchas
 - [ ] **SKL-04**: Anthropic skill-creator used to structure files and write evals
 - [ ] **SKL-05**: Evals verify agent can find correct action, use correct params, handle errors
 - [ ] **SKL-06**: whatsapp-messenger Claude Code skill updated to match new structure
-- [ ] **SKL-07**: Document vCard (contacts) and iCal (calendar events) file-based approaches in skill — the agent sends .vcf files for contacts and .ics files for events
+- [x] **SKL-07**: Document vCard (contacts) and iCal (calendar events) file-based approaches in skill — the agent sends .vcf files for contacts and .ics files for events
 
 ### Live Testing
 
@@ -68,9 +68,9 @@
 | ACT-07 | Phase 48 | Complete |
 | ACT-08 | Phase 48 | Complete |
 | SKL-01 | Phase 49 | Pending |
-| SKL-02 | Phase 49 | Pending |
-| SKL-03 | Phase 49 | Pending |
-| SKL-07 | Phase 49 | Pending |
+| SKL-02 | Phase 49 | Complete |
+| SKL-03 | Phase 49 | Complete |
+| SKL-07 | Phase 49 | Complete |
 | SKL-04 | Phase 50 | Pending |
 | SKL-05 | Phase 50 | Pending |
 | SKL-06 | Phase 51 | Pending |

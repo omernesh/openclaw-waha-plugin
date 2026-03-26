@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: Full WAHA Capabilities & Modular Skill Architecture
-status: verifying
-stopped_at: Completed 48-01-PLAN.md — Phase 48 plan 1 of 1 done
-last_updated: "2026-03-26T02:36:46.106Z"
+status: executing
+stopped_at: Completed 49-01-PLAN.md — Phase 49 plan 1 of 2 done
+last_updated: "2026-03-26T03:09:03.527Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 48 — action-exposure
+**Current focus:** Phase 49 — modular-skill-architecture
 
 ## Current Position
 
-Phase: 48 (action-exposure) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
+Phase: 49 (modular-skill-architecture) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-03-26
 
 Progress bar: [----------] 0/5 phases complete
@@ -48,6 +48,8 @@ Progress bar: [----------] 0/5 phases complete
 - Deploy to src/ subdirectory, clear /tmp/jiti/ cache after deploy
 - [Phase 48-action-exposure]: Used getClient() pattern for new send.ts functions — matches current codebase convention (deprecated resolveSession pattern in plan was stale)
 - [Phase 48-action-exposure]: API key CRUD stays in ACTION_HANDLERS but removed from UTILITY_ACTIONS — admin-only, not for LLM invocation
+- [Phase 49]: Labels placed in chats.md with WhatsApp Business caveat — not a separate file
+- [Phase 49]: readMessages vs read comparison table in messaging.md for disambiguation
 
 ### Pending Todos
 
@@ -60,6 +62,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T02:36:46.099Z
-Stopped at: Completed 48-01-PLAN.md — Phase 48 plan 1 of 1 done
+Last session: 2026-03-26T03:09:03.520Z
+Stopped at: Completed 49-01-PLAN.md — Phase 49 plan 1 of 2 done
 Resume file: None
