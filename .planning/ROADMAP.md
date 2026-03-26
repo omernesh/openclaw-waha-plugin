@@ -93,7 +93,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07) (completed 2026-03-26)
 - [x] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05) (completed 2026-03-26)
 - [x] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06) (completed 2026-03-26)
-- [ ] **Phase 52: Deploy & Live Testing** - Deploy to hpg6 and run all live capability tests (TST-01 through TST-12)
+- [x] **Phase 52: Deploy & Live Testing** - Deploy to hpg6 and run all live capability tests (TST-01 through TST-12) (completed 2026-03-26)
 
 ## Phase Details
 
@@ -230,10 +230,10 @@ Plans:
   6. Agent retrieves Michael's contact about text and profile picture URL
   7. Agent posts a text status and then deletes it; agent sets bot presence to online
   8. /join, /leave, /list slash commands still work correctly (regression check)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 52-01-PLAN.md — Deploy Phase 48 source files to hpg6, clear jiti, restart gateway
-- [ ] 52-02-PLAN.md — Run all 12 live test scenarios (TST-01 through TST-12)
+- [x] 52-02-PLAN.md — Run all 12 live test scenarios (TST-01 through TST-12)
 
 ## Progress
 
@@ -248,4 +248,4 @@ Plans:
 | 49. Modular Skill Architecture | 2/2 | Complete    | 2026-03-26 |
 | 50. Skill Creator & Evals | 1/1 | Complete    | 2026-03-26 |
 | 51. Claude Code Skill Update | 1/1 | Complete    | 2026-03-26 |
-| 52. Deploy & Live Testing | 1/2 | In Progress|  |
+| 52. Deploy & Live Testing | 2/2 | Complete   | 2026-03-26 |

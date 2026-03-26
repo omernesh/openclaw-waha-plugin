@@ -28,18 +28,18 @@
 
 ### Live Testing
 
-- [ ] **TST-01**: Agent adds Michael Greenberg (972556839823@c.us) to test group and removes him
-- [ ] **TST-02**: Agent promotes Michael to admin and demotes back to member
-- [ ] **TST-03**: Agent updates group subject and description
-- [ ] **TST-04**: Agent sets and deletes group picture
-- [ ] **TST-05**: Agent toggles info-admin-only and messages-admin-only settings
-- [ ] **TST-06**: Agent gets and revokes invite code
-- [ ] **TST-07**: Agent gets group participants list
-- [ ] **TST-08**: Agent creates a test group and deletes it
-- [ ] **TST-09**: Agent gets contact about info and profile picture
-- [ ] **TST-10**: Agent posts a text status and deletes it
-- [ ] **TST-11**: Agent sets bot presence to online
-- [ ] **TST-12**: /join, /leave, /list still work after refactoring (regression check)
+- [x] **TST-01**: Agent adds Michael Greenberg (972556839823@c.us) to test group and removes him
+- [x] **TST-02**: Agent promotes Michael to admin and demotes back to member
+- [x] **TST-03**: Agent updates group subject and description
+- [x] **TST-04**: Agent sets and deletes group picture
+- [x] **TST-05**: Agent toggles info-admin-only and messages-admin-only settings
+- [x] **TST-06**: Agent gets and revokes invite code
+- [x] **TST-07**: Agent gets group participants list
+- [x] **TST-08**: Agent creates a test group and deletes it
+- [x] **TST-09**: Agent gets contact about info and profile picture
+- [x] **TST-10**: Agent posts a text status and deletes it
+- [x] **TST-11**: Agent sets bot presence to online
+- [x] **TST-12**: /join, /leave, /list still work after refactoring (regression check)
 
 ## Future Requirements
 
@@ -74,18 +74,18 @@
 | SKL-04 | Phase 50 | Complete |
 | SKL-05 | Phase 50 | Complete |
 | SKL-06 | Phase 51 | Complete |
-| TST-01 | Phase 52 | Pending |
-| TST-02 | Phase 52 | Pending |
-| TST-03 | Phase 52 | Pending |
-| TST-04 | Phase 52 | Pending |
-| TST-05 | Phase 52 | Pending |
-| TST-06 | Phase 52 | Pending |
-| TST-07 | Phase 52 | Pending |
-| TST-08 | Phase 52 | Pending |
-| TST-09 | Phase 52 | Pending |
-| TST-10 | Phase 52 | Pending |
-| TST-11 | Phase 52 | Pending |
-| TST-12 | Phase 52 | Pending |
+| TST-01 | Phase 52 | Complete |
+| TST-02 | Phase 52 | Complete |
+| TST-03 | Phase 52 | Complete |
+| TST-04 | Phase 52 | Complete |
+| TST-05 | Phase 52 | Complete |
+| TST-06 | Phase 52 | Complete |
+| TST-07 | Phase 52 | Complete |
+| TST-08 | Phase 52 | Complete |
+| TST-09 | Phase 52 | Complete |
+| TST-10 | Phase 52 | Complete |
+| TST-11 | Phase 52 | Complete |
+| TST-12 | Phase 52 | Complete |
 
 **Coverage:**
 - v1.19 requirements: 27 total

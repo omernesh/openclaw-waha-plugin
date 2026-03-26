@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: Full WAHA Capabilities & Modular Skill Architecture
-status: executing
-stopped_at: Completed 52-01-PLAN.md — Phase 52 plan 1 of 2 done
-last_updated: "2026-03-26T04:59:58.928Z"
+status: verifying
+stopped_at: "Completed 52-02-PLAN.md — Phase 52 live testing done — checkpoint:human-verify"
+last_updated: "2026-03-26T07:02:35.588Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 10
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 Phase: 52 (deploy-live-testing) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-03-26
 
 Progress bar: [----------] 0/5 phases complete
@@ -57,6 +57,9 @@ Progress bar: [----------] 0/5 phases complete
 - [Phase 51-claude-code-skill-update]: whatsapp-messenger SKILL.md v2.0.0 description already covered all categories — no edits needed
 - [Phase 52-deploy-live-testing]: Disk-full root cause: syslog grew to 4GB+ — truncate syslog + vacuum journal to free space
 - [Phase 52-deploy-live-testing]: Gateway lock file must be manually deleted when it persists after crash restart
+- [Phase 52]: Group admin actions refused by LLM from group chat — all admin tests routed via DM to Logan
+- [Phase 52]: WAHA participants API requires [{id:'...'}] object array format, not string array
+- [Phase 52]: deleteGroup returns 501 on NOWEB — use leave as functional equivalent for test cleanup
 
 ### Pending Todos
 
@@ -69,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T04:59:58.922Z
-Stopped at: Completed 52-01-PLAN.md — Phase 52 plan 1 of 2 done
+Last session: 2026-03-26T07:02:35.580Z
+Stopped at: Completed 52-02-PLAN.md — Phase 52 live testing done — checkpoint:human-verify
 Resume file: None
