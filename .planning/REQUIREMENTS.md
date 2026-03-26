@@ -18,7 +18,7 @@
 
 ### Modular Skill Architecture
 
-- [ ] **SKL-01**: SKILL.md restructured as concise index referencing per-category instruction files
+- [x] **SKL-01**: SKILL.md restructured as concise index referencing per-category instruction files
 - [x] **SKL-02**: Per-category files created: groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md
 - [x] **SKL-03**: Each sub-file has action table with parameters, task-oriented examples, and gotchas
 - [ ] **SKL-04**: Anthropic skill-creator used to structure files and write evals
@@ -67,7 +67,7 @@
 | ACT-06 | Phase 48 | Complete |
 | ACT-07 | Phase 48 | Complete |
 | ACT-08 | Phase 48 | Complete |
-| SKL-01 | Phase 49 | Pending |
+| SKL-01 | Phase 49 | Complete |
 | SKL-02 | Phase 49 | Complete |
 | SKL-03 | Phase 49 | Complete |
 | SKL-07 | Phase 49 | Complete |

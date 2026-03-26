@@ -90,7 +90,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 ## v1.19 Full WAHA Capabilities & Modular Skill Architecture
 
 - [x] **Phase 48: Action Exposure** - Add all missing actions to UTILITY_ACTIONS in channel.ts (ACT-01 through ACT-08) (completed 2026-03-26)
-- [ ] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07)
+- [x] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07) (completed 2026-03-26)
 - [ ] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05)
 - [ ] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06)
 - [ ] **Phase 52: Deploy & Live Testing** - Deploy to hpg6 and run all live capability tests (TST-01 through TST-12)
@@ -188,10 +188,10 @@ Plans:
   2. Ten category files exist (groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md) each with action table, parameters, examples, and gotchas section
   3. vCard (.vcf) and iCal (.ics) file-based approaches are documented in contacts.md and messaging.md respectively with usage examples
   4. Agent reading any single category file has enough context to correctly invoke all actions in that category
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 49-01-PLAN.md — Create messaging.md, groups.md, contacts.md, channels.md, chats.md category files
-- [ ] 49-02-PLAN.md — Create status.md, presence.md, profile.md, media.md, slash-commands.md + rewrite SKILL.md index
+- [x] 49-02-PLAN.md — Create status.md, presence.md, profile.md, media.md, slash-commands.md + rewrite SKILL.md index
 
 ### Phase 50: Skill Creator & Evals
 **Goal**: Skill files are validated by Anthropic skill-creator and evals confirm the agent can find actions, use correct params, and handle errors
@@ -238,7 +238,7 @@ Plans:
 | 46. Skill Completeness Audit | 1/1 | Complete | 2026-03-25 |
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
 | 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
-| 49. Modular Skill Architecture | 1/2 | In Progress|  |
+| 49. Modular Skill Architecture | 2/2 | Complete   | 2026-03-26 |
 | 50. Skill Creator & Evals | 0/TBD | Not started | - |
 | 51. Claude Code Skill Update | 0/TBD | Not started | - |
 | 52. Deploy & Live Testing | 0/TBD | Not started | - |
