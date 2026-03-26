@@ -96,7 +96,15 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone: (Planning next)
+## Current Milestone: v1.19 Full WAHA Capabilities & Modular Skill Architecture
+
+**Goal:** Expose every implemented WAHA action to the agent and restructure SKILL.md into modular per-category instruction files with evals.
+
+**Target features:**
+- Expose all hidden ACTION_HANDLERS to the LLM via UTILITY_ACTIONS (group admin, chats, contacts, status, presence, profile, labels, media, events)
+- Restructure SKILL.md into modular per-category instruction files with an index
+- Use Anthropic skill-creator for structure and evals
+- Live testing all capabilities with test groups and test bot participant
 
 ## Context
 
@@ -158,4 +166,4 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-26 — v1.18 milestone completed*
+*Last updated: 2026-03-26 — v1.19 milestone started*
