@@ -159,6 +159,33 @@ export const WahaAccountSchemaBase = z
       ),
       intervalMinutes: z.number().int().min(0).optional().default(1440),
     }).optional().default({}),
+
+    // Phase 53 (GATE-01..04): Send time gate configuration.
+    // Controls when outbound messages are allowed. Default: disabled (no blocking).
+    // timezone: IANA timezone string for hour comparison. Default UTC.
+    // startHour/endHour: 24h format. Supports cross-midnight (e.g., 7-1 = 7am to 1am).
+    // onBlock: "reject" returns error to caller; "queue" is reserved for future use.
+    // Reject-not-queue is the locked default (STATE.md 2026-03-26). DO NOT CHANGE default.
+    sendGate: z.object({
+      enabled: z.boolean().optional().default(false),
+      timezone: z.string().optional().default("UTC"),
+      startHour: z.number().int().min(0).max(23).optional().default(7),
+      endHour: z.number().int().min(0).max(23).optional().default(1),
+      onBlock: z.enum(["reject", "queue"]).optional().default("reject"),
+    }).optional().default({}),
+
+    // Phase 53 (CAP-01..05): Hourly message cap configuration.
+    // Controls maximum outbound messages per rolling 60-minute window per session.
+    // Progressive limits tied to account maturity: New (0-7d), Warming (8-30d), Stable (30d+).
+    // Cap keyed by WAHA session name (locked decision, STATE.md 2026-03-26). DO NOT CHANGE.
+    hourlyCap: z.object({
+      enabled: z.boolean().optional().default(false),
+      limits: z.object({
+        new: z.number().int().positive().optional().default(15),
+        warming: z.number().int().positive().optional().default(30),
+        stable: z.number().int().positive().optional().default(50),
+      }).optional().default({}),
+    }).optional().default({}),
   })
   .strict();
 
