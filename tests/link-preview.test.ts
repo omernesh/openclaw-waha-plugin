@@ -1,5 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// Mock mimicry-enforcer so sendWahaText tests don't block on jitter/typing delays.
+// Phase 54-02 wired enforceMimicry into sendWahaText — must mock here to avoid timeouts.
+vi.mock("../src/mimicry-enforcer.js", () => ({
+  enforceMimicry: vi.fn().mockResolvedValue(undefined),
+  recordMimicrySuccess: vi.fn(),
+}));
+
+// Mock directory to avoid SQLite initialization in tests
+vi.mock("../src/directory.js", () => ({
+  getDirectoryDb: vi.fn().mockReturnValue({
+    isGroupMuted: vi.fn().mockReturnValue(false),
+    getDmSettings: vi.fn().mockReturnValue(null),
+  }),
+}));
+
 // Mock the modules that sendWahaText depends on
 vi.mock("../src/http-client.js", () => ({
   callWahaApi: vi.fn().mockResolvedValue({ ok: true }),
