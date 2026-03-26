@@ -188,8 +188,10 @@ Plans:
   2. Ten category files exist (groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md) each with action table, parameters, examples, and gotchas section
   3. vCard (.vcf) and iCal (.ics) file-based approaches are documented in contacts.md and messaging.md respectively with usage examples
   4. Agent reading any single category file has enough context to correctly invoke all actions in that category
-**Plans**: TBD
-**UI hint**: no
+**Plans:** 2 plans
+Plans:
+- [ ] 49-01-PLAN.md — Create messaging.md, groups.md, contacts.md, channels.md, chats.md category files
+- [ ] 49-02-PLAN.md — Create status.md, presence.md, profile.md, media.md, slash-commands.md + rewrite SKILL.md index
 
 ### Phase 50: Skill Creator & Evals
 **Goal**: Skill files are validated by Anthropic skill-creator and evals confirm the agent can find actions, use correct params, and handle errors
@@ -235,8 +237,8 @@ Plans:
 | 45. Admin UI Join/Leave | 2/2 | Complete | 2026-03-25 |
 | 46. Skill Completeness Audit | 1/1 | Complete | 2026-03-25 |
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
-| 48. Action Exposure | 1/1 | Complete   | 2026-03-26 |
-| 49. Modular Skill Architecture | 0/TBD | Not started | - |
+| 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
+| 49. Modular Skill Architecture | 0/2 | Planning | - |
 | 50. Skill Creator & Evals | 0/TBD | Not started | - |
 | 51. Claude Code Skill Update | 0/TBD | Not started | - |
 | 52. Deploy & Live Testing | 0/TBD | Not started | - |
