@@ -537,8 +537,9 @@ export async function handleWahaInbound(params: {
   }
 
   // === Pending selection response (shutup mute/unmute + slash command join/leave) ===
-  // DO NOT CHANGE -- DM interactive flow for command selections. Extended Phase 43.
-  if (isDm && !commandMatch && !slashMatch) {
+  // Checks BOTH DM and group contexts — slash commands (/join, /leave) are used in groups.
+  // Phase 43: extended from isDm-only to all contexts so numbered replies work in groups.
+  if (!commandMatch && !slashMatch) {
     const pending = checkPendingSelection(senderId, config);
     if (pending) {
       if (pending.type === "join" || pending.type === "leave") {

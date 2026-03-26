@@ -14,8 +14,12 @@ import {
   leaveWahaGroup,
   getWahaGroups,
   getWahaChannels,
+  followWahaChannel,
   unfollowWahaChannel,
+  getWahaChannel,
   resolveWahaTarget,
+  searchWahaChannelsByText,
+  fuzzyScore,
 } from "./send.js";
 import { checkShutupAuthorization } from "./shutup.js";
 import { getDirectoryDb } from "./directory.js";
@@ -27,17 +31,48 @@ import { createLogger } from "./logger.js";
 
 const log = createLogger({ component: "commands" });
 
+// ── User-friendly error extraction ──
+
+const FRIENDLY_MAP: Record<string, string> = {
+  "bad-request": "invalid invite link or group not found",
+  "not-authorized": "not authorized to join this group",
+  "item-not-found": "group not found",
+};
+
+function friendlyError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  // Try to extract JSON blob from WAHA error strings like "WAHA POST /api/... failed: 500 {...}"
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const exMsg: string | undefined = parsed?.exception?.message ?? parsed?.message;
+      if (exMsg) {
+        return FRIENDLY_MAP[exMsg] ?? exMsg;
+      }
+    } catch { /* not valid JSON, fall through */ }
+  }
+  // No JSON found — return a short version, no stack traces
+  const firstLine = raw.split("\n")[0] ?? raw;
+  return firstLine.length > 100 ? firstLine.slice(0, 100) + "…" : firstLine;
+}
+
 // ── Regex for /join, /leave, /list commands ──
 // DO NOT CHANGE — must match: /join <args>, /leave <args>, /list, /list groups, /list channels
 export const COMMANDS_RE = /^\/(join|leave|list)\s*(.*)?$/i;
 
 // ── Invite link detection ──
 
-/** Detect if a string looks like a WhatsApp invite link or raw invite code. */
+/** Detect if a string looks like a WhatsApp invite link or raw invite code (group OR channel). */
 function isInviteLink(str: string): boolean {
   // WhatsApp invite links: full URL or exact 22-char alphanumeric code.
   // DO NOT use {22,} (22+) — group names can be 22+ chars and would falsely match. DO NOT CHANGE.
-  return str.includes("chat.whatsapp.com/") || /^[A-Za-z0-9]{22}$/.test(str);
+  return str.includes("chat.whatsapp.com/") || str.includes("whatsapp.com/channel/") || /^[A-Za-z0-9]{22}$/.test(str);
+}
+
+/** Detect if a string is specifically a channel invite link (whatsapp.com/channel/CODE). */
+function isChannelInviteLink(str: string): boolean {
+  return str.includes("whatsapp.com/channel/");
 }
 
 /** Extract invite code from a WhatsApp invite link or raw code. */
@@ -106,6 +141,7 @@ async function handleJoin(
   config: CoreConfig,
   runtime: { log?: (msg: string) => void },
 ): Promise<void> {
+  log.info("commands: handleJoin called", { args: args.trim(), isChannel: isChannelInviteLink(args.trim()), isInvite: isInviteLink(args.trim()) });
   if (!args.trim()) {
     await sendWahaText({
       cfg: config, to: chatId,
@@ -115,8 +151,39 @@ async function handleJoin(
     return;
   }
 
+  if (isChannelInviteLink(args.trim())) {
+    // ── Channel invite link path ──
+    // Step 1: Extract invite code from URL
+    // Step 2: Resolve invite code to newsletter JID via GET /channels/{code}
+    // Step 3: Follow the channel via POST /channels/{jid}/follow
+    const channelCode = args.trim().split("whatsapp.com/channel/")[1]?.split(/[/?#]/)[0]?.trim() ?? "";
+    if (!channelCode) {
+      await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Invalid channel link", accountId: account.accountId, bypassPolicy: true });
+      return;
+    }
+    try {
+      // Resolve invite code → newsletter JID (WAHA returns { id, name, ... })
+      const channelInfo = await getWahaChannel({ cfg: config, channelId: channelCode, accountId: account.accountId }) as Record<string, unknown>;
+      const channelJid = String(channelInfo.id ?? "");
+      const channelName = String(channelInfo.name ?? "channel");
+      if (!channelJid || !channelJid.endsWith("@newsletter")) {
+        await sendWahaText({ cfg: config, to: chatId, text: "⚠️ Can't resolve channel from invite link", accountId: account.accountId, bypassPolicy: true });
+        return;
+      }
+      // Follow using the resolved JID
+      await followWahaChannel({ cfg: config, channelId: channelJid, accountId: account.accountId });
+      await sendWahaText({ cfg: config, to: chatId, text: `Followed "${channelName}" ✓`, accountId: account.accountId, bypassPolicy: true });
+      log.info("commands: /join channel via invite link succeeded", { channelCode: channelCode.slice(0, 12) + "...", channelJid });
+    } catch (err) {
+      const raw = (err as Error).message ?? String(err);
+      await sendWahaText({ cfg: config, to: chatId, text: `⚠️ Can't follow channel: ${friendlyError(err)}`, accountId: account.accountId, bypassPolicy: true });
+      log.warn("commands: /join channel invite link failed", { error: raw });
+    }
+    return;
+  }
+
   if (isInviteLink(args.trim())) {
-    // ── Invite link / raw code path ──
+    // ── Group invite link / raw code path ──
     const inviteCode = extractInviteCode(args.trim());
     try {
       await joinWahaGroup({ cfg: config, inviteCode, accountId: account.accountId });
@@ -127,47 +194,75 @@ async function handleJoin(
       });
       log.info("commands: /join via invite code succeeded", { inviteCode: inviteCode.slice(0, 8) + "..." });
     } catch (err) {
-      const msg = (err as Error).message ?? String(err);
+      const raw = (err as Error).message ?? String(err);
       await sendWahaText({
         cfg: config, to: chatId,
-        text: `⚠️ Could not join: ${msg}`,
+        text: `⚠️ Can't join group: ${friendlyError(err)}`,
         accountId: account.accountId, bypassPolicy: true,
       });
-      log.warn("commands: /join via invite code failed", { error: msg });
+      log.warn("commands: /join via invite code failed", { error: raw });
     }
     return;
   }
 
-  // ── Name-based search path ──
+  // ── Name-based search path (groups + channels) ──
   let result: Awaited<ReturnType<typeof resolveWahaTarget>>;
   try {
-    result = await resolveWahaTarget({ cfg: config, query: args.trim(), type: "group", accountId: account.accountId });
+    result = await resolveWahaTarget({ cfg: config, query: args.trim(), type: "auto", accountId: account.accountId });
   } catch (err) {
     await sendWahaText({
       cfg: config, to: chatId,
-      text: `⚠️ Search failed: ${(err as Error).message}`,
+      text: `⚠️ Search failed: ${friendlyError(err)}`,
       accountId: account.accountId, bypassPolicy: true,
     });
     return;
   }
 
-  const topMatches = result.matches.slice(0, 5);
+  // Filter to groups and channels only — can't "join" a contact
+  const topMatches = result.matches
+    .filter(m => m.jid.endsWith("@g.us") || m.jid.endsWith("@newsletter"))
+    .slice(0, 5);
+
+  // If no channel matches found, search WhatsApp's public channel directory
+  // resolveWahaTarget only returns channels the bot already follows — this fallback finds unfollowed ones.
+  // DO NOT REMOVE — without this, /join <channel name> can't discover new channels.
+  const hasChannelMatch = topMatches.some(m => m.jid.endsWith("@newsletter"));
+  if (!hasChannelMatch) {
+    try {
+      const channelResults = await searchWahaChannelsByText({ cfg: config, query: args.trim(), accountId: account.accountId });
+      const channels = Array.isArray(channelResults) ? channelResults : (channelResults as any)?.newsletters ?? [];
+      for (const ch of channels) {
+        const jid = String((ch as any).id ?? (ch as any).jid ?? "");
+        const name = String((ch as any).name ?? (ch as any).subject ?? "");
+        if (jid && name) {
+          topMatches.push({ jid, name, type: "channel" as const, confidence: fuzzyScore(args.trim(), name) });
+        }
+      }
+      // Re-sort by confidence and limit to 5
+      topMatches.sort((a, b) => b.confidence - a.confidence);
+      topMatches.splice(5);
+    } catch (err) {
+      log.warn("commands: channel search fallback failed", { error: (err as Error).message });
+    }
+  }
 
   if (topMatches.length === 0) {
     await sendWahaText({
       cfg: config, to: chatId,
-      text: `No groups matching '${args.trim()}' found`,
+      text: `No groups or channels matching '${args.trim()}' found`,
       accountId: account.accountId, bypassPolicy: true,
     });
     return;
   }
 
   if (topMatches.length === 1 && topMatches[0]!.confidence >= 0.8) {
-    // Single high-confidence match — bot already has access to this group (resolveWahaTarget
-    // only returns groups the bot session can see, meaning it's already a member)
+    // Single high-confidence match — already a member/follower
+    const isChannel = topMatches[0]!.jid.endsWith("@newsletter");
     await sendWahaText({
       cfg: config, to: chatId,
-      text: `Already a member of ${topMatches[0]!.name}`,
+      text: isChannel
+        ? `Already following ${topMatches[0]!.name}`
+        : `Already a member of ${topMatches[0]!.name}`,
       accountId: account.accountId, bypassPolicy: true,
     });
     return;
@@ -179,7 +274,7 @@ async function handleJoin(
   storePendingSelection(senderId, { type: "join", groups, durationStr: null }, config, runtime);
   await sendWahaText({
     cfg: config, to: chatId,
-    text: `Multiple groups match '${args.trim()}':\n\n${list}\n\nReply with a number to select.`,
+    text: `Multiple matches for '${args.trim()}':\n\n${list}\n\nReply with a number to select.`,
     accountId: account.accountId, bypassPolicy: true,
   });
 }
@@ -209,7 +304,7 @@ async function handleLeave(
   } catch (err) {
     await sendWahaText({
       cfg: config, to: chatId,
-      text: `⚠️ Search failed: ${(err as Error).message}`,
+      text: `⚠️ Search failed: ${friendlyError(err)}`,
       accountId: account.accountId, bypassPolicy: true,
     });
     return;
@@ -267,13 +362,13 @@ async function executeLeave(
     });
     log.info("commands: /leave succeeded", { jid });
   } catch (err) {
-    const msg = (err as Error).message ?? String(err);
+    const raw = (err as Error).message ?? String(err);
     await sendWahaText({
       cfg: config, to: chatId,
-      text: `⚠️ Could not leave: ${msg}`,
+      text: `⚠️ Can't leave: ${friendlyError(err)}`,
       accountId: account.accountId, bypassPolicy: true,
     });
-    log.warn("commands: /leave failed", { jid, error: msg });
+    log.warn("commands: /leave failed", { jid, error: raw });
   }
 }
 
@@ -439,12 +534,33 @@ export async function handleCommandSelectionResponse(
   const selected = pending.groups[num - 1]!;
 
   if (pending.type === "join") {
-    // Bot is already a member of this group (resolveWahaTarget only returns groups bot has access to)
-    await sendWahaText({
-      cfg: config, to: chatId,
-      text: `Already a member of ${selected.name}`,
-      accountId: account.accountId, bypassPolicy: true,
-    });
+    // resolveWahaTarget only returns groups/channels the bot already has access to.
+    // For channels, we still call followWahaChannel in case it's from a search result the bot can see but hasn't followed.
+    if (selected.jid.endsWith("@newsletter")) {
+      try {
+        await followWahaChannel({ cfg: config, channelId: selected.jid, accountId: account.accountId });
+        await sendWahaText({
+          cfg: config, to: chatId,
+          text: `Followed channel ✓`,
+          accountId: account.accountId, bypassPolicy: true,
+        });
+        log.info("commands: /join channel via selection succeeded", { jid: selected.jid });
+      } catch (err) {
+        await sendWahaText({
+          cfg: config, to: chatId,
+          text: `⚠️ Can't follow channel: ${friendlyError(err)}`,
+          accountId: account.accountId, bypassPolicy: true,
+        });
+        log.warn("commands: /join channel via selection failed", { jid: selected.jid, error: String(err) });
+      }
+    } else {
+      // Group — bot is already a member (resolveWahaTarget only returns groups bot has access to)
+      await sendWahaText({
+        cfg: config, to: chatId,
+        text: `Already a member of ${selected.name}`,
+        accountId: account.accountId, bypassPolicy: true,
+      });
+    }
     return true;
   }
 
