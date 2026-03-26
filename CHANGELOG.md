@@ -2,6 +2,22 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.18.0] - 2026-03-26 — Join/Leave/List & Skill Completeness
+
+### Added
+- **Slash commands** — `/join`, `/leave`, `/list` bypass the LLM entirely, saving tokens. `/join` supports invite links (groups + channels) and fuzzy name search. `/leave` supports groups and channels. `/list` supports filtering by `groups` or `channels`.
+- **Channel invite link support** — `/join https://whatsapp.com/channel/...` resolves invite code to newsletter JID via WAHA API, then follows. Two-step: GET channel info → POST follow.
+- **Channel name search** — `/join <name>` searches both local followed channels and WhatsApp's public channel directory via `searchWahaChannelsByText` fallback.
+- **Admin UI Join/Leave** — Directory tab has "Leave"/"Unfollow" buttons per group/channel row with AlertDialog confirmation. "Join by Link" input at top of directory tab.
+- **Friendly error messages** — `friendlyError()` extracts clean reasons from WAHA error blobs instead of dumping raw JSON to users.
+- **Skill completeness** — `whatsapp-messenger` skill rewritten: 109 actions across 16 categories. SKILL.md updated with invite link docs and slash command docs.
+
+### Fixed
+- **Invite code regex** — Changed from `{22,}` to `{22}` exact match to prevent 22+ char group names from being treated as invite codes.
+- **WAHA joinGroup field name** — Fixed `inviteCode` → `code` to match WAHA API expectation.
+- **Sender JID device suffix** — Strip `:N` device suffix from sender JID before authorization check (e.g., `972544329000:26` → `972544329000`).
+- **Pending selection in groups** — Selection responses (numbered replies) now work in group chats, not just DMs.
+
 ## [1.17.1] - 2026-03-25
 
 ### Fixed
