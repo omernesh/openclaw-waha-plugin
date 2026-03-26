@@ -2,8 +2,8 @@
 phase: 53
 slug: mimicrygate-core
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-26
 ---
 
@@ -17,20 +17,20 @@ created: 2026-03-26
 
 | Property | Value |
 |----------|-------|
-| **Framework** | {pytest 7.x / jest 29.x / vitest / go test / other} |
-| **Config file** | {path or "none — Wave 0 installs"} |
-| **Quick run command** | `{quick command}` |
-| **Full suite command** | `{full command}` |
-| **Estimated runtime** | ~53 seconds |
+| **Framework** | vitest ^4.0.18 |
+| **Config file** | `vitest.config.ts` (root) |
+| **Quick run command** | `npx vitest run src/mimicry-gate.test.ts` |
+| **Full suite command** | `npx vitest run` |
+| **Estimated runtime** | ~8 seconds |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `{quick run command}`
-- **After every plan wave:** Run `{full suite command}`
+- **After every task commit:** Run `npx vitest run src/mimicry-gate.test.ts`
+- **After every plan wave:** Run `npx vitest run`
 - **Before `/gsd:verify-work`:** Full suite must be green
-- **Max feedback latency:** 53 seconds
+- **Max feedback latency:** ~8 seconds
 
 ---
 
@@ -38,39 +38,47 @@ created: 2026-03-26
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 53-01-01 | 01 | 1 | REQ-{XX} | unit | `{command}` | ✅ / ❌ W0 | ⬜ pending |
+| 53-01-01 | 01 | 1 | INFRA-03 | unit | `npx vitest run src/config-io.test.ts` | Yes | pending |
+| 53-01-02 | 01 | 1 | INFRA-01, INFRA-02, GATE-02, CAP-04 | structural | `grep -c "export class MimicryDb" src/mimicry-gate.ts && grep -c "targetOverride" src/mimicry-gate.ts && grep -c "send_gate_json" src/directory.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | GATE-01 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | GATE-01 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | GATE-03 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | GATE-04 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | GATE-02 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | CAP-01 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | CAP-02 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | CAP-03 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | CAP-04 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | CAP-05 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | INFRA-02 | unit | `npx vitest run src/mimicry-gate.test.ts` | Wave 0 | pending |
+| 53-02-01 | 02 | 2 | INFRA-03 | unit | `npx vitest run src/config-io.test.ts` | Yes | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending -- all tests created in Plan 02 (TDD plan)*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `{tests/test_file.py}` — stubs for REQ-{XX}
-- [ ] `{tests/conftest.py}` — shared fixtures
-- [ ] `{framework install}` — if no framework detected
+- [ ] `src/mimicry-gate.test.ts` -- covers GATE-01..04, CAP-01..05, INFRA-02..04 (created as part of Plan 02 TDD)
+- [ ] Config schema tests via existing `src/config-io.test.ts` -- covers INFRA-03
 
-*If none: "Existing infrastructure covers all phase requirements."*
+*(Both the mimicry-gate test file is new -- this is a new module. Config-io tests already exist.)*
 
 ---
 
 ## Manual-Only Verifications
 
-| Behavior | Requirement | Why Manual | Test Instructions |
-|----------|-------------|------------|-------------------|
-| {behavior} | REQ-{XX} | {reason} | {steps} |
-
-*If none: "All phase behaviors have automated verification."*
+All phase behaviors have automated verification.
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 53s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 10s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** {pending / approved YYYY-MM-DD}
+**Approval:** pending
