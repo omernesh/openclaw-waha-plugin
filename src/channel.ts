@@ -80,6 +80,8 @@ import {
   rejectWahaCall,
   // API Keys — Added Phase 28, Plan 02
   createWahaApiKey, getWahaApiKeys, updateWahaApiKey, deleteWahaApiKey,
+  // Contact update, message ID, media conversion — Added Phase 48
+  createOrUpdateWahaContact, getWahaNewMessageId, convertWahaVoice, convertWahaVideo,
   // Name resolution
   resolveWahaTarget,
 } from "./send.js";
@@ -181,8 +183,10 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getChatsOverview: (p, cfg, aid) => getWahaChatsOverview({ cfg, page: p.page != null ? Number(p.page) : undefined, limit: p.limit != null ? Number(p.limit) : undefined, accountId: aid }),
   getChatMessages: (p, cfg, aid) => getWahaChatMessages({ cfg, chatId: String(p.chatId), limit: p.limit != null ? Number(p.limit) : undefined, offset: p.offset != null ? Number(p.offset) : undefined, downloadMedia: p.downloadMedia != null ? Boolean(p.downloadMedia) : undefined, accountId: aid }),
   getChatMessage: (p, cfg, aid) => getWahaChatMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }),
+  getMessageById: (p, cfg, aid) => getWahaChatMessage({ cfg, chatId: String(p.chatId), messageId: String(p.messageId), accountId: aid }), // Alias for getChatMessage — ACT-02
   deleteChat: (p, cfg, aid) => deleteWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
   clearChatMessages: (p, cfg, aid) => clearWahaChatMessages({ cfg, chatId: String(p.chatId), accountId: aid }),
+  clearMessages: (p, cfg, aid) => clearWahaChatMessages({ cfg, chatId: String(p.chatId), accountId: aid }), // Alias for clearChatMessages — ACT-02
   archiveChat: (p, cfg, aid) => archiveWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
   unarchiveChat: (p, cfg, aid) => unarchiveWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
   unreadChat: (p, cfg, aid) => unreadWahaChat({ cfg, chatId: String(p.chatId), accountId: aid }),
@@ -206,6 +210,7 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   removeParticipants: (p, cfg, aid) => removeWahaGroupParticipants({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
   promoteToAdmin: (p, cfg, aid) => promoteWahaGroupAdmin({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
   demoteFromAdmin: (p, cfg, aid) => demoteWahaGroupAdmin({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }),
+  demoteToMember: (p, cfg, aid) => demoteWahaGroupAdmin({ cfg, groupId: String(p.groupId), participants: p.participants as string[], accountId: aid }), // Alias for demoteFromAdmin — ACT-01
   getParticipants: (p, cfg, aid) => getWahaGroupParticipants({ cfg, groupId: String(p.groupId), accountId: aid }),
   setInfoAdminOnly: (p, cfg, aid) => setWahaGroupInfoAdminOnly({ cfg, groupId: String(p.groupId), adminOnly: Boolean(p.adminOnly), accountId: aid }),
   getInfoAdminOnly: (p, cfg, aid) => getWahaGroupInfoAdminOnly({ cfg, groupId: String(p.groupId), accountId: aid }),
@@ -226,6 +231,7 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getContactPicture: (p, cfg, aid) => getWahaContactPicture({ cfg, contactId: String(p.contactId), accountId: aid }),
   blockContact: (p, cfg, aid) => blockWahaContact({ cfg, contactId: String(p.contactId), accountId: aid }),
   unblockContact: (p, cfg, aid) => unblockWahaContact({ cfg, contactId: String(p.contactId), accountId: aid }),
+  createOrUpdateContact: (p, cfg, aid) => createOrUpdateWahaContact({ cfg, contactId: String(p.contactId), name: p.name ? String(p.name) : undefined, accountId: aid }),
   // Labels
   getLabels: (p, cfg, aid) => getWahaLabels({ cfg, accountId: aid }),
   createLabel: (p, cfg, aid) => createWahaLabel({ cfg, name: String(p.name), color: p.color != null ? Number(p.color) : undefined, accountId: aid }),
@@ -240,6 +246,7 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   sendVoiceStatus: (p, cfg, aid) => sendWahaVoiceStatus({ cfg, voice: String(p.voice), accountId: aid }),
   sendVideoStatus: (p, cfg, aid) => sendWahaVideoStatus({ cfg, video: String(p.video), caption: p.caption ? String(p.caption) : undefined, accountId: aid }),
   deleteStatus: (p, cfg, aid) => deleteWahaStatus({ cfg, id: String(p.id), accountId: aid }),
+  getNewMessageId: (p, cfg, aid) => getWahaNewMessageId({ cfg, accountId: aid }),
   // Channels
   getChannels: (p, cfg, aid) => getWahaChannels({ cfg, accountId: aid }),
   createChannel: (p, cfg, aid) => createWahaChannel({ cfg, name: String(p.name), description: p.description ? String(p.description) : undefined, picture: p.picture ? String(p.picture) : undefined, accountId: aid }),
@@ -258,6 +265,7 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getChannelSearchCategories: (p, cfg, aid) => getWahaChannelSearchCategories({ cfg, accountId: aid }),
   // Presence
   setPresenceStatus: (p, cfg, aid) => setWahaPresenceStatus({ cfg, status: p.status as "online" | "offline", accountId: aid }),
+  setPresence: (p, cfg, aid) => setWahaPresenceStatus({ cfg, status: p.status as "online" | "offline", accountId: aid }), // Alias for setPresenceStatus — ACT-05
   getPresence: (p, cfg, aid) => getWahaPresence({ cfg, contactId: String(p.contactId), accountId: aid }),
   subscribePresence: (p, cfg, aid) => subscribeWahaPresence({ cfg, contactId: String(p.contactId), accountId: aid }),
   // Bulk presence — Added Phase 28, Plan 01
@@ -274,6 +282,9 @@ const ACTION_HANDLERS: Record<string, (params: Record<string, unknown>, cfg: Cor
   getAllLids: (p, cfg, aid) => getWahaAllLids({ cfg, accountId: aid }),
   // Calls
   rejectCall: (p, cfg, aid) => rejectWahaCall({ cfg, callId: String(p.callId), accountId: aid }),
+  // Media conversion — Added Phase 48
+  convertVoice: (p, cfg, aid) => convertWahaVoice({ cfg, url: String(p.url), accountId: aid }),
+  convertVideo: (p, cfg, aid) => convertWahaVideo({ cfg, url: String(p.url), accountId: aid }),
   // API Keys CRUD — Added Phase 28, Plan 02
   createApiKey: (p, cfg, aid) => createWahaApiKey({ cfg, name: String(p.name), accountId: aid }),
   getApiKeys: (p, cfg, aid) => getWahaApiKeys({ cfg, accountId: aid }),
@@ -395,26 +406,77 @@ const STANDARD_ACTIONS = ["send", "poll", "react", "edit", "unsend", "pin", "unp
 // Utility actions don't need target resolution. They are exposed to the LLM
 // as available tools. Keep this list curated -- too many actions overwhelm the
 // model's context and degrade response quality. Each action here costs ~50 tokens.
+// API Keys CRUD removed from UTILITY_ACTIONS — admin-only, ACT-08. Handlers remain in ACTION_HANDLERS.
 const UTILITY_ACTIONS = [
-  "sendMulti", // Multi-recipient text send — up to 10 recipients. Added Phase 3, Plan 03.
-  "search", // DO NOT REMOVE — gateway-recognized name for listing/searching. See search handler above.
-  "readMessages", // Read recent chat messages in lean format for LLM context. Added Phase 4, Plan 03. DO NOT REMOVE.
-  "getGroups", "getGroup", "getGroupsCount", "getParticipants",
-  "getContacts", "getContact", "checkContactExists",
-  "getChatsOverview", "getChats", "getChatMessages",
-  "getProfile", "getLabels", "getChannels",
-  "getPresence", "findPhoneByLid", "findLidByPhone", "getAllLids",
-  "createGroup", "sendEvent", "sendLocation", "sendContactVcard",
-  "sendTextStatus", "sendImageStatus",
-  "sendImage", "sendVideo", "sendFile",
-  "joinGroup", "followChannel", "unfollowChannel",
+  // ── Core utilities ──
+  "sendMulti",        // Multi-recipient text send — up to 10 recipients. Added Phase 3, Plan 03.
+  "search",           // DO NOT REMOVE — gateway-recognized name for listing/searching. See search handler above.
+  "readMessages",     // Read recent chat messages in lean format for LLM context. Added Phase 4, Plan 03. DO NOT REMOVE.
   "resolveTarget",
-  "muteChat", "unmuteChat", // Chat mute/unmute — Added Phase 3, Plan 01. DO NOT REMOVE.
-  "editPolicy", // Phase 6: Rules-based policy edit. Manager-authorized field edits for contacts/groups. DO NOT REMOVE.
-  "searchChannelsByView", "getChannelSearchViews", "getChannelSearchCountries", "getChannelSearchCategories", // Channel search metadata. Added Phase 28, Plan 01.
-  "getGroupJoinInfo", "refreshGroups", // Group helpers. Added Phase 28, Plan 01.
-  "getAllPresence", // Bulk presence — all subscribed contacts. Added Phase 28, Plan 01.
-  "createApiKey", "getApiKeys", "updateApiKey", "deleteApiKey", // API Keys CRUD. Added Phase 28, Plan 02.
+
+  // ── Rich messages ──
+  "sendEvent", "sendLocation", "sendContactVcard", "sendList", "sendLinkPreview",
+  "sendButtonsReply", "sendPoll", "sendPollVote", "forwardMessage",
+
+  // ── Media ──
+  "sendImage", "sendVideo", "sendFile",
+  "convertVoice", "convertVideo",  // Media conversion — ACT-07
+
+  // ── Chat management ──
+  "getChats", "getChatsOverview", "getChatMessages", "getChatMessage", "getMessageById",
+  "deleteChat", "clearChatMessages", "clearMessages",
+  "archiveChat", "unarchiveChat", "unreadChat", "readChatMessages",
+  "getChatPicture",
+  "muteChat", "unmuteChat",  // Chat mute/unmute — Added Phase 3, Plan 01. DO NOT REMOVE.
+
+  // ── Group admin — ACT-01 ──
+  "getGroups", "getGroup", "getGroupsCount", "getParticipants",
+  "createGroup", "deleteGroup", "leaveGroup", "joinGroup",
+  "setGroupSubject", "setGroupDescription",
+  "setGroupPicture", "deleteGroupPicture", "getGroupPicture",
+  "addParticipants", "removeParticipants",
+  "promoteToAdmin", "demoteFromAdmin", "demoteToMember",
+  "setInfoAdminOnly", "getInfoAdminOnly", "setMessagesAdminOnly", "getMessagesAdminOnly",
+  "getInviteCode", "revokeInviteCode",
+  "getGroupJoinInfo", "refreshGroups",  // Group helpers. Added Phase 28, Plan 01.
+
+  // ── Contacts — ACT-03 ──
+  "getContacts", "getContact", "checkContactExists",
+  "getContactAbout", "getContactPicture",
+  "blockContact", "unblockContact",
+  "createOrUpdateContact",  // New — ACT-03
+
+  // ── Channels ──
+  "getChannels", "getChannel", "createChannel", "deleteChannel",
+  "followChannel", "unfollowChannel",
+  "muteChannel", "unmuteChannel",
+  "searchChannelsByText", "previewChannelMessages",
+  "searchChannelsByView", "getChannelSearchViews", "getChannelSearchCountries", "getChannelSearchCategories",
+
+  // ── Status — ACT-04 ──
+  "sendTextStatus", "sendImageStatus",
+  "sendVoiceStatus", "sendVideoStatus", "deleteStatus",  // ACT-04
+  "getNewMessageId",  // New — ACT-04
+
+  // ── Presence — ACT-05 ──
+  "getPresence", "setPresenceStatus", "setPresence", "subscribePresence",
+  "getAllPresence",  // Bulk presence. Added Phase 28, Plan 01.
+
+  // ── Profile — ACT-06 ──
+  "getProfile", "setProfileName", "setProfileStatus", "setProfilePicture", "deleteProfilePicture",
+
+  // ── Labels ──
+  "getLabels", "createLabel", "updateLabel", "deleteLabel",
+  "getChatLabels", "setChatLabels", "getChatsByLabel",
+
+  // ── LID ──
+  "findPhoneByLid", "findLidByPhone", "getAllLids",
+
+  // ── Calls ──
+  "rejectCall",
+
+  // ── Policy ──
+  "editPolicy",  // Phase 6: Rules-based policy edit. DO NOT REMOVE.
 ];
 
 // DO NOT change back to ALL_ACTIONS. That was the v1.8.x bug.

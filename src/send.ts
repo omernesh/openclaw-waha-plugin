@@ -1502,6 +1502,60 @@ export async function deleteWahaApiKey(params: { cfg: CoreConfig; keyId: string;
   return client.del(`/api/keys/${encodeURIComponent(params.keyId)}`);
 }
 
+// ── Contact update, message ID, media conversion — Added Phase 48 ────
+
+export async function createOrUpdateWahaContact(params: {
+  cfg: CoreConfig;
+  contactId: string;
+  name?: string;
+  accountId?: string;
+}): Promise<Record<string, unknown>> {
+  const client = getClient(params.cfg, params.accountId);
+  assertCanSend(client.session, params.cfg);
+  const res = await client.put(
+    client.sessionPath("/api/{session}/contacts") + `/${encodeURIComponent(params.contactId)}`,
+    { name: params.name },
+  );
+  return res as Record<string, unknown>;
+}
+
+export async function getWahaNewMessageId(params: {
+  cfg: CoreConfig;
+  accountId?: string;
+}): Promise<{ id: string }> {
+  const client = getClient(params.cfg, params.accountId);
+  const res = await client.get(client.sessionPath("/api/{session}/status/new-message-id"));
+  return res as { id: string };
+}
+
+export async function convertWahaVoice(params: {
+  cfg: CoreConfig;
+  url: string;
+  accountId?: string;
+}): Promise<Record<string, unknown>> {
+  const client = getClient(params.cfg, params.accountId);
+  assertCanSend(client.session, params.cfg);
+  const res = await client.post(
+    client.sessionPath("/api/{session}/media/convert/voice"),
+    { url: params.url },
+  );
+  return res as Record<string, unknown>;
+}
+
+export async function convertWahaVideo(params: {
+  cfg: CoreConfig;
+  url: string;
+  accountId?: string;
+}): Promise<Record<string, unknown>> {
+  const client = getClient(params.cfg, params.accountId);
+  assertCanSend(client.session, params.cfg);
+  const res = await client.post(
+    client.sessionPath("/api/{session}/media/convert/video"),
+    { url: params.url },
+  );
+  return res as Record<string, unknown>;
+}
+
 // ╔══════════════════════════════════════════════════════════════════════╗
 // ║  resolveWahaTarget — DO NOT CHANGE / DO NOT REMOVE                  ║
 // ║                                                                      ║
