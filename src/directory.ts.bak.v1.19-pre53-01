@@ -3,7 +3,6 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createLogger } from "./logger.js";
-import type { TargetGateOverride, TargetCapOverride } from "./mimicry-gate.js";
 
 
 const log = createLogger({ component: "directory" });
@@ -29,10 +28,6 @@ export type ContactDmSettings = {
   // "default" = use global canInitiateGlobal setting. "allow" = always allow. "block" = always block.
   // Stored in can_initiate_override column. DO NOT REMOVE.
   canInitiateOverride: "default" | "allow" | "block";
-  // Phase 53 (GATE-02, CAP-04): Per-contact/group/newsletter send gate and cap overrides.
-  // null/undefined = inherit from session/global config. DO NOT CHANGE -- used by resolveGateConfig/resolveCapLimit.
-  sendGateOverride?: TargetGateOverride | null;
-  hourlyCapOverride?: TargetCapOverride | null;
 };
 
 /** DIR-03: Plugin-level role for a group participant. No WhatsApp meaning — admin panel label only. */
@@ -150,9 +145,6 @@ export class DirectoryDb {
         custom_keywords TEXT DEFAULT '',
         can_initiate INTEGER DEFAULT 1,
         updated_at INTEGER NOT NULL,
-        -- Phase 53 (GATE-02, CAP-04): Per-contact/group/newsletter gate and cap overrides. JSON text, NULL = inherit.
-        send_gate_json TEXT DEFAULT NULL,
-        hourly_cap_json TEXT DEFAULT NULL,
         FOREIGN KEY (jid) REFERENCES contacts(jid)
       );
       CREATE INDEX IF NOT EXISTS idx_contacts_last_message ON contacts(last_message_at DESC);
@@ -266,15 +258,6 @@ export class DirectoryDb {
       const msg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
       if (!msg.includes('duplicate column')) throw migrationErr;
     }
-
-    // Phase 53: Add per-target gate/cap override columns if missing (GATE-02, CAP-04).
-    // Safe to run repeatedly -- ALTER TABLE ADD COLUMN is a no-op if column exists in SQLite.
-    try {
-      this.db.prepare('ALTER TABLE dm_settings ADD COLUMN send_gate_json TEXT DEFAULT NULL').run();
-    } catch { /* column already exists */ }
-    try {
-      this.db.prepare('ALTER TABLE dm_settings ADD COLUMN hourly_cap_json TEXT DEFAULT NULL').run();
-    } catch { /* column already exists */ }
 
     // TTL-02: Add expires_at column to allow_list for time-limited access grants.
     // NULL = permanent (never expires). Unix timestamp (seconds) = time-limited.
@@ -647,7 +630,7 @@ export class DirectoryDb {
 
   getContactDmSettings(jid: string): ContactDmSettings {
     const row = this.db
-      .prepare("SELECT mode, mention_only, custom_keywords, can_initiate, can_initiate_override, send_gate_json, hourly_cap_json FROM dm_settings WHERE jid = ?")
+      .prepare("SELECT mode, mention_only, custom_keywords, can_initiate, can_initiate_override FROM dm_settings WHERE jid = ?")
       .get(jid) as Record<string, unknown> | undefined;
 
     if (!row) return { ...DEFAULT_DM_SETTINGS };
@@ -659,9 +642,6 @@ export class DirectoryDb {
       customKeywords: (row.custom_keywords as string) ?? "",
       canInitiate: row.can_initiate !== 0,
       canInitiateOverride: (override === "allow" || override === "block") ? override : "default",
-      // Phase 53 (GATE-02, CAP-04): Per-contact/group/newsletter gate and cap overrides.
-      sendGateOverride: row.send_gate_json ? JSON.parse(row.send_gate_json as string) : null,
-      hourlyCapOverride: row.hourly_cap_json ? JSON.parse(row.hourly_cap_json as string) : null,
     };
   }
 
@@ -701,15 +681,12 @@ export class DirectoryDb {
       customKeywords: settings.customKeywords ?? existing.customKeywords,
       canInitiate: settings.canInitiate ?? existing.canInitiate,
       canInitiateOverride: settings.canInitiateOverride ?? existing.canInitiateOverride,
-      // Phase 53 (GATE-02, CAP-04): Preserve per-target gate/cap overrides across partial updates.
-      sendGateOverride: settings.sendGateOverride !== undefined ? settings.sendGateOverride : existing.sendGateOverride,
-      hourlyCapOverride: settings.hourlyCapOverride !== undefined ? settings.hourlyCapOverride : existing.hourlyCapOverride,
     };
 
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO dm_settings (jid, mode, mention_only, custom_keywords, can_initiate, can_initiate_override, send_gate_json, hourly_cap_json, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO dm_settings (jid, mode, mention_only, custom_keywords, can_initiate, can_initiate_override, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         jid,
@@ -718,8 +695,6 @@ export class DirectoryDb {
         merged.customKeywords,
         merged.canInitiate ? 1 : 0,
         merged.canInitiateOverride,
-        merged.sendGateOverride ? JSON.stringify(merged.sendGateOverride) : null,
-        merged.hourlyCapOverride ? JSON.stringify(merged.hourlyCapOverride) : null,
         Date.now(),
       );
   }
