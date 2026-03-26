@@ -230,9 +230,10 @@ Plans:
   6. Agent retrieves Michael's contact about text and profile picture URL
   7. Agent posts a text status and then deletes it; agent sets bot presence to online
   8. /join, /leave, /list slash commands still work correctly (regression check)
-**Plans**: 1 plan
+**Plans:** 2 plans
 Plans:
-- [ ] 51-01-PLAN.md — Deploy whatsapp-messenger v2.0.0 skill + plugin SKILL.md v6.0.0 to SIMPC and hpg6
+- [ ] 52-01-PLAN.md — Deploy Phase 48 source files to hpg6, clear jiti, restart gateway
+- [ ] 52-02-PLAN.md — Run all 12 live test scenarios (TST-01 through TST-12)
 
 ## Progress
 
@@ -246,5 +247,5 @@ Plans:
 | 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
 | 49. Modular Skill Architecture | 2/2 | Complete    | 2026-03-26 |
 | 50. Skill Creator & Evals | 1/1 | Complete    | 2026-03-26 |
-| 51. Claude Code Skill Update | 1/1 | Complete   | 2026-03-26 |
-| 52. Deploy & Live Testing | 0/TBD | Not started | - |
+| 51. Claude Code Skill Update | 1/1 | Complete    | 2026-03-26 |
+| 52. Deploy & Live Testing | 0/2 | Not started | - |
