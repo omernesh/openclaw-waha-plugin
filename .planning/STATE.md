@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: Full WAHA Capabilities & Modular Skill Architecture
-status: verifying
-stopped_at: Completed 51-01-PLAN.md — Phase 51 plan 1 of 1 done
-last_updated: "2026-03-26T04:17:27.688Z"
+status: executing
+stopped_at: Completed 52-01-PLAN.md — Phase 52 plan 1 of 2 done
+last_updated: "2026-03-26T04:59:58.928Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 51 — claude-code-skill-update
+**Current focus:** Phase 52 — deploy-live-testing
 
 ## Current Position
 
-Phase: 51 (claude-code-skill-update) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
+Phase: 52 (deploy-live-testing) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-03-26
 
 Progress bar: [----------] 0/5 phases complete
@@ -55,6 +55,8 @@ Progress bar: [----------] 0/5 phases complete
 - [Phase 50-01]: SKILL.md version field moved to metadata.version — quick_validate.py only allows specific root frontmatter keys
 - [Phase 50-01]: Evals test decision-making not live WAHA execution — agent selects action + params, no API access needed
 - [Phase 51-claude-code-skill-update]: whatsapp-messenger SKILL.md v2.0.0 description already covered all categories — no edits needed
+- [Phase 52-deploy-live-testing]: Disk-full root cause: syslog grew to 4GB+ — truncate syslog + vacuum journal to free space
+- [Phase 52-deploy-live-testing]: Gateway lock file must be manually deleted when it persists after crash restart
 
 ### Pending Todos
 
@@ -67,6 +69,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T04:17:27.681Z
-Stopped at: Completed 51-01-PLAN.md — Phase 51 plan 1 of 1 done
+Last session: 2026-03-26T04:59:58.922Z
+Stopped at: Completed 52-01-PLAN.md — Phase 52 plan 1 of 2 done
 Resume file: None
