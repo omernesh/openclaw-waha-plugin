@@ -87,7 +87,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 ## v1.20 Human Mimicry Hardening — Active
 
 - [x] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (mimicry-gate.ts, Zod schemas, SQLite tables) (completed 2026-03-26)
-- [ ] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle)
+- [x] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle) (completed 2026-03-26)
 - [ ] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
 - [ ] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing
 - [ ] **Phase 57: Admin UI & Observability** - Dashboard card, settings tab controls, mimicry status API
@@ -119,10 +119,10 @@ Plans:
   3. The `/shutup`, `/join`, and `/leave` commands bypass the gate and cap enforcements via `bypassPolicy` flag
   4. Consecutive sends from the queue have 3-8 second jittered delays between them (drain rate throttling)
   5. Inter-message delays include random variance of +/-30-50% of base delay so timing is not mechanically uniform
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
-- [ ] 54-01-PLAN.md — enforceMimicry chokepoint + recordMimicrySuccess (TDD in mimicry-enforcer.ts)
-- [ ] 54-02-PLAN.md — Wire enforcement into send.ts + inbound.ts send paths
+- [x] 54-01-PLAN.md — enforceMimicry chokepoint + recordMimicrySuccess (TDD in mimicry-enforcer.ts)
+- [x] 54-02-PLAN.md — Wire enforcement into send.ts + inbound.ts send paths
 
 ### Phase 55: Claude Code Integration
 **Goal**: Sends from the whatsapp-messenger Claude Code skill are subject to the same time gate, hourly cap, and typing simulation as agent sends
@@ -163,7 +163,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 53. MimicryGate Core | 2/2 | Complete    | 2026-03-26 |
-| 54. Send Pipeline Enforcement | 0/2 | Planned | - |
+| 54. Send Pipeline Enforcement | 2/2 | Complete   | 2026-03-26 |
 | 55. Claude Code Integration | 0/? | Not started | - |
 | 56. Adaptive Activity Patterns | 0/? | Not started | - |
 | 57. Admin UI & Observability | 0/? | Not started | - |

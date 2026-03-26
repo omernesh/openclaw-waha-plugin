@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.20
-milestone_name: Human Mimicry Hardening
-status: active
-stopped_at: Completed 54-01-PLAN.md
-last_updated: "2026-03-26T19:14:00Z"
+milestone: v1.18
+milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
+status: completed
+stopped_at: Completed 54-02-PLAN.md
+last_updated: "2026-03-26T19:30:33.445Z"
 last_activity: 2026-03-26
 progress:
-  total_phases: 5
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 3
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
   percent: 50
 ---
 
@@ -52,6 +52,7 @@ Progress: [█████░░░░░] 50%
 | Phase 53 P01 | 9 | 2 tasks | 3 files |
 | Phase 53 P02 | 358 | 2 tasks | 2 files |
 | Phase 54 P01 | 4 | 1 task (TDD) | 2 files |
+| Phase 54 P02 | 10 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Progress: [█████░░░░░] 50%
 - [Phase 54]: Separate mimicry-enforcer.ts avoids circular import between send.ts and mimicry-gate.ts
 - [Phase 54]: DI params _db/_now/_sleep for enforcer test isolation without fake timers
 - [Phase 54]: recordMimicrySuccess called by caller AFTER WAHA success -- failed sends don't consume cap
+- [Phase 54]: sendWahaMediaBatch calls enforceMimicry once with count=N before the batch loop (not per-media)
+- [Phase 54]: deliverWahaReply calls enforceMimicry AFTER presenceCtrl typing stop to avoid two concurrent typing indicators
+- [Phase 54]: Status sends pass isStatusSend=true so they honour time gate but skip hourly cap
 
 ### Architecture Notes
 
@@ -97,6 +101,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T19:14:00Z
-Stopped at: Completed 54-01-PLAN.md
+Last session: 2026-03-26T19:30:33.436Z
+Stopped at: Completed 54-02-PLAN.md
 Resume file: None
