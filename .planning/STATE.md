@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.19
-milestone_name: Full WAHA Capabilities & Modular Skill Architecture
-status: complete
-stopped_at: "v1.19 milestone archived"
+milestone: v1.20
+milestone_name: Human Mimicry Hardening
+status: active
+stopped_at: "Defining requirements"
 last_updated: "2026-03-26"
 last_activity: 2026-03-26
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 7
-  completed_plans: 7
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,26 +20,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** None — between milestones
+**Current focus:** v1.20 Human Mimicry Hardening
 
 ## Current Position
 
-Phase: Complete
-Plan: N/A
-Status: v1.19 milestone shipped and archived
-Last activity: 2026-03-26
-
-Progress bar: [##########] 5/5 phases complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-26 — Milestone v1.20 started
 
 ## Accumulated Context
 
 ### Decisions
 
-(Archived to .planning/milestones/v1.19-ROADMAP.md)
+(None yet for v1.20)
 
 ### Pending Todos
 
-None — milestone complete.
+None.
 
 ### Blockers/Concerns
 
@@ -48,5 +46,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: v1.19 milestone archived
+Stopped at: Defining requirements
 Resume file: None

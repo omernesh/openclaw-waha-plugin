@@ -90,7 +90,12 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 
 ### Active
 
-(Next milestone TBD)
+#### v1.20 — Human Mimicry Hardening
+
+- [ ] Time-of-day send gates (block outbound outside configurable hours, default 7am-1am)
+- [ ] Hourly message caps (hard limit per session, progressive as account matures)
+- [ ] Configuration hierarchy: global → per session → per contact/group/newsletter (applies to both gates and caps)
+- [ ] Claude Code mimicry integration (route whatsapp-messenger sends through typing delay + rate limiting)
 
 ### Out of Scope
 
@@ -102,6 +107,15 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Disappearing messages — low priority
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
+
+## Current Milestone: v1.20 Human Mimicry Hardening
+
+**Goal:** Make the agent indistinguishable from a human to Meta's bot detection by adding time-based send gates, hourly message caps with progressive limits, and routing Claude Code sends through the mimicry system.
+
+**Target features:**
+- Time-of-day send gates — block outbound messages outside configurable hours (default 7am-1am). Queue or reject. Configurable globally, per session, per contact/group/newsletter.
+- Hourly message caps — hard limit of 30-50 outbound messages/hour per session. Progressive limits as account matures. Configurable globally, per session, per contact/group/newsletter.
+- Claude Code mimicry integration — when whatsapp-messenger skill sends via Omer's session, route through typing delay + rate limiting system (currently bypasses all mimicry).
 
 ## Last Shipped: v1.19 Full WAHA Capabilities & Modular Skill Architecture (2026-03-26)
 
@@ -172,4 +186,4 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-26 — v1.19 shipped*
+*Last updated: 2026-03-26 — v1.20 milestone started*
