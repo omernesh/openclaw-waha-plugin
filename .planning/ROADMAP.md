@@ -92,7 +92,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 48: Action Exposure** - Add all missing actions to UTILITY_ACTIONS in channel.ts (ACT-01 through ACT-08) (completed 2026-03-26)
 - [x] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07) (completed 2026-03-26)
 - [x] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05) (completed 2026-03-26)
-- [ ] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06)
+- [x] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06) (completed 2026-03-26)
 - [ ] **Phase 52: Deploy & Live Testing** - Deploy to hpg6 and run all live capability tests (TST-01 through TST-12)
 
 ## Phase Details
@@ -215,7 +215,7 @@ Plans:
   3. Skill accurately reflects the full action surface available to the agent post-v1.19
 **Plans**: 1 plan
 Plans:
-- [ ] 51-01-PLAN.md — Deploy whatsapp-messenger v2.0.0 skill + plugin SKILL.md v6.0.0 to SIMPC and hpg6
+- [x] 51-01-PLAN.md — Deploy whatsapp-messenger v2.0.0 skill + plugin SKILL.md v6.0.0 to SIMPC and hpg6
 
 ### Phase 52: Deploy & Live Testing
 **Goal**: All v1.19 changes are deployed to production and every live test passes on real WhatsApp
@@ -246,5 +246,5 @@ Plans:
 | 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
 | 49. Modular Skill Architecture | 2/2 | Complete    | 2026-03-26 |
 | 50. Skill Creator & Evals | 1/1 | Complete    | 2026-03-26 |
-| 51. Claude Code Skill Update | 0/1 | Not started | - |
+| 51. Claude Code Skill Update | 1/1 | Complete   | 2026-03-26 |
 | 52. Deploy & Live Testing | 0/TBD | Not started | - |

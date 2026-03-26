@@ -23,7 +23,7 @@
 - [x] **SKL-03**: Each sub-file has action table with parameters, task-oriented examples, and gotchas
 - [x] **SKL-04**: Anthropic skill-creator used to structure files and write evals
 - [x] **SKL-05**: Evals verify agent can find correct action, use correct params, handle errors
-- [ ] **SKL-06**: whatsapp-messenger Claude Code skill updated to match new structure
+- [x] **SKL-06**: whatsapp-messenger Claude Code skill updated to match new structure
 - [x] **SKL-07**: Document vCard (contacts) and iCal (calendar events) file-based approaches in skill — the agent sends .vcf files for contacts and .ics files for events
 
 ### Live Testing
@@ -73,7 +73,7 @@
 | SKL-07 | Phase 49 | Complete |
 | SKL-04 | Phase 50 | Complete |
 | SKL-05 | Phase 50 | Complete |
-| SKL-06 | Phase 51 | Pending |
+| SKL-06 | Phase 51 | Complete |
 | TST-01 | Phase 52 | Pending |
 | TST-02 | Phase 52 | Pending |
 | TST-03 | Phase 52 | Pending |
