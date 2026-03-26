@@ -4,6 +4,42 @@
 
 > **Important:** Slash commands are NOT AI-invoked actions. They are processed **before** the message reaches the LLM. The agent cannot call these programmatically — they are sent as WhatsApp messages by authorized humans.
 
+## Actions
+
+Slash commands are sent as WhatsApp messages by authorized humans — they are not callable by the AI.
+
+| Command | Syntax | Effect |
+|---------|--------|--------|
+| `/join` | `/join <link or name>` | Join a group via invite link or name search |
+| `/leave` | `/leave <name>` | Leave a group or unfollow a channel |
+| `/list` | `/list [groups\|channels]` | List current group and channel memberships |
+| `/shutup` | `/shutup` | Interactively mute the bot in selected groups |
+| `/unshutup` | `/unshutup` | Interactively unmute the bot in selected groups |
+| `/activation` | `/activation` | Toggle group activation mode (mention ↔ always) |
+
+## Examples
+
+### Join a group by invite link
+```
+/join https://chat.whatsapp.com/AbcXyz123456
+```
+
+### Leave a group by name
+```
+/leave dev team
+```
+
+### List all memberships
+```
+/list
+```
+
+### Mute the bot in a group
+```
+/shutup
+```
+Bot replies with a numbered group list — reply with the number to mute.
+
 ## Overview
 
 Slash commands give owners direct control over the bot without going through the AI. They are processed at the inbound message handler layer and never reach the LLM.

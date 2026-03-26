@@ -1,256 +1,91 @@
 ---
 name: whatsapp-actions
 description: Use when the user asks to send a WhatsApp message, create a poll, share a location, manage groups, send a contact card, forward a message, react to a message, pin a message, edit or delete a message, create an event, manage labels, post a status/story, manage channels, join a group, follow a channel, change profile, block/unblock contacts, or perform any WhatsApp action through WAHA.
-version: 5.0.0
+version: 6.0.0
 ---
 
 > **IMPORTANT — Standard Action Names**: For targeted actions, use: `poll`, `send`, `edit`, `unsend`, `pin`/`unpin`, `read`, `react`. Do NOT use custom names like sendPoll, editMessage — they will be rejected.
 
-# Quick Reference
+# WhatsApp Actions — Skill Index
 
-| Task | Action | Key Parameters |
-|------|--------|---------------|
-| Send text | `send` | text (via target resolution) |
-| Send to multiple chats | `sendMulti` | recipients[], text |
-| Send contact card | `send` | contacts: [{fullName, phoneNumber}] |
-| Create poll | `poll` | name, options[], multipleAnswers |
-| Send image | `sendImage` | chatId, file (direct URL), caption? |
-| Send video | `sendVideo` | chatId, file (direct URL), caption? |
-| Send document | `sendFile` | chatId, file (direct URL), caption? |
-| Send link preview | `sendLinkPreview` | chatId, url, title, description? |
-| React to message | `react` | messageId, emoji |
-| Join group | `joinGroup` | inviteCode (part after chat.whatsapp.com/) |
-| Follow channel | `followChannel` | channelId (newsletter JID) |
-| Unfollow channel | `unfollowChannel` | channelId |
-| Share location | `sendLocation` | chatId, latitude, longitude, title |
-| Create group event | `sendEvent` | chatId, name, startTime |
-| Mute/unmute chat | `muteChat`/`unmuteChat` | chatId, duration? |
-| Read recent messages | `readMessages` | chatId, limit? (1-50, default 10) |
-| Search/list | `search` | query, scope ("group"\|"contact"\|"channel"\|"auto") |
-| Discover channels | `searchChannelsByText` / `getChannels` | query / (none) |
+The plugin auto-resolves human-readable names (group names, contact names) to WhatsApp JIDs automatically. Standard actions (`send`, `poll`, `react`, `edit`, `unsend`, `pin`, `unpin`, `read`, `delete`, `reply`) support target resolution. Utility actions require an explicit `chatId` or `groupId` parameter. Each category file below has the full action table, examples, and gotchas.
+
+## Category Files
+
+| Category | File | Key Actions |
+|----------|------|-------------|
+| Messaging & Rich Messages | [skills/messaging.md](skills/messaging.md) | send, poll, react, reply, sendEvent, sendLocation, readMessages |
+| Groups | [skills/groups.md](skills/groups.md) | createGroup, addParticipants, joinGroup, getInviteCode |
+| Contacts | [skills/contacts.md](skills/contacts.md) | getContacts, blockContact, sendContactVcard, createOrUpdateContact |
+| Channels (Newsletters) | [skills/channels.md](skills/channels.md) | followChannel, searchChannelsByText, createChannel |
+| Chat Management | [skills/chats.md](skills/chats.md) | archiveChat, getChatMessages, muteChat, labels |
+| Status / Stories | [skills/status.md](skills/status.md) | sendTextStatus, sendImageStatus, deleteStatus |
+| Presence | [skills/presence.md](skills/presence.md) | setPresenceStatus, setPresence, getPresence, subscribePresence |
+| Profile | [skills/profile.md](skills/profile.md) | getProfile, setProfileName, setProfilePicture |
+| Media + Utilities | [skills/media.md](skills/media.md) | sendImage, sendVideo, sendFile, convertVoice, LID lookups |
+| Slash Commands | [skills/slash-commands.md](skills/slash-commands.md) | /join, /leave, /list, /shutup |
 
 ---
 
-# Auto-Resolution (Preferred)
-
-Use human-readable names directly as targets in send/poll/edit/unsend/pin/unpin/read. The plugin fuzzy-matches names to JIDs automatically.
+## Quick Start
 
 ```
+// Send a text message (auto-resolves name to JID)
 Action: send  |  Target: "test group"  |  Parameters: { "text": "hello world" }
-Action: poll  |  Target: "test group"  |  Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
-Action: send  |  Target: "zeev nesher" |  Parameters: { "text": "Hey Zeev!" }
+
+// Send to multiple recipients
+Action: sendMulti
+Parameters: { "recipients": ["972544329000@c.us", "120363421825201386@g.us"], "text": "hello" }
+
+// Send an image
+Action: sendImage
+Parameters: { "chatId": "120363421825201386@g.us", "file": "https://example.com/photo.jpg", "caption": "Look!" }
+
+// Create a poll
+Action: poll  |  Target: "test group"
+Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
+
+// Read recent messages for context
+Action: readMessages
+Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
+
+// Search for a group by name
+Action: search
+Parameters: { "query": "dev team", "scope": "group" }
 ```
 
-If the name is ambiguous, you'll get an error listing possible matches — ask the user which one they meant.
+---
 
-## search Action
+## Auto-Resolution (Preferred)
 
-Use `search` to find groups, contacts, or channels by name. **No target — parameters only.**
+Use human-readable names as targets in send/poll/edit/unsend/pin/unpin/read. The plugin fuzzy-matches names to JIDs automatically.
 
+```
+Action: send  |  Target: "test group"   |  Parameters: { "text": "hello" }
+Action: send  |  Target: "zeev nesher"  |  Parameters: { "text": "Hey Zeev!" }
+```
+
+If the name is ambiguous you'll get an error listing possible matches — ask the user which one they meant.
+
+**`search` action** — find groups/contacts/channels by name. No target — parameters only:
 ```
 Action: search
 Parameters: { "query": "test group", "scope": "group" }
 ```
-
-- `query`: Name or partial name. Empty string = list all.
-- `scope`: `"group"`, `"contact"`, `"channel"`, or `"auto"` (all three)
-- Returns: `{ matches: [{jid, name, type, confidence}], query, searchedTypes }`
-- `resolveTarget` is an alias for `search` — same rules apply.
-
-**CRITICAL:** `search` does NOT accept a target. If user says "list all Hebrew groups", search with `query: ""`, `scope: "group"`, then filter results. Multiple matches with similar confidence → ask the user.
+`scope`: `"group"` | `"contact"` | `"channel"` | `"auto"` (all). Empty `query` = list all.
 
 ---
-
-# Sending Contact Cards (vCards)
-
-Use `send` with `contacts` parameter (preferred, uses target resolution):
-```
-Action: send
-Parameters: { "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }] }
-```
-Multiple contacts: add more objects to the array. Optional field: `organization`.
-Alternative: `sendContactVcard` action (requires explicit chatId).
-**Rule:** `phoneNumber` uses country code + number, **no + prefix**.
-
----
-
-# Sending Media
-
-| Action | Use For | Parameters |
-|--------|---------|-----------|
-| `sendImage` | JPEG, PNG, GIF, WebP | chatId, file, caption? |
-| `sendVideo` | MP4, WebM, MOV, AVI | chatId, file, caption? |
-| `sendFile` | PDFs, documents, other | chatId, file, caption? |
-
-**IMPORTANT:** `file` must be a direct media URL (not a JSON API endpoint). Extract the actual URL if fetching from an API. Local files: use absolute path (e.g., `/tmp/openclaw/image.png`). Alternative param names: `image`/`url` for sendImage, `video`/`url` for sendVideo, `url` for sendFile.
-
----
-
-# WhatsApp Actions Reference
-
-## Rich Messages
-
-| Action | Parameters | Notes |
-|--------|-----------|-------|
-| `poll` | chatId, name, options[], multipleAnswers | Standard action w/ target resolution |
-| `sendPollVote` | chatId, pollMessageId, votes[] | Vote on existing poll |
-| `sendLocation` | chatId, latitude, longitude, title | |
-| `sendContactVcard` | chatId, contacts[{fullName, phoneNumber}] | |
-| `sendList` | chatId, title, description, buttonText, sections[] | |
-| `forwardMessage` | chatId, messageId | |
-| `sendLinkPreview` | chatId, url, title, description?, image? | |
-| `sendButtonsReply` | chatId, messageId, buttonId | |
-| `sendEvent` | chatId, name, startTime, endTime?, description?, location? | |
-| `react` | messageId, emoji, remove? | |
-
-## Message Management
-
-| Action | Parameters |
-|--------|-----------|
-| `edit` | chatId, messageId, text |
-| `unsend` | chatId, messageId |
-| `pin` / `unpin` | chatId, messageId |
-| `starMessage` | chatId, messageId, star (boolean) |
-
-## Chat Management
-
-| Action | Parameters |
-|--------|-----------|
-| `getChats` / `getChatsOverview` | (none) / page?, limit? |
-| `getChatMessages` | chatId, limit?, offset?, downloadMedia? |
-| `getChatMessage` | chatId, messageId |
-| `deleteChat` / `clearChatMessages` | chatId |
-| `archiveChat` / `unarchiveChat` | chatId |
-| `read` / `unreadChat` | chatId |
-| `getChatPicture` | chatId |
-| `muteChat` | chatId, duration? (seconds) |
-| `unmuteChat` | chatId |
-| `readMessages` | chatId, limit? (1-50, default 10) |
-| `sendMulti` | recipients[], text |
-
-## Group Management
-
-| Action | Parameters | Notes |
-|--------|-----------|-------|
-| `createGroup` | name, participants[] | |
-| `getGroups` / `getGroupsCount` | (none) | |
-| `getGroup` | groupId | |
-| `deleteGroup` / `leaveGroup` | groupId | |
-| `getGroupJoinInfo` | groupId | Preview group details before joining via invite link |
-| `refreshGroups` | (none) | Force-refresh groups list from WAHA server |
-| `setGroupSubject` | groupId, subject | |
-| `setGroupDescription` | groupId, description | |
-| `setGroupPicture` / `deleteGroupPicture` / `getGroupPicture` | groupId, file? | |
-| `addParticipants` / `removeParticipants` | groupId, participants[] | |
-| `promoteToAdmin` / `demoteFromAdmin` | groupId, participants[] | |
-| `getParticipants` | groupId | |
-| `setInfoAdminOnly` / `getInfoAdminOnly` | groupId, adminOnly? | |
-| `setMessagesAdminOnly` / `getMessagesAdminOnly` | groupId, adminOnly? | |
-| `getInviteCode` | groupId | Returns `{ inviteCode, inviteLink }` — inviteLink is the full `https://chat.whatsapp.com/...` URL ready to share |
-| `revokeInviteCode` | groupId | Revokes current link and returns a new `{ inviteCode, inviteLink }` |
-| `joinGroup` | inviteCode | inviteCode is the part AFTER `chat.whatsapp.com/` (e.g. `"AbcXyz123..."`) — NOT the full URL |
-
-### Invite Links — Examples
-
-```
-// Get the invite link for a group (use getGroup or search first to find the groupId)
-Action: getInviteCode
-Parameters: { "groupId": "120363421825201386@g.us" }
-// Returns: { "inviteCode": "AbcXyz123...", "inviteLink": "https://chat.whatsapp.com/AbcXyz123..." }
-
-// Share the link with a user
-Action: send
-Target: zeev nesher
-Parameters: { "text": "Here's the link: https://chat.whatsapp.com/AbcXyz123..." }
-
-// Revoke (invalidate) the current link and get a fresh one
-Action: revokeInviteCode
-Parameters: { "groupId": "120363421825201386@g.us" }
-
-// Join a group using the invite code (extract from URL: everything after chat.whatsapp.com/)
-Action: joinGroup
-Parameters: { "inviteCode": "AbcXyz123..." }
-```
-
-## Contacts
-
-| Action | Parameters |
-|--------|-----------|
-| `getContacts` | (none) |
-| `getContact` / `getContactAbout` / `getContactPicture` | contactId |
-| `checkContactExists` | phone |
-| `blockContact` / `unblockContact` | contactId |
-
-## Labels
-
-| Action | Parameters |
-|--------|-----------|
-| `getLabels` | (none) |
-| `createLabel` | name, color? |
-| `updateLabel` | labelId, name?, color? |
-| `deleteLabel` | labelId |
-| `getChatLabels` / `setChatLabels` | chatId, labels[{id}]? |
-| `getChatsByLabel` | labelId |
-
-## Status/Stories
-
-| Action | Parameters |
-|--------|-----------|
-| `sendTextStatus` | text, backgroundColor?, font? |
-| `sendImageStatus` / `sendVideoStatus` | image/video, caption? |
-| `sendVoiceStatus` | voice |
-| `deleteStatus` | id |
-
-## Channels (Newsletters)
-
-| Action | Parameters |
-|--------|-----------|
-| `getChannels` / `getChannel` | (none) / channelId |
-| `createChannel` | name, description?, picture? |
-| `deleteChannel` / `followChannel` / `unfollowChannel` | channelId |
-| `muteChannel` / `unmuteChannel` | channelId |
-| `searchChannelsByText` | query |
-| `searchChannelsByView` | viewType (e.g. "RECOMMENDED") — search channels by view criteria |
-| `getChannelSearchViews` | (none) — list available view types for channel search |
-| `getChannelSearchCountries` | (none) — list countries for channel search filter |
-| `getChannelSearchCategories` | (none) — list categories for channel search filter |
-| `previewChannelMessages` | channelId |
-
-## Presence & Profile
-
-| Action | Parameters |
-|--------|-----------|
-| `setPresenceStatus` | status ("online"/"offline") |
-| `getPresence` / `subscribePresence` | contactId |
-| `getAllPresence` | (none) — get presence status for all subscribed contacts at once |
-| `getProfile` / `deleteProfilePicture` | (none) |
-| `setProfileName` | name |
-| `setProfileStatus` | status |
-| `setProfilePicture` | file |
-
-## LID & Calls
-
-| Action | Parameters |
-|--------|-----------|
-| `findPhoneByLid` | lid |
-| `findLidByPhone` | phone |
-| `getAllLids` | (none) |
-| `rejectCall` | callId |
 
 ## Parameter Formats
-- **chatId**: `"972XXXXXXXXX@c.us"` (DM), `"120363...@g.us"` (group), `"...@newsletter"` (channel)
-- **Phone numbers**: Country code + number, no +. Example: `"972544329000"`
-- **messageId**: Full serialized: `true_chatId_shortMsgId` or `false_chatId_shortMsgId`
-- **groupId**: Same as group chatId. **channelId**: Newsletter JID.
 
-## Known Engine Behaviors
-- NOWEB engine drops >95% of poll.vote webhook events
-- sendButtons is deprecated — use polls or lists instead
-- Event RSVPs arrive as `[event_rsvp]` messages
+- **chatId**: `"972XXXXXXXXX@c.us"` (DM), `"120363...@g.us"` (group), `"...@newsletter"` (channel)
+- **Phone numbers**: Country code + number, no `+`. Example: `"972544329000"`
+- **messageId**: Full serialized: `true_chatId_shortMsgId` or `false_chatId_shortMsgId`
+- **groupId**: Same format as group chatId. **channelId**: Newsletter JID (`...@newsletter`).
 
 ---
 
-# Error Handling and Recovery
+## Error Handling and Recovery
 
 | Error Pattern | Cause | Recovery |
 |---------------|-------|----------|
@@ -258,29 +93,25 @@ Parameters: { "inviteCode": "AbcXyz123..." }
 | `"Could not resolve '...' to a WhatsApp JID"` | Name not found | Run `search` first, retry with exact JID |
 | `"Ambiguous target '...'. Possible matches: ..."` | Multiple matches | Ask user which one, or use exact JID |
 | `"WAHA API rate limited (429)"` | Too many requests | Plugin auto-retries 3x with backoff (1s/2s/4s). If still failing, wait 5-10s |
-| `"timed out after Xms"` | WAHA unresponsive | Timeout is configurable via `timeoutMs` config (default 30s). Mutation ops may have succeeded despite timeout |
-| `"aborted — session ... is unhealthy (circuit breaker)"` | Session disconnected | No retries attempted. Reconnect session in WAHA dashboard first |
+| `"timed out after Xms"` | WAHA unresponsive | Timeout configurable via `timeoutMs` (default 30s). Mutation ops may have succeeded despite timeout |
+| `"aborted — session ... is unhealthy (circuit breaker)"` | Session disconnected | Reconnect session in WAHA dashboard first |
 | `"Session health: unhealthy"` | WhatsApp disconnected | All outbound calls fast-fail until session reconnects. Check admin panel Status tab |
 
-**General:** Failed sends → verify JID with `search`. Multiple failures → check Status tab. Many timeouts → space out actions.
+**General:** Failed sends → verify JID with `search`. Multiple failures → check Status tab.
 
 ---
 
-# Rate Limiting
+## Rate Limiting
 
-Token-bucket rate limiter: 20 tokens capacity, 15 tokens/sec refill. Each API call = 1 token. Overflow is queued. HTTP 429 triggers auto-retry with exponential backoff (1s/2s/4s, 3 attempts).
+Token-bucket: 20 tokens capacity, 15 tokens/sec refill. Each API call = 1 token. Overflow is queued. HTTP 429 triggers auto-retry with exponential backoff (1s/2s/4s, 3 attempts).
 
 Config: `rateLimitCapacity` (default 20), `rateLimitRefillRate` (default 15) in `channels.waha`.
 
-**For the agent:** Rate limiting is automatic. No delays needed between actions. For bulk sends, use `sendMulti` instead of looping.
-
-**Multi-account:** Each account has its own independent token bucket. One busy account cannot starve others.
+Rate limiting is automatic — no delays needed. For bulk sends, use `sendMulti`. Each account has its own independent token bucket.
 
 ---
 
-# Multi-Session
-
-## Session Roles
+## Multi-Session
 
 | Role | Sub-Role | Sends? | Receives? | Purpose |
 |------|----------|--------|-----------|---------|
@@ -288,286 +119,27 @@ Config: `rateLimitCapacity` (default 20), `rateLimitRefillRate` (default 15) in 
 | `human` | `listener` | No | Monitored chats | Monitor-only human session |
 | `human` | `full-access` | Yes | Yes | Human session with send access |
 
-**Key rule:** Only `full-access` sessions can send. `listener` sessions fail with an error on send attempts.
+Only `full-access` sessions can send. `listener` sessions fail with an error on send attempts.
 
-## Trigger Word Activation
+**Trigger word:** When `triggerWord` is set (e.g., `"!bot"`), the bot only activates in groups when messages start with that word. `triggerResponseMode`: `"dm"` (default) or `"group"`.
 
-When `triggerWord` is configured (e.g., `"!bot"`), the bot only activates in groups when a message starts with that word. `triggerResponseMode`: `"dm"` (default, replies via DM) or `"group"` (replies in-group).
-
-## readMessages
-
-**IMPORTANT:** `readMessages` does NOT accept a target — pass chat as `chatId` parameter. Use `search` to find JIDs by name.
-
-```
-Action: readMessages
-Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
-```
-
-Returns array of recent messages with sender, text, timestamp, type.
-
-## Cross-Session Routing
-
-Automatic — the bot uses its own session for groups it belongs to, falls back to human session as proxy otherwise. No manual session selection needed.
+**Cross-session routing** is automatic — the bot uses its own session for groups it belongs to.
 
 ---
 
-# Access Control & Policies
+## Access Control
 
-## DM Policy
-
-Controls who can message the bot in direct messages.
+**DM Policy** (`dmPolicy`):
 
 | Mode | Behavior |
 |------|----------|
 | `pairing` | Default. Unknown senders receive a pairing code challenge. |
-| `allowlist` | Only contacts in `allowFrom` can message. Others are silently blocked. |
+| `allowlist` | Only contacts in `allowFrom` can message. Others silently blocked. |
 | `open` | Anyone can message. Requires `allowFrom: ["*"]`. |
 | `disabled` | All DMs blocked. |
 
-## Group Policy
+**Group Policy** (`groupPolicy`): `open` (anyone in allowed groups) | `allowlist` (sender must be in `groupAllowFrom`) | `disabled`.
 
-Two independent layers control group inbound messages:
+**God Mode:** `godModeSuperUsers` JIDs bypass all filters. Always processed regardless of policy.
 
-1. **Group membership allowlist** (`allowedGroups`) — which groups the bot listens to
-2. **Group sender policy** (`groupPolicy` + `groupAllowFrom`) — who within allowed groups can trigger the bot
-
-| `groupPolicy` | Behavior |
-|----------------|----------|
-| `open` | Sender allowlist bypassed — anyone in allowed groups can trigger the bot |
-| `allowlist` | Sender must be in `groupAllowFrom` |
-| `disabled` | All group inbound blocked |
-
-## God Mode
-
-Superusers bypass all DM and group filters. Configured via `godModeSuperUsers` in config (list of JIDs). Messages from superusers are always processed regardless of policy settings.
-
-## Can Initiate
-
-Controls whether the bot can start new conversations (send first message to contacts it hasn't talked to before).
-
-- `canInitiateGlobal`: default setting for all contacts
-- Per-contact overrides available in the directory
-
----
-
-# Group Activation & Mentions
-
-## Activation Modes
-
-| Mode | Behavior |
-|------|----------|
-| `mention` | Default. Bot only replies when explicitly mentioned or replied to. |
-| `always` | Bot evaluates every message in the group. |
-
-## Mention Detection
-
-The bot considers itself "mentioned" when any of these are true:
-- Explicit WhatsApp @mention of the bot's number
-- Message matches a configured mention regex pattern (e.g., "sammie", "bot")
-- Message is a reply to a previous bot message
-
-## `/activation` Command
-
-Owner-only command sent in a group to switch between `mention` and `always` modes. Takes effect immediately for that group.
-
-## Group Context
-
-Group messages include additional context fields injected into the conversation:
-- `ChatType=group` — identifies this as a group conversation
-- `GroupSubject` — the group name
-- `GroupMembers` — list of participants
-- `WasMentioned` — whether the bot was mentioned in this message
-
-## Pending History
-
-On the bot's first turn in a group conversation, up to 50 recent messages are injected as context so the bot understands the ongoing discussion.
-
----
-
-# Message Delivery Behavior
-
-## Text Chunking
-
-Messages exceeding `textChunkLimit` (default 4000 characters) are automatically split into multiple WhatsApp messages.
-
-| `chunkMode` | Behavior |
-|-------------|----------|
-| `length` | Split at the character limit |
-| `newline` | Split at newline boundaries near the limit |
-
-## Debouncing
-
-Rapid consecutive incoming messages are batched into a single turn to avoid fragmented responses.
-
-- Default debounce window: 5000ms for WhatsApp
-- Media/attachments flush immediately (no debounce)
-- Control commands (like `/activation`) bypass debouncing
-
-## Read Receipts
-
-Sent automatically by default. Skipped for self-chat (messages to yourself).
-
-## Ack Reactions
-
-Configurable emoji reaction (e.g., eyes emoji) sent when a message is received, confirming the bot saw it.
-
-- Can be configured separately for DM and group contexts
-- Group ack modes: `"always"` | `"mentions"` | `"never"`
-
-## Media Handling
-
-- **Voice notes**: `audio/ogg` is automatically rewritten to `audio/ogg; codecs=opus` for proper voice bubble display in WhatsApp
-- **GIF playback**: Videos sent with `gifPlayback: true` display as animated GIFs
-- **Media size limit**: `mediaMaxMb` default 50MB, per-account overrides available
-
----
-
-# Group Membership Events
-
-When contacts join or leave groups, the plugin fires synthetic inbound messages so the agent is aware of membership changes:
-
-- `[group_join] 972544329000@c.us joined group 120363421825201386@g.us`
-- `[group_leave] 972544329000@c.us left group 120363421825201386@g.us`
-
-These are delivered as regular messages to the agent with `chatId` set to the group JID and `from` set to the participant JID. The directory is automatically updated when participants join.
-
----
-
-# API Keys Management
-
-Manage WAHA server-level API keys programmatically. These are server-scoped (not session-scoped).
-
-| Action | Parameters | Description |
-|--------|-----------|-------------|
-| `getApiKeys` | (none) | List all API keys on the WAHA server |
-| `createApiKey` | `name` | Create a new API key |
-| `updateApiKey` | `keyId`, `name?` | Update an existing API key |
-| `deleteApiKey` | `keyId` | Delete an API key |
-
-```
-Action: getApiKeys
-Parameters: {}
-
-Action: createApiKey
-Parameters: { "name": "my-key" }
-
-Action: deleteApiKey
-Parameters: { "keyId": "key-id-here" }
-```
-
----
-
-# Broadcast Groups
-
-Multiple agents can process the same incoming message simultaneously.
-
-- Configured in the top-level `broadcast` config section
-- Each agent has its own isolated session, conversation history, workspace, tools, and memory
-- Broadcast evaluation happens after channel allowlists and group activation checks
-- Currently a WhatsApp-only feature
-
----
-
-# Pairing Flow
-
-When `dmPolicy` is set to `pairing`, unknown contacts receive a pairing challenge instead of being silently blocked.
-
-- Pairing codes: 8 characters, uppercase alphanumeric
-- Codes expire after 1 hour
-- Maximum 3 pending pairing requests per channel at a time
-- After successful pairing, the contact is automatically added to `allowFrom`
-- Account-scoped: non-default accounts maintain separate pairing state
-
----
-
-# Session Keys & Routing
-
-## Session Key Format
-
-| Context | Session Key Pattern |
-|---------|-------------------|
-| DM | `agent:<agentId>:main` (all DMs collapsed into one session) |
-| Group | `agent:<agentId>:whatsapp:group:<groupJid>` (isolated per group) |
-
-Each group maintains its own conversation history and context, separate from DMs and other groups.
-
-## Agent Routing Priority
-
-When a message arrives, the system determines which agent handles it using this priority:
-
-1. Exact peer match (specific contact assigned to specific agent)
-2. Parent peer match
-3. Account match
-4. Channel match
-5. Default agent
-
----
-
-# /join, /leave, /list Commands
-
-Owner-only slash commands to join/leave groups and channels and list memberships — processed **before** the LLM, no AI involvement.
-
-**Authorization:** Same gate as `/shutup` — godModeSuperUsers and allowFrom. Unauthorized callers receive "You are not authorized to use this command."
-
-## /join
-
-Join a group by invite link or by name.
-
-| Variant | Syntax | Behavior |
-|---------|--------|----------|
-| Invite link | `/join https://chat.whatsapp.com/AbcXyz123` | Extracts the code, calls joinGroup API, replies "Joined group ✓" |
-| Raw invite code | `/join AbcXyz123...` (22+ alphanumeric chars) | Same as above |
-| By name | `/join test group` | Fuzzy-searches groups the bot already belongs to — if found, replies "Already a member of <name>" |
-| Ambiguous name | `/join dev` (multiple matches) | Lists numbered candidates; user replies with a number to confirm |
-
-> **Note:** Name-based `/join` only finds groups the bot already belongs to (WAHA only returns visible groups). To join a truly new group, always use the invite link.
-
-## /leave
-
-Leave a group or channel by name.
-
-| Syntax | Behavior |
-|--------|----------|
-| `/leave test group` | Fuzzy-searches groups and channels; leaves immediately on single high-confidence match |
-| `/leave dev` (ambiguous) | Lists numbered candidates; user replies with a number to confirm |
-
-- Groups: calls `leaveGroup` API
-- Channels/newsletters: calls `unfollowChannel` API
-- On success: replies `Left "<name>" ✓`
-
-## /list
-
-List groups and channels the bot is a member of.
-
-| Command | Output |
-|---------|--------|
-| `/list` | All groups + all channels |
-| `/list groups` | Groups only |
-| `/list channels` | Channels/newsletters only |
-
-Results are sorted alphabetically and numbered. Example:
-
-```
-Groups (3):
-1. Dev Team
-2. Family Chat
-3. Test Group
-
-Channels (1):
-1. Announcements
-```
-
----
-
-# /shutup and /unshutup Commands
-
-Owner-only commands to mute/unmute the bot in groups.
-
-| Command | Behavior |
-|---------|----------|
-| `/shutup` | Interactive flow: pick groups from a list, set mute duration |
-| `/unshutup` | Unmute the bot in selected groups |
-
-- Muted groups are stored persistently (survives restarts)
-- While muted, the bot ignores all messages in that group (including mentions)
-- When the bot sends messages on behalf of a human session, messages are prefixed with a robot emoji to distinguish them from human messages
+**Can Initiate:** `canInitiateGlobal` controls whether the bot can start new conversations. Per-contact overrides available in the directory.
