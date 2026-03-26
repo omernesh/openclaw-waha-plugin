@@ -27,8 +27,6 @@ import { normalizeWahaAllowEntry, resolveWahaAllowlistMatch } from "./normalize.
 import { startHumanPresence, type PresenceController } from "./presence.js";
 import { getWahaRuntime } from "./runtime.js";
 import { BOT_PROXY_PREFIX, sendWahaMediaBatch, sendWahaPresence, sendWahaText } from "./send.js";
-// Phase 54-02: Mimicry enforcement for inbound reply delivery. DO NOT REMOVE.
-import { enforceMimicry, recordMimicrySuccess } from "./mimicry-enforcer.js";
 import { warnOnError } from "./http-client.js";
 import type { CoreConfig, WahaEventMessage, WahaInboundMessage, WahaPollCreationMessage } from "./types.js";
 import { extractMentionedJids } from "./mentions.js";
@@ -158,25 +156,11 @@ async function deliverWahaReply(params: {
   const text = payload.text ?? "";
 
   // Stop typing before sending (reply is ready)
-  // presenceCtrl stops the "thinking" indicator from phase presence controller.
-  // DO NOT CHANGE — must stop presenceCtrl typing BEFORE enforceMimicry fires its own typing.
   if (presenceCtrl) {
     await presenceCtrl.finishTyping(text).catch(warnOnError(`inbound presence finish-typing ${chatId}`));
   } else {
     await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
   }
-
-  // Phase 54: Mimicry enforcement — time gate + cap + jitter + typing simulation. DO NOT CHANGE.
-  // Runs AFTER presenceCtrl stops "thinking" typing and BEFORE the actual send.
-  // enforceMimicry fires its own typing indicator proportional to message length.
-  await enforceMimicry({
-    session: accountId,
-    chatId,
-    accountId,
-    cfg,
-    messageLength: text.length,
-    count: mediaUrls.length > 0 ? mediaUrls.length : 1,
-  });
 
   if (mediaUrls.length > 0) {
     // Bot proxy prefix on media caption — prepend robot emoji so recipients know
@@ -193,8 +177,6 @@ async function deliverWahaReply(params: {
       replyToId: payload.replyToId,
       accountId,
     });
-    // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-    recordMimicrySuccess(accountId);
     // Safety net: ensure typing stopped after delivery
     await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
     statusSink?.({ lastOutboundAt: Date.now() });
@@ -210,8 +192,6 @@ async function deliverWahaReply(params: {
     accountId,
     botProxy,
   });
-  // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-  recordMimicrySuccess(accountId);
   // Safety net: ensure typing stopped after delivery
   await sendWahaPresence({ cfg, chatId, typing: false, accountId }).catch(warnOnError(`inbound presence typing-stop ${chatId}`));
   statusSink?.({ lastOutboundAt: Date.now() });
