@@ -133,7 +133,9 @@ Plans:
   2. A Claude Code send that would exceed the hourly cap is rejected by the proxy endpoint with a clear error, not forwarded to WAHA
   3. A Claude Code send inside the window and under cap triggers a typing indicator proportional to message length before the message is delivered
   4. The whatsapp-messenger skill routes all sends through the proxy endpoint instead of calling WAHA directly
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 55-01-PLAN.md — Proxy-send endpoint in monitor.ts + update whatsapp-messenger SKILL.md
 
 ### Phase 56: Adaptive Activity Patterns
 **Goal**: The system learns per-chat active hours from message history and automatically aligns send gates to observed human activity patterns
@@ -164,6 +166,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 53. MimicryGate Core | 2/2 | Complete    | 2026-03-26 |
 | 54. Send Pipeline Enforcement | 2/2 | Complete    | 2026-03-26 |
-| 55. Claude Code Integration | 0/? | Not started | - |
+| 55. Claude Code Integration | 0/1 | Not started | - |
 | 56. Adaptive Activity Patterns | 0/? | Not started | - |
 | 57. Admin UI & Observability | 0/? | Not started | - |
