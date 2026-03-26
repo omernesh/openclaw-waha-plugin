@@ -119,7 +119,10 @@ Plans:
   3. The `/shutup`, `/join`, and `/leave` commands bypass the gate and cap enforcements via `bypassPolicy` flag
   4. Consecutive sends from the queue have 3-8 second jittered delays between them (drain rate throttling)
   5. Inter-message delays include random variance of +/-30-50% of base delay so timing is not mechanically uniform
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 54-01-PLAN.md — enforceMimicry chokepoint + recordMimicrySuccess (TDD in mimicry-enforcer.ts)
+- [ ] 54-02-PLAN.md — Wire enforcement into send.ts + inbound.ts send paths
 
 ### Phase 55: Claude Code Integration
 **Goal**: Sends from the whatsapp-messenger Claude Code skill are subject to the same time gate, hourly cap, and typing simulation as agent sends
@@ -160,7 +163,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 53. MimicryGate Core | 2/2 | Complete    | 2026-03-26 |
-| 54. Send Pipeline Enforcement | 0/? | Not started | - |
+| 54. Send Pipeline Enforcement | 0/2 | Planned | - |
 | 55. Claude Code Integration | 0/? | Not started | - |
 | 56. Adaptive Activity Patterns | 0/? | Not started | - |
 | 57. Admin UI & Observability | 0/? | Not started | - |
