@@ -26,7 +26,7 @@ decisions:
 metrics:
   duration_seconds: 7200
   completed_date: "2026-03-26"
-  tasks_completed: 1
+  tasks_completed: 2
   tasks_total: 2
   files_changed: 0
 ---
@@ -39,7 +39,8 @@ metrics:
 
 | Task | Name | Commit | Files |
 |------|------|--------|-------|
-| 1 | Run all 12 live test scenarios via WAHA API | (no local changes) | hpg6 live tests only |
+| 1 | Run all 12 live test scenarios via WAHA API | 2e5a6e7 | hpg6 live tests only |
+| 2 | Human verification checkpoint | 5582f47 | User approved all test results |
 
 ## Test Results
 
