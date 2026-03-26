@@ -80,38 +80,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GATE-01 | — | Pending |
-| GATE-02 | — | Pending |
-| GATE-03 | — | Pending |
-| GATE-04 | — | Pending |
-| CAP-01 | — | Pending |
-| CAP-02 | — | Pending |
-| CAP-03 | — | Pending |
-| CAP-04 | — | Pending |
-| CAP-05 | — | Pending |
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
-| CC-01 | — | Pending |
-| CC-02 | — | Pending |
-| BEH-01 | — | Pending |
-| BEH-02 | — | Pending |
-| BEH-03 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| ADAPT-01 | — | Pending |
-| ADAPT-02 | — | Pending |
-| ADAPT-03 | — | Pending |
-| ADAPT-04 | — | Pending |
-| ADAPT-05 | — | Pending |
+| GATE-01 | Phase 53 | Pending |
+| GATE-02 | Phase 53 | Pending |
+| GATE-03 | Phase 53 | Pending |
+| GATE-04 | Phase 53 | Pending |
+| CAP-01 | Phase 53 | Pending |
+| CAP-02 | Phase 53 | Pending |
+| CAP-03 | Phase 53 | Pending |
+| CAP-04 | Phase 53 | Pending |
+| CAP-05 | Phase 53 | Pending |
+| INFRA-01 | Phase 53 | Pending |
+| INFRA-02 | Phase 53 | Pending |
+| INFRA-03 | Phase 53 | Pending |
+| INFRA-04 | Phase 53 | Pending |
+| CC-01 | Phase 55 | Pending |
+| CC-02 | Phase 55 | Pending |
+| BEH-01 | Phase 54 | Pending |
+| BEH-02 | Phase 54 | Pending |
+| BEH-03 | Phase 54 | Pending |
+| UI-01 | Phase 57 | Pending |
+| UI-02 | Phase 57 | Pending |
+| UI-03 | Phase 57 | Pending |
+| ADAPT-01 | Phase 56 | Pending |
+| ADAPT-02 | Phase 56 | Pending |
+| ADAPT-03 | Phase 56 | Pending |
+| ADAPT-04 | Phase 56 | Pending |
+| ADAPT-05 | Phase 56 | Pending |
 
 **Coverage:**
 - v1.20 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 after initial definition*
+*Last updated: 2026-03-26 — traceability populated after roadmap creation*
