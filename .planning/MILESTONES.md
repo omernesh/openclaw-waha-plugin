@@ -1,5 +1,21 @@
 # Milestones
 
+## v1.18 Join/Leave/List & Skill Completeness (Shipped: 2026-03-26)
+
+**Phases completed:** 5 phases, 8 plans, 9 tasks
+
+**Key accomplishments:**
+
+- regex-based /join, /leave, /list WhatsApp commands that bypass the LLM for direct group/channel management via invite links and fuzzy name matching
+- Wired /join, /leave, /list into inbound.ts -- commands intercepted before LLM, pending selections routed by type.
+- One-liner:
+- alert-dialog.tsx
+- Task 1: Audit all actions and rewrite SKILL.md with complete endpoint coverage
+- v1.17.2 deployed to both hpg6 locations with clean gateway startup; WAHA sessions 3cf11776_omer and 3cf11776_logan both WORKING
+- Status:
+
+---
+
 ## v1.13 Close All Gaps (Shipped: 2026-03-20)
 
 **Phases completed:** 8 phases, 19 plans, 2 tasks

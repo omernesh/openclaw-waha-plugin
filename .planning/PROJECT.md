@@ -73,9 +73,17 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Test coverage sprint (149 new tests: monitor, inbound, directory, shutup, React) — v1.13
 - ✓ Platform abstraction (WahaClient, PlatformAdapter, tenant-aware config) — v1.13
 
+- ✓ Slash commands (/join, /leave, /list) bypassing LLM — v1.18
+- ✓ Channel invite link support (resolve code → JID → follow) — v1.18
+- ✓ Admin UI Leave/Unfollow buttons + Join by Link input — v1.18
+- ✓ whatsapp-messenger skill: 109 actions across 16 categories — v1.18
+- ✓ SKILL.md invite link and slash command documentation — v1.18
+- ✓ Friendly error messages (extract clean reasons from WAHA errors) — v1.18
+- ✓ Pending selection in groups (not just DMs) — v1.18
+
 ### Active
 
-(Defined in REQUIREMENTS.md for v1.14)
+(Next milestone TBD)
 
 ### Out of Scope
 
@@ -88,22 +96,12 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone: v1.18 Join/Leave/List & Skill Completeness
-
-**Goal:** Make it dead simple for users and agents to join/leave groups and channels, list memberships, and get invite links — all without wasting LLM tokens. Ensure the WhatsApp skill documents ALL available WAHA API endpoints.
-
-**Target features:**
-- Slash commands (/join, /leave, /list) that bypass the LLM entirely
-- Fuzzy name resolution for join/leave with LLM confirmation on ambiguous matches
-- Invite link retrieval and sharing (existing API, documentation gap)
-- Admin UI: Leave button per group/channel row, Join by Link input in directory tab
-- Full WAHA API endpoint audit in whatsapp-messenger skill (excluding hijacked endpoints)
-- Live WhatsApp testing of all new features
+## Current Milestone: (Planning next)
 
 ## Context
 
 - **Runtime**: TypeScript on Node.js, deployed to hpg6 Linux server
-- **Codebase**: 15,000+ LOC TypeScript (40+ source files including WahaClient, PlatformAdapter, AnalyticsDb, SSE; src/admin/ React SPA ~4000+ lines TSX), 7,500+ LOC tests, 460+ passing tests
+- **Codebase**: 16,000+ LOC TypeScript (40+ source files including WahaClient, PlatformAdapter, AnalyticsDb, SSE, commands.ts; src/admin/ React SPA ~4500+ lines TSX), 7,500+ LOC tests, 594 passing tests
 - **WAHA Engine**: NOWEB (has known limitations — poll.vote <5% capture, contacts API needs store.enabled)
 - **Gateway**: OpenClaw at `/usr/lib/node_modules/openclaw/dist/` — READ-ONLY, not ours
 - **Sessions**: `3cf11776_logan` (bot), `3cf11776_omer` (Omer/human)
@@ -160,4 +158,4 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-25 — v1.18 milestone started*
+*Last updated: 2026-03-26 — v1.18 milestone completed*
