@@ -81,6 +81,13 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - ✓ Friendly error messages (extract clean reasons from WAHA errors) — v1.18
 - ✓ Pending selection in groups (not just DMs) — v1.18
 
+- ✓ 109 UTILITY_ACTIONS exposed to agent (up from 35) — v1.19
+- ✓ 10 modular skill category files (groups, contacts, channels, chats, status, presence, profile, media, messaging, slash-commands) — v1.19
+- ✓ SKILL.md v6.0.0 index (574-line monolith replaced with 145-line index) — v1.19
+- ✓ 8 skill evals (30/30 expectations passed) — v1.19
+- ✓ whatsapp-messenger Claude Code skill v2.0.0 — v1.19
+- ✓ 12/12 live WhatsApp tests passed (group admin, contacts, status, presence, slash commands) — v1.19
+
 ### Active
 
 (Next milestone TBD)
@@ -96,15 +103,14 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 - Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
 
-## Current Milestone: v1.19 Full WAHA Capabilities & Modular Skill Architecture
+## Last Shipped: v1.19 Full WAHA Capabilities & Modular Skill Architecture (2026-03-26)
 
-**Goal:** Expose every implemented WAHA action to the agent and restructure SKILL.md into modular per-category instruction files with evals.
-
-**Target features:**
-- Expose all hidden ACTION_HANDLERS to the LLM via UTILITY_ACTIONS (group admin, chats, contacts, status, presence, profile, labels, media, events)
-- Restructure SKILL.md into modular per-category instruction files with an index
-- Use Anthropic skill-creator for structure and evals
-- Live testing all capabilities with test groups and test bot participant
+**Key accomplishments:**
+- 109 UTILITY_ACTIONS exposed to agent (group admin, chats, contacts, status, presence, profile, media)
+- 10 modular skill category files with SKILL.md v6.0.0 index
+- 8 skill evals via Anthropic skill-creator (30/30 expectations passed)
+- whatsapp-messenger Claude Code skill v2.0.0
+- 12/12 live WhatsApp tests passed on real sessions
 
 ## Context
 
@@ -166,4 +172,4 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
 ---
-*Last updated: 2026-03-26 — v1.19 milestone started*
+*Last updated: 2026-03-26 — v1.19 shipped*
