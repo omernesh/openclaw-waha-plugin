@@ -59,39 +59,39 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ACT-01 | — | Pending |
-| ACT-02 | — | Pending |
-| ACT-03 | — | Pending |
-| ACT-04 | — | Pending |
-| ACT-05 | — | Pending |
-| ACT-06 | — | Pending |
-| ACT-07 | — | Pending |
-| ACT-08 | — | Pending |
-| SKL-01 | — | Pending |
-| SKL-02 | — | Pending |
-| SKL-03 | — | Pending |
-| SKL-04 | — | Pending |
-| SKL-05 | — | Pending |
-| SKL-06 | — | Pending |
-| SKL-07 | — | Pending |
-| TST-01 | — | Pending |
-| TST-02 | — | Pending |
-| TST-03 | — | Pending |
-| TST-04 | — | Pending |
-| TST-05 | — | Pending |
-| TST-06 | — | Pending |
-| TST-07 | — | Pending |
-| TST-08 | — | Pending |
-| TST-09 | — | Pending |
-| TST-10 | — | Pending |
-| TST-11 | — | Pending |
-| TST-12 | — | Pending |
+| ACT-01 | Phase 48 | Pending |
+| ACT-02 | Phase 48 | Pending |
+| ACT-03 | Phase 48 | Pending |
+| ACT-04 | Phase 48 | Pending |
+| ACT-05 | Phase 48 | Pending |
+| ACT-06 | Phase 48 | Pending |
+| ACT-07 | Phase 48 | Pending |
+| ACT-08 | Phase 48 | Pending |
+| SKL-01 | Phase 49 | Pending |
+| SKL-02 | Phase 49 | Pending |
+| SKL-03 | Phase 49 | Pending |
+| SKL-07 | Phase 49 | Pending |
+| SKL-04 | Phase 50 | Pending |
+| SKL-05 | Phase 50 | Pending |
+| SKL-06 | Phase 51 | Pending |
+| TST-01 | Phase 52 | Pending |
+| TST-02 | Phase 52 | Pending |
+| TST-03 | Phase 52 | Pending |
+| TST-04 | Phase 52 | Pending |
+| TST-05 | Phase 52 | Pending |
+| TST-06 | Phase 52 | Pending |
+| TST-07 | Phase 52 | Pending |
+| TST-08 | Phase 52 | Pending |
+| TST-09 | Phase 52 | Pending |
+| TST-10 | Phase 52 | Pending |
+| TST-11 | Phase 52 | Pending |
+| TST-12 | Phase 52 | Pending |
 
 **Coverage:**
 - v1.19 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27
+- Mapped to phases: 27
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 after initial definition*
+*Last updated: 2026-03-26 — traceability mapped after roadmap creation*

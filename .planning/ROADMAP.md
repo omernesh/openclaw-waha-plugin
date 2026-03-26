@@ -6,7 +6,8 @@
 - ✅ **v1.11 Polish, Sync & Features** — Phases 12-17 (shipped 2026-03-18)
 - ✅ **v1.12 UI Overhaul & Feature Polish** — Phases 18-24 (shipped 2026-03-18)
 - ✅ **v1.13 Close All Gaps** — Phases 25-32 (shipped 2026-03-20)
-- 🚧 **v1.18 Join/Leave/List & Skill Completeness** — Phases 43-47 (in progress)
+- ✅ **v1.18 Join/Leave/List & Skill Completeness** — Phases 43-47 (shipped 2026-03-25)
+- 🚧 **v1.19 Full WAHA Capabilities & Modular Skill Architecture** — Phases 48-52 (in progress)
 
 ## Phases
 
@@ -84,7 +85,15 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 44: Invite Link Documentation** - Document invite code actions in SKILL.md (completed 2026-03-25)
 - [x] **Phase 45: Admin UI Join/Leave** - Leave button and Join by Link in directory tab (completed 2026-03-25)
 - [x] **Phase 46: Skill Completeness Audit** - whatsapp-messenger skill documents all endpoints (completed 2026-03-25)
-- [x] **Phase 47: Live WhatsApp Testing** - End-to-end validation of all v1.18 features (completed 2026-03-25)
+- [x] **Phase 47: Live WhatsApp Testing** - End-to-end validation of all v1.18 features (completed 2026-03-25)
+
+## v1.19 Full WAHA Capabilities & Modular Skill Architecture
+
+- [ ] **Phase 48: Action Exposure** - Add all missing actions to UTILITY_ACTIONS in channel.ts (ACT-01 through ACT-08)
+- [ ] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07)
+- [ ] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05)
+- [ ] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06)
+- [ ] **Phase 52: Deploy & Live Testing** - Deploy to hpg6 and run all live capability tests (TST-01 through TST-12)
 
 ## Phase Details
 
@@ -156,12 +165,76 @@ Plans:
 - [x] 47-01-PLAN.md — Build and deploy v1.18 to hpg6, verify clean gateway startup
 - [ ] 47-02-PLAN.md — Run all live WhatsApp tests (TST-01 to TST-06), human verification checkpoint
 
+### Phase 48: Action Exposure
+**Goal**: Every implemented WAHA action is reachable by the agent — no capabilities hidden in ACTION_HANDLERS but absent from UTILITY_ACTIONS
+**Depends on**: Nothing (standalone channel.ts edit)
+**Requirements**: ACT-01, ACT-02, ACT-03, ACT-04, ACT-05, ACT-06, ACT-07, ACT-08
+**Success Criteria** (what must be TRUE):
+  1. Agent can invoke group admin actions (addParticipants, removeParticipants, promoteToAdmin, demoteToMember, setGroupSubject, setGroupDescription, setGroupPicture, deleteGroupPicture, getGroupPicture, setInfoAdminOnly, setMessagesAdminOnly, getInviteCode, revokeInviteCode, deleteGroup, leaveGroup) without "unknown action" errors
+  2. Agent can invoke chat management actions (archiveChat, unarchiveChat, clearMessages, unreadChat, getChatPicture, getMessageById) without errors
+  3. Agent can invoke contact actions (getContactAbout, getContactPicture, blockContact, unblockContact, createOrUpdateContact) without errors
+  4. Agent can invoke status, presence, and profile actions (sendVoiceStatus, sendVideoStatus, deleteStatus, getNewMessageId, setPresence, getPresence, subscribePresence, getProfile, setProfileName, setProfileStatus, setProfilePicture, deleteProfilePicture) without errors
+  5. Session management and API key CRUD actions are NOT in UTILITY_ACTIONS and cannot be invoked by the agent
+**Plans**: TBD
+
+### Phase 49: Modular Skill Architecture
+**Goal**: SKILL.md is a concise index and each action category has its own instruction file with full parameter tables, examples, and gotchas
+**Depends on**: Nothing (documentation work, independent of Phase 48)
+**Requirements**: SKL-01, SKL-02, SKL-03, SKL-07
+**Success Criteria** (what must be TRUE):
+  1. SKILL.md contains only a brief overview and links to per-category files (no inline action tables)
+  2. Ten category files exist (groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md) each with action table, parameters, examples, and gotchas section
+  3. vCard (.vcf) and iCal (.ics) file-based approaches are documented in contacts.md and messaging.md respectively with usage examples
+  4. Agent reading any single category file has enough context to correctly invoke all actions in that category
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 50: Skill Creator & Evals
+**Goal**: Skill files are validated by Anthropic skill-creator and evals confirm the agent can find actions, use correct params, and handle errors
+**Depends on**: Phase 49
+**Requirements**: SKL-04, SKL-05
+**Success Criteria** (what must be TRUE):
+  1. All per-category skill files pass skill-creator structure validation without warnings
+  2. Evals cover at least: correct action selection given a task description, correct parameter construction, and graceful error handling for at least 3 categories
+  3. Eval results are saved alongside skill files for future regression comparison
+**Plans**: TBD
+
+### Phase 51: Claude Code Skill Update
+**Goal**: The whatsapp-messenger Claude Code skill reflects the new modular structure so it stays in sync with what the agent reads
+**Depends on**: Phase 48, Phase 49
+**Requirements**: SKL-06
+**Success Criteria** (what must be TRUE):
+  1. whatsapp-messenger skill file references the new modular SKILL.md index structure
+  2. All newly exposed actions from Phase 48 appear in the skill with correct invocation examples
+  3. Skill accurately reflects the full action surface available to the agent post-v1.19
+**Plans**: TBD
+
+### Phase 52: Deploy & Live Testing
+**Goal**: All v1.19 changes are deployed to production and every live test passes on real WhatsApp
+**Depends on**: Phase 48, Phase 49, Phase 50, Phase 51
+**Requirements**: TST-01, TST-02, TST-03, TST-04, TST-05, TST-06, TST-07, TST-08, TST-09, TST-10, TST-11, TST-12
+**Success Criteria** (what must be TRUE):
+  1. Agent adds Michael Greenberg to the test group, then removes him — both confirmed via WhatsApp
+  2. Agent promotes Michael to admin and demotes back to member in the test group
+  3. Agent updates the test group's subject and description to new values
+  4. Agent sets a group picture and then deletes it; agent toggles info-admin-only and messages-admin-only settings; agent gets and revokes the invite code
+  5. Agent creates a new test group and deletes it
+  6. Agent retrieves Michael's contact about text and profile picture URL
+  7. Agent posts a text status and then deletes it; agent sets bot presence to online
+  8. /join, /leave, /list slash commands still work correctly (regression check)
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 43. Slash Commands | 2/2 | Complete    | 2026-03-25 |
-| 44. Invite Link Documentation | 1/1 | Complete    | 2026-03-25 |
-| 45. Admin UI Join/Leave | 2/2 | Complete    | 2026-03-25 |
-| 46. Skill Completeness Audit | 1/1 | Complete    | 2026-03-25 |
-| 47. Live WhatsApp Testing | 1/2 | Complete    | 2026-03-25 |
+| 43. Slash Commands | 2/2 | Complete | 2026-03-25 |
+| 44. Invite Link Documentation | 1/1 | Complete | 2026-03-25 |
+| 45. Admin UI Join/Leave | 2/2 | Complete | 2026-03-25 |
+| 46. Skill Completeness Audit | 1/1 | Complete | 2026-03-25 |
+| 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
+| 48. Action Exposure | 0/TBD | Not started | - |
+| 49. Modular Skill Architecture | 0/TBD | Not started | - |
+| 50. Skill Creator & Evals | 0/TBD | Not started | - |
+| 51. Claude Code Skill Update | 0/TBD | Not started | - |
+| 52. Deploy & Live Testing | 0/TBD | Not started | - |
