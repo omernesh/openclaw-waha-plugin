@@ -213,7 +213,9 @@ Plans:
   1. whatsapp-messenger skill file references the new modular SKILL.md index structure
   2. All newly exposed actions from Phase 48 appear in the skill with correct invocation examples
   3. Skill accurately reflects the full action surface available to the agent post-v1.19
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 51-01-PLAN.md — Deploy whatsapp-messenger v2.0.0 skill + plugin SKILL.md v6.0.0 to SIMPC and hpg6
 
 ### Phase 52: Deploy & Live Testing
 **Goal**: All v1.19 changes are deployed to production and every live test passes on real WhatsApp
@@ -228,7 +230,9 @@ Plans:
   6. Agent retrieves Michael's contact about text and profile picture URL
   7. Agent posts a text status and then deletes it; agent sets bot presence to online
   8. /join, /leave, /list slash commands still work correctly (regression check)
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 51-01-PLAN.md — Deploy whatsapp-messenger v2.0.0 skill + plugin SKILL.md v6.0.0 to SIMPC and hpg6
 
 ## Progress
 
@@ -241,6 +245,6 @@ Plans:
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
 | 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
 | 49. Modular Skill Architecture | 2/2 | Complete    | 2026-03-26 |
-| 50. Skill Creator & Evals | 1/1 | Complete   | 2026-03-26 |
-| 51. Claude Code Skill Update | 0/TBD | Not started | - |
+| 50. Skill Creator & Evals | 1/1 | Complete    | 2026-03-26 |
+| 51. Claude Code Skill Update | 0/1 | Not started | - |
 | 52. Deploy & Live Testing | 0/TBD | Not started | - |
