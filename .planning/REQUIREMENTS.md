@@ -9,16 +9,16 @@ Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
 
 ### Time Gates
 
-- [ ] **GATE-01**: Outbound messages are blocked outside configurable send window (default 7am-1am local time)
+- [x] **GATE-01**: Outbound messages are blocked outside configurable send window (default 7am-1am local time)
 - [x] **GATE-02**: Send window is configurable at global, per-session, and per-contact/group/newsletter levels
-- [ ] **GATE-03**: Quiet hours policy is configurable as "reject" (return error) or "queue" (hold until window opens)
-- [ ] **GATE-04**: Timezone is configurable per session via IANA timezone string (e.g., Asia/Jerusalem)
+- [x] **GATE-03**: Quiet hours policy is configurable as "reject" (return error) or "queue" (hold until window opens)
+- [x] **GATE-04**: Timezone is configurable per session via IANA timezone string (e.g., Asia/Jerusalem)
 
 ### Hourly Caps
 
-- [ ] **CAP-01**: Hard hourly message cap enforced per session using rolling window counter (not top-of-hour reset)
-- [ ] **CAP-02**: Account maturity tracked in 3 phases: New (0-7d), Warming (8-30d), Stable (30d+) derived from first_send_at
-- [ ] **CAP-03**: Progressive default caps tied to maturity: New=15/hr, Warming=30/hr, Stable=50/hr (all configurable)
+- [x] **CAP-01**: Hard hourly message cap enforced per session using rolling window counter (not top-of-hour reset)
+- [x] **CAP-02**: Account maturity tracked in 3 phases: New (0-7d), Warming (8-30d), Stable (30d+) derived from first_send_at
+- [x] **CAP-03**: Progressive default caps tied to maturity: New=15/hr, Warming=30/hr, Stable=50/hr (all configurable)
 - [x] **CAP-04**: Cap configurable at global, per-session, and per-contact/group/newsletter levels
 - [x] **CAP-05**: Cap counter persisted in SQLite to survive gateway restarts
 
@@ -27,7 +27,7 @@ Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
 - [x] **INFRA-01**: New mimicry-gate.ts module with time gate check, cap tracker, config resolution
 - [x] **INFRA-02**: Config hierarchy follows existing merge pattern (global → session → contact/group)
 - [x] **INFRA-03**: Zod schemas for sendGate and hourlyCap with .optional().default() on all new fields
-- [ ] **INFRA-04**: bypassPolicy flag skips all mimicry gates (preserves /shutup, /join, /leave)
+- [x] **INFRA-04**: bypassPolicy flag skips all mimicry gates (preserves /shutup, /join, /leave)
 
 ### Claude Code Integration
 
@@ -36,9 +36,9 @@ Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
 
 ### Behavioral Polish
 
-- [ ] **BEH-01**: Jittered inter-message delays on all outbound sends (random variance +/-30-50% of base delay)
-- [ ] **BEH-02**: Typing indicator duration proportional to message length (~40-60 WPM simulation)
-- [ ] **BEH-03**: Drain rate throttling: 3-8s jittered delay between consecutive queue drain sends
+- [x] **BEH-01**: Jittered inter-message delays on all outbound sends (random variance +/-30-50% of base delay)
+- [x] **BEH-02**: Typing indicator duration proportional to message length (~40-60 WPM simulation)
+- [x] **BEH-03**: Drain rate throttling: 3-8s jittered delay between consecutive queue drain sends
 
 ### Admin UI
 
@@ -80,24 +80,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GATE-01 | Phase 53 | Pending |
+| GATE-01 | Phase 53 | Complete |
 | GATE-02 | Phase 53 | Complete |
-| GATE-03 | Phase 53 | Pending |
-| GATE-04 | Phase 53 | Pending |
-| CAP-01 | Phase 53 | Pending |
-| CAP-02 | Phase 53 | Pending |
-| CAP-03 | Phase 53 | Pending |
+| GATE-03 | Phase 53 | Complete |
+| GATE-04 | Phase 53 | Complete |
+| CAP-01 | Phase 53 | Complete |
+| CAP-02 | Phase 53 | Complete |
+| CAP-03 | Phase 53 | Complete |
 | CAP-04 | Phase 53 | Complete |
 | CAP-05 | Phase 53 | Complete |
 | INFRA-01 | Phase 53 | Complete |
 | INFRA-02 | Phase 53 | Complete |
 | INFRA-03 | Phase 53 | Complete |
-| INFRA-04 | Phase 53 | Pending |
+| INFRA-04 | Phase 53 | Complete |
 | CC-01 | Phase 55 | Pending |
 | CC-02 | Phase 55 | Pending |
-| BEH-01 | Phase 54 | Pending |
-| BEH-02 | Phase 54 | Pending |
-| BEH-03 | Phase 54 | Pending |
+| BEH-01 | Phase 54 Plan 01 | Complete |
+| BEH-02 | Phase 54 Plan 01 | Complete |
+| BEH-03 | Phase 54 Plan 01 | Complete |
 | UI-01 | Phase 57 | Pending |
 | UI-02 | Phase 57 | Pending |
 | UI-03 | Phase 57 | Pending |

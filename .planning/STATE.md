@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.18
-milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
-status: verifying
-stopped_at: Completed 53-02-PLAN.md
-last_updated: "2026-03-26T18:18:47.286Z"
+milestone: v1.20
+milestone_name: Human Mimicry Hardening
+status: active
+stopped_at: Completed 54-01-PLAN.md
+last_updated: "2026-03-26T19:14:00Z"
 last_activity: 2026-03-26
 progress:
-  total_phases: 1
+  total_phases: 5
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 0
+  total_plans: 6
+  completed_plans: 3
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 53 — MimicryGate Core
+**Current focus:** Phase 54 — Send Pipeline Enforcement
 
 ## Current Position
 
-Phase: 53
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 54
+Plan: 01 complete
+Status: Active — 54-01 done, 54-02+ pending
 Last activity: 2026-03-26
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 | 57. Admin UI & Observability | - | - | - |
 | Phase 53 P01 | 9 | 2 tasks | 3 files |
 | Phase 53 P02 | 358 | 2 tasks | 2 files |
+| Phase 54 P01 | 4 | 1 task (TDD) | 2 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 53]: Intl.DateTimeFormat with formatToParts for timezone-aware hour extraction (not getHours())
 - [Phase 53]: Cross-midnight window: endHour <= startHour means hour >= startHour OR hour < endHour
 - [Phase 53]: getCapStatus is read-only -- never calls recordSend
+- [Phase 54]: Separate mimicry-enforcer.ts avoids circular import between send.ts and mimicry-gate.ts
+- [Phase 54]: DI params _db/_now/_sleep for enforcer test isolation without fake timers
+- [Phase 54]: recordMimicrySuccess called by caller AFTER WAHA success -- failed sends don't consume cap
 
 ### Architecture Notes
 
@@ -76,6 +80,7 @@ Progress: [░░░░░░░░░░] 0%
 - Typing simulation entry point: `sendWahaPresence()` at `send.ts:176` (existing, working)
 - SQLite infrastructure: follow `AnalyticsDb` pattern for rolling window table + `account_metadata` table
 - All new Zod fields MUST use `.optional().default()` — production configs must load without error
+- `src/mimicry-enforcer.ts` is the chokepoint — Plan 02 wires it into sendWahaText/Image/Video/File/etc in send.ts
 
 ### Research Flags
 
@@ -92,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T18:13:23.127Z
-Stopped at: Completed 53-02-PLAN.md
+Last session: 2026-03-26T19:14:00Z
+Stopped at: Completed 54-01-PLAN.md
 Resume file: None
