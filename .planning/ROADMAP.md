@@ -175,7 +175,9 @@ Plans:
   3. Agent can invoke contact actions (getContactAbout, getContactPicture, blockContact, unblockContact, createOrUpdateContact) without errors
   4. Agent can invoke status, presence, and profile actions (sendVoiceStatus, sendVideoStatus, deleteStatus, getNewMessageId, setPresence, getPresence, subscribePresence, getProfile, setProfileName, setProfileStatus, setProfilePicture, deleteProfilePicture) without errors
   5. Session management and API key CRUD actions are NOT in UTILITY_ACTIONS and cannot be invoked by the agent
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 48-01-PLAN.md — Add send.ts functions, ACTION_HANDLERS aliases, update UTILITY_ACTIONS
 
 ### Phase 49: Modular Skill Architecture
 **Goal**: SKILL.md is a concise index and each action category has its own instruction file with full parameter tables, examples, and gotchas
@@ -233,7 +235,7 @@ Plans:
 | 45. Admin UI Join/Leave | 2/2 | Complete | 2026-03-25 |
 | 46. Skill Completeness Audit | 1/1 | Complete | 2026-03-25 |
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
-| 48. Action Exposure | 0/TBD | Not started | - |
+| 48. Action Exposure | 0/1 | Not started | - |
 | 49. Modular Skill Architecture | 0/TBD | Not started | - |
 | 50. Skill Creator & Evals | 0/TBD | Not started | - |
 | 51. Claude Code Skill Update | 0/TBD | Not started | - |
