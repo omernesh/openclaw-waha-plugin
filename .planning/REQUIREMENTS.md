@@ -1,90 +1,97 @@
-# Requirements: WAHA OpenClaw Plugin — v1.18 Join/Leave/List & Skill Completeness
+# Requirements: WAHA OpenClaw Plugin — v1.19 Full WAHA Capabilities & Modular Skill Architecture
 
-**Defined:** 2026-03-25
+**Defined:** 2026-03-26
 **Core Value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
 
-## v1.18 Requirements
+## v1.19 Requirements
 
-Requirements for Join/Leave/List & Skill Completeness milestone.
+### Action Exposure
 
-### Slash Commands
+- [ ] **ACT-01**: All group admin actions exposed in UTILITY_ACTIONS (addParticipants, removeParticipants, promoteToAdmin, demoteToMember, setGroupSubject, setGroupDescription, setGroupPicture, deleteGroupPicture, getGroupPicture, setInfoAdminOnly, setMessagesAdminOnly, getInviteCode, revokeInviteCode, deleteGroup, leaveGroup)
+- [ ] **ACT-02**: All chat management actions exposed (archiveChat, unarchiveChat, clearMessages, unreadChat, getChatPicture, getMessageById)
+- [ ] **ACT-03**: All contact actions exposed (getContactAbout, getContactPicture, blockContact, unblockContact, createOrUpdateContact)
+- [ ] **ACT-04**: All status/stories actions exposed (sendVoiceStatus, sendVideoStatus, deleteStatus, getNewMessageId)
+- [ ] **ACT-05**: Presence actions exposed (setPresence, getPresence, subscribePresence)
+- [ ] **ACT-06**: Profile actions exposed (getProfile, setProfileName, setProfileStatus, setProfilePicture, deleteProfilePicture)
+- [ ] **ACT-07**: Media actions exposed (convertVoice, convertVideo)
+- [ ] **ACT-08**: Session management and API key CRUD remain excluded from UTILITY_ACTIONS (admin-only)
 
-- [x] **CMD-01**: User can send `/join <invite-link>` to join a group via WhatsApp invite link without LLM involvement
-- [x] **CMD-02**: User can send `/join <group-name>` to join a group by fuzzy name search, with LLM confirmation on ambiguous matches
-- [x] **CMD-03**: User can send `/leave <group-or-channel-name>` to leave a group/channel by fuzzy name match
-- [x] **CMD-04**: User can send `/list` to see all groups and channels the agent is a member of
-- [x] **CMD-05**: User can send `/list groups` to see only groups
-- [x] **CMD-06**: User can send `/list channels` to see only channels/newsletters
+### Modular Skill Architecture
 
-### Invite Links
+- [ ] **SKL-01**: SKILL.md restructured as concise index referencing per-category instruction files
+- [ ] **SKL-02**: Per-category files created: groups.md, contacts.md, channels.md, chats.md, status.md, presence.md, profile.md, media.md, messaging.md, slash-commands.md
+- [ ] **SKL-03**: Each sub-file has action table with parameters, task-oriented examples, and gotchas
+- [ ] **SKL-04**: Anthropic skill-creator used to structure files and write evals
+- [ ] **SKL-05**: Evals verify agent can find correct action, use correct params, handle errors
+- [ ] **SKL-06**: whatsapp-messenger Claude Code skill updated to match new structure
+- [ ] **SKL-07**: Document vCard (contacts) and iCal (calendar events) file-based approaches in skill — the agent sends .vcf files for contacts and .ics files for events
 
-- [x] **INV-01**: Agent can retrieve and share a group's invite link when asked
-- [x] **INV-02**: SKILL.md clearly documents getInviteCode, revokeInviteCode, and joinGroup actions
+### Live Testing
 
-### Admin UI
-
-- [x] **UI-01**: Directory tab shows a "Leave" action button on each group/channel row
-- [x] **UI-02**: Directory tab has a "Join by Link" input field for joining groups via invite URL
-- [x] **UI-03**: Leave/Join actions provide success/error feedback in the UI
-
-### Skill Completeness
-
-- [x] **SKL-01**: whatsapp-messenger skill documents ALL implemented WAHA API endpoints (excluding hijacked ones)
-- [x] **SKL-02**: Skill organizes endpoints by category (messaging, groups, contacts, channels, labels, status, presence, profile, media, calls)
-- [x] **SKL-03**: Skill documents the new /join, /leave, /list slash commands
-
-### Testing
-
-- [x] **TST-01**: Join by invite link tested via WhatsApp
-- [x] **TST-02**: Join by name tested via WhatsApp (exact + ambiguous match)
-- [x] **TST-03**: Leave group/channel tested via WhatsApp
-- [x] **TST-04**: /list, /list groups, /list channels tested via WhatsApp
-- [x] **TST-05**: Invite link retrieval tested via WhatsApp
-- [x] **TST-06**: Admin UI Join/Leave buttons tested via browser
+- [ ] **TST-01**: Agent adds Michael Greenberg (972556839823@c.us) to test group and removes him
+- [ ] **TST-02**: Agent promotes Michael to admin and demotes back to member
+- [ ] **TST-03**: Agent updates group subject and description
+- [ ] **TST-04**: Agent sets and deletes group picture
+- [ ] **TST-05**: Agent toggles info-admin-only and messages-admin-only settings
+- [ ] **TST-06**: Agent gets and revokes invite code
+- [ ] **TST-07**: Agent gets group participants list
+- [ ] **TST-08**: Agent creates a test group and deletes it
+- [ ] **TST-09**: Agent gets contact about info and profile picture
+- [ ] **TST-10**: Agent posts a text status and deletes it
+- [ ] **TST-11**: Agent sets bot presence to online
+- [ ] **TST-12**: /join, /leave, /list still work after refactoring (regression check)
 
 ## Future Requirements
 
-None deferred — all features in scope for v1.18.
+- Labels CRUD — deferred (WhatsApp Business only, not applicable for personal WhatsApp)
+- WAHA Events API — check NOWEB support status; iCal file workaround documented in skill
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Join by QR code scan | Requires device camera, not applicable for server-side agent |
-| Group creation from slash command | Already available via LLM action, no need to duplicate |
-| Bulk join/leave | Edge case, can be added later if needed |
-| Newsletter creation from slash command | Low demand, follow/unfollow sufficient |
+| Labels management | WhatsApp Business feature only — personal WhatsApp doesn't support |
+| Session management exposure to LLM | Admin-only — too dangerous for LLM to manage sessions |
+| API key CRUD exposure to LLM | Admin-only — security risk |
+| WAHA Events API (sendEvent) | NOWEB engine may not support; iCal file approach works and is documented |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CMD-01 | Phase 43 | Complete |
-| CMD-02 | Phase 43 | Complete |
-| CMD-03 | Phase 43 | Complete |
-| CMD-04 | Phase 43 | Complete |
-| CMD-05 | Phase 43 | Complete |
-| CMD-06 | Phase 43 | Complete |
-| INV-01 | Phase 44 | Complete |
-| INV-02 | Phase 44 | Complete |
-| UI-01 | Phase 45 | Complete |
-| UI-02 | Phase 45 | Complete |
-| UI-03 | Phase 45 | Complete |
-| SKL-01 | Phase 46 | Complete |
-| SKL-02 | Phase 46 | Complete |
-| SKL-03 | Phase 46 | Complete |
-| TST-01 | Phase 47 | Complete |
-| TST-02 | Phase 47 | Complete |
-| TST-03 | Phase 47 | Complete |
-| TST-04 | Phase 47 | Complete |
-| TST-05 | Phase 47 | Complete |
-| TST-06 | Phase 47 | Complete |
+| ACT-01 | — | Pending |
+| ACT-02 | — | Pending |
+| ACT-03 | — | Pending |
+| ACT-04 | — | Pending |
+| ACT-05 | — | Pending |
+| ACT-06 | — | Pending |
+| ACT-07 | — | Pending |
+| ACT-08 | — | Pending |
+| SKL-01 | — | Pending |
+| SKL-02 | — | Pending |
+| SKL-03 | — | Pending |
+| SKL-04 | — | Pending |
+| SKL-05 | — | Pending |
+| SKL-06 | — | Pending |
+| SKL-07 | — | Pending |
+| TST-01 | — | Pending |
+| TST-02 | — | Pending |
+| TST-03 | — | Pending |
+| TST-04 | — | Pending |
+| TST-05 | — | Pending |
+| TST-06 | — | Pending |
+| TST-07 | — | Pending |
+| TST-08 | — | Pending |
+| TST-09 | — | Pending |
+| TST-10 | — | Pending |
+| TST-11 | — | Pending |
+| TST-12 | — | Pending |
 
 **Coverage:**
-- v1.18 requirements: 20 total
-- Mapped to phases: 20
-- Unmapped: 0
+- v1.19 requirements: 27 total
+- Mapped to phases: 0
+- Unmapped: 27
 
 ---
-*Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after roadmap creation*
+*Requirements defined: 2026-03-26*
+*Last updated: 2026-03-26 after initial definition*
