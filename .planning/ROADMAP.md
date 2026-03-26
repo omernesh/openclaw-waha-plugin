@@ -104,7 +104,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. Hourly cap counts are stored per-session in SQLite using a rolling window (not a fixed top-of-hour bucket) and survive a gateway restart
   4. Account maturity phase (New/Warming/Stable) is derived from persisted `first_send_at` in the `account_metadata` SQLite table, not from process uptime
   5. All new Zod schema fields in `config-schema.ts` use `.optional().default()` and existing production configs load without error
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 53-01-PLAN.md — Config schema extension + MimicryDb class + types + config resolution
+- [ ] 53-02-PLAN.md — Gate enforcement functions (checkTimeOfDay, checkAndConsumeCap, getCapStatus) + TDD tests
 
 ### Phase 54: Send Pipeline Enforcement
 **Goal**: Every outbound message from the agent passes through time gate and hourly cap checks, with human-like timing variance
@@ -156,7 +159,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 53. MimicryGate Core | 0/? | Not started | - |
+| 53. MimicryGate Core | 0/2 | Planning complete | - |
 | 54. Send Pipeline Enforcement | 0/? | Not started | - |
 | 55. Claude Code Integration | 0/? | Not started | - |
 | 56. Adaptive Activity Patterns | 0/? | Not started | - |
