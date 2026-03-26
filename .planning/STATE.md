@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
-status: executing
-stopped_at: Phase 53 Plan 01 complete -- MimicryGate core infrastructure
-last_updated: "2026-03-26T18:02:13.412Z"
+status: verifying
+stopped_at: Completed 53-02-PLAN.md
+last_updated: "2026-03-26T18:13:23.133Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 Phase: 53 (MimicryGate Core) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-03-26
 
 Progress: [░░░░░░░░░░] 0%
@@ -50,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | 56. Adaptive Activity Patterns | - | - | - |
 | 57. Admin UI & Observability | - | - | - |
 | Phase 53 P01 | 9 | 2 tasks | 3 files |
+| Phase 53 P02 | 358 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Progress: [░░░░░░░░░░] 0%
 - [Phase 53]: Rolling window via per-row timestamps (not fixed buckets) prevents 2x burst at hour boundary
 - [Phase 53]: Reject-not-queue as default onBlock policy eliminates queue complexity and message loss on restart
 - [Phase 53]: 3-level config merge (global -> session -> target) for both gate and cap; most-specific wins
+- [Phase 53]: Intl.DateTimeFormat with formatToParts for timezone-aware hour extraction (not getHours())
+- [Phase 53]: Cross-midnight window: endHour <= startHour means hour >= startHour OR hour < endHour
+- [Phase 53]: getCapStatus is read-only -- never calls recordSend
 
 ### Architecture Notes
 
@@ -88,6 +92,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T18:02:13.405Z
-Stopped at: Phase 53 Plan 01 complete -- MimicryGate core infrastructure
+Last session: 2026-03-26T18:13:23.127Z
+Stopped at: Completed 53-02-PLAN.md
 Resume file: None

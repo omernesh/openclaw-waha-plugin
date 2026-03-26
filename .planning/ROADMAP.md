@@ -86,7 +86,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 ## v1.20 Human Mimicry Hardening — Active
 
-- [ ] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (mimicry-gate.ts, Zod schemas, SQLite tables)
+- [x] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (mimicry-gate.ts, Zod schemas, SQLite tables) (completed 2026-03-26)
 - [ ] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle)
 - [ ] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
 - [ ] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing
@@ -104,10 +104,10 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. Hourly cap counts are stored per-session in SQLite using a rolling window (not a fixed top-of-hour bucket) and survive a gateway restart
   4. Account maturity phase (New/Warming/Stable) is derived from persisted `first_send_at` in the `account_metadata` SQLite table, not from process uptime
   5. All new Zod schema fields in `config-schema.ts` use `.optional().default()` and existing production configs load without error
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 53-01-PLAN.md — Config schema extension + MimicryDb class + types + config resolution
-- [ ] 53-02-PLAN.md — Gate enforcement functions (checkTimeOfDay, checkAndConsumeCap, getCapStatus) + TDD tests
+- [x] 53-02-PLAN.md — Gate enforcement functions (checkTimeOfDay, checkAndConsumeCap, getCapStatus) + TDD tests
 
 ### Phase 54: Send Pipeline Enforcement
 **Goal**: Every outbound message from the agent passes through time gate and hourly cap checks, with human-like timing variance
@@ -159,7 +159,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 53. MimicryGate Core | 1/2 | In Progress|  |
+| 53. MimicryGate Core | 2/2 | Complete   | 2026-03-26 |
 | 54. Send Pipeline Enforcement | 0/? | Not started | - |
 | 55. Claude Code Integration | 0/? | Not started | - |
 | 56. Adaptive Activity Patterns | 0/? | Not started | - |
