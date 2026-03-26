@@ -1,0 +1,160 @@
+{
+  "expectations": [
+    {
+      "text": "Agent selects addParticipants (not createGroup, not send, not invite)",
+      "passed": true,
+      "evidence": "eval-1.md: 'Action: addParticipants' selected as Step 1 with explicit rejection of createGroup, send, and invite alternatives"
+    },
+    {
+      "text": "participants array contains 972556839823@c.us (with @c.us suffix)",
+      "passed": true,
+      "evidence": "eval-1.md: 'participants': ['972556839823@c.us'] — @c.us suffix correctly applied"
+    },
+    {
+      "text": "groupId is 120363421825201386@g.us (with @g.us suffix)",
+      "passed": true,
+      "evidence": "eval-1.md: 'groupId': '120363421825201386@g.us' — @g.us suffix correctly applied in both actions"
+    },
+    {
+      "text": "Agent also calls promoteToAdmin as a follow-up action",
+      "passed": true,
+      "evidence": "eval-1.md: Step 2 explicitly calls promoteToAdmin: 'After adding the participant, use promoteToAdmin to grant admin role'"
+    },
+    {
+      "text": "promoteToAdmin uses the same groupId and participant JID",
+      "passed": true,
+      "evidence": "eval-1.md: promoteToAdmin parameters show same groupId '120363421825201386@g.us' and participants ['972556839823@c.us']"
+    },
+    {
+      "text": "Agent selects getInviteCode (not joinGroup, not getGroup, not createGroup)",
+      "passed": true,
+      "evidence": "eval-2.md: 'Action: getInviteCode' selected; explicitly states 'NOT joinGroup — that joins a group using a code, it does not retrieve a code; NOT getGroup'"
+    },
+    {
+      "text": "groupId parameter is present and equals 120363421825201386@g.us",
+      "passed": true,
+      "evidence": "eval-2.md: Parameters show 'groupId': '120363421825201386@g.us'"
+    },
+    {
+      "text": "Agent does NOT call send or any messaging action",
+      "passed": true,
+      "evidence": "eval-2.md: 'NOT any messaging action — this is a query operation, no message is sent'"
+    },
+    {
+      "text": "Agent selects blockContact (not unblockContact, not delete, not muteChat)",
+      "passed": true,
+      "evidence": "eval-3.md: 'Action: blockContact' selected; explicitly states 'NOT unblockContact — that reverses a block; NOT delete — that deletes a chat; NOT muteChat'"
+    },
+    {
+      "text": "contactId parameter uses @c.us suffix: 972556839823@c.us",
+      "passed": true,
+      "evidence": "eval-3.md: Parameters show 'contactId': '972556839823@c.us' — @c.us suffix correctly applied"
+    },
+    {
+      "text": "Agent does NOT call getContacts or any listing action first",
+      "passed": true,
+      "evidence": "eval-3.md: 'The agent does NOT call getContacts or any listing action first — the contactId is already known from the phone number'"
+    },
+    {
+      "text": "Agent calls getContactPicture with contactId 972556839823@c.us",
+      "passed": true,
+      "evidence": "eval-4.md: Action 1 is 'getContactPicture' with 'contactId': '972556839823@c.us'"
+    },
+    {
+      "text": "Agent also calls getContactAbout with the same contactId",
+      "passed": true,
+      "evidence": "eval-4.md: Action 2 is 'getContactAbout' with 'contactId': '972556839823@c.us'"
+    },
+    {
+      "text": "Both actions use @c.us suffix on the phone number",
+      "passed": true,
+      "evidence": "eval-4.md: Both getContactPicture and getContactAbout use '972556839823@c.us'"
+    },
+    {
+      "text": "Agent does NOT conflate the two into a single action",
+      "passed": true,
+      "evidence": "eval-4.md: 'These are separate actions and must both be called. There is no single action that returns both.'"
+    },
+    {
+      "text": "Agent does NOT call followChannel with the raw URL or the invite code string as channelId",
+      "passed": true,
+      "evidence": "eval-5.md: Two explicit 'WRONG approach (DO NOT DO THIS)' blocks showing URL and invite code as wrong channelId values"
+    },
+    {
+      "text": "Agent identifies the need to resolve the invite code to a newsletter JID first",
+      "passed": true,
+      "evidence": "eval-5.md: 'The agent MUST NOT pass the URL or invite code directly to followChannel. The correct process is: 1. searchChannelsByText to find the channel JID'"
+    },
+    {
+      "text": "If agent uses a single action, it uses followChannel with a @newsletter JID (not the URL)",
+      "passed": true,
+      "evidence": "eval-5.md: Step 2 shows followChannel with 'channelId': '120363421825201386@newsletter' — correct @newsletter JID format"
+    },
+    {
+      "text": "Agent explains or demonstrates the two-step process: resolve invite code → follow channel",
+      "passed": true,
+      "evidence": "eval-5.md: Two-step process explicitly documented: Step 1 searchChannelsByText to get newsletter JID, Step 2 followChannel with that JID"
+    },
+    {
+      "text": "Agent selects sendLocation (not send, not sendImage, not sendFile)",
+      "passed": true,
+      "evidence": "eval-6.md: 'Action: sendLocation' selected; explicitly states 'NOT send — that is for text messages; NOT sendImage — that is for image files; NOT sendFile'"
+    },
+    {
+      "text": "latitude parameter is 32.0853",
+      "passed": true,
+      "evidence": "eval-6.md: Parameters show 'latitude': 32.0853"
+    },
+    {
+      "text": "longitude parameter is 34.7818",
+      "passed": true,
+      "evidence": "eval-6.md: Parameters show 'longitude': 34.7818"
+    },
+    {
+      "text": "title parameter is 'Office' or equivalent",
+      "passed": true,
+      "evidence": "eval-6.md: Parameters show 'title': 'Office'"
+    },
+    {
+      "text": "chatId is 120363421825201386@g.us",
+      "passed": true,
+      "evidence": "eval-6.md: Parameters show 'chatId': '120363421825201386@g.us'"
+    },
+    {
+      "text": "Agent selects deleteGroup (not leaveGroup, not delete, not archiveChat)",
+      "passed": true,
+      "evidence": "eval-7.md: 'Action: deleteGroup' selected; disambiguation table explicitly contrasts deleteGroup vs leaveGroup vs delete; 'NOT leaveGroup — that only removes the bot; NOT delete — that is a chat management action'"
+    },
+    {
+      "text": "groupId parameter is present and equals 120363421825201386@g.us",
+      "passed": true,
+      "evidence": "eval-7.md: Parameters show 'groupId': '120363421825201386@g.us'"
+    },
+    {
+      "text": "Agent explains the distinction: deleteGroup permanently deletes the group, leaveGroup only removes the bot",
+      "passed": true,
+      "evidence": "eval-7.md: 'deleteGroup — Permanently removes the group from WhatsApp. All participants lose access. leaveGroup — The bot exits the group but the group continues to exist.'"
+    },
+    {
+      "text": "Agent selects the read action (not readMessages, not getChatMessages)",
+      "passed": true,
+      "evidence": "eval-8.md: 'Action: read' selected; comparison table from messaging.md reproduced; 'NOT readMessages — that fetches message content, does not send read receipts; NOT getChatMessages'"
+    },
+    {
+      "text": "chatId parameter is set to 120363421825201386@g.us",
+      "passed": true,
+      "evidence": "eval-8.md: Parameters show 'chatId': '120363421825201386@g.us'"
+    },
+    {
+      "text": "Agent does NOT confuse read (send receipts) with readMessages (fetch content)",
+      "passed": true,
+      "evidence": "eval-8.md: Disambiguation table reproduced verbatim from messaging.md; explicit statement 'read — Standard action that sends WhatsApp read receipts; readMessages — Does NOT send read receipts. Does NOT affect the unread status.'"
+    }
+  ],
+  "summary": {
+    "passed": 30,
+    "failed": 0,
+    "total": 30,
+    "pass_rate": 1.0
+  }
+}

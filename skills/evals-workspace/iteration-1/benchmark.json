@@ -1,0 +1,215 @@
+{
+  "skill_name": "whatsapp-actions",
+  "metadata": {
+    "skill_name": "whatsapp-actions",
+    "skill_path": "D:/docker/waha-oc-plugin",
+    "executor_model": "claude-sonnet-4-6",
+    "analyzer_model": "claude-sonnet-4-6",
+    "timestamp": "2026-03-26T03:34:08Z",
+    "evals_run": [1, 2, 3, 4, 5, 6, 7, 8],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "Add participant and promote to admin",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent selects addParticipants (not createGroup, not send, not invite)", "passed": true, "evidence": "eval-1.md: 'Action: addParticipants' selected"},
+        {"text": "participants array contains 972556839823@c.us (with @c.us suffix)", "passed": true, "evidence": "eval-1.md: participants: ['972556839823@c.us']"},
+        {"text": "groupId is 120363421825201386@g.us (with @g.us suffix)", "passed": true, "evidence": "eval-1.md: groupId: '120363421825201386@g.us'"},
+        {"text": "Agent also calls promoteToAdmin as a follow-up action", "passed": true, "evidence": "eval-1.md: Step 2 calls promoteToAdmin"},
+        {"text": "promoteToAdmin uses the same groupId and participant JID", "passed": true, "evidence": "eval-1.md: same groupId and participant JID in promoteToAdmin"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Get invite link for group",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent selects getInviteCode (not joinGroup, not getGroup, not createGroup)", "passed": true, "evidence": "eval-2.md: 'Action: getInviteCode' with explicit rejections"},
+        {"text": "groupId parameter is present and equals 120363421825201386@g.us", "passed": true, "evidence": "eval-2.md: groupId: '120363421825201386@g.us'"},
+        {"text": "Agent does NOT call send or any messaging action", "passed": true, "evidence": "eval-2.md: 'NOT any messaging action — this is a query operation'"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Block a contact",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent selects blockContact (not unblockContact, not delete, not muteChat)", "passed": true, "evidence": "eval-3.md: 'Action: blockContact' with explicit rejection of alternatives"},
+        {"text": "contactId parameter uses @c.us suffix: 972556839823@c.us", "passed": true, "evidence": "eval-3.md: contactId: '972556839823@c.us'"},
+        {"text": "Agent does NOT call getContacts or any listing action first", "passed": true, "evidence": "eval-3.md: contactId already known from phone number, no listing needed"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 4,
+      "eval_name": "Get contact picture and about text",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent calls getContactPicture with contactId 972556839823@c.us", "passed": true, "evidence": "eval-4.md: Action 1 getContactPicture with 972556839823@c.us"},
+        {"text": "Agent also calls getContactAbout with the same contactId", "passed": true, "evidence": "eval-4.md: Action 2 getContactAbout with 972556839823@c.us"},
+        {"text": "Both actions use @c.us suffix on the phone number", "passed": true, "evidence": "eval-4.md: both use @c.us suffix"},
+        {"text": "Agent does NOT conflate the two into a single action", "passed": true, "evidence": "eval-4.md: 'These are separate actions and must both be called'"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "Follow channel from invite link",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent does NOT call followChannel with the raw URL or the invite code string as channelId", "passed": true, "evidence": "eval-5.md: Two explicit WRONG approach blocks showing correct rejection"},
+        {"text": "Agent identifies the need to resolve the invite code to a newsletter JID first", "passed": true, "evidence": "eval-5.md: 'MUST NOT pass the URL or invite code directly to followChannel'"},
+        {"text": "If agent uses a single action, it uses followChannel with a @newsletter JID (not the URL)", "passed": true, "evidence": "eval-5.md: Step 2 uses @newsletter JID format"},
+        {"text": "Agent explains or demonstrates the two-step process: resolve invite code → follow channel", "passed": true, "evidence": "eval-5.md: Explicit two-step process: searchChannelsByText → followChannel"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "Send location to group",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent selects sendLocation (not send, not sendImage, not sendFile)", "passed": true, "evidence": "eval-6.md: 'Action: sendLocation' with explicit rejections"},
+        {"text": "latitude parameter is 32.0853", "passed": true, "evidence": "eval-6.md: latitude: 32.0853"},
+        {"text": "longitude parameter is 34.7818", "passed": true, "evidence": "eval-6.md: longitude: 34.7818"},
+        {"text": "title parameter is 'Office' or equivalent", "passed": true, "evidence": "eval-6.md: title: 'Office'"},
+        {"text": "chatId is 120363421825201386@g.us", "passed": true, "evidence": "eval-6.md: chatId: '120363421825201386@g.us'"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 7,
+      "eval_name": "Delete group (action disambiguation)",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent selects deleteGroup (not leaveGroup, not delete, not archiveChat)", "passed": true, "evidence": "eval-7.md: 'Action: deleteGroup' with disambiguation table showing all wrong alternatives"},
+        {"text": "groupId parameter is present and equals 120363421825201386@g.us", "passed": true, "evidence": "eval-7.md: groupId: '120363421825201386@g.us'"},
+        {"text": "Agent explains the distinction: deleteGroup permanently deletes the group, leaveGroup only removes the bot", "passed": true, "evidence": "eval-7.md: 'Permanently removes the group from WhatsApp... leaveGroup — The bot exits the group but the group continues to exist'"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 8,
+      "eval_name": "Mark messages as read (action disambiguation)",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Agent selects the read action (not readMessages, not getChatMessages)", "passed": true, "evidence": "eval-8.md: 'Action: read' selected with explicit rejection of readMessages and getChatMessages"},
+        {"text": "chatId parameter is set to 120363421825201386@g.us", "passed": true, "evidence": "eval-8.md: chatId: '120363421825201386@g.us'"},
+        {"text": "Agent does NOT confuse read (send receipts) with readMessages (fetch content)", "passed": true, "evidence": "eval-8.md: disambiguation table from messaging.md reproduced, explicit statement of distinction"}
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0},
+      "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "delta": {
+      "pass_rate": "N/A (no without_skill baseline)",
+      "time_seconds": "N/A",
+      "tokens": "N/A"
+    }
+  },
+  "notes": [
+    "Single configuration run (with_skill only) — no without_skill baseline available",
+    "All 8 evals passed 100% of expectations (30/30 total)",
+    "Evals test decision-making (action selection + parameter construction) not live WAHA execution",
+    "Eval 5 (channel invite link) and Eval 7 (deleteGroup disambiguation) and Eval 8 (read vs readMessages) specifically test error-prone action selection",
+    "Category coverage: groups (evals 1,2,7), contacts (evals 3,4), channels (eval 5), messaging (evals 6,8)"
+  ]
+}
