@@ -1,310 +1,230 @@
-# Stack Research: v1.11 New Features
+# Stack Research
 
-**Domain:** WhatsApp OpenClaw plugin — background sync, pairing mode, TTL access, auto-reply, modules system
-**Researched:** 2026-03-17
-**Confidence:** HIGH (all recommendations verified against official sources or current npm registry)
+**Domain:** WhatsApp bot human mimicry — time gates, hourly caps, typing delay
+**Researched:** 2026-03-26
+**Confidence:** HIGH
 
----
+## Context: What's Already in the Codebase
 
-## Existing Stack (Do Not Re-Research)
+This is an additive milestone. The following are confirmed present and must NOT be re-added:
 
-These are already in production. Do NOT add alternatives or reconsider them.
-
-| Package | Version | In `package.json` |
-|---------|---------|-------------------|
-| `better-sqlite3` | ^11.10.0 | yes |
-| `lru-cache` | ^11.2.6 | yes |
-| `yaml` | ^2.8.2 | yes |
-| `zod` | ^4.3.6 | yes |
-| `p-queue` | (in use) | yes |
-| TypeScript | ^5.9.3 | devDep |
-| vitest | ^4.0.18 | devDep |
-
-**Built-in Node.js APIs already in use:** `node:http`, `node:fs`, `node:crypto`, `node:path`, `node:os`, `AbortSignal.timeout()`, native `fetch`, `setInterval`/`setTimeout`.
+| Capability | Where | Notes |
+|------------|-------|-------|
+| `better-sqlite3` ^11.10.0 | `package.json` | Used by `AnalyticsDb`, `DirectoryDb` |
+| `zod` ^4.3.6 | `package.json` | Config schema validation |
+| Token bucket rate limiter | `src/rate-limiter.ts` | Per-API-call concurrency, NOT per-hour message counting |
+| `sendWahaPresence()` | `src/send.ts:176` | Calls `/api/startTyping` / `/api/stopTyping` — already implemented |
+| `AnalyticsDb` (SQLite event store) | `src/analytics.ts` | Pattern to follow for hourly counter table |
+| Multi-session config hierarchy | `src/config-schema.ts` | Global + per-account fields via `WahaConfigSchema.accounts` |
+| `createRequire` + `better-sqlite3` pattern | `src/analytics.ts:9` | How to open SQLite in TypeScript with jiti |
 
 ---
 
-## Recommended Stack — New Additions
+## New Capabilities Needed
 
-### Background Directory Sync (CR-08, BUG-06, BUG-11, BUG-15)
+### 1. Timezone-Aware Time-of-Day Check
 
-**Decision: No new dependency. Use existing `setInterval`/`setTimeout` chain pattern.**
+**Recommendation: Use `Intl.DateTimeFormat` (Node.js built-in — zero new dependencies)**
 
-The project already uses a `setTimeout` chain (not `setInterval`) for health pings — a documented architectural decision. Apply the same pattern for background sync. The sync is long-running, sequential, and must respect rate limits — a simple async loop with configurable delay between batches is the right fit.
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `setTimeout` chain (existing pattern) | Built-in | Drive background sync loop | Consistent with health monitoring pattern. Prevents timer pile-up when a sync batch takes longer than the interval (which `setInterval` cannot prevent). Self-throttling: next tick only starts after current batch completes. |
-| `better-sqlite3` (existing) | ^11.10.0 | Store synced contacts/groups | Already the directory store. Add `synced_at`, `sync_source` columns and a `sync_state` table. No new dependency. |
-
-**Why NOT `node-cron` or `croner`:** Background directory sync is continuous, adaptive, and rate-limited — not time-scheduled. Cron syntax (run at 2am) doesn't model "pull until WAHA reports everything is synced, then idle". A `setTimeout` loop with configurable interval and backoff is both simpler and more accurate for this use case. Croner (zero-dep, ESM, TypeScript) would be the right choice IF we needed time-of-day scheduling — flag for future use if a "sync daily at midnight" requirement appears.
-
-**Sync architecture:** Pull WAHA contacts/groups/newsletters in configurable batches (e.g., 50 at a time), pause between batches (e.g., 2s), write to SQLite, track progress in a `sync_state` table (`last_sync_at`, `total_synced`, `sync_complete`). After initial full sync, switch to delta mode (re-sync every N hours or on webhook event).
-
-**New SQLite additions (no new package):**
-
-```sql
--- Add to contacts table (migration-safe ALTER TABLE pattern, already used)
-ALTER TABLE contacts ADD COLUMN synced_at INTEGER;
-ALTER TABLE contacts ADD COLUMN sync_source TEXT; -- 'waha_contacts' | 'waha_groups' | 'webhook'
-
--- New table for sync progress
-CREATE TABLE IF NOT EXISTS sync_state (
-  key TEXT PRIMARY KEY,  -- e.g., 'contacts', 'groups', 'newsletters'
-  last_sync_at INTEGER,
-  total_synced INTEGER DEFAULT 0,
-  sync_complete INTEGER DEFAULT 0
-);
-```
-
----
-
-### TTL-Based Access (FEATURE-02)
-
-**Decision: No new dependency. `expires_at INTEGER` column + cleanup query on `better-sqlite3`.**
-
-SQLite stores timestamps as Unix milliseconds (integers). The TTL pattern is: store `expires_at` column, check `expires_at IS NULL OR expires_at > ?` (current time) on every access, run periodic cleanup. This is a well-established SQLite pattern requiring zero new libraries.
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `better-sqlite3` (existing) | ^11.10.0 | `expires_at` column in `dm_settings` and `allow_list` | Synchronous SQLite fits the hot-path inbound filter check. Migrations follow the existing `ALTER TABLE ... ADD COLUMN` pattern with duplicate-column error handling already in `_createSchema()`. |
-
-**New SQLite additions:**
-
-```sql
--- dm_settings: add expires_at (null = never expires)
-ALTER TABLE dm_settings ADD COLUMN expires_at INTEGER;
-
--- allow_list: add expires_at (null = never expires)
-ALTER TABLE allow_list ADD COLUMN expires_at INTEGER;
-
--- pairing_grants: temporary access granted by passcode challenge
-CREATE TABLE IF NOT EXISTS pairing_grants (
-  jid TEXT NOT NULL,
-  session_id TEXT NOT NULL,
-  granted_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL,
-  passcode_used TEXT,
-  revoked INTEGER DEFAULT 0,
-  PRIMARY KEY (jid, session_id)
-);
-```
-
-**Cleanup:** Add a `cleanupExpiredGrants()` method to `DirectoryDb`, called from the sync loop (no need for a separate timer). Pattern: `DELETE FROM pairing_grants WHERE expires_at < ? AND revoked = 0`.
-
----
-
-### Pairing Mode — Passcode Challenge/Response and wa.me Deep Links (FEATURE-01)
-
-**Decision: No new dependency. URL parsing via built-in `URL` API. Passcode state in SQLite.**
-
-The wa.me deep link format is: `https://wa.me/{phone}?text={encoded_message}`. When a contact clicks the link, WhatsApp opens a DM pre-filled with the encoded message text. The plugin reads the first message from an unknown contact and checks if it matches a configured passcode pattern.
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Built-in `URL` + `URLSearchParams` | Node 18+ built-in | Parse wa.me link parameters, construct deep links for admin panel display | Zero dependencies. `new URL(href)` and `url.searchParams.get('text')` cover all needed operations. `encodeURIComponent()` handles encoding. |
-| `better-sqlite3` (existing) | ^11.10.0 | `pairing_grants` table, pending challenge state | Persists grant state across gateway restarts (same reason `pending_selections` was moved to SQLite in Phase 7). |
-| `node:crypto` (existing) | Built-in | Generate cryptographically random passcodes | `crypto.randomBytes(4).toString('hex')` gives an 8-character hex passcode (e.g., `a3f9b2c1`). Already imported in `src/signature.ts`. |
-
-**wa.me link construction (admin panel, no library):**
+No library needed. `Intl.DateTimeFormat` with `timeZone` option is fully supported in Node.js 18+ and handles all IANA timezone strings (e.g., `"Asia/Jerusalem"`, `"America/New_York"`).
 
 ```typescript
-function buildWamePairingLink(phone: string, passcode: string): string {
-  const msg = `VERIFY-${passcode}`;
-  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+function isWithinSendWindow(
+  nowMs: number,
+  timezone: string,   // IANA string, e.g. "Asia/Jerusalem"
+  startHour: number,  // 0-23, e.g. 7
+  endHour: number     // 0-23, e.g. 25 (next day 1am = 25)
+): boolean {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hour12: false,
+  });
+  const hour = parseInt(formatter.format(new Date(nowMs)), 10);
+  // endHour > 23 = spans midnight (e.g. 7..25 means 7am to 1am next day)
+  if (endHour > 24) {
+    return hour >= startHour || hour < (endHour - 24);
+  }
+  return hour >= startHour && hour < endHour;
 }
 ```
 
-**Passcode challenge flow (all in `inbound.ts`, pre-LLM):**
+**Why not Luxon:** Adds 68KB. The project already avoids date libraries (no `date-fns`, no `luxon` in `package.json`). Native `Intl` handles all IANA timezones since Node 18.
 
-1. Unknown contact sends first message
-2. Check `pairing_grants` table — if no active grant, enter challenge mode
-3. Message text matches configured passcode pattern (e.g., `VERIFY-{code}`) → grant TTL access, write to `pairing_grants`
-4. Message text does NOT match → send rejection canned response (see auto-reply below), log attempt
+**Why not Temporal API:** Stage 3 proposal, requires polyfill (`@js-temporal/polyfill`). Not production-ready without extra dependency. Overkill for a single hour-of-day check.
 
-**Per-session passcode config (in existing `WahaChannelConfig`):**
+**Confidence:** HIGH — MDN docs + Node.js 18 confirmed support.
+
+---
+
+### 2. Hourly Message Counter (Sliding Window)
+
+**Recommendation: Custom SQLite table using existing `better-sqlite3` — zero new dependencies**
+
+**Why not `rate-limiter-flexible`:** The library supports `better-sqlite3` but adds a new dependency for functionality that is trivially implemented with 3 SQL statements against the existing SQLite infrastructure. The analytics and directory DBs establish a clean pattern to follow.
+
+**Implementation pattern** (new file `src/send-limiter.ts`):
 
 ```typescript
-pairingMode: {
-  enabled: boolean;
-  passcode: string;           // configurable in admin panel, stored in openclaw.json
-  grantTtlMinutes: number;    // default: 30
-  deepLinkPhone: string;      // phone number for wa.me link display
+// Table: send_counts
+// Columns: account_id TEXT, window_start INTEGER, count INTEGER
+// window_start = floor(timestamp / 3600000) * 3600000 (1-hour buckets)
+
+// Check if under cap
+function canSend(db: Database, accountId: string, cap: number): boolean {
+  const windowStart = Math.floor(Date.now() / 3600_000) * 3600_000;
+  const row = db.prepare(
+    "SELECT count FROM send_counts WHERE account_id = ? AND window_start = ?"
+  ).get(accountId, windowStart) as { count: number } | undefined;
+  return (row?.count ?? 0) < cap;
 }
+
+// Increment counter
+function recordSend(db: Database, accountId: string): void {
+  const windowStart = Math.floor(Date.now() / 3600_000) * 3600_000;
+  db.prepare(`
+    INSERT INTO send_counts (account_id, window_start, count) VALUES (?, ?, 1)
+    ON CONFLICT(account_id, window_start) DO UPDATE SET count = count + 1
+  `).run(accountId, windowStart);
+}
+```
+
+This is a **fixed window** (hourly buckets), not sliding window. Sliding window requires per-message timestamp storage — unnecessary complexity for an anti-bot use case where "roughly 30 messages per hour" is the goal, not exact enforcement.
+
+**Progressive limits** (account maturity) are a config value, not algorithmic — no extra library needed. Config field: `hourlyCapBaseline: number`, `hourlyCapMature: number`, `matureAfterDays: number`.
+
+**Persistence across restarts:** Yes — SQLite survives restarts, unlike in-memory counters.
+
+**Prune old rows:** Add `DELETE FROM send_counts WHERE window_start < ?` with 24h retention on init (same pattern as `AnalyticsDb.prune()`).
+
+**Confidence:** HIGH — pattern directly mirrors existing `AnalyticsDb` and `DirectoryDb` implementations.
+
+---
+
+### 3. Claude Code Mimicry Integration (whatsapp-messenger skill routing)
+
+**Recommendation: Wrap `sendWahaText` with a new `sendWithMimicry()` function — no new dependencies**
+
+The existing `sendWahaPresence()` (src/send.ts:176) already calls `/api/startTyping` and `/api/stopTyping`. The typing delay logic is pure `setTimeout` math.
+
+**Integration point:** The `whatsapp-messenger` Claude Code skill calls `sendWahaText` directly via the plugin's action handler in `channel.ts`. Mimicry wrapping should happen at the `send` action dispatch layer.
+
+**Typing delay formula:**
+```typescript
+function typingDelayMs(text: string): number {
+  // Human average: ~200 chars/min = ~3.3 chars/sec
+  // Add jitter: +/-20%
+  const baseMs = (text.length / 3.3) * 1000;
+  const jitter = baseMs * (0.8 + Math.random() * 0.4);
+  return Math.min(Math.max(jitter, 500), 8000); // clamp 0.5s to 8s
+}
+```
+
+**No new library needed.** TheaterJS and similar libraries are browser-only typing animation tools, not server-side delay calculators.
+
+**Config flag to control mimicry:** `humanMimicry.enabled: boolean` per-account. When `false` (default for bot session), sends fire immediately. When `true` (for `omer` session / Claude Code sends), typing indicator + delay is applied.
+
+**Confidence:** HIGH — `sendWahaPresence` already works (confirmed in CLAUDE.md and send.ts).
+
+---
+
+## Recommended Stack (New Additions Only)
+
+### Core Technologies — No New Dependencies
+
+| Capability | Approach | Why |
+|------------|----------|-----|
+| Timezone check | `Intl.DateTimeFormat` (built-in) | Zero deps, full IANA support, Node 18+ |
+| Hourly counter | New SQLite table on existing `better-sqlite3` | Reuses established DB pattern, persists across restarts |
+| Typing delay | `setTimeout` + existing `sendWahaPresence()` | Already implemented, just needs orchestration wrapper |
+| Progressive limits | Config fields on `WahaAccountSchemaBase` | Zod already present, no new validation library |
+| Time gate enforcement | Inline at `sendWahaText` call site | No middleware framework needed |
+
+### Supporting Libraries — No New Additions
+
+| Library | Already Present | Usage |
+|---------|----------------|-------|
+| `better-sqlite3` ^11.10.0 | YES | Add `send_counts` table alongside `message_events` |
+| `zod` ^4.3.6 | YES | Extend `WahaAccountSchemaBase` with mimicry config fields |
+| `lru-cache` ^11.2.6 | YES | Cache per-account config lookups if needed |
+
+---
+
+## Installation
+
+```bash
+# No new packages needed.
+# All capabilities implemented using existing dependencies.
 ```
 
 ---
 
-### Auto-Reply Canned Message (FEATURE-03)
+## Config Schema Additions (Zod)
 
-**Decision: No new dependency. Rate limiting via SQLite `last_reply_at` column in `pairing_grants` / new `auto_reply_log` table. Cooldown checked with a simple timestamp comparison.**
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `better-sqlite3` (existing) | ^11.10.0 | Track `last_auto_reply_at` per JID to enforce cooldown | Single timestamp per JID. Pattern: `SELECT last_auto_reply_at FROM auto_reply_log WHERE jid = ?`. If `now - last > cooldown_ms`, send reply and update. |
-
-**New SQLite table:**
-
-```sql
-CREATE TABLE IF NOT EXISTS auto_reply_log (
-  jid TEXT PRIMARY KEY,
-  last_reply_at INTEGER NOT NULL
-);
-```
-
-**Config additions (existing `WahaChannelConfig`):**
+New fields on `WahaAccountSchemaBase` in `src/config-schema.ts`:
 
 ```typescript
-autoReply: {
-  enabled: boolean;
-  message: string;                   // template, {{adminNames}} variable
-  cooldownHours: number;             // default: 24
-}
+humanMimicry: z.object({
+  enabled: z.boolean().optional().default(false),
+  timezone: z.string().optional().default("UTC"),
+  sendWindowStart: z.number().int().min(0).max(23).optional().default(7),   // 7am
+  sendWindowEnd: z.number().int().min(0).max(48).optional().default(25),    // 1am next day
+  hourlyCapBaseline: z.number().int().positive().optional().default(30),    // new accounts
+  hourlyCapMature: z.number().int().positive().optional().default(50),      // mature accounts
+  matureAfterDays: z.number().int().positive().optional().default(30),
+  typingDelayEnabled: z.boolean().optional().default(false),
+}).optional().default({})
 ```
 
-**Template resolution:** `{{adminNames}}` resolves to names of participants with `participant_role = 'bot_admin'` from `group_participants` table — already tracked. No new system needed.
-
-**Send path:** Call the existing `sendWahaText()` directly from `inbound.ts` before routing to LLM. Zero token cost. Must NOT trigger the inbound pipeline recursively — use a flag or bypass the inbound filter for plugin-originated sends.
+Config hierarchy: global `humanMimicry` block + per-account override via `accounts[id].humanMimicry`. Resolver merges shallow (per-account wins) — matches existing pattern from `dmFilter`/`groupFilter`.
 
 ---
 
-### Modules System (FEATURE-04)
+## Alternatives Considered
 
-**Decision: No new dependency. Pure TypeScript interface + registry pattern. No dynamic `require()` or filesystem loader.**
-
-Modules are in-process TypeScript classes that implement a standard interface. They register themselves at plugin init time. The inbound pipeline calls each active module's `onInbound()` hook. No hot-reload (consistent with project constraint — gateway restart required for all code changes).
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| TypeScript interfaces (existing) | ^5.9.3 | `WahaModule` interface with `name`, `init()`, `configSchema`, `onInbound()`, `onOutbound()` hooks | Same pattern as the OpenClaw plugin SDK itself. No extra tooling. Statically typed. Testable via vitest (same as existing `mentions.ts` pure-function extraction). |
-| `zod` (existing) | ^4.3.6 | Per-module config schema validation | Consistent with `config-schema.ts`. Each module exports a `zod` schema for its settings. |
-| `better-sqlite3` (existing) | ^11.10.0 | `module_assignments` table (which modules are assigned to which groups/contacts) | Same store as everything else. Avoid a separate config file per module. |
-
-**Module interface (new `src/module-types.ts`):**
-
-```typescript
-export interface WahaModule {
-  readonly name: string;
-  readonly description: string;
-  readonly configSchema: z.ZodSchema;          // zod schema for module config
-  init(ctx: WahaModuleContext): Promise<void>;  // called at plugin startup
-  onInbound?(msg: InboundMessage, ctx: WahaModuleContext): Promise<void | 'stop'>;
-  onOutbound?(action: string, params: unknown, ctx: WahaModuleContext): Promise<void>;
-}
-
-export interface WahaModuleContext {
-  db: DirectoryDb;
-  config: WahaChannelConfig;
-  sendText: (chatId: string, text: string) => Promise<void>;
-  log: PluginLogger;
-}
-```
-
-**Module registry (new `src/module-registry.ts`):**
-
-```typescript
-class ModuleRegistry {
-  private modules: Map<string, WahaModule> = new Map();
-  register(mod: WahaModule): void { ... }
-  getActive(chatId: string): WahaModule[] { ... }  // checks module_assignments
-}
-```
-
-**New SQLite table:**
-
-```sql
-CREATE TABLE IF NOT EXISTS module_assignments (
-  module_name TEXT NOT NULL,
-  target_jid TEXT NOT NULL,      -- group, contact, or newsletter JID
-  target_type TEXT NOT NULL,     -- 'group' | 'contact' | 'newsletter'
-  config_json TEXT,              -- module-specific config override (JSON)
-  enabled INTEGER DEFAULT 1,
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY (module_name, target_jid)
-);
-```
-
-**Admin panel tab:** New "Modules" tab in `monitor.ts` using the existing shared UI component library (Button, Badge, Modal, Toast, Table, Form already available). No new frontend library.
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `Intl.DateTimeFormat` (built-in) | `luxon` ^3.x | Only if project already uses Luxon for other reasons — not this project |
+| `Intl.DateTimeFormat` (built-in) | `@js-temporal/polyfill` | When Temporal reaches Stage 4 + Node native support (not yet) |
+| Custom SQLite table | `rate-limiter-flexible` | When you need Redis or distributed rate limiting across multiple nodes |
+| Custom SQLite table | In-memory counter | Never for this use case — restarts reset the counter |
+| `setTimeout` + existing `sendWahaPresence` | Any typing animation library | Never — these are browser-only tools |
 
 ---
 
-## What NOT to Add
+## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `node-cron` / `croner` | Background sync is rate-limited async loop, not time-scheduled. Adds dependency for wrong abstraction. | `setTimeout` chain (existing pattern, already preferred for health pings) |
-| `croner` for future use | Flag it — if time-of-day scheduling is ever needed, croner (zero-dep, ESM-native, TypeScript typings, used by PM2/Uptime Kuma) is the right pick. | `croner` ^8.x if scheduling by wall clock is required |
-| `uuid` / `nanoid` | Passcode generation needs only 4 random bytes. | `node:crypto` `randomBytes()` (already imported) |
-| `express` or any HTTP framework | Admin panel is already served by `node:http` in `monitor.ts`. Adding a framework now would require rewiring all existing routes. | `node:http` (existing) |
-| Dynamic `require()` / filesystem module loading | Modules are in-process TypeScript — no need for plugin files on disk, no security surface. Hot-reload is out of scope (gateway restart required). | Static registry with `register()` calls at init |
-| Separate config file per module | Adds deployment complexity (must SCP more files). | `module_assignments` SQLite table + existing `openclaw.json` config |
-| `node:sqlite` (Node.js built-in, v22.5+) | The host gateway Node.js version is not guaranteed to be v22.5+. `better-sqlite3` is already a dependency and proven in production. | `better-sqlite3` (existing) |
+| `luxon` / `date-fns-tz` / `dayjs` | Zero additional capability over `Intl.DateTimeFormat` for hour-of-day check | `Intl.DateTimeFormat` |
+| `@js-temporal/polyfill` | Stage 3 API, polyfill overhead, no production track record in Node.js | `Intl.DateTimeFormat` |
+| `rate-limiter-flexible` | Adds a new dependency for 3-line SQLite queries; library's SQLite backend still requires `better-sqlite3` anyway | Direct `better-sqlite3` with custom table |
+| `cron` / `node-cron` | No periodic jobs needed — time gates check current time on each send, no background scheduler | Inline `Date.now()` + `Intl` check |
+| `p-limit` / `async-mutex` | `better-sqlite3` is synchronous, no async concurrency issue; existing `RateLimiter` covers API-call concurrency | Existing `RateLimiter` class |
 
 ---
 
-## No New npm Dependencies Required
+## Integration Points in Existing Code
 
-All v1.11 features are implementable with the existing dependency set:
-
-| Feature | Implementation | New Packages |
-|---------|----------------|--------------|
-| Background directory sync | `setTimeout` chain + `better-sqlite3` | None |
-| TTL-based access | `expires_at` column + `better-sqlite3` | None |
-| Pairing mode passcode | `node:crypto` + `better-sqlite3` + `inbound.ts` pre-filter | None |
-| wa.me deep link injection | Built-in `URL` + `encodeURIComponent` | None |
-| Auto-reply canned message | `better-sqlite3` cooldown table + `sendWahaText` call | None |
-| Modules system | TypeScript interface + `zod` + `better-sqlite3` | None |
-| Modules admin tab | Existing shared UI component library in `monitor.ts` | None |
-
-**Current `package.json` after v1.11:** Identical to v1.10 — no changes to `dependencies` or `devDependencies`.
-
----
-
-## Integration Points
-
-| New Capability | Touches | Integration Note |
-|----------------|---------|-----------------|
-| Background sync loop | `src/directory.ts`, new `src/sync.ts` | Started from `channel.ts` `init()`. Uses existing `DirectoryDb`. Rate-limited via shared token-bucket. |
-| TTL check | `src/inbound.ts` (DM filter), `src/directory.ts` | Add `isExpired(jid)` to `DirectoryDb`. Called at same point as allow-list check. |
-| Passcode challenge | `src/inbound.ts` (pre-LLM, before existing filters) | Check pairing mode enabled → unknown contact → check message matches passcode → grant/deny. |
-| Auto-reply send | `src/inbound.ts` → `src/send.ts` `sendWahaText()` | Must bypass own inbound pipeline. Pass `_skipAutoReply: true` in internal context or check sender is own session JID. |
-| Module hooks | `src/inbound.ts` (after existing filters, before LLM delivery) | `await registry.runInboundHooks(msg)` — if any module returns `'stop'`, halt LLM delivery. |
-| Module admin tab | `src/monitor.ts` (new route block + HTML tab) | Follow existing tab pattern: new `case '/api/admin/modules':` route + tab registration in `renderAdminPanel()`. |
-| wa.me link display | Admin panel — Pairing Mode section | Display-only in admin panel. No backend route needed — construct URL client-side from phone + passcode config. |
-
----
-
-## SQLite Migration Strategy
-
-All new columns follow the existing migration-safe pattern in `_createSchema()`:
-
-```typescript
-// Pattern already used in production for trigger_operator and participant_role columns:
-try {
-  this.db.prepare(`ALTER TABLE contacts ADD COLUMN synced_at INTEGER`).run();
-} catch (e: unknown) {
-  const msg = e instanceof Error ? e.message : String(e);
-  if (!msg.includes('duplicate column')) throw e;
-}
-```
-
-New tables use `CREATE TABLE IF NOT EXISTS` — idempotent, safe to run on every startup.
+| File | Change Needed |
+|------|---------------|
+| `src/config-schema.ts` | Add `humanMimicry` object to `WahaAccountSchemaBase` |
+| `src/send.ts` | Add gate + cap check before `callWahaApi` in `sendWahaText`; call `sendWahaPresence` + delay when `typingDelayEnabled` |
+| `src/send-limiter.ts` | New file: `SendLimiterDb` class (hourly counter) + `isWithinSendWindow()` (time gate) |
+| `src/monitor.ts` | Admin API endpoint to expose current hourly count + gate status per session |
+| `src/admin/` | React UI additions: mimicry config section, hourly cap gauge per session |
 
 ---
 
 ## Sources
 
-- [node-cron GitHub — kelektiv/node-cron ESM discussion](https://github.com/kelektiv/node-cron/issues/700) — confirmed CJS-only, not ideal for this ESM project
-- [croner npm](https://www.npmjs.com/package/croner) — zero-dep, ESM-native, TypeScript typings, used by PM2 and Uptime Kuma. Best cron choice IF wall-clock scheduling is ever needed (not needed for v1.11 continuous sync).
-- [better-sqlite3 GitHub — WiseLibs/better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — confirmed synchronous API, WAL mode, ALTER TABLE migration pattern
-- [wa.me deep link format — Meta Developers Community](https://developers.facebook.com/community/threads/957849225969148/) — confirmed `?text=` parameter with `encodeURIComponent` encoding
-- [wa.me link with ?text parameter guide](https://en.ajakteman.com/2026/03/how-to-create-wame-link-with-text.html) — confirmed format: `https://wa.me/{phone}?text={encoded}`
-- [Node.js Advanced Patterns: Plugin Manager — Medium](https://v-checha.medium.com/node-js-advanced-patterns-plugin-manager-44adb72aa6bb) — confirmed interface + registry pattern for TypeScript plugins
-- [TypeScript Plugin System Design — DEV Community](https://dev.to/hexshift/designing-a-plugin-system-in-typescript-for-modular-web-applications-4db5) — lifecycle hooks pattern (`init`, `onEvent`)
-- [setInterval vs cron — Sabbir.co](https://www.sabbir.co/blogs/68e2852ae6f20e639fc2c9bc) — confirmed setInterval drift risk; setTimeout chain preferred for long-running loops
-- [croner Overview — Hexagon/croner GitHub](https://github.com/Hexagon/croner) — MEDIUM confidence on version (^8.x), verified ESM support and zero-dep claim
+- Node.js `Intl.DateTimeFormat` — [MDN docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat) — HIGH confidence (official spec)
+- `better-sqlite3` ^11.10.0 — confirmed in `package.json` — HIGH confidence
+- `rate-limiter-flexible` SQLite support — [GitHub wiki](https://github.com/animir/node-rate-limiter-flexible/wiki/SQLite) — MEDIUM (confirmed supported but not used here)
+- Temporal API status — [MDN Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal) — HIGH (Stage 3, polyfill required as of 2026)
+- WAHA `/api/startTyping` — `src/send.ts:185` (existing working implementation) — HIGH confidence
+- Existing SQLite pattern — `src/analytics.ts`, `src/directory.ts` — HIGH confidence
 
 ---
-
-*Stack research for: WAHA OpenClaw Plugin v1.11*
-*Researched: 2026-03-17*
+*Stack research for: WAHA OpenClaw Plugin v1.20 Human Mimicry Hardening*
+*Researched: 2026-03-26*

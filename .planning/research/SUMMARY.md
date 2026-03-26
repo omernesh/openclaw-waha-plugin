@@ -1,188 +1,165 @@
 # Project Research Summary
 
-**Project:** WAHA OpenClaw Plugin v1.11
-**Domain:** WhatsApp AI agent plugin — polish, background sync, access control, and extensibility milestone
-**Researched:** 2026-03-17
-**Confidence:** HIGH
+**Project:** WAHA OpenClaw Plugin v1.20 Human Mimicry Hardening
+**Domain:** WhatsApp anti-bot detection — time gates, hourly caps, typing delay, Claude Code integration
+**Researched:** 2026-03-26
+**Confidence:** HIGH (stack and architecture verified against live codebase; features MEDIUM due to undocumented Meta detection signals)
 
 ## Executive Summary
 
-v1.11 is a tightly scoped follow-on milestone to v1.10. It is not a greenfield build — it is a polish, robustness, and extensibility pass on a working production plugin. The dominant research finding is that background directory sync is the load-bearing foundation of the milestone: seven of the eighteen bugs from human verification (BUG-01, BUG-06, BUG-10, BUG-11, BUG-12, BUG-15, BUG-16) all trace back to the directory not having locally cached data. Ship background sync early or the downstream name-resolution and search fixes cannot land. Everything else — pairing mode, TTL access, auto-reply, and the modules framework — is additive and can be phased independently after sync.
+v1.20 adds human behavioral simulation to a mature WhatsApp plugin to reduce Meta ban risk. The core risk being addressed is automated sending patterns: nighttime messages, burst volume, and uniform inter-message timing are the three primary signals that trigger WhatsApp account reviews. The recommended approach is additive: a new `src/mimicry-gate.ts` module provides time-of-day gating and hourly cap enforcement, wired into the existing `send.ts` send functions and `channel.ts` action dispatch. No new dependencies are required — the entire feature set is implementable using Node.js built-ins (`Intl.DateTimeFormat`, `setTimeout`) and the existing `better-sqlite3` infrastructure already in the codebase.
 
-The recommended approach is zero new npm dependencies. Every v1.11 feature is implementable with the existing stack: `better-sqlite3` for all persistence, `setTimeout` chains for background loops (matching the canonical `health.ts` pattern already in production), built-in `node:crypto` for passcode generation, and the existing TypeScript + Zod tooling for the module interface. The admin panel grows in place inside `monitor.ts`, following established tab and route patterns. The constraint is not capability — it is avoiding shortcuts that look like simplifications but create correctness traps: in-memory state lost on restart, mega-transactions that race with webhook writes, and the `setInterval` drift bug that the `setTimeout` chain pattern already solves.
+The most significant architectural constraint is that the `whatsapp-messenger` Claude Code skill currently calls the WAHA API directly, bypassing all plugin-level rate limiting. Without routing these calls through the plugin's mimicry system, the hourly cap is meaningless for the primary send path. The integration point is a new `POST /api/admin/proxy-send` route in `monitor.ts` — the skill must be updated to call this instead of WAHA directly. This is the highest-risk integration in the milestone and must be treated as a dedicated phase.
 
-The top risks are not technology risks — they are concurrency and security design risks. The SQLite write-concurrency problem between background sync batches and the inbound webhook handler is the most likely source of silent data loss. The auto-reply spam loop (bot replying to its own canned message) is the most likely source of a production incident. The passcode brute-force window is the most likely security gap. All three have documented prevention strategies and must be built in from day one, not added as a follow-up.
+The second structural concern is state persistence. Account maturity tracking (progressive caps by account age) and hourly message counts must survive gateway restarts. In-memory counters are insufficient. The rolling window hourly count must be stored in SQLite per-timestamp rows, and `first_send_at` per session must be persisted in a new `account_metadata` table. The existing `AnalyticsDb` and `DirectoryDb` patterns make this straightforward to implement correctly.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing dependency set is sufficient for all v1.11 features. No new packages required. Stack research confirmed this across all four planned features (background sync, TTL access, pairing mode, modules system) and cross-checked against the production constraint that the host Node.js version is not guaranteed to be v22.5+, ruling out the new built-in `node:sqlite`.
+All capabilities are implementable with zero new dependencies. The existing `better-sqlite3` (^11.10.0) covers the hourly counter and maturity state tables following the established `AnalyticsDb` pattern. `Intl.DateTimeFormat` (Node.js built-in) handles timezone-aware time-of-day checks with full IANA string support. Typing delay uses `setTimeout` math against the already-working `sendWahaPresence()` at `send.ts:176`. Config schema is extended using the existing Zod infrastructure in `config-schema.ts`.
 
 **Core technologies:**
-- `better-sqlite3` (^11.10.0, existing): All new persistence — `expires_at` columns, `pairing_challenges`, `auto_reply_log`, `module_assignments`, `sync_state` tables. Migration-safe `ALTER TABLE` pattern already established.
-- `setTimeout` chain (built-in, existing pattern): Background sync loop. Chosen over `setInterval` to prevent timer pile-up when a sync batch exceeds the interval duration. Matches `health.ts` canonical pattern.
-- `node:crypto` (built-in, already imported): Passcode generation — `crypto.randomBytes(4).toString('hex')` for 8-character one-time tokens.
-- Built-in `URL` + `encodeURIComponent` (built-in): wa.me deep link construction for pairing mode. Zero-dependency.
-- `zod` (^4.3.6, existing): Per-module config schema validation. Consistent with `config-schema.ts` patterns.
-- TypeScript interfaces (^5.9.3, existing): `WahaModule` interface for the modules system. Same pattern as the OpenClaw plugin SDK itself.
+- `Intl.DateTimeFormat` (built-in) — timezone-aware hour check — zero deps, DST-correct, Node 18+
+- `better-sqlite3` ^11.10.0 (existing) — hourly counter + maturity state — follows `AnalyticsDb` pattern exactly
+- `sendWahaPresence()` in `send.ts:176` (existing) — outbound typing simulation — already implemented and working
+- `zod` ^4.3.6 (existing) — new `sendGate` and `hourlyCap` schema blocks — every new field must use `.optional().default()`
+- `setTimeout` (built-in) — typing delay jitter — no library needed
 
-If time-of-day scheduling is ever needed in a future milestone, `croner` (zero-dep, ESM-native, TypeScript, used by PM2 and Uptime Kuma) is the correct choice — not `node-cron` (CJS-only). Not needed for v1.11.
+**What NOT to use:** `luxon`, `date-fns-tz`, `@js-temporal/polyfill`, `rate-limiter-flexible`, `node-cron`. All add dependencies for functionality the codebase already covers.
 
 ### Expected Features
 
-**Must have (table stakes — broken existing features):**
-- Background WAHA-to-SQLite directory sync (CR-08) — without this, search is slow and name resolution is impossible
-- Name resolution for @lid JIDs throughout the UI (BUG-01, BUG-10, BUG-12, BUG-16) — NOWEB exclusively sends @lid; raw JIDs everywhere is the top UX complaint
-- Local SQLite directory search (BUG-06, BUG-11) — instant search vs. 2-5s live WAHA API calls
-- Contacts tab pagination (BUG-15) — asymmetric with Groups tab, reads as a bug
-- UI bug sprint (BUG-02 through CR-16): ~22 standalone UI fixes requiring no architecture changes — role change flicker, 502 restart overlay, tooltip clipping, drawer staying open, tag-style inputs, collapsible cards, human-readable labels, and more
+**Must have (P1 — v1.20 launch):**
+- Time-of-day send gate with configurable window (default 7am-1am local) — direct ban risk, highest priority
+- Hourly message cap per session (hard limit, default 30 new / 50 stable) — burst is the #1 ban signal
+- Account maturity phase tracker (New/Warming/Stable derived from `first_send_at`) — new accounts under heightened surveillance
+- Progressive default caps tied to maturity phase — week-1 limits are stricter than stable-account limits
+- Config hierarchy: global `sendGate`/`hourlyCap` with per-session override — matches existing `dmFilter`/`groupFilter` pattern
+- Claude Code sends routed through mimicry proxy — currently 100% unprotected; bypass makes cap meaningless
+- Quiet hours policy: reject (default) or queue — reject-not-queue is the safer default (avoids message loss on restart)
+- Jittered inter-message delays — uniform timing is statistically detectable
 
-**Should have (new capabilities, meaningful value):**
-- TTL-based auto-expiring allowlist entries (FEATURE-02) — manual admin grants with auto-revocation; prerequisite for pairing mode
-- Auto-reply canned message to unauthorized DMs (FEATURE-03) — zero-LLM rejection with rate limiting; prevents token waste
-- Pairing mode — passcode-gated temporary access with wa.me URL injection (FEATURE-01) — controlled onboarding of unknown contacts
-- Modules system framework (FEATURE-04) — TypeScript interface + registry + admin tab; transforms plugin from fixed-feature to extensible
+**Should have (P2 — after validation):**
+- Typing delay proportional to message length (extend existing formula in `presence.ts`)
+- Admin panel maturity phase dashboard card (phase, days until upgrade, cap usage)
+- Drain rate throttling: 3-8s jittered delay between consecutive queue drain sends
+- Per-contact `rateLimitExempt` flag in directory settings
 
-**Defer (v1.12+):**
-- First-party module implementations (channel moderator, event planner) — framework ships in v1.11 as empty registry
-- Contacts/Channels bulk edit (CR-15, CR-17) — quality of life for large directories; depends on sync being settled
-- Scheduled messages — requires external cron, out of scope for the plugin
-- Cross-platform module abstraction — wrong abstraction; port by re-implementation per platform
+**Defer (v2+):**
+- Active-hours soft preference queue (hold for next engagement peak, not just any open hour)
+- Send-time distribution analytics chart (hourly histogram)
+- Automatic phase promotion based on read receipt engagement signals
+- Cross-session aggregate cap
 
 ### Architecture Approach
 
-All v1.11 features integrate into the existing five-file core (channel.ts, send.ts, inbound.ts, monitor.ts, directory.ts). Two new top-level files are added (`src/directory-sync.ts`, `src/pairing.ts`) and a new subdirectory (`src/modules/` with three files). The three heaviest modified files are `inbound.ts` (pairing hook, auto-reply hook, module hooks, TTL expiry check), `directory.ts` (schema migrations, new tables, new methods), and `monitor.ts` (new routes, new Modules tab). Config additions go to `config-schema.ts` only.
+The architecture is a pre-send guard pattern: a new standalone `src/mimicry-gate.ts` module is inserted into the send pipeline at the `sendWahaText`/`sendWahaImage`/`sendWahaVideo`/`sendWahaFile` layer in `send.ts` — NOT in `callWahaApi` (which handles health checks and API reads, not just message sends). Typing simulation for tool-call sends is injected at the `handleAction()` dispatch layer in `channel.ts`, keeping double-simulation away from the inbound bot reply path (which already goes through `startHumanPresence()` in `presence.ts`). The Claude Code integration path is a new HTTP proxy route in `monitor.ts` that enforces all mimicry logic before forwarding to WAHA.
 
 **Major components:**
-1. `src/directory-sync.ts` (new) — background `setTimeout` loop; pulls contacts/groups/newsletters from WAHA API, writes to `DirectoryDb` in page-sized batches; exposes `getSyncStatus()` for admin panel
-2. `src/pairing.ts` (new) — passcode challenge/response state machine; reads/writes `pairing_challenges` and `allow_list` (with `expires_at`); sends scripted replies via `sendWahaText`
-3. `src/modules/` (new, 3 files) — `WahaModule` interface, `ModuleRegistry` singleton backed by SQLite `modules` table, barrel export; inbound pipeline calls `onInbound` hooks serially
-4. `src/directory.ts` (extended) — `expires_at` migration on `allow_list`; new tables: `auto_reply_log`, `pairing_challenges`, `modules`, `sync_state`; new methods: `upsertContactBatch`, `upsertTTLGrant`, `pruneExpiredGrants`, `getLastAutoReply`, `recordAutoReply`
-5. `src/inbound.ts` (extended) — insertion points: pairing check after DM filter rejects, auto-reply after pairing non-intercept, module hooks after rules resolution
+1. `src/mimicry-gate.ts` (NEW) — time gate check, hourly cap tracker, config resolution, `simulateOutboundTyping`, `getCapStatus`
+2. `src/send.ts` (MODIFIED) — `checkMimicryGate()` call at top of 4 send functions; respects existing `bypassPolicy` flag
+3. `src/channel.ts` (MODIFIED) — typing simulation for tool-call `send` action via `simulateOutboundTyping()`
+4. `src/monitor.ts` (MODIFIED) — `POST /api/admin/proxy-send` (Claude Code entry point) + `GET /api/admin/mimicry` (status API)
+5. `src/config-schema.ts` (MODIFIED) — `SendGateSchema` + `HourlyCapSchema` Zod objects added to `WahaAccountSchemaBase`
+6. `src/admin/` React panel (MODIFIED) — new "Send Gates" card in DashboardTab + sendGate/hourlyCap config in SettingsTab
 
-**Key patterns to follow:**
-- `setTimeout` chain (not `setInterval`) for all background loops — `health.ts` is the canonical example
-- Migration-safe `ALTER TABLE` with duplicate-column catch — every new column uses this
-- `INSERT OR REPLACE` (upsert) for sync writes — shorter write window, concurrency-safe
-- Serial module hook execution with early-exit on `false` — correct short-circuit semantics
-- TTL check in SQL (`WHERE expires_at IS NULL OR expires_at > ?`) not in TypeScript — never load expired rows
+**Build order:** Phase 1 (config schema + mimicry-gate core) is the hard dependency for all others. Phase 2 (wire into send.ts) and Phase 3 (Claude Code proxy) can run in parallel after Phase 1. Phase 4 (admin UI) is always last.
 
 ### Critical Pitfalls
 
-1. **Background sync race with inbound webhook writes** — Both the sync loop and webhook handler write to `contacts` and `group_participants` simultaneously. With a large-transaction approach, `SQLITE_BUSY` silently drops webhook writes. Prevention: page-sized batches (50-100 rows), async write mutex, `INSERT OR REPLACE` not DELETE+INSERT. Must be designed in from day one.
-
-2. **Auto-reply spam loop** — Bot sends canned rejection, WAHA delivers the outbound webhook, inbound handler processes bot's own message, sends another reply. Repeat. Prevention: auto-reply hook must be inserted AFTER the `fromMe` check (not before it); also exclude bot's own session JIDs explicitly. Test by sending a DM from the bot session to itself.
-
-3. **Auto-reply rate limit lost on gateway restart** — In-memory rate limit map is cleared on every deploy. Contact receives duplicate canned replies after each restart. Prevention: store `last_auto_reply_at` in SQLite from day one — not a later optimization.
-
-4. **Passcode brute-force and replay** — Static 4-6 digit passcode is brute-forceable in seconds with no rate limiting. Static config passcode is replayable forever. Prevention: max 3 attempts per contact per 30 minutes with 24-hour lockout stored in SQLite; wa.me link tokens should be one-time use, not the static passcode.
-
-5. **Background sync full-resync on every startup** — With 500+ contacts and frequent restarts (every deploy), sync never finishes. Prevention: store last sync timestamp in SQLite `sync_state` table; on startup, if last sync < 24h ago, run incremental; only full-resync if > 24h.
-
-6. **TTL zombie grants accumulating** — Lazy expiry (check at read, never delete) causes the `allow_list` table to grow unbounded, degrading query performance. Prevention: periodic cleanup job (`DELETE WHERE expires_at < now()`), plus an index on `expires_at`.
-
-7. **Module hook ordering breaks existing pipeline** — Inserting module hooks at the wrong position (before `fromMe`/dedup checks or after LLM dispatch) causes modules to fire on messages they should never see. Prevention: hooks slot defined as `POST_FILTER` only (after policy, before LLM delivery); `fromMe` messages must never reach module hooks.
+1. **Hourly cap placed inside token bucket acquire() hangs the drainer** — check hourly cap BEFORE calling `acquire()`; throw synchronously, never await; the token bucket queue is for per-second burst shaping, not hourly count gating
+2. **Claude Code skill bypasses plugin entirely** — the skill calls WAHA API directly via HTTP; plugin-level caps do nothing; must add `POST /api/admin/proxy-send` to `monitor.ts` with auth check and update the skill to call it
+3. **Timezone bug: `new Date().getHours()` returns UTC on hpg6** — use `Intl.DateTimeFormat` with configured IANA timezone; handle cross-midnight windows with `currentHour >= startHour || currentHour < endHour` logic
+4. **In-memory hourly counter resets on restart; top-of-hour bucket allows 2x burst** — store per-message timestamps in SQLite rolling window; count `WHERE sent_at > (now - 3_600_000)`; never use a single counter that resets at :00
+5. **Config schema breaks existing configs on deploy** — every new field must use `.optional().default(value)`; add new field names to `knownKeys` set in `validateWahaConfig`; test against production `openclaw.json` before deploying
+6. **Progressive limits maturity state not persisted across restarts** — store `first_send_at` per session in SQLite `account_metadata` table; never compute maturity from plugin startup time
+7. **Cap keyed by `accountId` instead of WAHA session name** — Logan (bot) and Omer (Claude Code) sends must share the same hourly cap bucket; key by WAHA session name, not plugin `accountId`
 
 ## Implications for Roadmap
 
-Based on combined research, the dependency structure and phase groupings are clear. The suggested order is: UI bug sprint first (fast wins, no dependencies), then background sync (unblocks everything else), then name resolution (depends on sync), then TTL + pairing + auto-reply as a coupled cluster, then modules framework as a self-contained final phase.
+Based on research, the architecture's build order and pitfall prevention requirements map cleanly to 4 phases. Phase 3 (Claude Code integration) is the highest ban-risk gap and should be prioritized alongside Phase 2.
 
-### Phase 1: UI Bug Sprint
-**Rationale:** ~22 standalone UI fixes with no schema or architecture changes. All independent. Ship fast to clear the backlog and improve baseline quality before adding new features.
-**Delivers:** Repaired admin panel UX — role change optimistic update, 502 restart overlay, tooltip CSS fix, drawer-stays-open, tag-style inputs, collapsible filter cards, human-readable labels, Clear button fixes, log tab search clear, refresh button feedback, bot JID exclusion from directory, per-session stats, promote-to-admin auto-grants.
-**Addresses:** BUG-02, BUG-03, BUG-04, BUG-05, BUG-07, BUG-08, BUG-09, BUG-13, BUG-14, BUG-17, BUG-18, CR-01, CR-02, CR-03, CR-05, CR-06, CR-07, CR-09, CR-11, CR-12, CR-13, CR-14, CR-16
-**Avoids:** Template literal double-escaping pitfall (any monitor.ts change requires double-backslash audit)
+### Phase 1: Config Schema + MimicryGate Core
+**Rationale:** All subsequent phases require `SendGateSchema`, `HourlyCapSchema`, and the core enforcement functions. Building this standalone first means unit tests validate gate logic before it touches live send paths. No live deploy needed at this phase — pure logic + schema changes.
+**Delivers:** `src/mimicry-gate.ts` with `checkTimeOfDay`, `checkAndConsumeCap`, `resolveGateConfig`, `resolveCapLimit`, `getCapStatus`; new Zod schemas in `config-schema.ts`; SQLite rolling window table + `account_metadata` table; unit tests with injectable `now` clock
+**Addresses:** Time-of-day gate, hourly cap, progressive limits (maturity phases), config hierarchy
+**Avoids:** Config schema breakage (`.optional().default()` on every new field); timezone UTC bug (`Intl.DateTimeFormat`); hourly reset exploit (rolling window in SQLite); maturity state loss (SQLite `account_metadata` table); testability gap (injectable `now` parameter on all gate functions)
 
-### Phase 2: Background Directory Sync
-**Rationale:** Foundation for all name resolution and directory search fixes. Build this second so every subsequent phase can assume locally cached data.
-**Delivers:** Continuous WAHA-to-SQLite sync for contacts, groups, newsletters, and @lid mappings. Local directory search. Sync status indicator in Directory tab. Cursor-based incremental sync on subsequent startups.
-**Addresses:** CR-08, BUG-06 (local search), BUG-11 (contact picker from SQLite), BUG-15 (contacts pagination)
-**Uses:** `setTimeout` chain (existing pattern), `better-sqlite3` `upsertContactBatch`, `callWahaApi` from `http-client.ts` for rate-limit compliance
-**Avoids:** Race condition pitfall (page-sized batches, write mutex), rate-limiter starvation pitfall (separate sync throttle, 500ms inter-page delay), full-resync-on-restart pitfall (`sync_state` table with cursor)
+### Phase 2: Wire Gate/Cap into send.ts
+**Rationale:** Once `mimicry-gate.ts` exists and is tested, wiring it into the 4 send functions is a focused, low-risk change. The existing `bypassPolicy` flag preserves system commands (`/shutup`, `/join`, `/leave`). This phase makes the cap real for all agent-side sends.
+**Delivers:** `checkMimicryGate()` at top of `sendWahaText`, `sendWahaImage`, `sendWahaVideo`, `sendWahaFile`; integration test confirming blocked sends outside window and over cap; live deploy test confirming `/shutup` confirm still passes through unblocked
+**Uses:** Phase 1 `mimicry-gate.ts`; existing `bypassPolicy` flag in `send.ts`
+**Avoids:** Token bucket interaction bug (cap check before `acquire()`); double-simulation for bot replies (gate in `send.ts` only — no typing sim here, typing sim stays in `channel.ts`)
 
-### Phase 3: Name Resolution
-**Rationale:** Depends on background sync populating the @lid-to-name mapping. Cannot fix raw @lid display until the SQLite lookup data exists.
-**Delivers:** Resolved display names everywhere @lid JIDs appear — Access Control card, God Mode Users tag bubbles, Allow From / Group Allow From tags, group participants list.
-**Addresses:** BUG-01, BUG-10, BUG-12, BUG-16
-**Implements:** Frontend `resolveName(jid)` utility calling `/api/admin/directory/:jid`, progressive enhancement (raw JID until resolved)
+### Phase 3: Claude Code Mimicry Integration (proxy-send endpoint)
+**Rationale:** Without this phase, the hourly cap is enforced for agent sends but not for Claude Code sends — the primary ban risk path is still unprotected. This is the most impactful phase for actual ban prevention. Runs in parallel with Phase 2 since both depend only on Phase 1.
+**Delivers:** `POST /api/admin/proxy-send` route in `monitor.ts` with `requireAuth` middleware, gate enforcement, cap enforcement, typing simulation, then WAHA forward; updated `whatsapp-messenger` skill pointing to this endpoint instead of WAHA directly; typing simulation in `channel.ts` `handleAction()` for `send` action
+**Uses:** Phase 1 `mimicry-gate.ts`; existing `requireAuth` middleware in `monitor.ts`; existing `sendWahaPresence()` in `send.ts:176`
+**Avoids:** Claude Code bypass (cap is meaningful for all sends including skill sends); per-session vs per-account cap confusion (proxy uses WAHA session name as cap key); unauthenticated proxy endpoint (existing `requireAuth` applied)
 
-### Phase 4: TTL-Based Access
-**Rationale:** Schema changes for `expires_at` are shared with pairing mode. Land the TTL infrastructure and manual admin grants first as standalone value, then pairing mode builds on top.
-**Delivers:** Manual admin-set expiring access for contacts and groups. "Expires in Xh Ym" display in Directory. Inbound filter checks `expires_at` in SQL. Periodic cleanup job. Index on `expires_at`.
-**Addresses:** FEATURE-02
-**Avoids:** Zombie grants pitfall (cleanup job + index from day one)
-
-### Phase 5: Auto-Reply and Pairing Mode
-**Rationale:** Auto-reply is the simpler building block; pairing mode uses it as the challenge delivery mechanism. Both depend on the `expires_at` infrastructure from Phase 4.
-**Delivers:** Canned rejection message to unauthorized DMs with SQLite-backed rate limiting. Passcode challenge/response flow for unknown contacts. wa.me deep link injection for zero-friction passcode delivery. Active grants view and manual revoke in admin panel.
-**Addresses:** FEATURE-03, FEATURE-01
-**Avoids:** Auto-reply spam loop pitfall (insert after `fromMe` check, exclude own session JIDs); rate-limit persistence pitfall (SQLite `auto_reply_log` from day one); passcode brute-force pitfall (3 attempts / 30 min lockout, one-time tokens for wa.me links)
-
-### Phase 6: Modules Framework
-**Rationale:** Architecturally independent of pairing/TTL but depends on DirectoryDb patterns being settled. Ship last as the extensibility capstone.
-**Delivers:** `WahaModule` interface, `ModuleRegistry` singleton, `modules` SQLite table, serial inbound hook pipeline with `POST_FILTER` slot, Modules tab in admin panel (enable/disable, config form, chat assignment picker). Empty registry — no first-party modules ship in v1.11.
-**Addresses:** FEATURE-04
-**Avoids:** Hook ordering pitfall (explicit `POST_FILTER` slot, `fromMe` messages never reach hooks); module isolation pitfall (`Object.freeze(structuredClone(config))` per module, module-scoped state namespaces)
+### Phase 4: Admin UI + Status API
+**Rationale:** Gate and cap enforcement should be observable before calling the milestone complete. Admins need to see what phase the account is in, whether the gate is currently open, and how close the cap is to its limit. This phase adds no enforcement logic — purely observability and configuration surface.
+**Delivers:** `GET /api/admin/mimicry` status endpoint (gate open/closed per session, cap usage, maturity phase); DashboardTab "Send Gates" card with gate status badge and cap progress bar with reset ETA; SettingsTab sendGate hours pickers, timezone selector, hourlyCap limit input, progressive limits table; Playwright tests for all new UI
+**Implements:** Admin panel components using existing shadcn/ui + Tailwind patterns; Mimicry status API
+**Avoids:** UX pitfalls: cap shows count with no reset ETA; gate rejects with no retry-after info; maturity phase changes silently
 
 ### Phase Ordering Rationale
 
-- **UI bug sprint first** because it has zero dependencies, fast delivery, and clears distracting regressions before adding new features.
-- **Background sync second** because seven downstream bugs depend on it. Deferring it delays three subsequent phases.
-- **Name resolution third** because it is a pure consumer of sync data — no new infrastructure, just read from what sync wrote.
-- **TTL before pairing mode** because pairing mode creates TTL grants; the schema and methods must exist before the pairing challenge can grant access.
-- **Auto-reply bundled with pairing mode** because the challenge message IS the auto-reply when pairing mode is active. The infrastructure is shared and shipping them together avoids a second round of inbound.ts surgery.
-- **Modules last** because it is the most architecturally novel addition and benefits from all other phases being stable first.
+- Phase 1 is the only hard dependency — it establishes the schema and all enforcement primitives
+- Phases 2 and 3 are independent after Phase 1; Phase 3 should be prioritized (directly addresses the Claude Code bypass gap which is the highest ban risk)
+- Phase 4 is always last — observability layer added after enforcement is proven and stable
+- Reject-not-queue chosen as default policy: eliminates message loss on restart and avoids SQLite queue complexity for v1.20
+- Rolling window hourly counter (SQLite per-timestamp rows) chosen over fixed bucket: prevents the 2x burst exploit at hour boundaries that naive implementations allow
 
 ### Research Flags
 
-Phases with known complexity that may benefit from a focused planning pass:
-- **Phase 2 (Background Sync):** SQLite write concurrency is the most technically risky part of v1.11. The async mutex design and batch size need to be explicit in the phase plan, not left to implementation.
-- **Phase 5 (Pairing Mode):** Security design (attempt rate limiting, one-time token vs. static passcode, passcode storage hashing) must be decided in the plan, not during coding.
+Phases needing careful implementation review:
+- **Phase 3 (Claude Code proxy):** Verify exact call sites in `whatsapp-messenger` skill before implementation — confirm the skill calls WAHA directly and identify all curl endpoint calls to replace. Also confirm `requireAuth` middleware signature in `monitor.ts` before wiring the new route.
+- **Phase 1 (rolling window query):** Confirm SQLite rolling window query performance for `COUNT(*) WHERE sent_at > ?` against the `AnalyticsDb` table pattern. Should be negligible at 30-50 msg/hr but worth verifying against existing `message_events` table structure.
 
-Phases with standard patterns (planning from existing code is sufficient):
-- **Phase 1 (UI Bug Sprint):** All fixes are established patterns already in the codebase.
-- **Phase 3 (Name Resolution):** Pure SQLite lookup + frontend utility. Well-trodden path.
-- **Phase 4 (TTL Access):** Schema migration and SQL filter pattern are established. Cleanup job follows health.ts timer model.
-- **Phase 6 (Modules Framework):** TypeScript interface + registry is a standard pattern. No novel infrastructure.
+Phases with standard patterns (no additional research needed):
+- **Phase 2 (send.ts wiring):** Pattern is identical to existing `assertCanSend`/`assertPolicyCanSend` checks already in `send.ts`. Direct implementation.
+- **Phase 4 (admin UI):** shadcn/ui components and React patterns are established from v1.12 panel rewrite. Standard badge + progress bar components.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All recommendations verified — no new packages, confirmed against existing production code and npm registry |
-| Features | HIGH | All features defined from first-party human verification (bugs.md). No inference from external sources. |
-| Architecture | HIGH | Based on direct source inspection of all relevant files. Integration points and file modifications are specific. |
-| Pitfalls | HIGH | Based on codebase analysis, bugs.md findings, and documented lessons-learned history from v1.10 |
+| Stack | HIGH | All integration points verified in live codebase (`send.ts:176`, `analytics.ts`, `config-schema.ts`). Zero new dependencies confirmed viable. |
+| Features | MEDIUM | WhatsApp detection signals are undocumented by Meta. Synthesized from WAHA community ban reports and warmup tool documentation. Core features (time gate, hourly cap) are consensus-validated across multiple sources. |
+| Architecture | HIGH | All files inspected directly. Integration points (`sendWahaText`, `handleAction`, `monitor.ts` HTTP server, `bypassPolicy` flag) confirmed. Build order validated against existing dependency graph. |
+| Pitfalls | HIGH | All 9 pitfalls derived from direct codebase analysis (token bucket drain loop, Zod strict schema, `bypassPolicy` flag, `callWahaApi` scope). Not speculative — each references specific code locations. |
 
-**Overall confidence:** HIGH
+**Overall confidence:** HIGH for implementation approach; MEDIUM for feature effectiveness (cannot verify Meta's internal detection thresholds from outside)
 
 ### Gaps to Address
 
-- **WAHA contacts API incremental sync parameter:** Research assumed a `updatedAfter` or similar parameter for incremental pulls. This needs verification against the live WAHA instance before the background sync phase plan is finalized. If WAHA NOWEB does not support it, the incremental strategy falls back to full-resync, with the `sync_state` cursor only preventing startup thrash on rapid restarts.
-- **Passcode hashing approach:** Research recommends hashing (SHA-256 + salt minimum). The exact storage format — in `openclaw.json` vs. a dedicated SQLite secrets table — needs a decision before the pairing mode phase plan. Storing a hash in `openclaw.json` complicates the admin panel "change passcode" flow.
-- **Module outbound hooks scope:** Whether `channel.ts` should call module `onOutbound` hooks before dispatching actions is listed as "optional, later" in the architecture research. This decision affects the module interface definition — if deferred, the interface should still reserve the hook slot to avoid a breaking change in v1.12.
+- **Claude Code skill architecture:** Research assumed the skill calls WAHA directly via HTTP. Confirm exact call sites in `whatsapp-messenger` skill before Phase 3 implementation to ensure the proxy endpoint covers all send paths.
+- **Quiet hours queue policy:** Research recommends "reject" as default (safer, no message loss risk on restart). If deferred delivery is required, a SQLite `send_queue` table would be needed — this is out of scope for v1.20. Decide explicitly before Phase 1 config schema is locked so `onBlock: "queue" | "reject"` enum is correct from the start.
+- **Bot reply counting against cap:** Architecture research confirms inbound bot replies will decrement the hourly cap (they go through `send.ts`). Verify this is intended behavior before Phase 2. If bot replies should be exempt, a `skipMimicryGate` boolean needs to be added to `sendWahaText` params in the Phase 1 schema design.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `.planning/phases/11-dashboard-sessions-log/bugs.md` — direct human verification findings, 18 bugs and CRs
-- `src/directory.ts`, `src/health.ts`, `src/inbound.ts`, `src/monitor.ts`, `src/channel.ts`, `src/config-schema.ts` — direct source inspection
-- `.planning/PROJECT.md` — feature requirements and architectural decisions
-- `CLAUDE.md` — architectural constraints, WAHA API quirks, critical rules
-- `docs/LESSONS_LEARNED.md` — past regressions and hard-won fixes
+- `src/send.ts` — `sendWahaText`, `sendWahaPresence`, outbound send entry points, `bypassPolicy` flag
+- `src/http-client.ts` — `TokenBucket` drain loop structure, `MutationDedup` TTL
+- `src/config-schema.ts` — `WahaAccountSchemaBase`, `.strict()`, `validateWahaConfig`, `knownKeys` set
+- `src/analytics.ts` — SQLite pattern for timestamped event rows and prune strategy
+- `src/presence.ts` — existing typing simulation, `startHumanPresence` design and scope
+- Node.js `Intl.DateTimeFormat` — MDN official spec — IANA timezone support in Node 18+
+- `.planning/PROJECT.md` — v1.20 requirements, multi-session architecture
 
 ### Secondary (MEDIUM confidence)
-- [better-sqlite3 GitHub](https://github.com/WiseLibs/better-sqlite3) — WAL mode, ALTER TABLE migration pattern
-- [wa.me deep link format — Meta Developers Community](https://developers.facebook.com/community/threads/957849225969148/) — `?text=` parameter with encodeURIComponent
-- [Node.js Advanced Patterns: Plugin Manager — Medium](https://v-checha.medium.com/node-js-advanced-patterns-plugin-manager-44adb72aa6bb) — interface + registry pattern
-- [TypeScript Plugin System Design — DEV Community](https://dev.to/hexshift/designing-a-plugin-system-in-typescript-for-modular-web-applications-4db5) — lifecycle hooks pattern
-- [setInterval vs cron — Sabbir.co](https://www.sabbir.co/blogs/68e2852ae6f20e639fc2c9bc) — setTimeout chain preferred for long-running loops
+- [WAHA GitHub Issue #1362](https://github.com/devlikeapro/waha/issues/1362) — NOWEB ban signals from community reports
+- [WAHA GitHub Issue #765](https://github.com/devlikeapro/waha/issues/765) — group send ban patterns
+- [WAWarmer warmup docs](https://warmer.wadesk.io/blog/whatsapp-account-warm-up) — maturity phase progression and cap recommendations
+- Meta WhatsApp Cloud API typing indicators (official docs) — typing indicator behavior and max duration
 
 ### Tertiary (LOW confidence)
-- [croner npm](https://www.npmjs.com/package/croner) — flagged for future use if time-of-day scheduling is ever needed; not required for v1.11
-- WAHA `updatedAfter` incremental sync parameter — not verified against live instance; assumed from WAHA documentation patterns
+- [tisankan.dev automation unbanned guide](https://tisankan.dev/whatsapp-automation-how-do-you-stay-unbanned/) — behavioral signal list (unverified against Meta internals)
+- [a2c.chat bulk send timing](https://www.a2c.chat/en/whatsapp-bulk-sending-time-5-best-time-slots-tested.html) — send window recommendations (community data, not Meta-confirmed)
 
 ---
-*Research completed: 2026-03-17*
+*Research completed: 2026-03-26*
 *Ready for roadmap: yes*

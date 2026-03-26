@@ -1,583 +1,418 @@
 # Architecture Research
 
-**Domain:** WhatsApp OpenClaw plugin — v1.11 feature integration
-**Researched:** 2026-03-17
-**Confidence:** HIGH (based on direct source inspection of all relevant files)
+**Domain:** Human Mimicry Hardening — time-of-day send gates, hourly message caps, Claude Code mimicry integration
+**Researched:** 2026-03-26
+**Confidence:** HIGH (code directly inspected, all integration points verified in source)
+
+## Standard Architecture
+
+### System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         OpenClaw Gateway (READ-ONLY)                │
+│   handleAction() → plugin.handleAction() → send.ts functions        │
+├─────────────────────────────────────────────────────────────────────┤
+│                  NEW: MimicryGate (src/mimicry-gate.ts)             │
+│  ┌──────────────────┐  ┌───────────────────┐  ┌─────────────────┐  │
+│  │  TimeOfDayGate   │  │  HourlyCapTracker │  │  MimicryRouter  │  │
+│  │  (gate.check())  │  │  (cap.consume())  │  │  (delay+type)   │  │
+│  └────────┬─────────┘  └────────┬──────────┘  └───────┬─────────┘  │
+│           │                     │                     │             │
+├───────────┴─────────────────────┴─────────────────────┴────────────┤
+│                 Existing: send.ts (sendWahaText, sendWahaImage...)  │
+│  sendWahaText → [assertCanSend] → [assertPolicyCanSend] → WAHA API  │
+├─────────────────────────────────────────────────────────────────────┤
+│              Existing: http-client.ts (callWahaApi)                 │
+│   [TokenBucket] → [circuit breaker] → [429 backoff] → fetch()      │
+├─────────────────────────────────────────────────────────────────────┤
+│              Existing: Config Layer (config-schema.ts)              │
+│  WahaConfigSchema (global) → accounts.{id} (per-session override)  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Responsibilities
+
+| Component | Responsibility | Status |
+|-----------|----------------|--------|
+| `src/mimicry-gate.ts` | Time-of-day gate + hourly cap enforcement + progression table | NEW |
+| `src/send.ts` | All WAHA API calls; mimicry gate inserted here for outbound sends | MODIFIED (light) |
+| `src/channel.ts` | Action dispatch; Claude Code sends routed through typing simulation | MODIFIED (light) |
+| `src/config-schema.ts` | New Zod fields: `sendGate`, `hourlyCap`, `mimicry` | MODIFIED |
+| `src/monitor.ts` | New admin API route: GET /api/admin/mimicry for cap status | MODIFIED |
+| `src/admin/` (React) | New UI in DashboardTab/SettingsTab for gate and cap config | MODIFIED |
+| `src/presence.ts` | Existing typing simulation — reused by Claude Code path | UNCHANGED |
 
 ---
 
-## Current System Overview
+## Recommended Project Structure
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                     OpenClaw Gateway (READ-ONLY)                      │
-│    handleAction() → channel.ts → outbound pipeline                   │
-│    webhook events  → monitor.ts → inbound pipeline                   │
-└───────────────────────────────┬──────────────────────────────────────┘
-                                │ plugin-sdk interface only
-┌───────────────────────────────▼──────────────────────────────────────┐
-│                         channel.ts (Plugin Adapter)                   │
-│  listActions() · handleAction() · autoResolveTarget · send/recv       │
-└───┬──────────────────────┬───────────────────────┬───────────────────┘
-    │                      │                       │
-┌───▼─────────┐   ┌────────▼─────────┐   ┌────────▼────────┐
-│  send.ts    │   │  inbound.ts      │   │  monitor.ts     │
-│ WAHA API    │   │ webhook handler  │   │ HTTP server     │
-│ calls       │   │ DM/group filter  │   │ admin panel     │
-│ (~1600 LOC) │   │ rules resolution │   │ /api/admin/*    │
-└───────────┬─┘   └──────────┬───────┘   └────────┬────────┘
-            │                │                    │
-            └────────────────▼────────────────────▼
-                     ┌────────────────────┐
-                     │   directory.ts     │
-                     │  DirectoryDb       │
-                     │  SQLite (WAL)      │
-                     │  contacts          │
-                     │  dm_settings       │
-                     │  allow_list        │
-                     │  group_participants│
-                     │  group_filter_*    │
-                     │  muted_groups      │
-                     │  pending_selections│
-                     └────────────────────┘
-            ┌────────────────────────────────────┐
-            │        Supporting modules           │
-            │  http-client.ts  health.ts          │
-            │  accounts.ts     dedup.ts           │
-            │  normalize.ts    dm-filter.ts       │
-            │  inbound-queue.ts  presence.ts      │
-            │  rules-*.ts      shutup.ts          │
-            │  mentions.ts     trigger-word.ts    │
-            └────────────────────────────────────┘
+src/
+├── mimicry-gate.ts          # NEW — time gate + hourly cap + cap state tracker
+├── send.ts                  # MODIFIED — gate/cap checked before outbound sends
+├── channel.ts               # MODIFIED — Claude Code sends routed through presence.ts
+├── config-schema.ts         # MODIFIED — new sendGate/hourlyCap Zod schemas
+├── presence.ts              # UNCHANGED — reused for Claude Code typing simulation
+├── http-client.ts           # UNCHANGED — token bucket stays (different concern)
+├── monitor.ts               # MODIFIED — /api/admin/mimicry GET route for cap status
+└── admin/src/
+    └── components/tabs/
+        └── DashboardTab.tsx # MODIFIED — new Mimicry card showing gate + cap state
 ```
+
+### Structure Rationale
+
+- **`mimicry-gate.ts` is new, standalone:** Keeps time-gate and cap logic isolated from the existing token bucket in `http-client.ts`. The token bucket manages per-second API burst; mimicry-gate manages per-hour human volume. These are different timescales and different concerns — do not merge.
+- **Gate check in `send.ts`, not `http-client.ts`:** `callWahaApi` handles ALL WAHA calls including health checks, directory syncs, and group fetches. Caps must only count outbound message sends, not every API call. The right chokepoint is the `sendWahaText` / `sendWahaImage` / `sendWahaVideo` / `sendWahaFile` layer.
+- **Claude Code path goes through `channel.ts`:** The whatsapp-messenger skill calls `handleAction()` which dispatches to `send.ts` functions. The `handleAction()` in `channel.ts` is the correct injection point for pre-send typing delay + presence simulation, keeping `send.ts` free of double-simulation.
 
 ---
 
-## v1.11 Feature Integration Map
+## Architectural Patterns
 
-Each v1.11 feature is analyzed below: what it touches, what is new, what is modified.
+### Pattern 1: Gate Check as Pre-Send Guard
 
----
+**What:** `mimicry-gate.ts` exports a single `checkMimicryGate(accountId, chatId, cfg)` function. Call it at the top of `sendWahaText`, `sendWahaImage`, `sendWahaVideo`, `sendWahaFile` — the four outbound message sends that count against the cap. Non-message calls (group info, contacts, presence) skip it.
 
-### 1. Background Directory Sync
+**When to use:** Any outbound call that creates a visible WhatsApp message.
 
-**What it does:** Continuously pulls contacts/groups/newsletters from WAHA API into SQLite so that directory search queries hit local DB instead of live WAHA API.
+**Trade-offs:** Minor per-send overhead (single Map lookup + time arithmetic). Negligible at this scale.
 
-**New file required:** `src/directory-sync.ts`
-
-```
-WAHA API (/api/contacts, /api/groups, /api/lids)
-    ↓  (rate-limited, paginated, setTimeout chain)
-directory-sync.ts  →  DirectoryDb.upsertContact()
-    ↓  (exposes state for admin panel)
-syncStatus: { lastSyncAt, totalSynced, inProgress, sessionKey }
-```
-
-**New file: `src/directory-sync.ts`**
-
-Responsibilities:
-- `startDirectorySync(opts)` — initiates background loop per-session (same pattern as `health.ts` setTimeout chain)
-- Iterates contacts, groups, newsletters from WAHA API with rate limiting (calls `callWahaApi` from `http-client.ts`)
-- Writes via `DirectoryDb.upsertContact()` — no new DB methods needed for initial pass
-- Exposes `getSyncStatus(sessionKey)` for admin panel display
-- AbortSignal pattern (same as `health.ts`) for clean shutdown
-
-**Existing file modifications:**
-
-| File | Change |
-|------|--------|
-| `monitor.ts` | Start `directorySync` loop alongside `startHealthCheck` at startup; add `GET /api/admin/sync/status` route |
-| `directory.ts` | Add `upsertContactBatch()` for efficient bulk inserts; add `expires_at` column to `allow_list` (needed by FEATURE-02 too) |
-| `config-schema.ts` | Add `syncIntervalMs` config field (default 3600000 — 1 hour) |
-| Admin panel Directory tab | Show "Last synced: HH:MM" + "X contacts synced" from sync status API |
-
-**Data flow — search after sync:**
-```
-User types in Directory search
-    → GET /api/admin/directory?search=nadav
-    → DirectoryDb.getContacts({ search: "nadav" })
-    → SQLite LIKE query (instant, no WAHA API call)
-    → Results rendered
-```
-
-**SQLite additions in `directory.ts`:**
-- `upsertContactBatch(rows[])` — transaction-wrapped batch insert for sync efficiency
-- No schema changes needed for basic sync (existing `contacts` table already has `display_name`, `jid`, `is_group`)
-
----
-
-### 2. Pairing Mode
-
-**What it does:** Passcode-gated temporary DM access. Unknown contact DMs → challenge/response → grants TTL-limited access. Also supports wa.me deep link with embedded passcode.
-
-**New file required:** `src/pairing.ts`
-
-```
-Inbound DM (unauthorized contact)
-    ↓
-inbound.ts DM filter check
-    ↓
-pairing.ts: isPairingEnabled() → sendChallenge() / verifyPasscode()
-    ↓
-DirectoryDb: upsertTTLGrant() → allow_list with expires_at
-    ↓
-contact granted access for TTL duration
-```
-
-**New file: `src/pairing.ts`**
-
-Responsibilities:
-- `isPairingEnabled(cfg, accountId)` — checks if pairing mode is on for this session
-- `handlePairingChallenge(senderJid, messageText, cfg, account)` — detects wa.me passcode injection OR pending challenge response
-- `sendPairingChallenge(senderJid, account)` — sends scripted challenge message via `sendWahaText` (no LLM)
-- `verifyPasscode(passcode, cfg, accountId)` — checks against config-stored passcode
-- `grantPairingAccess(senderJid, db, ttlMs)` — writes TTL entry to allow_list via `DirectoryDb`
-- `PairingState` — SQLite-backed map of `senderJid → { challenged_at, attempts }` with auto-expiry (short TTL, ~5 min window)
-
-**Existing file modifications:**
-
-| File | Change |
-|------|--------|
-| `inbound.ts` | Add pairing check after DM filter rejects; call `handlePairingChallenge()`; if challenge passed, short-circuit to allow message through |
-| `config-schema.ts` | Add `pairingMode.enabled`, `pairingMode.passcode`, `pairingMode.ttlMs`, `pairingMode.maxAttempts` to `WahaAccountSchemaBase` |
-| `directory.ts` | Add `expires_at` column to `allow_list`; add `upsertTTLGrant(jid, expiresAt)` and `pruneExpiredGrants()`; add `pairing_challenges` table |
-| `monitor.ts` | Add `GET /api/admin/pairing/grants` (active TTL grants) and `DELETE /api/admin/pairing/grants/:jid` (manual revoke) |
-| Admin panel | New pairing section in Settings tab: toggle, passcode field, TTL config, active grants table |
-
-**Integration point in `inbound.ts` — insertion location:**
-```
-DM filter check → BLOCKED
-    ↓
-[NEW] if pairingMode.enabled:
-    handlePairingChallenge() → may grant access or send challenge
-    if granted: continue processing as normal
-    if challenged/blocked: return (no LLM)
-    ↓ (only if not pairing mode or pairing did not intercept)
-auto-reply canned message (FEATURE-03)
-    ↓
-drop message (silent)
-```
-
-**Config addition (config-schema.ts):**
+**Example:**
 ```typescript
-pairingMode: z.object({
-  enabled: z.boolean().optional().default(false),
-  passcode: buildSecretInputSchema().optional(),
-  ttlMs: z.number().int().positive().optional().default(1_800_000), // 30 min
-  maxAttempts: z.number().int().positive().optional().default(3),
-}).optional()
-```
+// src/send.ts — top of sendWahaText(), sendWahaImage(), sendWahaVideo(), sendWahaFile()
+import { checkMimicryGate } from "./mimicry-gate.js";
 
----
-
-### 3. TTL-Based Access (FEATURE-02)
-
-**What it does:** Manual admin-set expiring access for contacts and groups — independent of pairing mode but shares the same `expires_at` infrastructure.
-
-**No new file needed.** Builds on `directory.ts` schema changes from pairing mode.
-
-**Existing file modifications:**
-
-| File | Change |
-|------|--------|
-| `directory.ts` | `expires_at INTEGER` column on `allow_list` (migration-safe ALTER TABLE); `upsertTTLGrant(jid, expiresAt)`; `pruneExpiredGrants()` called on startup and periodically; `getContact()` returns `expiresAt` field |
-| `inbound.ts` | DM filter allow-list check must validate `expires_at IS NULL OR expires_at > NOW()` — currently allow-list entries have no expiry |
-| `monitor.ts` | `PUT /api/admin/directory/:jid/settings` gains `expiresAt` field; `GET /api/admin/directory` returns `expiresAt` in response |
-| Admin panel Directory tab | Contact settings drawer: "Access Expires" datetime picker; show "Expires in 2h 15m" badge on active TTL grants; gray out expired entries |
-
-**DB migration approach (same pattern as existing migrations):**
-```typescript
-// Migration-safe in _createSchema():
-try {
-  this.db.prepare(`ALTER TABLE allow_list ADD COLUMN expires_at INTEGER`).run();
-} catch (e) {
-  if (!String(e).includes('duplicate column')) throw e;
+export async function sendWahaText(params: { cfg, to, text, accountId, bypassPolicy, ... }) {
+  const client = getClient(params.cfg, params.accountId);
+  assertCanSend(client.session, params.cfg);
+  // NEW: time gate + hourly cap check (after assertCanSend, before policy check)
+  // bypassPolicy also bypasses gate (system commands like /shutup confirmations)
+  if (!params.bypassPolicy) {
+    checkMimicryGate(client.accountId, chatId, params.cfg); // throws GateError | CapError
+  }
+  // ... rest of existing logic unchanged
 }
 ```
 
-**Inbound check — modified allow-list lookup:**
-```
-// Was: SELECT allow_dm FROM allow_list WHERE jid = ?
-// Now: SELECT allow_dm FROM allow_list WHERE jid = ?
-//       AND (expires_at IS NULL OR expires_at > ?)
-// Second param: Date.now()
-```
+### Pattern 2: In-Memory Cap Tracker with Hourly Buckets
 
----
+**What:** `mimicry-gate.ts` tracks sent message counts in a `Map<accountId, HourlyWindow>` where `HourlyWindow = { hour: number, count: number }`. On each send, if `Date.now()` is in a new hour, reset count. Compare against configured `hourlyCap.limit`.
 
-### 4. Auto-Reply Canned Message (FEATURE-03)
+**When to use:** Hourly message cap enforcement.
 
-**What it does:** When DM is blocked (not in allowlist, pairing not active), send scripted rejection message instead of silent drop. Rate-limited per-contact to avoid spam.
+**Trade-offs:** In-memory only — resets on gateway restart. Acceptable: gateway restart is a rare ops action, not a normal event. Persisting to SQLite adds complexity without meaningful benefit (cap is a rate limiter, not an audit log). If you need historical outbound counts, `analytics.ts` already stores `message_events` with `direction='outbound'`.
 
-**No new file needed.**
-
-**Existing file modifications:**
-
-| File | Change |
-|------|--------|
-| `inbound.ts` | After DM filter rejects AND pairing mode does not intercept: call `sendAutoReply()` if enabled in config |
-| `directory.ts` | New table `auto_reply_log (jid TEXT PRIMARY KEY, sent_at INTEGER)` — tracks last reply time per contact for rate limiting |
-| `config-schema.ts` | Add `autoReply.enabled`, `autoReply.message`, `autoReply.cooldownMs` to account schema |
-| `send.ts` | No change — `sendWahaText()` already handles scripted sends |
-
-**Auto-reply data flow:**
-```
-DM blocked by filter
-    ↓
-pairingMode.enabled? → handle pairing (may allow or challenge)
-    ↓ (if not pairing or pairing failed)
-autoReply.enabled?
-    → DirectoryDb.getLastAutoReply(senderJid)
-    → if null or > cooldownMs ago:
-        sendWahaText(account, senderJid, resolvedMessage)
-        DirectoryDb.recordAutoReply(senderJid)
-    → else: silent drop (cooldown active)
-```
-
-**`resolvedMessage` template resolution:**
-- `[bot admin name]` → query `group_participants` for `participant_role = 'bot_admin'`; resolve names from directory
-- Keep simple: string replacement, no template engine
-
----
-
-### 5. Modules System (FEATURE-04)
-
-**What it does:** Framework for pluggable higher-level capabilities (channel moderator, event planner, etc.) assigned to specific chats. New admin panel tab.
-
-**New files required:**
-
-| File | Purpose |
-|------|---------|
-| `src/modules/module-types.ts` | `WahaModule` interface definition |
-| `src/modules/module-registry.ts` | Registry singleton: `registerModule()`, `getModulesForChat()` |
-| `src/modules/index.ts` | Barrel export + auto-registration of built-in modules |
-
-**No first-party modules ship in v1.11** — the framework only. Modules tab shows empty state with "No modules installed."
-
-**Module interface (`module-types.ts`):**
+**Example:**
 ```typescript
-export interface WahaModule {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  configSchema: z.ZodObject<any>;
+// src/mimicry-gate.ts
+interface HourlyWindow { hour: number; count: number; }
+const capWindows = new Map<string, HourlyWindow>();
 
-  // Lifecycle
-  init(db: DirectoryDb, config: unknown): Promise<void>;
+function currentHour(): number { return Math.floor(Date.now() / 3_600_000); }
 
-  // Hooks (return false to suppress normal processing)
-  onInbound?(msg: WahaInboundMessage, chat: string): Promise<boolean | void>;
-  onOutbound?(action: string, params: Record<string, unknown>): Promise<boolean | void>;
+export function checkAndConsumeCap(accountId: string, cfg: CoreConfig): void {
+  const limit = resolveCapLimit(accountId, cfg); // global → per-session merge
+  if (!limit) return; // cap disabled
+  const h = currentHour();
+  const win = capWindows.get(accountId) ?? { hour: h, count: 0 };
+  if (win.hour !== h) { win.hour = h; win.count = 0; }
+  if (win.count >= limit) throw new CapError(`Hourly cap reached (${win.count}/${limit})`);
+  win.count++;
+  capWindows.set(accountId, win);
 }
 ```
 
-**Module registry (`module-registry.ts`):**
+### Pattern 3: Config Hierarchy — Global → Per-Session Merge
+
+**What:** Mirrors the existing pattern in `config-schema.ts` where `WahaConfigSchema` has top-level fields that per-account entries can override. New `sendGate` and `hourlyCap` objects follow the same pattern: top-level defaults, `accounts.{id}` can override. `resolveGateConfig(accountId, cfg)` merges: per-session value takes priority over global, global is the fallback.
+
+**When to use:** All gate and cap resolution in `mimicry-gate.ts`.
+
+**Trade-offs:** No per-contact/group overrides in v1.20. The `DirectoryDb.dm_settings` table has a natural place for per-contact cap settings in a future phase — leave that door open by keeping `resolveCapLimit` as a function (not inline logic), so the signature can later accept `chatId`.
+
+**Example config schema addition (`config-schema.ts`):**
 ```typescript
-// Module state: per-chat assignments stored in SQLite
-// New DB table: modules (module_id, enabled, config_json, assigned_chats_json)
-class ModuleRegistry {
-  register(mod: WahaModule): void
-  getEnabled(): WahaModule[]
-  getModulesForChat(chatJid: string): WahaModule[]
-  getConfig(moduleId: string): unknown
+const SendGateSchema = z.object({
+  enabled: z.boolean().optional().default(true),
+  startHour: z.number().int().min(0).max(23).optional().default(7),   // 7am
+  endHour: z.number().int().min(0).max(23).optional().default(1),     // 1am (next day)
+  timezone: z.string().optional().default("Asia/Jerusalem"),
+  onBlock: z.enum(["reject", "queue"]).optional().default("reject"),
+}).optional();
+
+const HourlyCapSchema = z.object({
+  enabled: z.boolean().optional().default(true),
+  limit: z.number().int().positive().optional().default(40),
+  progressiveLimits: z.array(
+    z.object({
+      daysOld: z.number().int().min(0),
+      limit: z.number().int().positive()
+    })
+  ).optional(), // [{daysOld:0, limit:15}, {daysOld:30, limit:30}, {daysOld:90, limit:50}]
+}).optional();
+```
+
+Add both to `WahaAccountSchemaBase`: `sendGate: SendGateSchema`, `hourlyCap: HourlyCapSchema`.
+
+### Pattern 4: Claude Code Mimicry Integration Point
+
+**What:** The whatsapp-messenger skill calls `handleAction("send", { target, params })` in `channel.ts`. `handleAction` currently dispatches directly to `sendWahaText`. To route through typing delay, inject a presence simulation step before the WAHA send.
+
+**Key insight:** The existing `startHumanPresence()` in `presence.ts` is designed for inbound replies (it takes `incomingText` to calibrate read delay). For Claude Code outbound sends (no incoming message), use a simplified path: `sendWahaPresence(typing: true)` → sleep(calcTypingDuration) → `sendWahaPresence(typing: false)` → send. The `calcTypingDuration` helper is private to `presence.ts` — either export it or duplicate the simple formula in `mimicry-gate.ts`.
+
+**Where exactly:** In `channel.ts` → `handleAction()`, when action is `send` (or any message-creating action), check if the session has `mimicry.simulateTyping` enabled. If yes, run typing simulation before dispatching to `send.ts`. This is exclusively the external tool call path — bot replies go through `inbound.ts` → `startHumanPresence()` and never touch `handleAction()`.
+
+**Example:**
+```typescript
+// src/channel.ts — inside handleAction(), before send dispatch
+if (action === "send" && shouldSimulateTyping(resolvedAccountId, cfg)) {
+  const chatId = resolveTarget(...);
+  const text = params.text ?? "";
+  await simulateOutboundTyping({ cfg, chatId, text, accountId: resolvedAccountId });
 }
-export const moduleRegistry = new ModuleRegistry();
+// then dispatch to sendWahaText as before
 ```
-
-**Existing file modifications:**
-
-| File | Change |
-|------|--------|
-| `directory.ts` | New table `modules (module_id TEXT PRIMARY KEY, enabled INTEGER, config_json TEXT, assigned_chats_json TEXT, updated_at INTEGER)` |
-| `inbound.ts` | After DM/group filter pass: call `moduleRegistry.getModulesForChat(chatJid)` and invoke `onInbound` hooks |
-| `channel.ts` | Before `handleAction` dispatches: call module `onOutbound` hooks (optional, for enforcement) |
-| `monitor.ts` | Add `/api/admin/modules` CRUD routes; add "Modules" tab HTML/JS between Sessions and Log tabs |
-
-**Admin panel Modules tab routes:**
-- `GET /api/admin/modules` — list all registered modules with status
-- `PUT /api/admin/modules/:id/enable` — toggle
-- `PUT /api/admin/modules/:id/config` — save config
-- `PUT /api/admin/modules/:id/assignments` — set assigned chats (JID array)
-
-**Inbound hook insertion point in `inbound.ts`:**
-```
-Message passes DM/group filter
-    ↓
-Rules policy resolved
-    ↓
-[NEW] Module hooks: moduleRegistry.getModulesForChat(chatJid)
-    → for each module: await module.onInbound(msg, chatJid)
-    → if any returns false: suppress delivery (module handled it)
-    ↓
-deliverWahaReply() / OpenClaw runtime delivery
-```
-
----
-
-## Component Boundary Summary
-
-```
-New files
-  src/directory-sync.ts    — background WAHA→SQLite sync loop
-  src/pairing.ts           — passcode challenge/response + TTL grant
-  src/modules/             — module framework (3 files)
-    module-types.ts        — WahaModule interface
-    module-registry.ts     — registry singleton + SQLite store
-    index.ts               — barrel + auto-register built-ins
-
-Modified files — light touch (< 50 lines each)
-  config-schema.ts         — pairingMode, autoReply, syncIntervalMs
-  channel.ts               — module outbound hooks (optional, later)
-
-Modified files — moderate changes (50-200 lines each)
-  directory.ts             — expires_at migration, TTL methods,
-                             auto_reply_log table, modules table,
-                             upsertContactBatch, pruneExpiredGrants
-  inbound.ts               — pairing hook, auto-reply hook,
-                             module hooks; TTL expiry check
-  monitor.ts               — sync status route, pairing routes,
-                             modules routes, Modules tab HTML/JS
-
-Admin panel changes (embedded in monitor.ts)
-  Directory tab            — sync status indicator, TTL badges
-  Settings tab             — pairingMode config, autoReply config
-  Modules tab (NEW)        — module list, enable/config/assignments
-```
-
----
-
-## Data Flow Changes
-
-### Background Sync Flow (new)
-```
-monitor.ts startup
-    → startDirectorySync({ session, baseUrl, apiKey, intervalMs, db })
-    → directory-sync.ts: fetch /api/contacts (paginated via offset/limit)
-    → for each contact: db.upsertContact(jid, displayName)
-    → after contacts: fetch /api/groups → upsertContact (is_group=true)
-    → after groups: fetch /api/lids → store @lid→@c.us mapping
-    → sleep intervalMs → repeat
-    → getSyncStatus() returns { lastSyncAt, totalSynced, inProgress }
-```
-
-### Pairing Flow (new)
-```
-Inbound DM from unknown jid
-    → inbound.ts: DM filter → BLOCKED
-    → pairing.ts: isPairingEnabled() → true
-    → check pairing_challenges table: has pending challenge for jid?
-      YES: verifyPasscode(messageText)
-        → match: grantPairingAccess(jid, ttlMs) → db.upsertTTLGrant()
-                 allow message through normal pipeline
-        → no match: send "wrong passcode" reply, increment attempts
-        → max attempts: ban from pairing for cooldown period
-      NO: sendPairingChallenge(jid) → sendWahaText() scripted
-          db.upsertPairingChallenge(jid, { challenged_at: now, attempts: 0 })
-```
-
-### TTL Access Check (modified existing flow)
-```
-inbound.ts: isAllowed(jid) check
-    → Was: allow_list WHERE jid = ?
-    → Now: allow_list WHERE jid = ? AND (expires_at IS NULL OR expires_at > NOW())
-    → Expired entries behave as blocked — trigger auto-reply or pairing
-```
-
-### Module Hook Flow (new)
-```
-Message passes filter + rules resolution
-    → moduleRegistry.getModulesForChat(chatJid)
-    → [module1.onInbound, module2.onInbound] (serial, in registration order)
-    → any module returns false → suppress delivery (module handled it)
-    → all modules pass → normal delivery to OpenClaw runtime
-```
-
----
-
-## Suggested Build Order
-
-Dependencies chain upward — each item unlocks the next.
-
-**Phase 1 (foundation — all features depend on this)**
-- `directory.ts`: `expires_at` migration + `upsertTTLGrant` + `pruneExpiredGrants`
-- `directory.ts`: `upsertContactBatch` + `auto_reply_log` table + `pairing_challenges` table
-- `config-schema.ts`: `pairingMode` + `autoReply` + `syncIntervalMs` fields
-- Rationale: All subsequent features depend on these DB and config changes. One migration pass is cleaner than two.
-
-**Phase 2 (background sync — independent of pairing)**
-- `directory-sync.ts`: new file, background loop
-- `monitor.ts`: start sync at startup, `/api/admin/sync/status` route
-- Admin panel Directory tab: sync status indicator
-- Rationale: Unblocks BUG-06, BUG-11, BUG-15 (directory search bugs). No dependencies on pairing. Can ship independently.
-
-**Phase 3 (pairing mode — depends on Phase 1)**
-- `pairing.ts`: new file, challenge/response/grant logic
-- `inbound.ts`: pairing hook insertion
-- `monitor.ts`: pairing grant management routes
-- Admin panel Settings: pairing config section + active grants table
-- Rationale: Depends on `expires_at` infrastructure from Phase 1. Logically prior to FEATURE-02 since pairing creates TTL grants.
-
-**Phase 4 (TTL access — depends on Phase 1 + Phase 3 schema)**
-- `inbound.ts`: TTL expiry check in allow-list lookup
-- `monitor.ts`: `expiresAt` in directory settings route
-- Admin panel Directory tab: TTL badges, datetime picker in settings drawer
-- Rationale: Same `expires_at` column. Pairing and TTL share infrastructure. Admin control of TTL is the manual complement to automated pairing.
-
-**Phase 5 (auto-reply — depends on Phase 1 + Phase 3 hook location)**
-- `inbound.ts`: auto-reply hook after pairing check
-- `monitor.ts`: autoReply config exposed in settings
-- Admin panel Settings: autoReply section (toggle, message template, cooldown)
-- Rationale: Needs pairing hook location established first (Phase 3). `auto_reply_log` table added in Phase 1.
-
-**Phase 6 (modules framework — depends on Phase 1 DB pattern)**
-- `src/modules/module-types.ts`: `WahaModule` interface
-- `src/modules/module-registry.ts`: registry + SQLite modules table
-- `src/modules/index.ts`: barrel
-- `directory.ts`: modules table migration
-- `inbound.ts`: module `onInbound` hooks
-- `monitor.ts`: modules routes + Modules tab
-- Rationale: Self-contained. Depends on DirectoryDb pattern established in Phase 1 but not on pairing or auto-reply. Could be parallelized with Phases 3-5 if needed, but Phase 1 must come first.
-
-**Critical path:** Phase 1 → (Phase 2 || Phase 3) → Phase 4 → Phase 5 → Phase 6
-
-Phase 2 and Phase 3 are independent of each other and can be run in parallel.
-
----
-
-## Architectural Patterns to Follow
-
-### Pattern 1: setTimeout Chain for Background Loops
-
-**What:** Schedule next iteration only after current completes. Used by `health.ts` as canonical example.
-
-**When to use:** All new background loops (directory sync).
-
-**Trade-offs:** Slightly longer total cycle time than setInterval (interval + work time), but avoids pile-up. The right trade-off for all plugin background loops.
 
 ```typescript
-function tick(opts: SyncOptions, state: SyncState): void {
-  if (opts.abortSignal.aborted) return;
-  doWork(opts, state).finally(() => {
-    if (!opts.abortSignal.aborted) {
-      const t = setTimeout(() => tick(opts, state), opts.intervalMs);
-      if (typeof t === 'object' && 'unref' in t) (t as NodeJS.Timeout).unref();
-    }
-  });
+// src/mimicry-gate.ts — new exported helper
+export async function simulateOutboundTyping(params: {
+  cfg: CoreConfig; chatId: string; text: string; accountId?: string;
+}): Promise<void> {
+  const presenceCfg = resolvePresenceConfig(params.cfg);
+  if (!presenceCfg.enabled) return;
+  await sendWahaPresence({ ...params, typing: true }).catch(warnOnError("mimicry typing-start"));
+  const charsPerSecond = (presenceCfg.wpm * 5) / 60;
+  const baseMs = (params.text.length / charsPerSecond) * 1000;
+  const jitter = presenceCfg.jitter;
+  const jittered = baseMs * (jitter[0] + Math.random() * (jitter[1] - jitter[0]));
+  const duration = Math.min(Math.max(jittered, presenceCfg.typingDurationMs[0]), presenceCfg.typingDurationMs[1]);
+  await sleep(duration);
+  await sendWahaPresence({ ...params, typing: false }).catch(warnOnError("mimicry typing-stop"));
 }
 ```
 
-### Pattern 2: Migration-Safe ALTER TABLE
+---
 
-**What:** Try/catch ALTER TABLE that ignores "duplicate column" errors. Used throughout `directory.ts`.
+## Data Flow
 
-**When to use:** Every new column added to existing tables in v1.11.
+### Outbound Send Flow (v1.20)
 
-**Trade-offs:** Slightly verbose but absolutely required — production DB already exists and restarts frequently.
-
-```typescript
-try {
-  this.db.prepare(`ALTER TABLE allow_list ADD COLUMN expires_at INTEGER`).run();
-} catch (e) {
-  const msg = e instanceof Error ? e.message : String(e);
-  if (!msg.includes('duplicate column')) throw e;
-}
+```
+handleAction("send", params)              [channel.ts]
+    |
+    v
+shouldSimulateTyping(accountId, cfg)?
+    | YES
+    v
+simulateOutboundTyping()                  [mimicry-gate.ts]
+  --> sendWahaPresence(typing=true)
+  --> sleep(calcTypingDuration(text))
+  --> sendWahaPresence(typing=false)
+    |
+    v
+sendWahaText(params)                      [send.ts]
+    |
+    v
+checkMimicryGate(accountId, cfg)          [mimicry-gate.ts]
+  --> checkTimeOfDay(accountId, cfg)      -- throws GateError if outside hours
+  --> checkAndConsumeCap(accountId, cfg)  -- throws CapError if over limit
+    |
+    v
+assertCanSend()                           [existing -- unchanged]
+assertPolicyCanSend()                     [existing -- unchanged]
+    |
+    v
+callWahaApi()                             [http-client.ts -- unchanged]
+  --> TokenBucket.acquire()
+  --> fetch()
 ```
 
-### Pattern 3: Scripted Replies via sendWahaText
+### Inbound Bot Reply Flow (UNCHANGED — for contrast)
 
-**What:** Use `sendWahaText()` directly for scripted/automated replies that must NOT reach the LLM.
+```
+handleWahaInbound()                       [inbound.ts]
+    |
+    v
+startHumanPresence()                      [presence.ts]
+  --> sendSeen + readDelay + typing flicker
+    |
+    v
+deliverWahaReply()                        [inbound.ts]
+    |
+    v
+sendWahaText() / sendWahaMediaBatch()     [send.ts]
+  --> checkMimicryGate()                  -- ALSO applies here (bot replies count too)
+  --> callWahaApi()
+```
 
-**When to use:** Pairing challenges, auto-reply canned messages. Any zero-token response.
+Note: bot inbound replies will also be counted against the hourly cap via the `send.ts` gate check. This is intentional — the cap limits all outbound messages from the session, regardless of trigger source.
 
-**Trade-offs:** Bypasses the OpenClaw runtime entirely. No LLM cost, no token burn. Must use `account.session` and `account.baseUrl` from the resolved account.
+### Config Resolution Flow
 
-### Pattern 4: Module Hooks as Serial Middleware
+```
+resolveGateConfig(accountId, cfg):
+  accounts[accountId].sendGate        (per-session, highest priority)
+    | fallback
+  cfg.channels.waha.sendGate          (global)
+    | fallback
+  DEFAULTS                            (enabled=true, 7am-1am, reject)
 
-**What:** Ordered list of hook functions called sequentially. First `false` return short-circuits remaining hooks.
+resolveCapLimit(accountId, cfg):
+  accounts[accountId].hourlyCap.limit (per-session)
+    | fallback
+  cfg.channels.waha.hourlyCap.limit   (global)
+    | fallback + progression check
+  progressiveLimits[accountAge].limit (if progressive table set)
+```
 
-**When to use:** Module `onInbound` pipeline.
+### Admin Panel Data Flow (new routes)
 
-**Trade-offs:** Slower than `Promise.all` but predictable order and correct short-circuit semantics. Test each module in isolation.
+```
+GET /api/admin/mimicry
+  Response: [{ accountId, session,
+               gate: { enabled, startHour, endHour, timezone, currentlyOpen },
+               cap:  { enabled, limit, usedThisHour, resetsAt } }]
 
----
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Sync Loop Using setInterval
-
-**What people do:** `setInterval(() => runSync(), 3600_000)`
-
-**Why it's wrong:** If a sync takes longer than the interval, a second iteration starts while the first is still running. Causes duplicate DB writes and race conditions.
-
-**Do this instead:** setTimeout chain — `health.ts` is the canonical example.
-
-### Anti-Pattern 2: Background Sync Bypassing http-client Rate Limiter
-
-**What people do:** Call `fetch()` directly in the sync loop to avoid rate limiter overhead.
-
-**Why it's wrong:** WAHA API has implicit rate limits. Directory sync runs continuously and will trigger 429s, starving the message handler of API quota.
-
-**Do this instead:** Always call `callWahaApi()` from `http-client.ts`. Add deliberate inter-page delay in sync loop (e.g., 500ms between pages).
-
-### Anti-Pattern 3: Storing Pairing State In-Memory Only
-
-**What people do:** `const pairingState = new Map<string, PairingChallenge>()`
-
-**Why it's wrong:** Gateway restarts frequently. In-memory state is lost on restart. A challenge sent before restart cannot be verified after restart.
-
-**Do this instead:** Store pending challenges in SQLite `pairing_challenges` table — same pattern as `pending_selections` used by shutup.ts. Short TTL (5 min) prevents stale challenge buildup.
-
-### Anti-Pattern 4: Module Hooks Awaited in Parallel
-
-**What people do:** `await Promise.all(modules.map(m => m.onInbound(msg, chat)))`
-
-**Why it's wrong:** If two modules both want to short-circuit delivery, parallel execution makes it impossible to know which "won". Side effects between modules may race.
-
-**Do this instead:** Serial execution with early-exit on `false` return.
-
-### Anti-Pattern 5: TTL Check in Application Code Instead of SQL
-
-**What people do:** Load allow-list entry then check `entry.expiresAt < Date.now()` in TypeScript.
-
-**Why it's wrong:** Loads expired entries unnecessarily. More code paths to test. Risk of forgetting the check.
-
-**Do this instead:** Add `AND (expires_at IS NULL OR expires_at > ?)` directly in the SQL WHERE clause with `Date.now()` as the parameter.
+SSE stream (existing /api/admin/events) -- optional: push cap_consumed events
+```
 
 ---
 
-## Integration Points Summary
+## Integration Points
 
-### External Services
+### New vs Modified — Explicit Breakdown
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| WAHA API (contacts) | `callWahaApi()` via `http-client.ts` | Paginated; use offset/limit in sync loop |
-| WAHA API (groups) | `callWahaApi()` via `http-client.ts` | Returns dict — use `Object.values()` (existing quirk) |
-| WAHA API (lids) | `getWahaAllLids()` from `send.ts` | Already implemented; sync should reuse same function |
-| SQLite | `DirectoryDb` methods only | Never call `this.db` directly outside `directory.ts` |
+| File | Change Type | What Changes |
+|------|-------------|-------------|
+| `src/mimicry-gate.ts` | **NEW** | Time gate + cap tracker + config resolution + `simulateOutboundTyping` + `getCapStatus` |
+| `src/config-schema.ts` | **MODIFIED** | Add `sendGate` and `hourlyCap` Zod schemas to `WahaAccountSchemaBase` |
+| `src/send.ts` | **MODIFIED** | Add `checkMimicryGate()` call at top of 4 send functions; respect existing `bypassPolicy` flag |
+| `src/channel.ts` | **MODIFIED** | Add typing simulation for tool-call `send` action; guard with `shouldSimulateTyping()` |
+| `src/monitor.ts` | **MODIFIED** | Add `GET /api/admin/mimicry` route returning gate+cap status per session |
+| `src/admin/src/components/tabs/DashboardTab.tsx` | **MODIFIED** | New "Send Gates" card: gate open/closed badge + cap progress bar |
+| `src/admin/src/components/tabs/SettingsTab.tsx` | **MODIFIED** | New sendGate/hourlyCap config section (enable toggle, hours inputs, cap limit) |
+| `src/admin/src/types.ts` | **MODIFIED** | Add `SendGateStatus`, `HourlyCapStatus` types |
+| `src/presence.ts` | **UNCHANGED** | Reused via `simulateOutboundTyping` calling `sendWahaPresence` + `sleep` |
+| `src/http-client.ts` | **UNCHANGED** | Token bucket stays; different concern (burst vs hourly) |
+| `src/directory.ts` | **UNCHANGED** | No per-contact cap in v1.20; `dm_settings` available for Phase 2 |
+| `src/analytics.ts` | **UNCHANGED** | Existing outbound event tracking covers cap audit if needed |
+| `src/inbound.ts` | **UNCHANGED** | Bot reply path unchanged; gate applies via `send.ts` layer automatically |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `directory-sync.ts` → `directory.ts` | `DirectoryDb` method calls only | No direct DB access from sync module |
-| `pairing.ts` → `inbound.ts` | Function calls, returns boolean | pairing.ts must NOT import from inbound.ts (circular dep) |
-| `pairing.ts` → `send.ts` | `sendWahaText()` for challenge messages | Same pattern as shutup.ts |
-| `module-registry.ts` → `directory.ts` | `DirectoryDb` for module config persistence | Registry receives db reference at init |
-| `inbound.ts` → `module-registry.ts` | `moduleRegistry.getModulesForChat()` | Singleton import; initialized before first message |
-| `monitor.ts` → `directory-sync.ts` | `startDirectorySync()` + `getSyncStatus()` | Same pattern as `startHealthCheck` from `health.ts` |
-| Admin panel → `/api/admin/*` routes | XHR to monitor.ts HTTP server | All existing CORS, JSON, textContent-only patterns apply |
+| `channel.ts` → `mimicry-gate.ts` | Direct import — `simulateOutboundTyping()` | Before `sendWahaText` dispatch in `handleAction()` |
+| `send.ts` → `mimicry-gate.ts` | Direct import — `checkMimicryGate()` | At start of 4 send functions |
+| `mimicry-gate.ts` → `send.ts` | Direct import — `sendWahaPresence()` | For typing start/stop in `simulateOutboundTyping` |
+| `mimicry-gate.ts` → `http-client.ts` | Direct import — `sleep()` | For typing delay in `simulateOutboundTyping` |
+| `monitor.ts` → `mimicry-gate.ts` | Direct import — `getCapStatus()` | For admin API route |
+| `config-schema.ts` | Extended in place | Schema is source of truth; no circular dep added |
+
+---
+
+## Build Order
+
+Dependencies flow: schema → enforcement → UI. Phases 2 and 3 are independent and can build in parallel.
+
+**Phase 1 — Config Schema + MimicryGate core** (no external deps)
+- Add `sendGate` + `hourlyCap` Zod schemas to `config-schema.ts`
+- Write `src/mimicry-gate.ts`: `checkTimeOfDay`, `checkAndConsumeCap`, `resolveGateConfig`, `resolveCapLimit`, `getCapStatus`
+- Unit tests for gate + cap logic
+- Gate: `vitest` passes, config validates without error
+
+**Phase 2 — Wire gate/cap into send.ts** (depends on Phase 1)
+- Add `checkMimicryGate()` call to `sendWahaText`, `sendWahaImage`, `sendWahaVideo`, `sendWahaFile`
+- Respect `bypassPolicy` flag — gate skipped when `bypassPolicy: true`
+- Integration test: send outside hours throws `GateError`, exceed cap throws `CapError`
+- Gate: deploy + live test, confirm messages blocked correctly, `/shutup` confirm still works
+
+**Phase 3 — Claude Code mimicry integration** (depends on Phase 1, parallel with Phase 2)
+- Add `simulateOutboundTyping()` to `mimicry-gate.ts`
+- Wire into `channel.ts` `handleAction()` for `send` action
+- Gate: live test via whatsapp-messenger skill — typing indicator appears in WhatsApp before message
+
+**Phase 4 — Admin UI + API route** (depends on Phases 1-3)
+- Add `GET /api/admin/mimicry` to `monitor.ts`
+- DashboardTab: new "Send Gates" card with gate status badge + hourly cap progress bar
+- SettingsTab: sendGate hours pickers + hourlyCap limit input + progressive limits table
+- Gate: Playwright test
+
+### Critical Dependency Notes
+
+- `bypassPolicy` is the existing escape hatch — all gate/cap enforcement MUST check it. System commands (`/shutup`, `/join`, `/leave`) pass `bypassPolicy: true` and must continue to bypass the gate.
+- Bot inbound replies go through `send.ts` and WILL be counted against the hourly cap. This is intentional — the cap is a per-session outbound rate, regardless of trigger source. If this needs to be optional, add a separate `skipMimicryGate` boolean to `sendWahaText` params.
+- The `resolvePresenceConfig()` function in `presence.ts` is unexported. Either export it (preferred) or duplicate the config resolution in `mimicry-gate.ts`.
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| 1-5 sessions | In-memory cap tracker per accountId — no changes needed |
+| 10+ sessions (SaaS) | Move cap state to SQLite `mimicry_caps` table, same pattern as `analytics.ts` |
+| High-volume | Progressive limits table in config handles account maturity automatically |
+
+The in-memory approach is correct for the current single-node hpg6 deployment. The `Map<accountId, ...>` keying already supports multiple sessions.
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Gate Check in `callWahaApi`
+
+**What people do:** Put the gate/cap check in `http-client.ts` since all WAHA calls go through it.
+
+**Why it's wrong:** `callWahaApi` is called for health checks, group syncs, presence updates, contact fetches — none of which are message sends. The hourly cap would count every API call, not just user-visible messages. At 15 tokens/sec (token bucket default), the cap would be exhausted in seconds.
+
+**Do this instead:** Check at the `sendWahaText` / `sendWahaImage` / `sendWahaVideo` / `sendWahaFile` layer in `send.ts`. These four functions are the only ones that create visible WhatsApp messages.
+
+### Anti-Pattern 2: Double-Simulate Typing for Bot Replies
+
+**What people do:** Add `simulateOutboundTyping()` to `sendWahaText` unconditionally.
+
+**Why it's wrong:** Inbound bot replies already go through `startHumanPresence()` in `inbound.ts` which runs a full read delay + typing flicker. Calling it again in `send.ts` would stack two typing simulations, causing the bot to show typing for 2x the expected duration.
+
+**Do this instead:** `simulateOutboundTyping()` is only called from `channel.ts` `handleAction()` — the code path exclusive to external tool calls (Claude Code / skill invocations). The `send.ts` gate check has no typing simulation, only the gate/cap enforcement.
+
+### Anti-Pattern 3: Persist Cap State to SQLite on Every Send
+
+**What people do:** Write cap counters to `analytics.ts` or a new `mimicry_caps` table for persistence across restarts.
+
+**Why it's wrong:** Gateway restarts are rare and intentional (deploy cycle). Writing to SQLite on every outbound message adds I/O overhead with no practical benefit. The `analytics.ts` already stores `message_events` with `direction='outbound'` — if you need post-restart cap reconstruction, that data is there.
+
+**Do this instead:** In-memory `Map<accountId, HourlyWindow>`. Cap resets on restart are acceptable behavior.
+
+### Anti-Pattern 4: Timezone Handling with `Date.getHours()`
+
+**What people do:** Use `new Date().getHours()` for time-of-day gate.
+
+**Why it's wrong:** Returns server local time. hpg6 is UTC+3, but if server timezone changes or user wants a different timezone in config, the gate breaks silently.
+
+**Do this instead:** Use `Intl.DateTimeFormat` with configurable timezone from `sendGate.timezone` (default `"Asia/Jerusalem"`):
+
+```typescript
+function getHourInTimezone(tz: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric", hour12: false, timeZone: tz
+  }).formatToParts(new Date());
+  return parseInt(parts.find(p => p.type === "hour")!.value, 10);
+}
+```
+
+Pure JS, no library needed, handles DST correctly.
 
 ---
 
 ## Sources
 
-- Direct source inspection: `src/directory.ts`, `src/health.ts`, `src/inbound.ts`, `src/monitor.ts`, `src/channel.ts`, `src/config-schema.ts`, `src/inbound-queue.ts`, `src/shutup.ts`, `src/dm-filter.ts`
-- `.planning/PROJECT.md` — v1.11 requirements and feature scope
-- `.planning/phases/11-dashboard-sessions-log/bugs.md` — FEATURE-01 through FEATURE-04 specifications with user design decisions
+- Direct code inspection: `src/send.ts`, `src/channel.ts`, `src/http-client.ts`, `src/config-schema.ts`, `src/presence.ts`, `src/rate-limiter.ts`, `src/analytics.ts`, `src/inbound.ts`
+- `.planning/PROJECT.md` — v1.20 requirements and existing architecture decisions table
+- `CLAUDE.md` — critical rules, deploy constraints, send.ts DO NOT CHANGE markers
 
 ---
-
-*Architecture research for: WAHA OpenClaw Plugin v1.11 integration design*
-*Researched: 2026-03-17*
+*Architecture research for: WAHA OpenClaw Plugin v1.20 Human Mimicry Hardening*
+*Researched: 2026-03-26*

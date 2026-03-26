@@ -1,215 +1,207 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** v1.11 feature additions to existing brittle WhatsApp plugin (background sync, pairing mode, TTL access, auto-reply, modules system)
-**Researched:** 2026-03-17
-**Confidence:** HIGH (based on codebase analysis, bugs.md findings, lessons-learned history, and established patterns in similar feature domains)
+**Domain:** Adding human mimicry features (time-of-day gates, hourly caps, Claude Code integration) to existing brittle WhatsApp plugin
+**Researched:** 2026-03-26
+**Confidence:** HIGH (codebase analysis, established patterns, specific integration points verified)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Background Sync Race Condition With Inbound Webhook Writes
+### Pitfall 1: Hourly Cap Fights the Existing Token Bucket
 
 **What goes wrong:**
-Background sync pulls the full contacts/groups list from WAHA and writes it to SQLite in a loop. Meanwhile, the inbound webhook handler also writes to the same `contacts` and `group_participants` tables when new messages arrive (upsert-on-message pattern). These two writers collide. Even with SQLite WAL mode, if the background sync runs a multi-row transaction and the webhook handler tries to upsert mid-transaction, the webhook write either deadlocks or silently fails with `SQLITE_BUSY`. The busy_timeout is already set but a long-running bulk sync transaction will exhaust it.
+The existing `TokenBucket` in `http-client.ts` is a per-second throughput limiter (20-burst, 15 tokens/sec). A new hourly cap is a per-hour count limiter. If you place the hourly check AFTER the token bucket `acquire()`, a burst of 30 messages can exhaust the hourly cap in 2 seconds while the token bucket happily allows it. If you place it BEFORE, you block the token bucket queue drain, causing silent hung requests (promises that never resolve because `release()` was never called).
 
 **Why it happens:**
-The background sync naturally batches writes for efficiency (single transaction for 1000 contacts). The existing inbound webhook handler was written assuming it's the only writer. The sync loop has no awareness of concurrent webhook writes and vice versa.
+Two independent rate-limiting layers with different time windows. Developers assume they compose cleanly, but the token bucket drains an async queue — if you gate on hourly cap inside `acquire()`, you stall the drainer. If you gate outside, you can't block in-flight token bucket requests.
 
 **How to avoid:**
-- Run background sync writes in small page-sized batches (50-100 rows) with a `yield` between batches — never one mega-transaction across all contacts
-- Add a dedicated write serializer: both the sync loop and webhook handler acquire a single-writer async mutex before writing to `DirectoryDb`
-- Use `INSERT OR REPLACE` (upsert) not DELETE+INSERT — shorter write window, safer for concurrent access
-- Do NOT use a separate SQLite connection for the sync loop; reuse the singleton `getDirectoryDb()` instance
+Keep the hourly cap as a hard check at the `sendWahaText` / `callWahaApi` entry point, BEFORE the token bucket acquires. Throw an error rather than queuing. The token bucket is for burst shaping, not for deferring sends across hours. A rejected send should surface to the caller with a meaningful error ("hourly cap reached, try again at HH:MM") rather than silently hanging. Never await on the hourly cap — check and throw or pass.
 
 **Warning signs:**
-- `SQLITE_BUSY` errors in logs during the first sync run
-- Contacts visible in WAHA but not appearing in the directory tab after sync completes
-- Intermittent "no such row" errors from webhook handler immediately after sync finishes
+- Send requests that hang for >30 seconds when hourly cap is nearly full
+- Token bucket queue depth climbing with no corresponding outbound traffic
+- `acquire()` never logging "queue full" even though hourly cap is exceeded
 
-**Phase to address:** Background sync phase (any phase implementing CR-08)
+**Phase to address:**
+Phase: Time-of-Day Gates & Hourly Caps (core implementation phase)
 
 ---
 
-### Pitfall 2: Background Sync Exhausting the Rate Limiter and Starving User-Facing Calls
+### Pitfall 2: Message Loss on Restart When Queuing Gated Sends
 
 **What goes wrong:**
-Background sync makes repeated WAHA API calls to paginate through contacts/groups/newsletters. The token-bucket rate limiter from Phase 1 (R2) is shared across ALL outbound WAHA calls. If the sync loop runs at full speed, it drains the bucket and causes user-facing sends (triggered by the agent) to queue behind sync pages. A busy sync run can cause a visible "hang" of 3-10 seconds before the agent's message is sent.
+If the time-of-day gate queues blocked messages in memory (e.g., "send this at 7am"), a gateway restart wipes the queue. The agent doesn't know the message was never sent. Duplicate send on retry is worse than loss — double-messages to real humans are visually jarring.
 
 **Why it happens:**
-The rate limiter was built to protect against flood, not to distinguish sync calls from user-facing calls. Background sync is the highest-volume API consumer in the system — it can easily generate 100+ calls in a single run.
+The plugin has no persisted outbound queue. The inbound queue (`inbound-queue.ts`) is in-memory and explicitly documented as acceptable to lose on restart (webhook flood protection only). Applying the same in-memory approach to outbound queuing is wrong because the semantics differ — inbound drops are acceptable, outbound drops are silent message loss.
 
 **How to avoid:**
-- Run sync calls through a SEPARATE low-priority token bucket, or exempt them from the shared limiter but cap the sync loop to 2 calls/second max
-- Add a `syncPaused` flag: when a user-facing send is queued, pause the sync loop until the send completes
-- Alternatively: use `setTimeout`-based pacing in the sync loop (e.g., 500ms delay between pages) — no shared limiter needed, just explicit throttling
-- Track sync calls separately in metrics so you can observe their rate impact
+Do NOT queue rejected messages across restarts. Choose one of two strategies:
+1. **Reject, don't queue**: When a send is gated (wrong time window or hourly cap), throw synchronously. The gateway will retry, which is correct — it's designed for transient failures. This is the simpler and safer approach for v1.20.
+2. **Persist queue in SQLite**: Only if deferred delivery is required. Use the existing `analytics.ts` SQLite infrastructure. Add a `send_queue` table. Re-drain on startup. This is complex and not needed for the initial feature.
+
+The `MutationDedup` class in `http-client.ts` already prevents gateway retry double-sends within a 60s TTL — lean on this rather than building a queue.
 
 **Warning signs:**
-- Agent send latency rises above 3 seconds when background sync is running
-- Rate-limiter queue depth visible in Queue tab spikes during sync
-- Gateway logs show "token bucket empty" during sync windows
+- `setTimeout` used to hold a send until the gate opens
+- Any in-memory array that accumulates pending outbound sends
+- No SQLite persistence for queued sends but restart recovery is implied
 
-**Phase to address:** Background sync phase — must build throttling in from day one, not as a follow-up
+**Phase to address:**
+Phase: Time-of-Day Gates & Hourly Caps (core implementation phase) — establish reject-don't-queue as the contract
 
 ---
 
-### Pitfall 3: Passcode System Vulnerable to Brute-Force and Replay
+### Pitfall 3: Timezone Hell in Time-of-Day Gate
 
 **What goes wrong:**
-Pairing mode uses a numeric passcode. Without rate limiting on passcode attempts, any WhatsApp user who DMs the bot can brute-force a 4-6 digit passcode in seconds. Even with a correct passcode, if the same passcode is reused across sessions (per-session static config), a person who previously learned the passcode can re-authenticate at any time, bypassing the TTL expiry intention.
+The server (hpg6) runs UTC. `new Date().getHours()` returns UTC hours. A 7am-1am gate configured in Israel Standard Time (UTC+3) will fire 3 hours late — gate opens at 10:00 UTC instead of 07:00 UTC, closes at 04:00 UTC instead of 01:00 UTC. Cross-midnight windows (`7am-1am` spans two calendar days) require modular arithmetic that naive `startHour <= currentHour <= endHour` breaks entirely.
 
 **Why it happens:**
-Passcode systems are naturally stateless unless you explicitly track failed attempts. The "per-session or per-contact" passcode scoping (from FEATURE-01) makes it tempting to keep a single static passcode in config — but static passcodes are replayable forever.
+Node.js `Date` has no timezone awareness without an explicit IANA timezone string and `Intl.DateTimeFormat`. Developers use `getHours()` assuming local time, but Node on a Linux server is almost always UTC.
 
 **How to avoid:**
-- Rate-limit passcode attempts: max 3 attempts per contact per 30 minutes, then a 24-hour lockout — store attempt count + lockout_until in SQLite
-- Generate time-scoped passcodes (TOTP-style rotation: passcode changes every 24h) OR support single-use passcodes that are invalidated after first successful use
-- For the `wa.me` link injection use case (FEATURE-01): passcodes in links should be one-time tokens (UUID or random 8-char alphanumeric), not a shared static code
-- Never log the passcode in plaintext in gateway logs — log only "passcode attempt from [JID]: MATCH/NO_MATCH"
-- Store passcode hash (bcrypt or SHA-256 with salt), not plaintext, in config
+- Store `timezone` in config alongside `sendWindowStart`/`sendWindowEnd` (e.g., `timezone: "Asia/Jerusalem"`).
+- Use `Intl.DateTimeFormat` with `timeZone` to extract the local hour: `new Intl.DateTimeFormat('en', { timeZone, hour: 'numeric', hour12: false }).format(now)`.
+- Handle the cross-midnight case explicitly: if `startHour > endHour` (e.g., `7 > 1` is false, but `22 > 6` is true), the window wraps midnight. Check: `currentHour >= startHour || currentHour < endHour`.
+- Default timezone to `"Asia/Jerusalem"` (the primary user's timezone) — not UTC, not server local.
+- Test with hours 0, 1, 6, 7, 13, 22, 23 in the configured timezone.
 
 **Warning signs:**
-- Multiple failed passcode attempts from the same JID in a short window (check logs)
-- Admin reports a contact gained access unexpectedly (replay of old passcode)
+- `new Date().getHours()` anywhere in the gate logic without a timezone conversion
+- Config that stores only `startHour` and `endHour` with no `timezone` field
+- End-to-end tests running correctly on a developer machine (Windows local time) but failing on hpg6 (UTC)
 
-**Phase to address:** Pairing mode phase (FEATURE-01) — security must be in the initial design
+**Phase to address:**
+Phase: Time-of-Day Gates & Hourly Caps (core implementation phase)
 
 ---
 
-### Pitfall 4: TTL Expiry Checked at Read Time But Not Cleaned Up — Zombie Grants
+### Pitfall 4: Config Schema Breaks Zod Validation on Existing Configs
 
 **What goes wrong:**
-TTL access grants have an `expires_at` column in SQLite. The inbound filter checks `expires_at > now()` before allowing a message. This appears to work — but expired entries are never deleted from the DB. Over time (especially with pairing mode creating lots of temporary grants), the table accumulates thousands of expired rows. SQLite query performance degrades on unindexed `expires_at` scans. Worse: the admin panel's "active TTL grants" view shows the right count, but the underlying query joins against the expired rows and runs slowly.
+`validateWahaConfig` in `config-schema.ts` uses `WahaConfigSchema` which ends with `.strict()`. Adding new fields to `WahaAccountSchemaBase` adds them to the strict schema. If the existing `openclaw.json` on hpg6 has fields from OTHER subsystems (it does — see the strip-unknown-keys comment in `validateWahaConfig`), the strip logic in `validateWahaConfig` already handles this. However, if new fields are added with default values but the schema runs in strict mode on the raw config object from disk, the strip happens BEFORE validation, so new fields with defaults will resolve correctly. The real risk is if new fields are optional but the Zod type infers them as `required` due to a missing `.optional()` — causing every config save from the admin panel to fail validation until the new keys are present.
 
 **Why it happens:**
-Lazy expiry (check at read, never delete) is the easiest implementation. Developers ship it and forget the cleanup step because it "works" in testing with small data.
+`WahaAccountSchemaBase` uses `.strict()` which rejects unknown keys. The `validateWahaConfig` function strips unknown keys before validating, but this only helps for keys unknown to the schema, not for new required keys missing from existing configs. A new field added as `z.number().min(0)` without `.optional().default(X)` will cause all existing configs to fail validation immediately after deploy.
 
 **How to avoid:**
-- Add a periodic cleanup job (every 15 minutes) that `DELETE FROM dm_settings WHERE expires_at IS NOT NULL AND expires_at < ?` with `Date.now()` — run it in the existing health-ping setTimeout chain to avoid a new timer
-- Add an index on `expires_at` in the migration: `CREATE INDEX IF NOT EXISTS idx_expires_at ON dm_settings(expires_at) WHERE expires_at IS NOT NULL`
-- Cap the maximum TTL duration in the admin panel (e.g., max 7 days) to bound accumulation even without cleanup
-- Log cleanup runs at DEBUG level with count of rows deleted
+Every new config field MUST use `.optional().default(value)`. Never add a required field to `WahaAccountSchemaBase`. Test by running `validateWahaConfig` against the current production config JSON (copy from hpg6) before deploying. Add the new field names to the `knownKeys` set in `validateWahaConfig` so they aren't stripped.
 
 **Warning signs:**
-- Directory tab slows down after a week of pairing mode use
-- SQLite file size grows unexpectedly (check with `ls -lh ~/.openclaw/`)
-- Admin panel "active TTL grants" count is correct but query takes >100ms
+- New config field in schema without `.optional()`
+- Admin panel config save returning 400 after deploy
+- Gateway logs showing `validation_failed` immediately on startup
 
-**Phase to address:** TTL access phase (FEATURE-02) — index and cleanup must be part of the schema migration
+**Phase to address:**
+Phase: Config Schema Extension (any phase that adds new config keys)
 
 ---
 
-### Pitfall 5: Auto-Reply Spam Loop — Bot Replies to Its Own Rejection Message
+### Pitfall 5: Claude Code Skill Bypasses the Entire Plugin
 
 **What goes wrong:**
-Auto-reply sends a canned "you're not allowed" message to unauthorized DMs (FEATURE-03). The bot sends this message using its own session. WAHA delivers a webhook for the bot's outbound message. If `fromMe` filtering is not airtight, the inbound handler processes the bot's own message, determines the bot's JID is also "unauthorized" (it's not in the allow list for itself), and sends another canned reply. Repeat.
+The `whatsapp-messenger` Claude Code skill calls the WAHA API directly via `curl` or HTTP (it calls `sendText` endpoint directly on `http://127.0.0.1:3004`). It does NOT go through `sendWahaText` in the plugin, does NOT go through `callWahaApi`, does NOT hit the token bucket or any plugin-level rate limiter. This is explicitly documented in the milestone context. Adding hourly caps to the plugin does nothing to limit Claude Code sends. If Claude Code sends 200 messages via the skill in an hour and the plugin caps the agent at 30, Meta sees 230 messages from the session — cap is meaningless.
 
 **Why it happens:**
-The `fromMe` flag in WAHA webhooks is session-relative. The existing code filters `fromMe: true` in the main message path, but the auto-reply logic is new code that runs in a pre-filter phase BEFORE the existing `fromMe` check. If the ordering is wrong, the bot replies to itself.
+The Claude Code skill was designed for direct API access for simplicity (no gateway). It predates the mimicry system. There is no intercept point at the WAHA API level.
 
 **How to avoid:**
-- Auto-reply logic MUST be inserted AFTER the `fromMe` check, not before it — even though it feels like a "pre-LLM" filter, it's still post-`fromMe`-filter
-- Maintain a `recentlyReplied` Set (by contact JID + time window) — if we already sent a canned reply to this JID in the last 24h, skip the send entirely (already planned in FEATURE-03 rate limit requirement)
-- Add the bot's own session JIDs to the auto-reply exclusion list — never send a canned reply to a message from any of our own sessions
-- Test specifically: send a DM from the bot session to itself and verify no reply loop occurs
+The only integration path is: (a) make the Claude Code skill call a new plugin HTTP endpoint (e.g., `POST /api/admin/send` that enforces all mimicry logic), or (b) add a WAHA-level proxy layer (complex, fragile). Option (a) is the correct approach. The admin panel server in `monitor.ts` already runs an HTTP server on port 8050 — add a `POST /api/admin/proxy-send` route that runs through time gate + hourly cap + token bucket + typing delay before calling WAHA. Update the `whatsapp-messenger` skill to hit this endpoint instead of WAHA directly. This is the entire "Claude Code mimicry integration" phase.
 
 **Warning signs:**
-- Gateway logs show the same outbound "canned reply" message sent more than once in rapid succession to the same JID
-- WAHA logs show the bot session sending hundreds of messages to itself
+- Hourly cap implemented in plugin but Claude Code sends not counted in the same bucket
+- `whatsapp-messenger` skill still contains direct `curl http://127.0.0.1:3004/api/sendText` calls
+- No new route added to `monitor.ts`
 
-**Phase to address:** Auto-reply phase (FEATURE-03)
+**Phase to address:**
+Phase: Claude Code Mimicry Integration (dedicated phase, after time gate + cap are working)
 
 ---
 
-### Pitfall 6: Auto-Reply Rate Limit State Lost on Gateway Restart — Spam Window
+### Pitfall 6: Progressive Limits State Not Persisting Across Restarts
 
 **What goes wrong:**
-The 24-hour "only reply once per contact" rate limit for auto-reply (FEATURE-03) is stored in memory (a `Map` with timestamps). When the gateway restarts (which happens on every code deploy), the map is cleared. An unauthorized contact who triggered the auto-reply 2 minutes before the restart will receive another canned reply immediately after the restart when they DM again.
+Progressive limits track "account maturity" — a new account gets 10 msgs/hour, after 30 days gets 30, after 90 days gets 50. If this maturity state is stored in memory, every gateway restart resets it. The account appears "new" again. Worse, if the maturity calculation uses the plugin startup timestamp as "account age start", the account never matures because restarts keep resetting the clock.
 
 **Why it happens:**
-In-memory state is the easiest implementation. Developers don't anticipate the restart-on-deploy pattern (every phase deploys, every deploy restarts the gateway).
+In-memory state is the default pattern in this codebase (the inbound queue, SSE clients, rate limiter state). It works for ephemeral state but not for maturity tracking.
 
 **How to avoid:**
-- Store auto-reply timestamps in SQLite (`contacts` table, add `last_auto_reply_at` column) — persists across restarts
-- Alternative: use a TTL-aware in-memory store that re-hydrates from SQLite on startup
-- The cleanup overhead is minimal — a single extra column on `contacts`, written only when auto-reply fires
+Store the "account first seen" timestamp in the existing SQLite database (either `DirectoryDb` or `AnalyticsDb`). A single `account_metadata` table with `(session_id TEXT PRIMARY KEY, first_seen_at INTEGER, message_count_total INTEGER)` is sufficient. Do not recalculate maturity from restart time — read it from SQLite on startup. The hourly message count should be stored as a rolling window in SQLite with a timestamp, not as an in-memory counter, so restarts don't lose count accuracy.
 
 **Warning signs:**
-- User reports receiving two "not allowed" messages shortly apart — check if a deploy happened between them
-- Test: send unauthorized DM, restart gateway within 1 minute, send another DM — verify no second reply
+- Maturity stage stored as a module-level variable initialized at startup
+- `Date.now() - pluginStartTime` used anywhere in maturity calculation
+- No SQLite migration adding maturity state tables
 
-**Phase to address:** Auto-reply phase (FEATURE-03) — persistence must be in the initial design
+**Phase to address:**
+Phase: Hourly Caps & Progressive Limits (core implementation phase)
 
 ---
 
-### Pitfall 7: Module System Inbound Hook Ordering Breaks Existing Pipeline
+### Pitfall 7: Hourly Count Reset at Wrong Boundary
 
 **What goes wrong:**
-The module framework (FEATURE-04) adds inbound hooks — each module gets a chance to intercept/transform messages. This hook pipeline runs inside `handleWahaInbound`. The existing inbound pipeline has carefully ordered checks: `fromMe` filter → dedup claim → shutup check → trigger word → DM policy → group policy → LLM dispatch. Inserting module hooks at the wrong position (e.g., before dedup claim or after LLM dispatch) causes modules to fire on messages they shouldn't see, or fire after the message has already been processed.
+"Hourly cap" is ambiguous: does it reset at the top of the clock hour (00:00, 01:00, 02:00) or is it a rolling 60-minute window? If it resets at the top of the hour, the agent can send 30 messages at 12:59 and 30 more at 13:00 — 60 in 2 minutes, which looks automated. If it's a rolling window, implementation is more complex but more accurate to human behavior.
 
 **Why it happens:**
-The existing pipeline has no extension points by design — it was built as a monolithic waterfall. Adding module hooks as an afterthought without understanding the ordering invariants breaks the pipeline.
+"Hourly cap" defaults to "reset at top of hour" in naive implementations because `Math.floor(Date.now() / 3_600_000)` gives a bucket key. Rolling windows require storing timestamps.
 
 **How to avoid:**
-- Define explicit hook slots with documented semantics: `PRE_FILTER` (before fromMe/dedup), `POST_FILTER` (after policy, before LLM), `POST_DISPATCH` (after LLM response sent)
-- Modules should NOT be allowed to hook `PRE_FILTER` — that's reserved for system-level guards (fromMe, dedup, shutup)
-- Module hooks should receive a `context` object that includes the policy resolution result — modules should augment, not re-implement policy
-- Run module hooks in deterministic order (registration order, documented) — non-deterministic ordering creates hard-to-reproduce bugs
-- Any exception from a module hook MUST be caught and logged without stopping the pipeline — one bad module should not take down all message processing
+Use a rolling 60-minute window. Store each outbound message's timestamp in a SQLite table. Count of rows where `sent_at > (now - 3_600_000)` is the current hourly usage. This is accurate and restart-safe. The query is fast on a small table (max ~50 rows if cap is enforced). Prune rows older than 2 hours periodically to keep the table bounded.
 
 **Warning signs:**
-- Messages being silently dropped after a module is registered
-- Duplicate LLM dispatches (module hook fires AND the main pipeline fires)
-- `fromMe` messages reaching module hooks (means hooks are before the fromMe filter)
+- Hourly bucket counter reset with `setInterval` at 60-minute boundaries
+- Counter stored as a single integer in memory
+- No per-timestamp record of outbound sends
 
-**Phase to address:** Modules phase (FEATURE-04)
+**Phase to address:**
+Phase: Hourly Caps & Progressive Limits
 
 ---
 
-### Pitfall 8: Module Isolation Failure — Modules Sharing Mutable State
+### Pitfall 8: Testing Time-Based Logic Is Broken Without Dependency Injection
 
 **What goes wrong:**
-Two modules registered for the same group both maintain in-memory state (e.g., a "moderator" module tracks recent messages, an "event planner" module tracks RSVPs). If they share a mutable object passed through the hook context, one module's mutations affect the other. More subtly: if modules are implemented as closures over the same config object, a config update in one module leaks into another.
+`sendWahaText` calls `Date.now()` directly. Time gate checks call `new Date().getHours()`. Tests that run in CI run at a fixed moment in real time — if the gate is configured for 7am-1am and tests run at 2am UTC on a CI server, all gated send tests fail. You can't mock `Date.now()` in vitest without either global mocking (which leaks between tests) or dependency injection.
 
 **Why it happens:**
-The plugin is a single Node.js module — everything shares the same process heap. Module isolation requires explicit design (copies, freezes, separate namespaces). Without it, modules naturally share everything.
+Inline `Date.now()` calls are the path of least resistance. The existing codebase already does this throughout (`http-client.ts`, `dedup.ts`, `policy-cache.ts`). v1.20 adds time-sensitive logic that changes behavior based on the current clock — making the problem much more acute.
 
 **How to avoid:**
-- Each module receives a COPY of the relevant config slice, not a reference: `Object.freeze(structuredClone(moduleConfig))`
-- Module state must be stored in a module-scoped namespace (e.g., `Map<string, ModuleState>` keyed by module ID) — never on a shared singleton
-- Module hooks receive an immutable context snapshot — if a module needs to signal state changes, it returns a result object rather than mutating the context
-- Use TypeScript `readonly` types on all hook context objects to make mutation a compile error
+Extract a `now: () => number` parameter or a `clock: { now: () => number; getLocalHour: (tz: string) => number }` injectable. The gate enforcement function should accept `now` as a parameter with `Date.now()` as the default: `function isWithinSendWindow(config, now = Date.now()): boolean`. Tests pass a fixed timestamp. This is the pure-function extraction pattern already established in `mentions.ts` for testability. The hourly count query also needs a `now` parameter for the rolling window boundary calculation.
 
 **Warning signs:**
-- Module A behavior changes after installing Module B with no direct interaction between them
-- Config update for one module affects another module's behavior
-- Test: register two modules that each log their received config — verify the logs show independent values
+- Tests using `vi.useFakeTimers()` globally (leaks state across test files in vitest)
+- Gate logic test that always passes at the same real-world hour range
+- No `now` parameter on the gate or cap enforcement functions
 
-**Phase to address:** Modules phase (FEATURE-04)
+**Phase to address:**
+Phase: Testing (dedicated test phase, but the injectable pattern must be built into the implementation phase)
 
 ---
 
-### Pitfall 9: Background Sync Full-Resync on Every Startup Causing Startup Lag
+### Pitfall 9: Per-Session vs. Per-Account Cap Confusion
 
 **What goes wrong:**
-Background sync is implemented to always start from page 1 on gateway startup (full resync). With 500+ contacts, this takes 2-5 minutes during which directory search returns incomplete results. Worse: if the gateway restarts frequently (every code deploy), the sync never finishes before the next restart. The directory is perpetually 20% populated.
+The plugin has two WAHA sessions: `3cf11776_logan` (bot) and `3cf11776_omer` (human). Meta tracks ban risk per WhatsApp account (phone number), not per plugin session name. If the hourly cap is enforced per `accountId` (plugin concept) but Claude Code sends use `session` directly, the two caps are separate and the combined outbound volume can be double the safe limit.
 
 **Why it happens:**
-"Start from scratch on restart" is the simplest correctness guarantee. Incremental sync requires tracking a cursor (last sync timestamp or a sequence number from WAHA). Developers defer cursor tracking as a "future optimization."
+The plugin's multi-account architecture separates `accountId` (plugin config key) from `session` (WAHA session name). Rate limiting was designed around `accountId`. Claude Code sends specify the WAHA `session` directly and bypass `accountId` routing entirely.
 
 **How to avoid:**
-- Store the last successful sync timestamp in SQLite (`sync_state` table or a `_meta` key-value table)
-- On startup: if last sync was < 24h ago, run an incremental sync (only new/changed contacts) — if > 24h, run full resync
-- Better: use WAHA's contact update webhooks to do real-time incremental updates, with a daily full resync for safety
-- Add a "Sync in progress: X/Y contacts" indicator in the Directory tab so the admin can see sync state
-- The initial full sync should run at LOW priority (2 calls/second max) so it doesn't impact startup
+The hourly cap must be keyed by the underlying WhatsApp phone number (or WAHA session name), not by `accountId`. When the Claude Code mimicry endpoint in `monitor.ts` receives a send request specifying session `3cf11776_omer`, it should use the same hourly cap bucket as the plugin's `omer` account. Use the WAHA session name as the cap key, not `accountId`. The session name is stable and unique per phone number.
 
 **Warning signs:**
-- Directory tab shows "10 contacts" immediately after startup but grows to 500 contacts over 5 minutes (resync is working but slow)
-- Gateway restart frequency matches sync completion time — net result is perpetually incomplete sync
+- Hourly cap keyed by `accountId` without mapping to a WAHA session name
+- Separate cap buckets for Logan sends vs. Omer sends when they share a phone-level risk
+- Claude Code proxy route accepting a `session` parameter but looking up cap by `accountId`
 
-**Phase to address:** Background sync phase (CR-08)
+**Phase to address:**
+Phase: Claude Code Mimicry Integration
 
 ---
 
@@ -217,14 +209,11 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| In-memory TTL tracking (no SQLite) | No schema migration needed | Lost on every restart, spam window after deploy | Never — restarts are too frequent |
-| Single mega-transaction for bulk sync writes | Simpler code | SQLITE_BUSY collisions with webhook writes | Never — batch instead |
-| Static passcode in config | Easy to configure | Replayable forever, no invalidation | Never — security feature |
-| Module hooks as direct pipeline mutations | Fewer abstractions | Ordering bugs, tight coupling | Never in production pipeline |
-| Sync loop using shared rate limiter | No extra code | Starves user-facing calls during sync | Only if sync rate is capped at 1 call/2s independently |
-| Full resync on every startup | Always correct data | Never finishes if restarts are frequent | Only for initial implementation (v1) with a ticket to add cursor |
-| Auto-reply rate limit in memory | Fast, no DB write | Allows spam after restart | Never — add `last_auto_reply_at` column from day one |
-| Passcode in plaintext config | Easy to set up | Leaked in logs, git history | Never — hash it |
+| In-memory hourly counter | Simple, no SQLite migration | Resets on restart, counts missed after crash | Never — maturity tracking requires persistence |
+| Top-of-hour bucket reset | Trivial implementation | Burst window exploit (2x cap at hour boundary) | Never — rolling window is only slightly more code |
+| Hard-code timezone to "Asia/Jerusalem" without config | Zero config complexity | Breaks for any user in different timezone | Only acceptable as a default, not as the sole behavior |
+| Gate sends at plugin level only, ignore Claude Code skill | Only one system to change | Cap is meaningless if Claude Code bypasses it | Never for v1.20 — both paths must be gated |
+| Throw generic "rate limited" on cap exceeded | Simple error path | Agent retries immediately, hammers cap check | Never — include "retry after" timestamp in error |
 
 ---
 
@@ -232,16 +221,12 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| WAHA contacts API | Assuming it returns an array | Returns a dict keyed by JID — use `Object.values()` |
-| WAHA contacts API | Calling without `store.enabled` | Returns 400 if `config.noweb.store.enabled` is not `True` |
-| WAHA pagination | Assuming one call returns all results | Use `limit` + `offset` parameters, paginate until result < limit |
-| SQLite WAL mode | Starting multiple long transactions concurrently | Use small batches + async mutex for concurrent writers |
-| template literal in monitor.ts | Single backslashes in embedded JS | Double-escape ALL backslashes: `\\w` not `\w`, `\\'` not `\'` |
-| Admin panel dynamic content | Using innerHTML for any user-controlled data | Always use textContent — innerHTML is XSS; already hardened in v1.10, do NOT regress |
-| OpenClaw config write | Writing to wrong path | Always write to `~/.openclaw/openclaw.json`, never the workspace path |
-| OpenClaw config write | Sending bare config fields | POST `/api/admin/config` expects `{"waha": {...}}` wrapper |
-| TTL column in SQLite | Storing as ISO string | Store as Unix timestamp (integer milliseconds) — easier range queries |
-| WAHA `@lid` JIDs | Treating as opaque identifiers in allowlists | `groupAllowFrom` needs BOTH `@c.us` AND `@lid` for the same person |
+| Existing `TokenBucket` + new hourly cap | Check hourly cap inside `acquire()` — hangs drainer | Check hourly cap before calling `acquire()`, throw if exceeded |
+| Claude Code skill + mimicry system | Assume plugin sends cover all outbound | Add `POST /api/admin/proxy-send` to `monitor.ts`; update skill to call it |
+| Config schema + new fields | Add field without `.optional().default(X)` | Every new field must have `.optional().default(X)` or validation breaks on existing configs |
+| SQLite hourly count + rolling window | Use `COUNT(*)` on entire table | Add `WHERE sent_at > ?` with `now - 3_600_000` to bound the count to 60-min window |
+| Zod `knownKeys` set in `validateWahaConfig` | Forget to add new field names to `knownKeys` | New fields get stripped before validation if not added to `knownKeys` set |
+| `MutationDedup` + gated sends | Gated-then-retried send hits dedup TTL | Dedup key includes timestamp-of-request — if retry comes after cap window opens, key will differ and send proceeds correctly; no action needed |
 
 ---
 
@@ -249,12 +234,9 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Full contact list re-render on every name resolution callback | Dashboard Access Control card flickers every few seconds (BUG-02) | Debounce renders, only re-render changed entries | Immediately with 2+ sessions |
-| Sync loop using shared rate limiter without priority | Agent send latency > 3s during sync | Separate sync token bucket or explicit throttle | When contact list > 200 entries |
-| Expired TTL rows never deleted | SQLite file grows, directory queries slow | Periodic cleanup job + index on `expires_at` | After 1-2 weeks of pairing mode use |
-| Directory search querying WAHA API in realtime | Search takes 2-5s, rate-limited | Search local SQLite (CR-08 fix) | At any scale > 50 contacts |
-| Module hook array scanned for every inbound message | Linear scan per module per message | Use a Set-based dispatch table keyed by hook slot | When modules > 5 |
-| Auto-reply sending to same contact multiple times per restart | Contacts get spam on every deploy | Persist `last_auto_reply_at` in SQLite | On every deploy (multiple times per day) |
+| Rolling window query on unbounded table | Slow hourly cap check after weeks of sends | Prune rows older than 2 hours in the same transaction as the insert | After ~10k rows (~200 hours of capped operation) |
+| Timezone conversion via `Intl.DateTimeFormat` on every send | CPU spike on high-volume sends | Cache the resolved local hour with a 1-minute TTL (not per-call) | Not a real concern at 30-50 msgs/hour, but worth noting |
+| SQLite WAL + high-frequency writes for hourly count | Write contention with `DirectoryDb` | Use the same WAL-mode SQLite connection with `PRAGMA journal_mode=WAL` already set | Not a concern at this message volume |
 
 ---
 
@@ -262,13 +244,9 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Static numeric passcode in config | Brute-forced in seconds, replayable forever | Rate-limit attempts (3/30min), rotate daily, or use one-time tokens for `wa.me` links |
-| Passcode in plaintext in config/logs | Leaked in git history, log aggregators | Hash it (SHA-256+salt minimum), never log the value |
-| No attempt rate limiting on passcode | Brute-force in < 1 minute | Max 3 attempts per JID per 30 minutes, 24h lockout |
-| Module hook receiving mutable config reference | One module corrupts another's config | Pass `Object.freeze(structuredClone(config))` to each module |
-| Auto-reply canned message with admin names | Leaks admin identity to unauthorized contacts | Only include admin name if the config explicitly opts in; default to generic message |
-| TTL grant admin UI without CSRF protection | Unauthorized grant revocations | Admin panel already runs on local network only (127.0.0.1) — acceptable for this deployment |
-| innerHTML for module-supplied content | XSS if a module renders user data in HTML | All module-supplied content must go through textContent (same rule as base admin panel) |
+| Proxy-send endpoint in `monitor.ts` has no auth check | Any process on hpg6 can send WhatsApp messages through Omer's session | Apply the existing `requireAuth` middleware (adminToken check) to the new `/api/admin/proxy-send` route |
+| Config stores send window as string "07:00-01:00" without validation | Malformed config causes gate to fail open (always allows send) | Validate hours as integers 0-23 in Zod schema; gate should fail CLOSED (block send) on parse error |
+| Hourly cap bypass via direct WAHA API when plugin rejects | Attacker or misbehaving agent calls WAHA directly | Can't prevent at plugin level — WAHA API key is in config and visible to all processes on hpg6; not a concern for this threat model |
 
 ---
 
@@ -276,29 +254,25 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Sync progress shown as raw numbers only | Admin doesn't know if sync is stuck | Show "Syncing: 47/500 contacts (last updated 2m ago)" with a stuck detection threshold |
-| Pairing mode passcode reset with no warning | Admin changes passcode, existing active grants still work | Rotating the passcode should NOT invalidate already-granted TTL sessions (TTL grants are independent) |
-| TTL expiry shown as absolute timestamp | Admin can't tell how much time is left | Show relative time ("Expires in 2h 15m") with a tooltip showing the absolute time |
-| Module enable/disable requiring gateway restart | Admin enables a module, nothing happens until restart | Show "Restart required" banner prominently after any module change |
-| Bulk sync "Refresh Now" button with no feedback | Admin clicks, nothing visible happens for 10s | Show spinner + "Syncing..." immediately, "Done" with count when complete |
-| Dashboard re-renders clearing per-session section scroll position | User scrolls down to a session, name resolution fires, view jumps back | Preserve scroll position across incremental renders |
+| Gate rejects send with no info about when it will be allowed | Agent (and user) can't tell when to retry | Error message must include "send window opens at HH:MM {timezone}" |
+| Hourly cap shows current count but not the reset time | User sees "28/30 used" with no ETA | Admin panel cap widget shows count + "resets in X minutes" (oldest send timestamp + 60min) |
+| Progressive limit stage changes silently | Admin can't tell why the cap changed | Log a structured event when maturity stage advances (stored in analytics SQLite) |
+| New config fields appear in admin panel with no labels | User doesn't know what "sendWindowStart" means | Use descriptive labels: "Earliest send time (24h)" with timezone selector |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Background sync:** Verify it runs incrementally after the first full sync — check that restarting the gateway does NOT trigger a full resync if last sync was < 24h ago
-- [ ] **TTL expiry:** Verify expired entries are actually DELETED from SQLite after the cleanup job runs — not just excluded from queries
-- [ ] **TTL expiry:** Verify the admin panel "active grants" count goes to zero after all grants expire, not just becomes invisible
-- [ ] **Passcode brute-force protection:** Verify that after 3 wrong attempts, the 4th attempt is silently dropped even if it's the correct passcode
-- [ ] **Passcode replay:** Verify that a passcode used in a previous TTL window cannot grant access again (if using one-time tokens)
-- [ ] **Auto-reply loop:** Verify the bot does NOT reply to its own canned rejection message — send an auto-reply, then have the bot "see" it via webhook
-- [ ] **Auto-reply rate limit persistence:** Verify restarting the gateway does NOT allow a second canned reply to fire for a contact who already received one within 24h
-- [ ] **Module hook ordering:** Verify `fromMe: true` messages NEVER reach module hooks — add a test that sends a bot-outbound message and asserts no module hook fired
-- [ ] **Module isolation:** Verify updating Module A's config does NOT change Module B's behavior — test by logging received config in both
-- [ ] **Sync + webhook concurrency:** Verify that a message received during a bulk sync write does NOT result in a `SQLITE_BUSY` error or a silently dropped contact upsert
-- [ ] **Name resolution for @lid JIDs:** Verify that BUG-01 (Access Control card showing raw `@lid` JIDs) is fixed — every `@lid` entry in allowFrom/groupAllowFrom must display a resolved name or be paired with its `@c.us` equivalent
-- [ ] **Template literal double-escaping:** Verify any new regex or string in monitor.ts embedded JS uses double-escaped backslashes — run the admin panel in a browser and check browser console for JS syntax errors
+- [ ] **Time gate:** Tested cross-midnight window (e.g., 22:00-06:00 config) — verify `22 <= currentHour || currentHour < 6` logic, not `22 <= currentHour <= 6`
+- [ ] **Timezone:** Gate uses `Intl.DateTimeFormat` with configured `timezone`, not `new Date().getHours()` (UTC)
+- [ ] **Claude Code bypass:** Verified that `whatsapp-messenger` skill has been updated to call proxy endpoint, not WAHA directly — check by sending a test message via the skill at 2am (outside window) and confirming it is blocked
+- [ ] **Config migration:** Ran `validateWahaConfig` against the actual production `openclaw.json` before deploying — confirmed no validation errors
+- [ ] **Cap persistence:** Restarted the gateway during an active send session — confirmed hourly count was read from SQLite, not reset to 0
+- [ ] **Cap key:** Confirmed both Logan (bot) and Omer (Claude Code) sends share the same cap bucket keyed by WAHA session name
+- [ ] **Token bucket interaction:** Confirmed hourly cap check happens BEFORE `acquire()` — not inside the token bucket queue drain
+- [ ] **Error messages:** Confirmed cap-exceeded error includes retry-after timestamp, not a generic "rate limited" string
+- [ ] **Admin panel:** Send window settings and cap status visible in React admin panel with correct shadcn/ui components (not raw HTML)
+- [ ] **Progressive limits:** Confirmed maturity stage stored in SQLite, not computed from `Date.now() - pluginStartTime`
 
 ---
 
@@ -306,12 +280,12 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Background sync race → corrupted directory | MEDIUM | Run `POST /api/admin/directory/refresh` to rebuild from WAHA API; add write serialization before next deploy |
-| Auto-reply spam loop | HIGH | Immediately deploy a hotfix with `fromMe` guard before the auto-reply logic; check if WAHA session is temporarily banned |
-| Passcode brute-forced | MEDIUM | Rotate passcode in admin panel; all existing TTL grants from that passcode remain valid (TTL is independent); add rate limiting in hotfix |
-| TTL cleanup never ran → slow directory | LOW | Run `DELETE FROM dm_settings WHERE expires_at IS NOT NULL AND expires_at < ?` manually via SSH; add cleanup job before next deploy |
-| Module hook crash taking down message pipeline | HIGH | Wrap ALL module hook invocations in try/catch; re-deploy with the broken module disabled; do NOT let module exceptions propagate |
-| Sync draining rate limiter → agent hangs | MEDIUM | Reduce sync rate constant (calls/second) via config hot-patch; long term: separate rate bucket for sync vs user-facing |
+| Config validation breaks on deploy | LOW | Roll back `WahaAccountSchemaBase` change, re-add `.optional().default()` wrappers, redeploy both hpg6 locations |
+| Message loss from in-memory queue on restart | MEDIUM | No recovery from lost messages; prevent by using reject-not-queue strategy; if already built as queue, migrate to SQLite store |
+| Timezone bug sends at wrong hours | LOW | Add `timezone` config field with default, fix gate logic, redeploy |
+| Claude Code bypass not caught until after deploy | MEDIUM | Update skill to point to proxy endpoint; retest by sending at 2am in IST |
+| Hourly cap resets on restart (in-memory counter) | LOW | Migrate counter to SQLite rolling window table; one migration script |
+| Token bucket hangs from cap check inside `acquire()` | HIGH | Restart gateway immediately; move cap check to before `acquire()` call |
 
 ---
 
@@ -319,33 +293,29 @@ Background sync is implemented to always start from page 1 on gateway startup (f
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Background sync race condition with webhook writes | Background sync phase (CR-08) | Stress test: 200 contacts syncing while 10 messages arrive; zero SQLITE_BUSY in logs |
-| Sync draining rate limiter | Background sync phase (CR-08) | Measure send latency during sync; must be < 1s p95 |
-| Startup full-resync causing perpetually incomplete directory | Background sync phase (CR-08) | Restart gateway twice in 2 minutes; second restart does NOT trigger full resync |
-| Passcode brute-force and replay | Pairing mode phase (FEATURE-01) | 4th wrong attempt is blocked; passcode cannot be reused after TTL expiry |
-| TTL zombie grants accumulating | TTL access phase (FEATURE-02) | After 15-minute cleanup window, expired rows are GONE from SQLite (not just hidden) |
-| Auto-reply spam loop | Auto-reply phase (FEATURE-03) | Bot sends canned reply; WAHA webhook for it arrives; no second reply fires |
-| Auto-reply rate limit lost on restart | Auto-reply phase (FEATURE-03) | Restart gateway mid-24h window; no second canned reply fires |
-| Module hook ordering breaks pipeline | Modules phase (FEATURE-04) | `fromMe: true` messages never reach module hooks; duplicate dispatches impossible |
-| Module isolation failure | Modules phase (FEATURE-04) | Module A config change does not affect Module B behavior |
-| Dashboard re-render flicker (BUG-02) | Dashboard polish phase | Dashboard stable for 60s with no visible flicker after initial load |
-| @lid JIDs not resolved in UI (BUG-01) | Name resolution phase | Every `@lid` in allowFrom/groupAllowFrom shows a name or is paired with @c.us entry |
-| template literal double-escape | Any monitor.ts change | Open admin panel in browser; zero JS console errors |
+| Token bucket vs hourly cap race condition | Phase: Time-of-Day Gates & Hourly Caps | Unit test: send 30 msgs, verify 31st throws before `acquire()` is called |
+| Message loss on restart | Phase: Time-of-Day Gates & Hourly Caps | Restart gateway mid-session, verify no queued sends are silently dropped |
+| Timezone bug | Phase: Time-of-Day Gates & Hourly Caps | Test with `timezone: "Asia/Jerusalem"` on UTC server, verify IST hour is used |
+| Config schema breaks existing configs | Phase: Config Schema Extension | Run `validateWahaConfig` against production `openclaw.json` before every deploy |
+| Claude Code bypass | Phase: Claude Code Mimicry Integration | Send via skill at 2am IST, confirm blocked; send at noon, confirm allowed |
+| Progressive limits not persisted | Phase: Hourly Caps & Progressive Limits | Restart gateway, confirm maturity stage unchanged and hourly count correct |
+| Hourly reset at top-of-hour vs rolling window | Phase: Hourly Caps & Progressive Limits | Send 30 msgs at :59, verify 31st blocked even after clock rolls to next hour |
+| Testability of time logic | Phase: Core Implementation | All gate/cap functions accept `now` parameter; CI tests pass with injected timestamps |
+| Per-session vs per-account cap key | Phase: Claude Code Mimicry Integration | Confirm Logan sends and Omer sends share cap bucket in SQLite |
 
 ---
 
 ## Sources
 
-- Codebase analysis: `src/inbound.ts`, `src/directory.ts`, `src/monitor.ts`, `src/send.ts` (direct inspection)
-- Project bugs file: `.planning/phases/11-dashboard-sessions-log/bugs.md` — 18 bugs and CRs from human verification
-- Project context: `CLAUDE.md` (brittle code patterns, DO NOT CHANGE markers, deployment constraints)
-- Project decisions: `.planning/PROJECT.md` (architectural decisions, key constraints)
-- Lessons learned: `docs/LESSONS_LEARNED.md` (past regressions, hard-won fixes)
-- Previous pitfalls research: `.planning/research/PITFALLS.md` (v1.10 milestone patterns)
-- WAHA quirks: CLAUDE.md § "Key WAHA API Quirks" (dict-not-array, @lid dual JID, media URL expiry)
-- SQLite concurrency: WAL mode documentation — readers don't block writers, but only one writer at a time
-- Passcode security: OWASP Authentication Cheat Sheet — rate limiting, hashing, one-time token patterns
+- Codebase: `src/http-client.ts` — `TokenBucket` implementation, `MutationDedup`, drain loop structure
+- Codebase: `src/rate-limiter.ts` — `RateLimiter` class (concurrent + delay limiter, separate from token bucket)
+- Codebase: `src/config-schema.ts` — `WahaAccountSchemaBase` `.strict()` schema, `validateWahaConfig` strip-then-validate pattern, `knownKeys` set
+- Codebase: `src/send.ts` — `sendWahaText` entry point showing policy/mute checks before WAHA API call
+- Codebase: `src/inbound-queue.ts` — in-memory queue pattern (acceptable for inbound, not for outbound)
+- Codebase: `.planning/PROJECT.md` — v1.20 requirements, multi-session context, two-location deploy constraints
+- Memory: `project_v1_20_human_mimicry.md` — original feature intent, bypass concern explicitly noted
+- Prior art: `docs/LESSONS_LEARNED.md` (existing lessons from prior milestones about SQLite persistence, jiti cache, deploy pitfalls)
 
 ---
-*Pitfalls research for: v1.11 additions to WAHA OpenClaw plugin*
-*Researched: 2026-03-17*
+*Pitfalls research for: v1.20 Human Mimicry Hardening — time-of-day gates, hourly caps, Claude Code integration*
+*Researched: 2026-03-26*
