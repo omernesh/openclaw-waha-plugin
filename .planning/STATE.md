@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.19
 milestone_name: Full WAHA Capabilities & Modular Skill Architecture
 status: verifying
-stopped_at: Completed 49-02-PLAN.md — Phase 49 plan 2 of 2 done
-last_updated: "2026-03-26T03:11:34.882Z"
+stopped_at: Completed 50-01-PLAN.md — Phase 50 plan 1 of 1 done
+last_updated: "2026-03-26T03:43:34.935Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 10
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  completed_phases: 3
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 49 — modular-skill-architecture
+**Current focus:** Phase 50 — skill-creator-evals
 
 ## Current Position
 
-Phase: 49 (modular-skill-architecture) — EXECUTING
-Plan: 2 of 2
+Phase: 50 (skill-creator-evals) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-03-26
 
@@ -52,6 +52,8 @@ Progress bar: [----------] 0/5 phases complete
 - [Phase 49]: readMessages vs read comparison table in messaging.md for disambiguation
 - [Phase 49]: LID/Calls/Policy actions folded into skills/media.md as Other Utilities section
 - [Phase 49]: SKILL.md version bumped to 6.0.0 — 574-line file replaced with 145-line index
+- [Phase 50-01]: SKILL.md version field moved to metadata.version — quick_validate.py only allows specific root frontmatter keys
+- [Phase 50-01]: Evals test decision-making not live WAHA execution — agent selects action + params, no API access needed
 
 ### Pending Todos
 
@@ -64,6 +66,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T03:11:34.875Z
-Stopped at: Completed 49-02-PLAN.md — Phase 49 plan 2 of 2 done
+Last session: 2026-03-26T03:43:34.925Z
+Stopped at: Completed 50-01-PLAN.md — Phase 50 plan 1 of 1 done
 Resume file: None

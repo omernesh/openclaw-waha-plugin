@@ -91,7 +91,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 - [x] **Phase 48: Action Exposure** - Add all missing actions to UTILITY_ACTIONS in channel.ts (ACT-01 through ACT-08) (completed 2026-03-26)
 - [x] **Phase 49: Modular Skill Architecture** - Restructure SKILL.md into per-category files with index (SKL-01, SKL-02, SKL-03, SKL-07) (completed 2026-03-26)
-- [ ] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05)
+- [x] **Phase 50: Skill Creator & Evals** - Use Anthropic skill-creator to validate structure and write evals (SKL-04, SKL-05) (completed 2026-03-26)
 - [ ] **Phase 51: Claude Code Skill Update** - Update whatsapp-messenger Claude Code skill (SKL-06)
 - [ ] **Phase 52: Deploy & Live Testing** - Deploy to hpg6 and run all live capability tests (TST-01 through TST-12)
 
@@ -201,9 +201,9 @@ Plans:
   1. All per-category skill files pass skill-creator structure validation without warnings
   2. Evals cover at least: correct action selection given a task description, correct parameter construction, and graceful error handling for at least 3 categories
   3. Eval results are saved alongside skill files for future regression comparison
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 50-01-PLAN.md — Validate SKILL.md structure, create evals.json (8+ evals across 4 categories), run eval subagents, grade and benchmark results
+- [x] 50-01-PLAN.md — Validate SKILL.md structure, create evals.json (8+ evals across 4 categories), run eval subagents, grade and benchmark results
 
 ### Phase 51: Claude Code Skill Update
 **Goal**: The whatsapp-messenger Claude Code skill reflects the new modular structure so it stays in sync with what the agent reads
@@ -241,6 +241,6 @@ Plans:
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
 | 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
 | 49. Modular Skill Architecture | 2/2 | Complete    | 2026-03-26 |
-| 50. Skill Creator & Evals | 0/1 | Not started | - |
+| 50. Skill Creator & Evals | 1/1 | Complete   | 2026-03-26 |
 | 51. Claude Code Skill Update | 0/TBD | Not started | - |
 | 52. Deploy & Live Testing | 0/TBD | Not started | - |
