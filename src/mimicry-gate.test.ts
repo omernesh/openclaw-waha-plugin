@@ -19,13 +19,13 @@ import {
 } from "./mimicry-gate.js";
 import { validateWahaConfig } from "./config-schema.js";
 
-// Fixed base timestamp: 2026-01-15 13:00:00 UTC (Thursday, 1pm UTC)
-const BASE_NOW = 1736942400000;
+// Fixed base timestamp: 2025-01-15 12:00:00 UTC (Wednesday, noon UTC)
+const BASE_NOW = 1736942400000; // new Date(1736942400000).toISOString() = "2025-01-15T12:00:00.000Z"
 
-// Helper: create hour offset from BASE_NOW (BASE_NOW is hour 13 UTC)
-// hour 0 UTC = BASE_NOW - 13*3600*1000
+// Helper: create a timestamp where UTC hour = h on 2025-01-15.
+// BASE_NOW is 12:00 UTC, so: utcHour(h) = BASE_NOW - 12*3600*1000 + h*3600*1000
 function utcHour(h: number): number {
-  return BASE_NOW - 13 * 3_600_000 + h * 3_600_000;
+  return BASE_NOW - 12 * 3_600_000 + h * 3_600_000;
 }
 
 // ─── MimicryDb fixture helpers ────────────────────────────────────────────────
@@ -368,15 +368,18 @@ describe("checkAndConsumeCap", () => {
     expect(firstSend).toBe(NOW);
   });
 
-  it("ensureFirstSendAt is NOT set on blocked send", () => {
+  it("blocked send does not change firstSendAt (idempotent ensureFirstSendAt)", () => {
+    // Pre-populate 15 sends (recordSend sets firstSendAt internally)
     for (let i = 0; i < 15; i++) {
       db.recordSend(SESSION, NOW - i * 1000);
     }
-    // Ensure no first_send_at yet
-    expect(db.getFirstSendAt(SESSION)).toBeNull();
-    checkAndConsumeCap(SESSION, LIMIT, db, NOW);
-    // Still null — blocked, no recordSend or ensureFirstSendAt called
-    expect(db.getFirstSendAt(SESSION)).toBeNull();
+    const firstSendAtBefore = db.getFirstSendAt(SESSION);
+    expect(firstSendAtBefore).not.toBeNull();
+
+    // Blocked call should not change firstSendAt
+    const result = checkAndConsumeCap(SESSION, LIMIT, db, NOW);
+    expect(result.allowed).toBe(false);
+    expect(db.getFirstSendAt(SESSION)).toBe(firstSendAtBefore);
   });
 });
 

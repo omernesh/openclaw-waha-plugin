@@ -203,4 +203,114 @@ export function resolveCapLimit(
   return merged[maturity];
 }
 
-// Gate enforcement functions are in Plan 02 of this phase.
+// ─── Plan 02: Gate enforcement functions ──────────────────────────────────────
+// DO NOT REMOVE -- these are the core enforcement primitives wired by Phase 54.
+
+/**
+ * Private helper: extract the local hour (0-23) for a given UTC timestamp
+ * using the specified IANA timezone. Uses Intl.DateTimeFormat.formatToParts
+ * for correctness across all timezones including DST transitions.
+ * DO NOT CHANGE -- getHours() returns UTC, not local time.
+ */
+function extractHour(nowMs: number, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(new Date(nowMs));
+  const hourPart = parts.find((p) => p.type === "hour");
+  if (!hourPart) {
+    log.warn("extractHour: could not parse hour from Intl.DateTimeFormat", { timezone });
+    return new Date(nowMs).getUTCHours();
+  }
+  const h = parseInt(hourPart.value, 10);
+  // Intl may return 24 for midnight in some locales — normalize to 0.
+  return h === 24 ? 0 : h;
+}
+
+/**
+ * checkTimeOfDay — enforces time-of-day send gate.
+ *
+ * Returns {allowed: true} if gate is disabled or current hour is inside window.
+ * Returns {allowed: false, reason} if outside window.
+ *
+ * Cross-midnight window (endHour <= startHour): hour >= startHour OR hour < endHour.
+ * Same-day window (endHour > startHour): hour >= startHour AND hour < endHour.
+ * endHour is exclusive.
+ *
+ * DO NOT CHANGE -- cross-midnight logic was carefully verified with tests.
+ */
+export function checkTimeOfDay(config: ResolvedGateConfig, now: number = Date.now()): GateResult {
+  if (!config.enabled) return { allowed: true };
+
+  const hour = extractHour(now, config.timezone);
+  const { startHour, endHour } = config;
+  const crossMidnight = endHour <= startHour;
+  const inWindow = crossMidnight
+    ? (hour >= startHour || hour < endHour)
+    : (hour >= startHour && hour < endHour);
+
+  if (!inWindow) {
+    return {
+      allowed: false,
+      reason: `Outside send window (${startHour}:00-${endHour}:00 ${config.timezone})`,
+    };
+  }
+  return { allowed: true };
+}
+
+/**
+ * checkAndConsumeCap — checks hourly cap and records a send atomically.
+ *
+ * WARNING: This is a combined check-and-record. Only call when send is definitely happening.
+ * If allowed, records the send AND sets first_send_at for maturity tracking.
+ * If blocked, returns {allowed: false} without recording anything.
+ *
+ * INFRA-04: bypassPolicy callers must skip this function entirely. Phase 54 wires this.
+ *
+ * DO NOT CHANGE -- blocked sends must not call recordSend or ensureFirstSendAt.
+ */
+export function checkAndConsumeCap(
+  session: string,
+  limit: number,
+  db: MimicryDb,
+  now: number = Date.now()
+): CapResult {
+  const effectiveNow = now;
+  const count = db.countRecentSends(session, effectiveNow);
+
+  if (count >= limit) {
+    return { allowed: false, count, limit, reason: `Hourly cap reached (${count}/${limit})` };
+  }
+
+  db.recordSend(session, effectiveNow);
+  db.ensureFirstSendAt(session, effectiveNow);
+  return { allowed: true, count: count + 1, limit };
+}
+
+/**
+ * getCapStatus — read-only snapshot of current cap state.
+ *
+ * Returns {count, limit, remaining, maturity, windowStartMs} without recording a send.
+ * Use this for UI display and pre-flight checks that must not affect cap counts.
+ *
+ * DO NOT CHANGE -- this must remain read-only (no recordSend calls).
+ */
+export function getCapStatus(
+  session: string,
+  limit: number,
+  db: MimicryDb,
+  now: number = Date.now()
+): CapStatus {
+  const effectiveNow = now;
+  const count = db.countRecentSends(session, effectiveNow);
+  const firstSendAt = db.getFirstSendAt(session);
+  const maturity = getMaturityPhase(firstSendAt, effectiveNow);
+  return {
+    count,
+    limit,
+    remaining: Math.max(0, limit - count),
+    maturity,
+    windowStartMs: effectiveNow - 3_600_000,
+  };
+}
