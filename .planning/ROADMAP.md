@@ -201,7 +201,9 @@ Plans:
   1. All per-category skill files pass skill-creator structure validation without warnings
   2. Evals cover at least: correct action selection given a task description, correct parameter construction, and graceful error handling for at least 3 categories
   3. Eval results are saved alongside skill files for future regression comparison
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 50-01-PLAN.md — Validate SKILL.md structure, create evals.json (8+ evals across 4 categories), run eval subagents, grade and benchmark results
 
 ### Phase 51: Claude Code Skill Update
 **Goal**: The whatsapp-messenger Claude Code skill reflects the new modular structure so it stays in sync with what the agent reads
@@ -238,7 +240,7 @@ Plans:
 | 46. Skill Completeness Audit | 1/1 | Complete | 2026-03-25 |
 | 47. Live WhatsApp Testing | 1/2 | Complete | 2026-03-25 |
 | 48. Action Exposure | 1/1 | Complete    | 2026-03-26 |
-| 49. Modular Skill Architecture | 2/2 | Complete   | 2026-03-26 |
-| 50. Skill Creator & Evals | 0/TBD | Not started | - |
+| 49. Modular Skill Architecture | 2/2 | Complete    | 2026-03-26 |
+| 50. Skill Creator & Evals | 0/1 | Not started | - |
 | 51. Claude Code Skill Update | 0/TBD | Not started | - |
 | 52. Deploy & Live Testing | 0/TBD | Not started | - |
