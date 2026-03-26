@@ -1,0 +1,99 @@
+{
+  "skill_name": "whatsapp-actions",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add Michael Greenberg (972556839823) to the group 120363421825201386@g.us and then promote him to admin.",
+      "expected_output": "Two sequential actions: first addParticipants with participants as @c.us JID, then promoteToAdmin with the same participant and groupId.",
+      "files": [],
+      "expectations": [
+        "Agent selects addParticipants (not createGroup, not send, not invite)",
+        "participants array contains 972556839823@c.us (with @c.us suffix)",
+        "groupId is 120363421825201386@g.us (with @g.us suffix)",
+        "Agent also calls promoteToAdmin as a follow-up action",
+        "promoteToAdmin uses the same groupId and participant JID"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Get the invite link for the group 120363421825201386@g.us.",
+      "expected_output": "Action: getInviteCode with groupId parameter set to the group JID.",
+      "files": [],
+      "expectations": [
+        "Agent selects getInviteCode (not joinGroup, not getGroup, not createGroup)",
+        "groupId parameter is present and equals 120363421825201386@g.us",
+        "Agent does NOT call send or any messaging action"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Block the contact 972556839823.",
+      "expected_output": "Action: blockContact with contactId parameter using the @c.us JID format.",
+      "files": [],
+      "expectations": [
+        "Agent selects blockContact (not unblockContact, not delete, not muteChat)",
+        "contactId parameter uses @c.us suffix: 972556839823@c.us",
+        "Agent does NOT call getContacts or any listing action first"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Get Michael Greenberg's profile picture and about text. His number is 972556839823.",
+      "expected_output": "Two actions: getContactPicture AND getContactAbout, both using the @c.us JID.",
+      "files": [],
+      "expectations": [
+        "Agent calls getContactPicture with contactId 972556839823@c.us",
+        "Agent also calls getContactAbout with the same contactId",
+        "Both actions use @c.us suffix on the phone number",
+        "Agent does NOT conflate the two into a single action"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Follow the WhatsApp channel at https://whatsapp.com/channel/0029VaXXXXXXXX.",
+      "expected_output": "Agent must resolve the invite code first using resolveChannelInvite (or getChannelByInviteCode), then call followChannel with the resolved newsletter JID — NOT the URL or invite code directly.",
+      "files": [],
+      "expectations": [
+        "Agent does NOT call followChannel with the raw URL or the invite code string as channelId",
+        "Agent identifies the need to resolve the invite code to a newsletter JID first",
+        "If agent uses a single action, it uses followChannel with a @newsletter JID (not the URL)",
+        "Agent explains or demonstrates the two-step process: resolve invite code → follow channel"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Send a location to the group 120363421825201386@g.us at coordinates 32.0853, 34.7818 titled 'Office'.",
+      "expected_output": "Action: sendLocation with chatId, latitude 32.0853, longitude 34.7818, and title 'Office'.",
+      "files": [],
+      "expectations": [
+        "Agent selects sendLocation (not send, not sendImage, not sendFile)",
+        "latitude parameter is 32.0853",
+        "longitude parameter is 34.7818",
+        "title parameter is 'Office' or equivalent",
+        "chatId is 120363421825201386@g.us"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Delete the group 120363421825201386@g.us.",
+      "expected_output": "Action: deleteGroup (NOT leaveGroup which just removes the bot, NOT delete which deletes the chat history from local view).",
+      "files": [],
+      "expectations": [
+        "Agent selects deleteGroup (not leaveGroup, not delete, not archiveChat)",
+        "groupId parameter is present and equals 120363421825201386@g.us",
+        "Agent explains the distinction: deleteGroup permanently deletes the group, leaveGroup only removes the bot"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Mark all messages in the group 120363421825201386@g.us as read.",
+      "expected_output": "Action: read (sends read receipts to WhatsApp, clears unread count) — NOT readMessages which fetches message content.",
+      "files": [],
+      "expectations": [
+        "Agent selects the read action (not readMessages, not getChatMessages)",
+        "chatId parameter is set to 120363421825201386@g.us",
+        "Agent does NOT confuse read (send receipts) with readMessages (fetch content)"
+      ]
+    }
+  ]
+}
