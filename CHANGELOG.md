@@ -2,6 +2,23 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.19.0] - 2026-03-26 — Full WAHA Capabilities & Modular Skill Architecture
+
+### Added
+- **Full action exposure** — UTILITY_ACTIONS expanded from 35 to 109 entries. Every implemented WAHA action is now reachable by the agent.
+- **4 new send.ts functions** — `createOrUpdateWahaContact`, `getWahaNewMessageId`, `convertWahaVoice`, `convertWahaVideo`.
+- **4 ACTION_HANDLERS aliases** — `demoteToMember`→`demoteFromAdmin`, `getMessageById`→`getChatMessage`, `clearMessages`→`clearChatMessages`, `setPresence`→`setPresenceStatus`.
+- **Modular skill architecture** — 10 per-category skill files in `skills/` (groups, contacts, channels, chats, status, presence, profile, media, messaging, slash-commands). Each has action table, parameters, examples, gotchas.
+- **SKILL.md v6.0.0** — Rewritten as concise 145-line index linking to category files (was 574-line monolith).
+- **Skill evals** — 8 eval scenarios across 4 categories, 30/30 expectations passed. Results in `skills/evals-workspace/`.
+- **whatsapp-messenger skill v2.0.0** — Claude Code skill updated to reflect full 109-action surface.
+
+### Fixed
+- **Health check Invalid URL** — Accounts without `baseUrl` (policy-only configs) no longer crash the health check loop. Guard added before URL construction.
+
+### Security
+- **API key CRUD excluded** — `createApiKey`, `getApiKeys`, `updateApiKey`, `deleteApiKey` removed from UTILITY_ACTIONS (kept in ACTION_HANDLERS for admin use).
+
 ## [1.18.0] - 2026-03-26 — Join/Leave/List & Skill Completeness
 
 ### Added

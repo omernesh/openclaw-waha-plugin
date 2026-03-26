@@ -455,6 +455,10 @@ export function createWahaWebhookServer(opts: {
   } else {
     const allAccounts = listEnabledWahaAccounts(opts.config);
     for (const acct of allAccounts) {
+      if (!acct.baseUrl) {
+        log.debug("Health check skipped: no baseUrl configured", { accountId: acct.accountId });
+        continue;
+      }
       if (!acct.session) {
         log.warn("Health check skipped: no session configured", { accountId: acct.accountId });
         continue;
