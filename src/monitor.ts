@@ -547,13 +547,20 @@ export function createWahaWebhookServer(opts: {
     // Routes sends through mimicry enforcement (time gate, cap, typing simulation).
     // DO NOT REMOVE — closing bypass gap where Claude Code sends skip mimicry.
     if (req.url === "/api/admin/proxy-send" && req.method === "POST") {
+      let body: Record<string, unknown>;
       try {
         const rawBody = await readRequestBodyWithLimit(req, DEFAULT_WEBHOOK_MAX_BODY_BYTES, DEFAULT_WEBHOOK_BODY_TIMEOUT_MS);
-        const body = JSON.parse(rawBody) as Record<string, unknown>;
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch (err) {
+        writeJsonResponse(res, 400, { error: "Invalid request body" });
+        return;
+      }
+      try {
         const result = await handleProxySend({ body, cfg: opts.config });
         writeJsonResponse(res, result.status, result.body);
       } catch (err) {
-        writeJsonResponse(res, 400, { error: "Invalid request body" });
+        log.error("proxy-send handler error", { error: err instanceof Error ? err.message : String(err) });
+        writeJsonResponse(res, 500, { error: "Internal proxy-send error" });
       }
       return;
     }

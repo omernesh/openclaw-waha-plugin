@@ -48,7 +48,10 @@ export async function handleProxySend(input: ProxySendInput): Promise<ProxySendR
 
   // 2. Determine send type and message length for typing simulation (CC-02)
   const sendType = (body.type as string | undefined) ?? "text";
-  const messageLength = typeof body.text === "string" ? (body.text as string).length : 0;
+  if (!(sendType in SEND_TYPE_TO_PATH)) {
+    return { status: 400, body: { error: `Unknown send type: ${sendType}. Valid types: ${Object.keys(SEND_TYPE_TO_PATH).join(", ")}` } };
+  }
+  const messageLength = typeof body.text === "string" ? body.text.length : 0;
 
   // 3. Enforce mimicry — gate + cap + jitter + typing (CC-01, CC-02)
   try {

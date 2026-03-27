@@ -1138,7 +1138,7 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
         startActivityScanner({
           accountId: account.accountId,
           config: ctx.cfg as CoreConfig,
-          session: account.accountId,
+          session: account.session, // Fix: use account.session (WAHA session name), not accountId
           abortSignal: ctx.abortSignal,
         });
       }

@@ -400,6 +400,7 @@ export async function sendWahaMediaBatch(params: {
   caption?: string;
   replyToId?: string;
   accountId?: string;
+  bypassPolicy?: boolean;
 }) {
   const { mediaUrls, caption } = params;
   if (mediaUrls.length === 0) return;
@@ -408,14 +409,16 @@ export async function sendWahaMediaBatch(params: {
   // Must run before any individual media send to reject the whole batch if cap would be exceeded.
   const batchClient = getClient(params.cfg, params.accountId);
   const batchChatId = normalizeWahaMessagingTarget(params.to);
-  await enforceMimicry({
-    session: batchClient.session,
-    chatId: batchChatId,
-    accountId: batchClient.accountId,
-    cfg: params.cfg,
-    count: mediaUrls.length,
-    messageLength: (params.caption ?? "").length,
-  });
+  if (!params.bypassPolicy) {
+    await enforceMimicry({
+      session: batchClient.session,
+      chatId: batchChatId,
+      accountId: batchClient.accountId,
+      cfg: params.cfg,
+      count: mediaUrls.length,
+      messageLength: (params.caption ?? "").length,
+    });
+  }
 
   await sendMediaWithLeadingCaption({
     mediaUrls,
@@ -435,7 +438,7 @@ export async function sendWahaMediaBatch(params: {
     },
   });
   // Phase 54: Record entire batch as a single cap entry (batch pre-check was count=N). DO NOT CHANGE.
-  recordMimicrySuccess(batchClient.session);
+  if (!params.bypassPolicy) recordMimicrySuccess(batchClient.session);
 }
 
 
@@ -594,25 +597,27 @@ export async function sendWahaReaction(params: {
 // Do NOT flatten poll fields into the top-level body.
 export async function sendWahaPoll(params: {
   cfg: CoreConfig; chatId: string; name: string; options: string[];
-  multipleAnswers?: boolean; replyToId?: string; accountId?: string;
+  multipleAnswers?: boolean; replyToId?: string; accountId?: string; bypassPolicy?: boolean;
 }) {
   const client = getClient(params.cfg, params.accountId);
   assertCanSend(client.session, params.cfg);
   // Phase 54: Mimicry enforcement — polls are always new agent content. DO NOT CHANGE.
-  await enforceMimicry({
-    session: client.session,
-    chatId: params.chatId,
-    accountId: client.accountId,
-    cfg: params.cfg,
-    messageLength: params.name.length,
-  });
+  if (!params.bypassPolicy) {
+    await enforceMimicry({
+      session: client.session,
+      chatId: params.chatId,
+      accountId: client.accountId,
+      cfg: params.cfg,
+      messageLength: params.name.length,
+    });
+  }
   const result = await client.post("/api/sendPoll", {
     chatId: params.chatId, session: client.session,
     poll: { name: params.name, options: params.options, multipleAnswers: params.multipleAnswers ?? false },
     ...(params.replyToId ? { reply_to: params.replyToId } : {}),
   });
   // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-  recordMimicrySuccess(client.session);
+  if (!params.bypassPolicy) recordMimicrySuccess(client.session);
   return result;
 }
 
@@ -630,43 +635,47 @@ export async function sendWahaPollVote(params: {
 // ── VERIFIED WORKING 2026-03-10 ──────────────────────────────────
 export async function sendWahaLocation(params: {
   cfg: CoreConfig; chatId: string; latitude: number; longitude: number; title: string;
-  replyToId?: string; accountId?: string;
+  replyToId?: string; accountId?: string; bypassPolicy?: boolean;
 }) {
   const client = getClient(params.cfg, params.accountId);
   assertCanSend(client.session, params.cfg);
   // Phase 54: Mimicry enforcement — location shares are new agent content. DO NOT CHANGE.
-  await enforceMimicry({
-    session: client.session,
-    chatId: params.chatId,
-    accountId: client.accountId,
-    cfg: params.cfg,
-    messageLength: params.title.length,
-  });
+  if (!params.bypassPolicy) {
+    await enforceMimicry({
+      session: client.session,
+      chatId: params.chatId,
+      accountId: client.accountId,
+      cfg: params.cfg,
+      messageLength: params.title.length,
+    });
+  }
   const result = await client.post("/api/sendLocation", {
     chatId: params.chatId, session: client.session,
     latitude: params.latitude, longitude: params.longitude, title: params.title,
     ...(params.replyToId ? { reply_to: params.replyToId } : {}),
   });
   // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-  recordMimicrySuccess(client.session);
+  if (!params.bypassPolicy) recordMimicrySuccess(client.session);
   return result;
 }
 
 export async function sendWahaContactVcard(params: {
   cfg: CoreConfig; chatId: string;
   contacts: Array<{ fullName: string; phoneNumber: string; organization?: string }>;
-  replyToId?: string; accountId?: string;
+  replyToId?: string; accountId?: string; bypassPolicy?: boolean;
 }) {
   const client = getClient(params.cfg, params.accountId);
   assertCanSend(client.session, params.cfg);
   // Phase 54: Mimicry enforcement — contact card shares are new agent content. DO NOT CHANGE.
-  await enforceMimicry({
-    session: client.session,
-    chatId: params.chatId,
-    accountId: client.accountId,
-    cfg: params.cfg,
-    messageLength: 0,
-  });
+  if (!params.bypassPolicy) {
+    await enforceMimicry({
+      session: client.session,
+      chatId: params.chatId,
+      accountId: client.accountId,
+      cfg: params.cfg,
+      messageLength: 0,
+    });
+  }
   const result = await client.post("/api/sendContactVcard", {
     chatId: params.chatId, session: client.session,
     contacts: params.contacts.map(c => ({
@@ -676,25 +685,27 @@ export async function sendWahaContactVcard(params: {
     ...(params.replyToId ? { reply_to: params.replyToId } : {}),
   });
   // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-  recordMimicrySuccess(client.session);
+  if (!params.bypassPolicy) recordMimicrySuccess(client.session);
   return result;
 }
 
 export async function sendWahaList(params: {
   cfg: CoreConfig; chatId: string; title: string; description: string; buttonText: string;
   sections: Array<{ title: string; rows: Array<{ id: string; title: string; description?: string }> }>;
-  replyToId?: string; accountId?: string;
+  replyToId?: string; accountId?: string; bypassPolicy?: boolean;
 }) {
   const client = getClient(params.cfg, params.accountId);
   assertCanSend(client.session, params.cfg);
   // Phase 54: Mimicry enforcement — list messages are new agent content. DO NOT CHANGE.
-  await enforceMimicry({
-    session: client.session,
-    chatId: params.chatId,
-    accountId: client.accountId,
-    cfg: params.cfg,
-    messageLength: params.description.length,
-  });
+  if (!params.bypassPolicy) {
+    await enforceMimicry({
+      session: client.session,
+      chatId: params.chatId,
+      accountId: client.accountId,
+      cfg: params.cfg,
+      messageLength: params.description.length,
+    });
+  }
   const result = await client.post("/api/sendList", {
     chatId: params.chatId, session: client.session,
     title: params.title, description: params.description, buttonText: params.buttonText,
@@ -702,28 +713,30 @@ export async function sendWahaList(params: {
     ...(params.replyToId ? { reply_to: params.replyToId } : {}),
   });
   // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-  recordMimicrySuccess(client.session);
+  if (!params.bypassPolicy) recordMimicrySuccess(client.session);
   return result;
 }
 
 export async function forwardWahaMessage(params: {
-  cfg: CoreConfig; chatId: string; messageId: string; accountId?: string;
+  cfg: CoreConfig; chatId: string; messageId: string; accountId?: string; bypassPolicy?: boolean;
 }) {
   const client = getClient(params.cfg, params.accountId);
   assertCanSend(client.session, params.cfg);
   // Phase 54: Mimicry enforcement — forwards are new content in the target chat. DO NOT CHANGE.
-  await enforceMimicry({
-    session: client.session,
-    chatId: params.chatId,
-    accountId: client.accountId,
-    cfg: params.cfg,
-    messageLength: 0,
-  });
+  if (!params.bypassPolicy) {
+    await enforceMimicry({
+      session: client.session,
+      chatId: params.chatId,
+      accountId: client.accountId,
+      cfg: params.cfg,
+      messageLength: 0,
+    });
+  }
   const result = await client.post("/api/forwardMessage", {
     chatId: params.chatId, session: client.session, messageId: params.messageId,
   });
   // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
-  recordMimicrySuccess(client.session);
+  if (!params.bypassPolicy) recordMimicrySuccess(client.session);
   return result;
 }
 

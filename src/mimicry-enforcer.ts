@@ -17,6 +17,9 @@ import {
 } from "./mimicry-gate.js";
 import { sendWahaPresence } from "./send.js";
 import { getDirectoryDb } from "./directory.js";
+import { createLogger } from "./logger.js";
+
+const log = createLogger({ component: "mimicry-enforcer" });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +52,11 @@ export interface EnforceMimicryParams {
   /** Override sleep function (avoids real delays in tests) */
   _sleep?: (ms: number) => Promise<void>;
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const BASE_DELAY_MS = 5000;
+const JITTER_FACTOR = 0.4;
+const MAX_TYPING_DURATION_MS = 8000;
 
 // ─── Default sleep ─────────────────────────────────────────────────────────────
 
@@ -86,17 +94,27 @@ export async function enforceMimicry(params: EnforceMimicryParams): Promise<void
   if (bypassPolicy) return;
 
   // Step 2: resolve per-target overrides from DirectoryDb (best-effort, ignore errors)
+  // Fix: hoist getDirectoryDb call to avoid calling it twice
+  let dirDb: ReturnType<typeof getDirectoryDb> | null = null;
+  try {
+    dirDb = getDirectoryDb(accountId);
+  } catch (err) {
+    log.warn("DirectoryDb lookup failed (first boot?)", { accountId, error: err instanceof Error ? err.message : String(err) });
+  }
+
   let targetGateOverride = null;
   let targetCapOverride = null;
   try {
-    const dirDb = getDirectoryDb(accountId);
-    const dmSettings = dirDb.getDmSettings(chatId);
-    if (dmSettings) {
-      targetGateOverride = dmSettings.sendGateOverride ?? null;
-      targetCapOverride = dmSettings.hourlyCapOverride ?? null;
+    if (dirDb) {
+      const dmSettings = dirDb.getContactDmSettings(chatId);
+      if (dmSettings) {
+        targetGateOverride = dmSettings.sendGateOverride ?? null;
+        targetCapOverride = dmSettings.hourlyCapOverride ?? null;
+      }
     }
-  } catch {
+  } catch (err) {
     // Non-fatal: directory may not be initialized yet on first boot
+    log.warn("DirectoryDb getContactDmSettings failed", { chatId, error: err instanceof Error ? err.message : String(err) });
   }
 
   // Step 2b (Phase 56, ADAPT-04, ADAPT-05): If no manual gate override, check activity profile.
@@ -105,16 +123,18 @@ export async function enforceMimicry(params: EnforceMimicryParams): Promise<void
   // to global/session config unchanged (no error). DO NOT REMOVE.
   if (!targetGateOverride) {
     try {
-      const dirDb = getDirectoryDb(accountId);
-      const profile = dirDb.getActivityProfile(chatId);
-      if (profile) {
-        targetGateOverride = {
-          startHour: profile.peakStartHour,
-          endHour: profile.peakEndHour,
-        };
+      if (dirDb) {
+        const profile = dirDb.getActivityProfile(chatId);
+        if (profile) {
+          targetGateOverride = {
+            startHour: profile.peakStartHour,
+            endHour: profile.peakEndHour,
+          };
+        }
       }
-    } catch {
+    } catch (err) {
       // Non-fatal: directory may not have activity profiles table yet
+      log.warn("DirectoryDb getActivityProfile failed", { chatId, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -126,8 +146,9 @@ export async function enforceMimicry(params: EnforceMimicryParams): Promise<void
     throw new Error(`[mimicry] Send blocked: ${gateResult.reason ?? "outside send window"}`);
   }
 
-  // Step 4: cap pre-check (skip for status/story sends)
-  if (!isStatusSend) {
+  // Step 4: cap pre-check (skip for status/story sends and when hourlyCap is disabled)
+  const capEnabled = wahaConfig.hourlyCap?.enabled ?? false;
+  if (!isStatusSend && capEnabled) {
     const db = _db ?? getMimicryDb();
     const firstSendAt = db.getFirstSendAt(session);
     const maturity = getMaturityPhase(firstSendAt, _now);
@@ -142,18 +163,16 @@ export async function enforceMimicry(params: EnforceMimicryParams): Promise<void
   }
 
   // Step 5: jitter delay — base 5000ms ±40% → effective range 3000-7000ms
-  const BASE_DELAY_MS = 5000;
-  const JITTER_FACTOR = 0.4;
   const jitter = BASE_DELAY_MS * JITTER_FACTOR;
   const delayMs = BASE_DELAY_MS + (Math.random() * 2 - 1) * jitter;
   await _sleep(Math.round(delayMs));
 
   // Step 6: typing simulation — only when messageLength > 0
   if (messageLength && messageLength > 0) {
-    const typingDurationMs = Math.min((messageLength / 4) * 1000, 8000);
-    await sendWahaPresence({ cfg, chatId, typing: true });
+    const typingDurationMs = Math.min((messageLength / 4) * 1000, MAX_TYPING_DURATION_MS);
+    await sendWahaPresence({ cfg, chatId, typing: true }).catch(() => {});
     await _sleep(typingDurationMs);
-    await sendWahaPresence({ cfg, chatId, typing: false });
+    await sendWahaPresence({ cfg, chatId, typing: false }).catch(() => {});
   }
 }
 

@@ -32,7 +32,7 @@ const BETWEEN_CHATS_MS = 500;    // sleep between individual chat scans
 const FIRST_TICK_DELAY_MS = 30_000;   // 30s startup delay
 const ON_PEAK_RETRY_MS = 30 * 60_000; // 30 min retry when on-peak
 const BATCH_CONTINUE_MS = 5 * 60_000; // 5 min between partial batches
-const FULL_PASS_DELAY_MS = 7 * 24 * 60 * 60_000; // 7-day rescan interval
+const FULL_PASS_DELAY_MS = SEVEN_DAYS_MS; // 7-day rescan interval
 const MIN_TIMESTAMPS = 20;       // sparse guard for computePeakWindow
 const TOP_PERCENT = 0.6;         // top-60% of hours by volume = peak window
 

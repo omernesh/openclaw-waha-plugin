@@ -192,6 +192,7 @@ async function deliverWahaReply(params: {
       caption,
       replyToId: payload.replyToId,
       accountId,
+      bypassPolicy: true, // Fix: deliverWahaReply already called enforceMimicry above — skip double enforcement
     });
     // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
     recordMimicrySuccess(accountId);
@@ -209,6 +210,7 @@ async function deliverWahaReply(params: {
     replyToId: payload.replyToId,
     accountId,
     botProxy,
+    bypassPolicy: true, // Fix: deliverWahaReply already called enforceMimicry above — skip double enforcement
   });
   // Phase 54: Record successful send for hourly cap. DO NOT CHANGE.
   recordMimicrySuccess(accountId);

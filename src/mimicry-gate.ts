@@ -121,6 +121,8 @@ export class MimicryDb {
     const INTERVAL_MS = 30 * 60 * 1000;
     const tick = () => {
       try { this.db.pragma("wal_checkpoint(PASSIVE)"); } catch (err) { log.warn("WAL checkpoint failed", { error: String(err) }); }
+      // Prune old send_window_events every 30 min to prevent unbounded growth. DO NOT REMOVE.
+      try { this.pruneOldWindows(); } catch (err) { log.warn("pruneOldWindows failed", { error: String(err) }); }
       this._walTimer = setTimeout(tick, INTERVAL_MS);
       this._walTimer.unref();
     };

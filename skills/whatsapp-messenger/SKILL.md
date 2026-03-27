@@ -1,7 +1,7 @@
 ---
 name: whatsapp-messenger
 description: Send WhatsApp messages to Omer, read WhatsApp conversations, create polls, send reactions, manage groups, contacts, channels, labels, presence, profile, and communicate via WAHA REST API. Use when the user asks to "message me on WhatsApp", "send a WhatsApp message", "notify me on WhatsApp", "read WhatsApp messages", "check WhatsApp", "create a WhatsApp poll", "send WhatsApp reaction", "list groups", "join a group", "leave a group", or when you need to communicate with Omer outside of the terminal.
-version: 2.0.0
+version: 3.0.0
 ---
 
 # WhatsApp Messenger Skill
@@ -10,20 +10,16 @@ Full WhatsApp control through the WAHA REST API on hpg6. Over 100 actions availa
 
 ## Connection Details
 
-| Setting | Value |
-|---------|-------|
-| **SSH** | `ssh omer@100.114.126.43` (key auth) |
-| **Proxy URL** | `http://127.0.0.1:8050` (on hpg6, mimicry-enforced) |
-| **WAHA API** | `http://127.0.0.1:3004` (on hpg6, direct — read-only actions only) |
-| **API Key Header** | `X-Api-Key: XcTCX9cn84LE/uMm3SnHEvm0giwtNnHBmGR7OGeAOpA=` |
-| **Session** | `3cf11776_omer` |
+All connection details are sourced from environment variables. **Never hardcode secrets.**
 
-## Omer's Contact Details
-
-| Target | Chat ID |
-|--------|---------|
-| **Omer DM** | `972544329000@c.us` |
-| **Sammie Test Group** | `120363421825201386@g.us` |
+| Setting | Env Var | Description |
+|---------|---------|-------------|
+| **SSH Host** | `WAHA_SSH_HOST` | SSH target for hpg6 (e.g. `omer@100.114.126.43`) |
+| **Proxy URL** | `WAHA_PROXY_URL` | Mimicry-enforced send proxy (e.g. `http://127.0.0.1:8050/api/admin/proxy-send`) |
+| **WAHA API URL** | `WAHA_API_URL` | Direct WAHA API for read-only actions (e.g. `http://127.0.0.1:3004`) |
+| **API Key** | `WAHA_API_KEY` | WAHA API key for `X-Api-Key` header |
+| **Session** | `WAHA_SESSION` | WAHA session ID (e.g. `3cf11776_omer`) |
+| **Omer DM** | `WAHA_OMER_CHAT_ID` | Omer's chat JID (e.g. `972544329000@c.us`) |
 
 ## How to Use Actions
 
@@ -32,41 +28,41 @@ Actions are invoked through the OpenClaw gateway. Standard actions (send, poll, 
 ### Send a Text Message (primary example)
 
 ```bash
-ssh omer@100.114.126.43 'python3 -c "
-import json, urllib.request
+ssh $WAHA_SSH_HOST 'python3 -c "
+import json, urllib.request, os
 data = json.dumps({
     \"chatId\": \"CHAT_ID\",
     \"text\": \"YOUR_MESSAGE\",
-    \"session\": \"3cf11776_omer\",
+    \"session\": \"'$WAHA_SESSION'\",
     \"type\": \"text\"
 }).encode()
-req = urllib.request.Request(\"http://127.0.0.1:8050/api/admin/proxy-send\", data=data, headers={\"Content-Type\": \"application/json\"})
+req = urllib.request.Request(\"'$WAHA_PROXY_URL'\", data=data, headers={\"Content-Type\": \"application/json\"})
 print(urllib.request.urlopen(req).read().decode()[:200])
 "'
 ```
 
-Replace `CHAT_ID` with `972544329000@c.us` (Omer DM) or a group JID.
+Replace `CHAT_ID` with the target JID (use `$WAHA_OMER_CHAT_ID` for Omer DM) or a group JID.
 
 ### Send Media (image via proxy)
 
 ```bash
-ssh omer@100.114.126.43 'python3 -c "
+ssh $WAHA_SSH_HOST 'python3 -c "
 import json, urllib.request
 data = json.dumps({
     \"chatId\": \"CHAT_ID\",
     \"image\": {\"url\": \"https://example.com/photo.jpg\"},
     \"caption\": \"Check this out\",
-    \"session\": \"3cf11776_omer\",
+    \"session\": \"'$WAHA_SESSION'\",
     \"type\": \"image\"
 }).encode()
-req = urllib.request.Request(\"http://127.0.0.1:8050/api/admin/proxy-send\", data=data, headers={\"Content-Type\": \"application/json\"})
+req = urllib.request.Request(\"'$WAHA_PROXY_URL'\", data=data, headers={\"Content-Type\": \"application/json\"})
 print(urllib.request.urlopen(req).read().decode()[:200])
 "'
 ```
 
 ## Proxy Routing (Mimicry Enforcement)
 
-All outbound sends (text, image, video, file) MUST go through the proxy endpoint at `http://127.0.0.1:8050/api/admin/proxy-send`. This enforces:
+All outbound sends (text, image, video, file) MUST go through `$WAHA_PROXY_URL`. This enforces:
 - **Time gate** — sends blocked outside configured hours
 - **Hourly cap** — sends rejected when hourly limit reached
 - **Typing simulation** — human-like typing delay before send
@@ -78,7 +74,7 @@ The proxy accepts the same JSON body as WAHA API, plus a `type` field (`text`, `
 - `502` with `{ "error": "WAHA API error: ..." }` — WAHA forwarding failed
 - `400` — missing required fields (chatId, session)
 
-Read-only actions (getChats, getContacts, search, etc.) still call WAHA API directly at port 3004.
+Read-only actions (getChats, getContacts, search, etc.) still call `$WAHA_API_URL` directly.
 
 ---
 
@@ -334,9 +330,9 @@ Slash commands are intercepted **before** the LLM — no action call is needed. 
 
 ## Guidelines
 
-- **Route sends through proxy** — all text/image/video/file sends must use `http://127.0.0.1:8050/api/admin/proxy-send`, not WAHA directly. Read-only queries (getChats, getContacts, readMessages, search) still use WAHA at port 3004.
+- **Route sends through proxy** — all text/image/video/file sends must use `$WAHA_PROXY_URL`, not WAHA directly. Read-only queries (getChats, getContacts, readMessages, search) still use `$WAHA_API_URL`.
 - **If proxy returns 403 (blocked), report the error to the user** — do NOT retry or fall back to direct WAHA
-- **Default to Omer's DM** (`972544329000@c.us`) unless a specific group is requested
+- **Default to Omer's DM** (`$WAHA_OMER_CHAT_ID`) unless a specific group is requested
 - **Keep messages concise** — WhatsApp has a 4096 character limit per message
 - **Wait 30-60 seconds** after sending to the bot's group before reading replies (AI processing time)
 - **Never impersonate Omer** — only send as the bot session

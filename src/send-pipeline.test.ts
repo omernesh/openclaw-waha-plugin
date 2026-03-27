@@ -16,13 +16,13 @@ vi.mock("./send.js", () => ({
 }));
 
 // ─── Mock directory.js for activity profile tests ────────────────────────────
-// Default: getDmSettings returns null, getActivityProfile returns null.
+// Default: getContactDmSettings returns null, getActivityProfile returns null.
 // Individual tests override via vi.mocked(getDirectoryDb).mockReturnValue(...).
 const mockGetDmSettings = vi.fn().mockReturnValue(null);
 const mockGetActivityProfile = vi.fn().mockReturnValue(null);
 vi.mock("./directory.js", () => ({
   getDirectoryDb: vi.fn(() => ({
-    getDmSettings: mockGetDmSettings,
+    getContactDmSettings: mockGetDmSettings,
     getActivityProfile: mockGetActivityProfile,
   })),
 }));
@@ -138,7 +138,7 @@ describe("enforceMimicry", () => {
   it("throws '[mimicry] Send blocked:' with 'Hourly cap' when cap is exhausted", async () => {
     const cfg = makeCfg({
       sendGate: { enabled: false },
-      hourlyCap: { limits: { new: 2, warming: 2, stable: 2 } },
+      hourlyCap: { enabled: true, limits: { new: 2, warming: 2, stable: 2 } },
     });
 
     // Record 2 sends to hit limit
@@ -245,7 +245,7 @@ describe("enforceMimicry", () => {
   it("throws cap exceeded when batch count would exceed remaining cap", async () => {
     const cfg = makeCfg({
       sendGate: { enabled: false },
-      hourlyCap: { limits: { new: 5, warming: 5, stable: 5 } },
+      hourlyCap: { enabled: true, limits: { new: 5, warming: 5, stable: 5 } },
     });
 
     // 3 sends already recorded — remaining = 5-3 = 2; batch of 3 would exceed
@@ -271,7 +271,7 @@ describe("enforceMimicry", () => {
   it("allows batch when count is within remaining cap", async () => {
     const cfg = makeCfg({
       sendGate: { enabled: false },
-      hourlyCap: { limits: { new: 10, warming: 10, stable: 10 } },
+      hourlyCap: { enabled: true, limits: { new: 10, warming: 10, stable: 10 } },
     });
 
     // 2 sends recorded — remaining = 10-2 = 8; batch of 3 fits
@@ -304,7 +304,7 @@ describe("enforceMimicry", () => {
   it("isStatusSend=true skips cap check but enforces time gate", async () => {
     const cfg = makeCfg({
       sendGate: { enabled: true, startHour: 7, endHour: 1, timezone: "UTC" },
-      hourlyCap: { limits: { new: 1, warming: 1, stable: 1 } },
+      hourlyCap: { enabled: true, limits: { new: 1, warming: 1, stable: 1 } },
     });
 
     // Fill cap beyond limit
