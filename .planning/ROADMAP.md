@@ -160,7 +160,9 @@ Plans:
   1. The dashboard shows a "Send Gates" card per session with: maturity phase label, days until next phase upgrade, current hourly cap usage (N/max), and gate open/closed badge
   2. The settings tab has inputs for send window start/end hours, timezone selector (IANA string), hourly cap limit, and the progressive limits table (New/Warming/Stable)
   3. `GET /api/admin/mimicry` returns gate open/closed status, cap usage, and maturity phase for each active session
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 57-01-PLAN.md — API route + dashboard card + settings section (UI-01, UI-02, UI-03)
 **UI hint**: yes
 
 ## Progress
