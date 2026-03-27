@@ -90,7 +90,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle) (completed 2026-03-26)
 - [x] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
 - [x] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing (2/2 plans complete 2026-03-27)
-- [ ] **Phase 57: Admin UI & Observability** - Dashboard card, settings tab controls, mimicry status API
+- [x] **Phase 57: Admin UI & Observability** - Dashboard card, settings tab controls, mimicry status API (completed 2026-03-27)
 
 ## Phase Details
 
@@ -160,9 +160,9 @@ Plans:
   1. The dashboard shows a "Send Gates" card per session with: maturity phase label, days until next phase upgrade, current hourly cap usage (N/max), and gate open/closed badge
   2. The settings tab has inputs for send window start/end hours, timezone selector (IANA string), hourly cap limit, and the progressive limits table (New/Warming/Stable)
   3. `GET /api/admin/mimicry` returns gate open/closed status, cap usage, and maturity phase for each active session
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 57-01-PLAN.md — API route + dashboard card + settings section (UI-01, UI-02, UI-03)
+- [x] 57-01-PLAN.md — API route + dashboard card + settings section (UI-01, UI-02, UI-03)
 **UI hint**: yes
 
 ## Progress
@@ -173,4 +173,4 @@ Plans:
 | 54. Send Pipeline Enforcement | 2/2 | Complete    | 2026-03-26 |
 | 55. Claude Code Integration | 1/1 | Complete | 2026-03-27 |
 | 56. Adaptive Activity Patterns | 1/2 | In Progress|  |
-| 57. Admin UI & Observability | 0/? | Not started | - |
+| 57. Admin UI & Observability | 1/1 | Complete   | 2026-03-27 |

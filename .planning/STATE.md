@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
 status: completed
-stopped_at: Completed 56-01-PLAN.md
-last_updated: "2026-03-27T20:14:40.781Z"
+stopped_at: Completed 57-01-PLAN.md
+last_updated: "2026-03-27T20:46:27.725Z"
 last_activity: 2026-03-27
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 6
-  percent: 60
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 8
+  completed_plans: 8
+  percent: 70
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Progress: [███████░░░] 70%
 | Phase 54 P02 | 10 | 2 tasks | 3 files |
 | Phase 55 P01 | 22 | 2 tasks | 4 files |
 | Phase 56 P01 | 602 | 2 tasks | 4 files |
+| Phase 57 P01 | 15 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Progress: [███████░░░] 70%
 - [Phase 56-02]: Step 2b guard `if (!targetGateOverride)` ensures manual admin override always wins over learned profile
 - [Phase 56-02]: getActivityProfile error swallowed (non-fatal) — falls back to global gate config silently
 - [Phase 56-02]: startActivityScanner receives session: account.accountId (same as accountId per ScannerOptions)
+- [Phase 57]: Route placed after /api/admin/sessions, getCapStatus used (read-only) never checkAndConsumeCap — status API must not consume quota
+- [Phase 57]: buildPayload() in SettingsTab extended with sendGate/hourlyCap to wire auto-save for new mimicry config fields
 
 ### Architecture Notes
 
@@ -113,6 +116,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T20:14:40.775Z
-Stopped at: Completed 56-02-PLAN.md
+Last session: 2026-03-27T20:46:11.697Z
+Stopped at: Completed 57-01-PLAN.md
 Resume file: None

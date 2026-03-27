@@ -42,9 +42,9 @@ Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
 
 ### Admin UI
 
-- [ ] **UI-01**: Dashboard card showing maturity phase, days until upgrade, current cap usage vs limit, gate open/closed
-- [ ] **UI-02**: Settings tab: send gate hours pickers, timezone selector, hourly cap limit inputs, progressive limits table
-- [ ] **UI-03**: Mimicry status API endpoint (GET /api/admin/mimicry) for gate status and cap usage per session
+- [x] **UI-01**: Dashboard card showing maturity phase, days until upgrade, current cap usage vs limit, gate open/closed
+- [x] **UI-02**: Settings tab: send gate hours pickers, timezone selector, hourly cap limit inputs, progressive limits table
+- [x] **UI-03**: Mimicry status API endpoint (GET /api/admin/mimicry) for gate status and cap usage per session
 
 ### Adaptive Activity Patterns
 
@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BEH-01 | Phase 54 Plan 01 | Complete |
 | BEH-02 | Phase 54 Plan 01 | Complete |
 | BEH-03 | Phase 54 Plan 01 | Complete |
-| UI-01 | Phase 57 | Pending |
-| UI-02 | Phase 57 | Pending |
-| UI-03 | Phase 57 | Pending |
+| UI-01 | Phase 57 | Complete |
+| UI-02 | Phase 57 | Complete |
+| UI-03 | Phase 57 | Complete |
 | ADAPT-01 | Phase 56 | Complete |
 | ADAPT-02 | Phase 56 | Complete |
 | ADAPT-03 | Phase 56 | Complete |
