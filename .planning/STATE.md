@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 55
-Plan: 01 (complete)
-Status: Active — 55-01 done
+Phase: 56
+Plan: 02 (complete)
+Status: Active — 56-02 done
 Last activity: 2026-03-27
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
@@ -83,6 +83,9 @@ Progress: [██████░░░░] 60%
 - [Phase 56]: _firstTickDelayMs DI param in ScannerOptions for test isolation without fake timers
 - [Phase 56]: computePeakWindow uses contiguous span of top-60% hours (permissive for bimodal activity patterns)
 - [Phase 56]: isOffPeak delegates to resolveGateConfig + checkTimeOfDay from mimicry-gate.ts (no logic duplication)
+- [Phase 56-02]: Step 2b guard `if (!targetGateOverride)` ensures manual admin override always wins over learned profile
+- [Phase 56-02]: getActivityProfile error swallowed (non-fatal) — falls back to global gate config silently
+- [Phase 56-02]: startActivityScanner receives session: account.accountId (same as accountId per ScannerOptions)
 
 ### Architecture Notes
 
@@ -111,5 +114,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27T20:14:40.775Z
-Stopped at: Completed 56-01-PLAN.md
+Stopped at: Completed 56-02-PLAN.md
 Resume file: None

@@ -89,7 +89,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [x] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (mimicry-gate.ts, Zod schemas, SQLite tables) (completed 2026-03-26)
 - [x] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle) (completed 2026-03-26)
 - [x] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
-- [ ] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing
+- [x] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing (2/2 plans complete 2026-03-27)
 - [ ] **Phase 57: Admin UI & Observability** - Dashboard card, settings tab controls, mimicry status API
 
 ## Phase Details
