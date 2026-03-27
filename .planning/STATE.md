@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
 status: completed
-stopped_at: Completed 55-01-PLAN.md
-last_updated: "2026-03-27T01:07:00.000Z"
+stopped_at: Completed 56-01-PLAN.md
+last_updated: "2026-03-27T20:14:40.781Z"
 last_activity: 2026-03-27
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 60
 ---
 
@@ -54,6 +54,7 @@ Progress: [██████░░░░] 60%
 | Phase 54 P01 | 4 | 1 task (TDD) | 2 files |
 | Phase 54 P02 | 10 | 2 tasks | 3 files |
 | Phase 55 P01 | 22 | 2 tasks | 4 files |
+| Phase 56 P01 | 602 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Progress: [██████░░░░] 60%
 - [Phase 55]: Extracted handleProxySend into proxy-send-handler.ts for testability (avoids mocking full HTTP server)
 - [Phase 55]: Proxy calls callWahaApi directly, not sendWahaText, to avoid double mimicry enforcement
 - [Phase 55]: recordMimicrySuccess called only after WAHA success -- failed proxy sends don't consume cap
+- [Phase 56]: _firstTickDelayMs DI param in ScannerOptions for test isolation without fake timers
+- [Phase 56]: computePeakWindow uses contiguous span of top-60% hours (permissive for bimodal activity patterns)
+- [Phase 56]: isOffPeak delegates to resolveGateConfig + checkTimeOfDay from mimicry-gate.ts (no logic duplication)
 
 ### Architecture Notes
 
@@ -106,6 +110,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T01:07:00.000Z
-Stopped at: Completed 55-01-PLAN.md
+Last session: 2026-03-27T20:14:40.775Z
+Stopped at: Completed 56-01-PLAN.md
 Resume file: None

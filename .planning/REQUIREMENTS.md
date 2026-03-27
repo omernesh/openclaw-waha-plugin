@@ -48,9 +48,9 @@ Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
 
 ### Adaptive Activity Patterns
 
-- [ ] **ADAPT-01**: System scans group/contact message history (last 7 days) to build per-chat activity profiles (busiest hours, busiest days)
-- [ ] **ADAPT-02**: Activity profiles stored in SQLite table for reuse, rescanned weekly
-- [ ] **ADAPT-03**: Scanning runs incrementally — small portion of contact list per day, during off-peak hours, only when system is not under high usage
+- [x] **ADAPT-01**: System scans group/contact message history (last 7 days) to build per-chat activity profiles (busiest hours, busiest days)
+- [x] **ADAPT-02**: Activity profiles stored in SQLite table for reuse, rescanned weekly
+- [x] **ADAPT-03**: Scanning runs incrementally — small portion of contact list per day, during off-peak hours, only when system is not under high usage
 - [ ] **ADAPT-04**: Time gates adapt per-group/contact based on activity profile — sends aligned to match observed human activity patterns
 - [ ] **ADAPT-05**: Fallback to global/session default gate when no activity profile exists for a chat
 
@@ -101,9 +101,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-01 | Phase 57 | Pending |
 | UI-02 | Phase 57 | Pending |
 | UI-03 | Phase 57 | Pending |
-| ADAPT-01 | Phase 56 | Pending |
-| ADAPT-02 | Phase 56 | Pending |
-| ADAPT-03 | Phase 56 | Pending |
+| ADAPT-01 | Phase 56 | Complete |
+| ADAPT-02 | Phase 56 | Complete |
+| ADAPT-03 | Phase 56 | Complete |
 | ADAPT-04 | Phase 56 | Pending |
 | ADAPT-05 | Phase 56 | Pending |
 
