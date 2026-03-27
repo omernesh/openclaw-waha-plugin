@@ -147,7 +147,10 @@ Plans:
   3. When a chat has an activity profile, the time gate uses that chat's peak hours instead of the global/session default window
   4. When no profile exists for a chat, the system falls back to the global or session-level gate configuration without error
   5. Activity profiles are rescanned automatically each week, overwriting stale data
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 56-01-PLAN.md — SQLite schema + activity scanner module + tests (ADAPT-01, ADAPT-02, ADAPT-03)
+- [ ] 56-02-PLAN.md — Wire scanner into enforcer + channel startup (ADAPT-04, ADAPT-05)
 
 ### Phase 57: Admin UI & Observability
 **Goal**: Operators can see the mimicry system's current state and configure send gates and caps from the admin panel
@@ -167,5 +170,5 @@ Plans:
 | 53. MimicryGate Core | 2/2 | Complete    | 2026-03-26 |
 | 54. Send Pipeline Enforcement | 2/2 | Complete    | 2026-03-26 |
 | 55. Claude Code Integration | 1/1 | Complete | 2026-03-27 |
-| 56. Adaptive Activity Patterns | 0/? | Not started | - |
+| 56. Adaptive Activity Patterns | 0/2 | Not started | - |
 | 57. Admin UI & Observability | 0/? | Not started | - |
