@@ -13,7 +13,8 @@ Full WhatsApp control through the WAHA REST API on hpg6. Over 100 actions availa
 | Setting | Value |
 |---------|-------|
 | **SSH** | `ssh omer@100.114.126.43` (key auth) |
-| **WAHA API** | `http://127.0.0.1:3004` (on hpg6) |
+| **Proxy URL** | `http://127.0.0.1:8050` (on hpg6, mimicry-enforced) |
+| **WAHA API** | `http://127.0.0.1:3004` (on hpg6, direct — read-only actions only) |
 | **API Key Header** | `X-Api-Key: XcTCX9cn84LE/uMm3SnHEvm0giwtNnHBmGR7OGeAOpA=` |
 | **Session** | `3cf11776_omer` |
 
@@ -36,14 +37,48 @@ import json, urllib.request
 data = json.dumps({
     \"chatId\": \"CHAT_ID\",
     \"text\": \"YOUR_MESSAGE\",
-    \"session\": \"3cf11776_omer\"
+    \"session\": \"3cf11776_omer\",
+    \"type\": \"text\"
 }).encode()
-req = urllib.request.Request(\"http://127.0.0.1:3004/api/sendText\", data=data, headers={\"Content-Type\": \"application/json\", \"X-Api-Key\": \"XcTCX9cn84LE/uMm3SnHEvm0giwtNnHBmGR7OGeAOpA=\"})
+req = urllib.request.Request(\"http://127.0.0.1:8050/api/admin/proxy-send\", data=data, headers={\"Content-Type\": \"application/json\"})
 print(urllib.request.urlopen(req).read().decode()[:200])
 "'
 ```
 
 Replace `CHAT_ID` with `972544329000@c.us` (Omer DM) or a group JID.
+
+### Send Media (image via proxy)
+
+```bash
+ssh omer@100.114.126.43 'python3 -c "
+import json, urllib.request
+data = json.dumps({
+    \"chatId\": \"CHAT_ID\",
+    \"image\": {\"url\": \"https://example.com/photo.jpg\"},
+    \"caption\": \"Check this out\",
+    \"session\": \"3cf11776_omer\",
+    \"type\": \"image\"
+}).encode()
+req = urllib.request.Request(\"http://127.0.0.1:8050/api/admin/proxy-send\", data=data, headers={\"Content-Type\": \"application/json\"})
+print(urllib.request.urlopen(req).read().decode()[:200])
+"'
+```
+
+## Proxy Routing (Mimicry Enforcement)
+
+All outbound sends (text, image, video, file) MUST go through the proxy endpoint at `http://127.0.0.1:8050/api/admin/proxy-send`. This enforces:
+- **Time gate** — sends blocked outside configured hours
+- **Hourly cap** — sends rejected when hourly limit reached
+- **Typing simulation** — human-like typing delay before send
+
+The proxy accepts the same JSON body as WAHA API, plus a `type` field (`text`, `image`, `video`, `file`). It forwards to WAHA after enforcement passes.
+
+**Error responses:**
+- `403` with `{ "blocked": true, "error": "..." }` — gate or cap blocked the send
+- `502` with `{ "error": "WAHA API error: ..." }` — WAHA forwarding failed
+- `400` — missing required fields (chatId, session)
+
+Read-only actions (getChats, getContacts, search, etc.) still call WAHA API directly at port 3004.
 
 ---
 
@@ -299,6 +334,8 @@ Slash commands are intercepted **before** the LLM — no action call is needed. 
 
 ## Guidelines
 
+- **Route sends through proxy** — all text/image/video/file sends must use `http://127.0.0.1:8050/api/admin/proxy-send`, not WAHA directly. Read-only queries (getChats, getContacts, readMessages, search) still use WAHA at port 3004.
+- **If proxy returns 403 (blocked), report the error to the user** — do NOT retry or fall back to direct WAHA
 - **Default to Omer's DM** (`972544329000@c.us`) unless a specific group is requested
 - **Keep messages concise** — WhatsApp has a 4096 character limit per message
 - **Wait 30-60 seconds** after sending to the bot's group before reading replies (AI processing time)
