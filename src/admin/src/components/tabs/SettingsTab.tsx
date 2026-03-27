@@ -414,6 +414,28 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
       waha.actions = { reactions: config.actions.reactions }
     }
 
+    // Phase 57 (UI-02): sendGate and hourlyCap — mimicry timing controls. DO NOT REMOVE.
+    if (config.sendGate) {
+      waha.sendGate = {
+        enabled: config.sendGate.enabled,
+        timezone: config.sendGate.timezone,
+        startHour: config.sendGate.startHour,
+        endHour: config.sendGate.endHour,
+        onBlock: config.sendGate.onBlock,
+      }
+    }
+
+    if (config.hourlyCap) {
+      waha.hourlyCap = {
+        enabled: config.hourlyCap.enabled,
+        limits: {
+          new: config.hourlyCap.limits.new,
+          warming: config.hourlyCap.limits.warming,
+          stable: config.hourlyCap.limits.stable,
+        },
+      }
+    }
+
     return { waha }
   }
 
@@ -1453,6 +1475,122 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                   <p className="font-medium text-foreground mb-1">Per-Group Filter Overrides</p>
                   <p>Individual groups can override the global keyword filter settings. Go to Directory → Groups → click a group row → use the Filter Override section to customize patterns, god mode scope, and trigger behavior for that specific group.</p>
                 </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Section 12: Send Gate & Rate Limits (Phase 57, UI-02) — mimicry timing controls. DO NOT REMOVE. */}
+        <Collapsible defaultOpen={false}>
+          <Card>
+            <CollapsibleTrigger className="w-full text-left">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle>Send Gate &amp; Rate Limits<Tip text="Human mimicry timing controls. Send gate blocks outbound messages outside the configured time window. Hourly caps limit how many messages can be sent per session per hour." /></CardTitle>
+                  <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+
+                {/* Send Gate Toggle */}
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="sendGate.enabled"
+                    checked={config.sendGate?.enabled ?? false}
+                    onCheckedChange={(v) => updateConfig('sendGate.enabled', v)}
+                  />
+                  <Label htmlFor="sendGate.enabled">Send Gate Enabled<Tip text="When on, outbound messages outside the configured time window are blocked or queued." /></Label>
+                </div>
+
+                {/* Send Window Hours */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sendGate.startHour">Window Start (hour)<Tip text="Hour of day (0-23) when the send gate opens. Default: 7 (7am)." /></Label>
+                    <Input
+                      id="sendGate.startHour"
+                      type="number" min={0} max={23}
+                      value={config.sendGate?.startHour ?? 7}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10)
+                        if (!isNaN(n) && n >= 0 && n <= 23) updateConfig('sendGate.startHour', n)
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sendGate.endHour">Window End (hour)<Tip text="Hour of day (0-23) when the send gate closes. Default: 1 (1am). Cross-midnight: endHour ≤ startHour." /></Label>
+                    <Input
+                      id="sendGate.endHour"
+                      type="number" min={0} max={23}
+                      value={config.sendGate?.endHour ?? 1}
+                      onChange={(e) => {
+                        const n = parseInt(e.target.value, 10)
+                        if (!isNaN(n) && n >= 0 && n <= 23) updateConfig('sendGate.endHour', n)
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Timezone */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="sendGate.timezone">Timezone (IANA)<Tip text="Timezone for the send window. Use IANA format, e.g. Asia/Jerusalem, America/New_York, UTC." /></Label>
+                  <Input
+                    id="sendGate.timezone"
+                    value={config.sendGate?.timezone ?? 'UTC'}
+                    onChange={(e) => updateConfig('sendGate.timezone', e.target.value)}
+                    placeholder="e.g. Asia/Jerusalem"
+                  />
+                </div>
+
+                {/* Quiet Hours Policy */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="sendGate.onBlock">Quiet Hours Policy<Tip text="What happens when a send is attempted outside the window. Reject = return error immediately. Queue = hold until window opens." /></Label>
+                  <select
+                    id="sendGate.onBlock"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={config.sendGate?.onBlock ?? 'reject'}
+                    onChange={(e) => updateConfig('sendGate.onBlock', e.target.value)}
+                  >
+                    <option value="reject">Reject</option>
+                    <option value="queue">Queue</option>
+                  </select>
+                </div>
+
+                <hr className="border-border" />
+
+                {/* Hourly Cap Toggle */}
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="hourlyCap.enabled"
+                    checked={config.hourlyCap?.enabled ?? true}
+                    onCheckedChange={(v) => updateConfig('hourlyCap.enabled', v)}
+                  />
+                  <Label htmlFor="hourlyCap.enabled">Hourly Cap Enabled<Tip text="When on, outbound messages are capped per session per hour based on account maturity." /></Label>
+                </div>
+
+                {/* Progressive Limits Table */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Progressive Limits (messages/hr)<Tip text="Per-session hourly send limits based on account age. New accounts have lower limits to reduce ban risk." /></Label>
+                  {([
+                    { label: 'New (0-7 days)', key: 'new' as const, dflt: 15 },
+                    { label: 'Warming (8-30 days)', key: 'warming' as const, dflt: 30 },
+                    { label: 'Stable (30+ days)', key: 'stable' as const, dflt: 50 },
+                  ] as { label: string; key: 'new' | 'warming' | 'stable'; dflt: number }[]).map(({ label, key, dflt }) => (
+                    <div key={key} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{label}</span>
+                      <Input
+                        type="number" min={1} className="w-20 h-7 text-right"
+                        value={config.hourlyCap?.limits?.[key] ?? dflt}
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value, 10)
+                          if (!isNaN(n) && n > 0) updateConfig(`hourlyCap.limits.${key}`, n)
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
               </CardContent>
             </CollapsibleContent>
           </Card>

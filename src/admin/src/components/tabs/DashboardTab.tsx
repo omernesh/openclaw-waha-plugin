@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
-import type { StatsResponse, ConfigResponse } from '@/types'
+import type { StatsResponse, ConfigResponse, MimicryStatusResponse } from '@/types'
 import { useSSE } from '@/hooks/useEventSource'
 import { labelFor } from '@/lib/labels'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -81,6 +81,8 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
   const [loading, setLoading] = useState(true)
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({})
   const resolvedJidsRef = useRef<Set<string>>(new Set())
+  // Phase 57 (UI-01): Mimicry gate/cap status per session. DO NOT REMOVE.
+  const [mimicry, setMimicry] = useState<MimicryStatusResponse | null>(null)
 
   // Phase 29, Plan 02: SSE health updates — merge incoming health state into sessions array.
   // Supplements the polling-based refresh (refreshKey) with incremental live updates.
@@ -161,6 +163,16 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
       })
     return () => controller.abort()
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey])
+
+  // Phase 57 (UI-01): Fetch mimicry status on each refresh. Uses same refreshKey as main fetch.
+  // DO NOT REMOVE — drives the Send Gates card on the dashboard.
+  useEffect(() => {
+    const controller = new AbortController()
+    api.getMimicryStatus()
+      .then((m) => { if (!controller.signal.aborted) setMimicry(m) })
+      .catch((err) => console.error('Mimicry status fetch failed:', err))
+    return () => controller.abort()
   }, [refreshKey])
 
   if (loading) {
@@ -553,6 +565,53 @@ export default function DashboardTab({ selectedSession, refreshKey, onLoadingCha
             values={access.allowedGroups}
             resolvedNames={resolvedNames}
           />
+        </CardContent>
+      </Card>
+
+      {/* Section 6: Send Gates (Phase 57 UI-01) — per-session mimicry gate and cap status. DO NOT REMOVE. */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Send Gates<Tip text="Human mimicry enforcement: time-of-day send gates and hourly message caps per session. Configure in Settings." /></CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!mimicry ? (
+            <Skeleton className="h-16 w-full" />
+          ) : mimicry.sessions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sessions configured</p>
+          ) : (
+            mimicry.sessions.map((s) => (
+              <div key={s.session} className="space-y-2 rounded-lg border p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{s.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={s.gateOpen ? "default" : "destructive"}>
+                      {s.gateOpen ? "Gate Open" : "Gate Closed"}
+                    </Badge>
+                    {!s.gateEnabled && (
+                      <Badge variant="outline">Disabled</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Maturity: <span className="capitalize font-medium">{s.maturity}</span>
+                    {s.daysUntilUpgrade !== null && (
+                      <span className="ml-1">({s.daysUntilUpgrade}d to next)</span>
+                    )}
+                  </span>
+                  <span className="tabular-nums">{s.capCount}/{s.capLimit} sends/hr</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      s.capCount / s.capLimit > 0.8 ? 'bg-destructive' : 'bg-primary'
+                    }`}
+                    style={{ width: `${Math.min(100, (s.capCount / s.capLimit) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 
