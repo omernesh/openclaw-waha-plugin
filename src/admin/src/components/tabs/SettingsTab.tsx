@@ -448,9 +448,11 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
     if (config.hourlyCap) {
       waha.hourlyCap = {
         enabled: config.hourlyCap.enabled,
-        limitNew: config.hourlyCap.limitNew,
-        limitWarming: config.hourlyCap.limitWarming,
-        limitStable: config.hourlyCap.limitStable,
+        limits: {
+          new: config.hourlyCap.limits.new,
+          warming: config.hourlyCap.limits.warming,
+          stable: config.hourlyCap.limits.stable,
+        },
       }
     }
 
@@ -1577,10 +1579,10 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                       <span className="text-muted-foreground">{label}</span>
                       <Input
                         type="number" min={1} className="w-20 h-7 text-right"
-                        value={config.hourlyCap?.[`limit${key.charAt(0).toUpperCase()}${key.slice(1)}` as keyof typeof config.hourlyCap] ?? dflt}
+                        value={config.hourlyCap?.limits?.[key] ?? dflt}
                         onChange={(e) => {
                           const n = parseInt(e.target.value, 10)
-                          if (!isNaN(n) && n > 0) updateConfig(`hourlyCap.limit${key.charAt(0).toUpperCase()}${key.slice(1)}`, n)
+                          if (!isNaN(n) && n > 0) updateConfig(`hourlyCap.limits.${key}`, n)
                         }}
                       />
                     </div>

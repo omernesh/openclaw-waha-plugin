@@ -34,9 +34,7 @@ export interface TargetGateOverride {
 
 export interface TargetCapOverride {
   enabled?: boolean;
-  limitNew?: number;
-  limitWarming?: number;
-  limitStable?: number;
+  limits?: { new?: number; warming?: number; stable?: number };
 }
 
 export interface ResolvedGateConfig {
@@ -49,9 +47,7 @@ export interface ResolvedGateConfig {
 
 export interface ResolvedCapConfig {
   enabled: boolean;
-  limitNew: number;
-  limitWarming: number;
-  limitStable: number;
+  limits: { new: number; warming: number; stable: number };
 }
 
 export interface GateResult {
@@ -209,14 +205,10 @@ export function resolveCapLimit(
   targetOverride?: TargetCapOverride | null
 ): number {
   const defaultLimits = { new: 15, warming: 30, stable: 50 };
-  const globalCap = cfg.hourlyCap ?? {};
-  const perSessionCap = session ? (cfg.accounts?.[session]?.hourlyCap ?? {}) : {};
-  const globalLimits = { new: globalCap.limitNew, warming: globalCap.limitWarming, stable: globalCap.limitStable };
-  const sessionLimits = { new: perSessionCap.limitNew, warming: perSessionCap.limitWarming, stable: perSessionCap.limitStable };
-  const targetLimits = targetOverride ? { new: targetOverride.limitNew, warming: targetOverride.limitWarming, stable: targetOverride.limitStable } : {};
-  // Filter out undefined values before merging so they don't overwrite defaults
-  const clean = (o: Record<string, number | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
-  const merged = { ...defaultLimits, ...clean(globalLimits), ...clean(sessionLimits), ...clean(targetLimits) };
+  const global = cfg.hourlyCap?.limits ?? {};
+  const perSession = session ? (cfg.accounts?.[session]?.hourlyCap?.limits ?? {}) : {};
+  const perTarget = targetOverride?.limits ?? {};
+  const merged = { ...defaultLimits, ...global, ...perSession, ...perTarget };
   return merged[maturity];
 }
 

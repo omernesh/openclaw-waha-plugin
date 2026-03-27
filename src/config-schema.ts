@@ -178,12 +178,13 @@ export const WahaAccountSchemaBase = z
     // Controls maximum outbound messages per rolling 60-minute window per session.
     // Progressive limits tied to account maturity: New (0-7d), Warming (8-30d), Stable (30d+).
     // Cap keyed by WAHA session name (locked decision, STATE.md 2026-03-26). DO NOT CHANGE.
-    // FLAT STRUCTURE: limits inlined to avoid 3-level nesting that crashes gateway AJV compiler.
     hourlyCap: z.object({
       enabled: z.boolean().optional().default(false),
-      limitNew: z.number().int().positive().optional().default(15),
-      limitWarming: z.number().int().positive().optional().default(30),
-      limitStable: z.number().int().positive().optional().default(50),
+      limits: z.object({
+        new: z.number().int().positive().optional().default(15),
+        warming: z.number().int().positive().optional().default(30),
+        stable: z.number().int().positive().optional().default(50),
+      }).optional().default({}),
     }).optional().default({}),
   })
   .strict();

@@ -137,9 +137,7 @@ export interface WahaConfig {
   }
   hourlyCap?: {
     enabled: boolean
-    limitNew: number
-    limitWarming: number
-    limitStable: number
+    limits: { new: number; warming: number; stable: number }
   }
   mediaPreprocessing?: {
     enabled: boolean
