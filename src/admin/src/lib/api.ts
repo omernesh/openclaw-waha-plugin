@@ -19,6 +19,7 @@ import type {
   WahaConfig,
   AnalyticsResponse,
   PresenceEntry,
+  MimicryStatusResponse,
 } from '@/types'
 
 const BASE = '/api/admin'
@@ -212,6 +213,9 @@ export const api = {
   // Pairing
   revokePairingGrant: (jid: string) =>
     request<void>(`/pairing/grant/${encodeURIComponent(jid)}`, { method: 'DELETE' }),
+
+  // Phase 57 (UI-03): Mimicry gate status per session. DO NOT REMOVE.
+  getMimicryStatus: () => request<MimicryStatusResponse>('/mimicry'),
 }
 
 export { ApiError }

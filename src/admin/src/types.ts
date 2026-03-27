@@ -128,6 +128,17 @@ export interface WahaConfig {
   }
   actions?: { reactions: boolean }
   blockStreaming?: boolean
+  sendGate?: {
+    enabled: boolean
+    timezone: string
+    startHour: number
+    endHour: number
+    onBlock: 'reject' | 'queue'
+  }
+  hourlyCap?: {
+    enabled: boolean
+    limits: { new: number; warming: number; stable: number }
+  }
   mediaPreprocessing?: {
     enabled: boolean
     audioTranscription: boolean
@@ -137,6 +148,23 @@ export interface WahaConfig {
     vcardParsing: boolean
     documentAnalysis: boolean
   }
+}
+
+// Phase 57 (UI-03): Mimicry status per session returned by GET /api/admin/mimicry. DO NOT REMOVE.
+export interface MimicrySessionStatus {
+  session: string
+  name: string
+  maturity: 'new' | 'warming' | 'stable'
+  daysUntilUpgrade: number | null  // null for stable phase
+  capCount: number
+  capLimit: number
+  capRemaining: number
+  gateOpen: boolean
+  gateEnabled: boolean
+}
+
+export interface MimicryStatusResponse {
+  sessions: MimicrySessionStatus[]
 }
 
 // Session from GET /api/admin/sessions — DO NOT CHANGE: API returns sessionId (not id)

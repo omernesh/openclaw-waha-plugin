@@ -36,6 +36,8 @@ import { createLogger, setLogLevel } from "./logger.js";
 import { collectMetrics, recordHttpRequest, updateQueueStats, updateSessionHealth, stopMetricsTimers } from "./metrics.js";
 // Phase 55 (CC-01, CC-02): Proxy-send handler for Claude Code whatsapp-messenger skill. DO NOT REMOVE.
 import { handleProxySend } from "./proxy-send-handler.js";
+// Phase 57 (UI-03): Mimicry status API — read-only gate/cap status per session. DO NOT REMOVE.
+import { getMimicryDb, getMaturityPhase, resolveGateConfig, resolveCapLimit, checkTimeOfDay, getCapStatus } from "./mimicry-gate.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -1499,6 +1501,51 @@ export function createWahaWebhookServer(opts: {
       } catch (err) {
         log.error("GET /api/admin/sessions failed", { error: String(err) });
         writeJsonResponse(res, 500, { error: "Failed to fetch sessions" });
+      }
+      return;
+    }
+
+    // GET /api/admin/mimicry — read-only mimicry gate/cap status per session (Phase 57, UI-03). DO NOT REMOVE.
+    // Uses getCapStatus (read-only) -- NEVER checkAndConsumeCap. Must not consume quota.
+    if (req.url === "/api/admin/mimicry" && req.method === "GET") {
+      try {
+        const db = getMimicryDb();
+        const accounts = listEnabledWahaAccounts(opts.config);
+        const wahaConfig = (opts.config.channels?.waha ?? {}) as any;
+        const now = Date.now();
+
+        const sessions = accounts.map((acc) => {
+          const session = acc.session;
+          const firstSendAt = db.getFirstSendAt(session);
+          const maturity = getMaturityPhase(firstSendAt, now);
+          const limit = resolveCapLimit(session, maturity, wahaConfig, null);
+          const capStatus = getCapStatus(session, limit, db, now);
+          const gateConfig = resolveGateConfig(session, wahaConfig, null);
+          const gateResult = checkTimeOfDay(gateConfig, now);
+
+          // Days until next maturity phase upgrade
+          const ageDays = firstSendAt ? (now - firstSendAt) / 86_400_000 : 0;
+          const daysUntilUpgrade = maturity === "new" ? Math.max(0, 7 - ageDays)
+            : maturity === "warming" ? Math.max(0, 30 - ageDays)
+            : null; // stable has no next phase
+
+          return {
+            session,
+            name: acc.name ?? session,
+            maturity,
+            daysUntilUpgrade: daysUntilUpgrade !== null ? Math.ceil(daysUntilUpgrade) : null,
+            capCount: capStatus.count,
+            capLimit: capStatus.limit,
+            capRemaining: capStatus.remaining,
+            gateOpen: gateResult.allowed,
+            gateEnabled: gateConfig.enabled,
+          };
+        });
+
+        writeJsonResponse(res, 200, { sessions });
+      } catch (err) {
+        log.error("GET /api/admin/mimicry failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Internal server error" });
       }
       return;
     }
