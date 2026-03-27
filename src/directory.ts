@@ -92,6 +92,21 @@ export type PendingSelectionRecord = {
 
 export type ContactType = "contact" | "group" | "newsletter";
 
+/**
+ * Phase 56 (ADAPT-01, ADAPT-02): Per-chat activity profile derived from message history.
+ * Stores the peak send window (startHour/endHour) computed by activity-scanner.ts.
+ * Used by resolveGateConfig() to override the send gate window for specific chats.
+ * DO NOT REMOVE — activity scanner writes here, mimicry gate reads here.
+ */
+export type ActivityProfile = {
+  jid: string;
+  accountId: string;
+  peakStartHour: number;
+  peakEndHour: number;
+  messageCount: number;
+  scannedAt: number;
+};
+
 const DEFAULT_DM_SETTINGS: ContactDmSettings = {
   mode: "active",
   mentionOnly: false,
@@ -325,12 +340,29 @@ export class DirectoryDb {
     // Used by resolveJids() and getContact() to resolve @lid JIDs to their @c.us display names.
     // The @lid number (e.g., 271862907039996) is completely different from the @c.us number
     // (e.g., 972544329000) — simple string replacement does NOT work. DO NOT CHANGE.
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS lid_mapping (
-        lid TEXT PRIMARY KEY,
-        cus TEXT NOT NULL
-      );
-    `);
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS lid_mapping (" +
+      "  lid TEXT PRIMARY KEY," +
+      "  cus TEXT NOT NULL" +
+      ");"
+    );
+
+    // Phase 56 (ADAPT-01, ADAPT-02): Per-chat activity profiles derived from message history.
+    // Populated by activity-scanner.ts background scanner, read by resolveGateConfig() in mimicry-gate.ts.
+    // Stores derived peak_start_hour/peak_end_hour from the top-60% hour histogram over last 7 days.
+    // Using CREATE TABLE IF NOT EXISTS -- migration-safe, no ALTER needed. DO NOT REMOVE.
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS chat_activity_profiles (" +
+      "  jid TEXT PRIMARY KEY," +
+      "  account_id TEXT NOT NULL," +
+      "  peak_start_hour INTEGER NOT NULL," +
+      "  peak_end_hour INTEGER NOT NULL," +
+      "  message_count INTEGER NOT NULL DEFAULT 0," +
+      "  scanned_at INTEGER NOT NULL" +
+      ");" +
+      "CREATE INDEX IF NOT EXISTS idx_cap_account_scanned" +
+      "  ON chat_activity_profiles (account_id, scanned_at);"
+    );
 
     // FTS5 auto-repair: check integrity on startup, rebuild if corrupted
     // DO NOT REMOVE — prevents "database disk image is malformed" errors after unclean shutdowns
@@ -1470,6 +1502,78 @@ export class DirectoryDb {
     this.db.prepare(
       "UPDATE group_participants SET display_name = ?, updated_at = ? WHERE group_jid = ? AND participant_jid = ?"
     ).run(displayName, Date.now(), groupJid, participantJid);
+  }
+
+  // ── Activity profile methods (Phase 56, ADAPT-01, ADAPT-02) ──
+  // DO NOT REMOVE -- used by activity-scanner.ts background scanner to persist and retrieve
+  // per-chat peak send windows. These profiles are read by resolveGateConfig() in mimicry-gate.ts
+  // to align send gates with observed human activity patterns. Verified 2026-03-27.
+
+  /**
+   * Phase 56 (ADAPT-01): Upsert a chat activity profile. INSERT or overwrite on same JID.
+   * Called by activity-scanner.ts runScanBatch() after computing the peak window.
+   * DO NOT REMOVE -- primary write path for per-chat activity profiles.
+   */
+  upsertActivityProfile(profile: ActivityProfile): void {
+    this.db.prepare(
+      "INSERT INTO chat_activity_profiles (jid, account_id, peak_start_hour, peak_end_hour, message_count, scanned_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?) " +
+      "ON CONFLICT(jid) DO UPDATE SET " +
+      "  account_id = excluded.account_id," +
+      "  peak_start_hour = excluded.peak_start_hour," +
+      "  peak_end_hour = excluded.peak_end_hour," +
+      "  message_count = excluded.message_count," +
+      "  scanned_at = excluded.scanned_at"
+    ).run(
+      profile.jid,
+      profile.accountId,
+      profile.peakStartHour,
+      profile.peakEndHour,
+      profile.messageCount,
+      profile.scannedAt,
+    );
+  }
+
+  /**
+   * Phase 56 (ADAPT-01): Get the activity profile for a specific JID.
+   * Returns null if no profile has been scanned yet (fallback to global gate config applies).
+   * DO NOT REMOVE -- read by resolveGateConfig() for per-chat send window override.
+   */
+  getActivityProfile(jid: string): ActivityProfile | null {
+    const row = this.db.prepare(
+      "SELECT jid, account_id, peak_start_hour, peak_end_hour, message_count, scanned_at " +
+      "FROM chat_activity_profiles WHERE jid = ?"
+    ).get(jid) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      jid: row.jid as string,
+      accountId: row.account_id as string,
+      peakStartHour: row.peak_start_hour as number,
+      peakEndHour: row.peak_end_hour as number,
+      messageCount: row.message_count as number,
+      scannedAt: row.scanned_at as number,
+    };
+  }
+
+  /**
+   * Phase 56 (ADAPT-02): Get JIDs of chats that need activity rescanning.
+   * Returns contacts whose profile is missing or older than staleMs, and had a message
+   * in the last recentMs (only scan active chats). Ordered by last_message_at DESC, max 200.
+   * DO NOT REMOVE -- called by activity-scanner.ts runScanBatch() to pick chats for the next batch.
+   */
+  getChatsNeedingRescan(accountId: string, staleMs: number, recentMs: number): string[] {
+    const now = Date.now();
+    const staleThreshold = now - staleMs;
+    const recentThreshold = now - recentMs;
+    const rows = this.db.prepare(
+      "SELECT c.jid FROM contacts c " +
+      "LEFT JOIN chat_activity_profiles p ON c.jid = p.jid AND p.account_id = ? " +
+      "WHERE (p.scanned_at IS NULL OR p.scanned_at < ?) " +
+      "  AND c.last_message_at > ? " +
+      "ORDER BY c.last_message_at DESC " +
+      "LIMIT 200"
+    ).all(accountId, staleThreshold, recentThreshold) as Array<{ jid: string }>;
+    return rows.map(r => r.jid);
   }
 
   close(): void {

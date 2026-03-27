@@ -411,6 +411,76 @@ describe("pending_selections", () => {
   });
 });
 
+// ── activity profile ──
+
+describe("activity profile", () => {
+  let db: DirectoryDb;
+  beforeEach(() => { db = makeDb(); });
+  afterEach(() => { db.close(); });
+
+  it("upsertActivityProfile inserts and getActivityProfile retrieves with correct fields", () => {
+    const profile = {
+      jid: "111@c.us",
+      accountId: "acc1",
+      peakStartHour: 9,
+      peakEndHour: 18,
+      messageCount: 42,
+      scannedAt: 1000000,
+    };
+    db.upsertActivityProfile(profile);
+    const result = db.getActivityProfile("111@c.us");
+    expect(result).not.toBeNull();
+    expect(result!.jid).toBe("111@c.us");
+    expect(result!.accountId).toBe("acc1");
+    expect(result!.peakStartHour).toBe(9);
+    expect(result!.peakEndHour).toBe(18);
+    expect(result!.messageCount).toBe(42);
+    expect(result!.scannedAt).toBe(1000000);
+  });
+
+  it("upsertActivityProfile overwrites existing row on same JID (rescan overwrite)", () => {
+    db.upsertActivityProfile({ jid: "111@c.us", accountId: "acc1", peakStartHour: 9, peakEndHour: 18, messageCount: 10, scannedAt: 1000 });
+    db.upsertActivityProfile({ jid: "111@c.us", accountId: "acc1", peakStartHour: 20, peakEndHour: 23, messageCount: 50, scannedAt: 2000 });
+    const result = db.getActivityProfile("111@c.us");
+    expect(result!.peakStartHour).toBe(20);
+    expect(result!.peakEndHour).toBe(23);
+    expect(result!.messageCount).toBe(50);
+    expect(result!.scannedAt).toBe(2000);
+  });
+
+  it("getActivityProfile returns null for unknown JID", () => {
+    expect(db.getActivityProfile("unknown@c.us")).toBeNull();
+  });
+
+  it("getChatsNeedingRescan returns contacts with stale or missing profiles, ordered by last_message_at DESC, limited to 200", () => {
+    const now = Date.now();
+    // Insert contacts with last_message_at in last 7 days
+    for (let i = 1; i <= 5; i++) {
+      db.upsertContact(`${i}@c.us`, `Contact${i}`, false);
+      // Manually set last_message_at
+      (db as any).db.prepare("UPDATE contacts SET last_message_at = ? WHERE jid = ?").run(now - i * 1000, `${i}@c.us`);
+    }
+    // Contact 3 has an up-to-date profile (scanned within staleMs)
+    db.upsertActivityProfile({ jid: "3@c.us", accountId: "acc1", peakStartHour: 9, peakEndHour: 18, messageCount: 5, scannedAt: now - 1000 });
+
+    const staleMs = 7 * 24 * 60 * 60 * 1000; // 7 days
+    const recentMs = 7 * 24 * 60 * 60 * 1000; // active in last 7 days
+    const jids = db.getChatsNeedingRescan("acc1", staleMs, recentMs);
+
+    // 3@c.us should NOT be in list (fresh profile)
+    expect(jids).not.toContain("3@c.us");
+    // Others should be included
+    expect(jids).toContain("1@c.us");
+    expect(jids).toContain("2@c.us");
+    expect(jids.length).toBeLessThanOrEqual(200);
+
+    // Verify ordering by last_message_at DESC — 1@c.us has most recent (now - 1000 ms)
+    const idx1 = jids.indexOf("1@c.us");
+    const idx2 = jids.indexOf("2@c.us");
+    expect(idx1).toBeLessThan(idx2);
+  });
+});
+
 // ── singleton ──
 
 describe("singleton (getDirectoryDb)", () => {
