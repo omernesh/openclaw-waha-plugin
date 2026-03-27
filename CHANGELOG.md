@@ -2,6 +2,29 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [1.20.0] - 2026-03-28 — Human Mimicry Hardening
+
+### Added
+- **MimicryGate core** — SQLite-backed time-of-day send gates, progressive hourly caps (New/Warming/Stable maturity phases), account metadata tracking.
+- **Send pipeline enforcement** — `enforceMimicry()` chokepoint wired into all 16 send functions + `deliverWahaReply`. 3-7s jittered delays, typing simulation (length/4, capped 8s), bypass for `/shutup`/`/join`/`/leave`.
+- **Proxy-send endpoint** — `POST /api/admin/proxy-send` with full mimicry enforcement for Claude Code skill sends.
+- **Adaptive activity patterns** — Per-chat peak hour learning from message history. Weekly background scans via setTimeout chain. `chat_activity_profiles` SQLite table with derived send windows.
+- **Admin UI: Send Gates card** — Per-session maturity phase, days-to-upgrade, cap usage bar (destructive at >80%), gate open/closed badge.
+- **Admin UI: Mimicry settings** — Send window start/end hours, IANA timezone, quiet hours policy, hourly cap toggle, progressive limits table.
+- **Mimicry status API** — `GET /api/admin/mimicry` returns gate/cap/maturity per session.
+- **whatsapp-messenger skill v3.0.0** — Env var-driven (no hardcoded secrets), proxy routing enforced.
+
+### Fixed
+- Double enforceMimicry on inbound replies (double jitter, double cap charge)
+- `hourlyCap.enabled: false` was ignored (cap always enforced at defaults)
+- `send_window_events` table grew unbounded (now pruned every 30 min)
+- `getDmSettings` method name mismatch (runtime crash on every enforced send)
+- Missing `bypassPolicy` guards on poll/location/vcard/list/forward sends
+- Uncaught `sendWahaPresence` errors in typing simulation blocked actual sends
+- Proxy-send catch block swallowed all errors with misleading 400
+- `recordMimicrySuccess` fired after fully-failed media batches
+- Scanner restart for same account orphaned old timer (concurrent loops)
+
 ## [1.19.0] - 2026-03-26 — Full WAHA Capabilities & Modular Skill Architecture
 
 ### Added
