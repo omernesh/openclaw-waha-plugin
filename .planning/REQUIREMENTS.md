@@ -31,8 +31,8 @@ Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
 
 ### Claude Code Integration
 
-- [ ] **CC-01**: Claude Code whatsapp-messenger sends routed through mimicry gate+cap enforcement
-- [ ] **CC-02**: Typing simulation applied to outbound Claude Code sends (proportional to message length)
+- [x] **CC-01**: Claude Code whatsapp-messenger sends routed through mimicry gate+cap enforcement
+- [x] **CC-02**: Typing simulation applied to outbound Claude Code sends (proportional to message length)
 
 ### Behavioral Polish
 
@@ -93,8 +93,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-02 | Phase 53 | Complete |
 | INFRA-03 | Phase 53 | Complete |
 | INFRA-04 | Phase 53 | Complete |
-| CC-01 | Phase 55 | Pending |
-| CC-02 | Phase 55 | Pending |
+| CC-01 | Phase 55 Plan 01 | Complete |
+| CC-02 | Phase 55 Plan 01 | Complete |
 | BEH-01 | Phase 54 Plan 01 | Complete |
 | BEH-02 | Phase 54 Plan 01 | Complete |
 | BEH-03 | Phase 54 Plan 01 | Complete |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
 status: completed
-stopped_at: Completed 54-02-PLAN.md
-last_updated: "2026-03-26T19:39:06.350Z"
-last_activity: 2026-03-26
+stopped_at: Completed 55-01-PLAN.md
+last_updated: "2026-03-27T01:07:00.000Z"
+last_activity: 2026-03-27
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 50
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 5
+  completed_plans: 5
+  percent: 60
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 54 — Send Pipeline Enforcement
+**Current focus:** Phase 55 — Claude Code Integration (complete)
 
 ## Current Position
 
-Phase: 54
-Plan: Not started
-Status: Active — 54-01 done, 54-02+ pending
-Last activity: 2026-03-26
+Phase: 55
+Plan: 01 (complete)
+Status: Active — 55-01 done
+Last activity: 2026-03-27
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [█████░░░░░] 50%
 | Phase 53 P02 | 358 | 2 tasks | 2 files |
 | Phase 54 P01 | 4 | 1 task (TDD) | 2 files |
 | Phase 54 P02 | 10 | 2 tasks | 3 files |
+| Phase 55 P01 | 22 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Progress: [█████░░░░░] 50%
 - [Phase 54]: sendWahaMediaBatch calls enforceMimicry once with count=N before the batch loop (not per-media)
 - [Phase 54]: deliverWahaReply calls enforceMimicry AFTER presenceCtrl typing stop to avoid two concurrent typing indicators
 - [Phase 54]: Status sends pass isStatusSend=true so they honour time gate but skip hourly cap
+- [Phase 55]: Extracted handleProxySend into proxy-send-handler.ts for testability (avoids mocking full HTTP server)
+- [Phase 55]: Proxy calls callWahaApi directly, not sendWahaText, to avoid double mimicry enforcement
+- [Phase 55]: recordMimicrySuccess called only after WAHA success -- failed proxy sends don't consume cap
 
 ### Architecture Notes
 
@@ -85,6 +89,7 @@ Progress: [█████░░░░░] 50%
 - SQLite infrastructure: follow `AnalyticsDb` pattern for rolling window table + `account_metadata` table
 - All new Zod fields MUST use `.optional().default()` — production configs must load without error
 - `src/mimicry-enforcer.ts` is the chokepoint — Plan 02 wires it into sendWahaText/Image/Video/File/etc in send.ts
+- `src/proxy-send-handler.ts` is the Claude Code proxy — calls enforceMimicry + callWahaApi + recordMimicrySuccess
 
 ### Research Flags
 
@@ -101,6 +106,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T19:30:33.436Z
-Stopped at: Completed 54-02-PLAN.md
+Last session: 2026-03-27T01:07:00.000Z
+Stopped at: Completed 55-01-PLAN.md
 Resume file: None

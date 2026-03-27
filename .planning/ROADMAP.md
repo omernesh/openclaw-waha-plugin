@@ -88,7 +88,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 - [x] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (mimicry-gate.ts, Zod schemas, SQLite tables) (completed 2026-03-26)
 - [x] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle) (completed 2026-03-26)
-- [ ] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
+- [x] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
 - [ ] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing
 - [ ] **Phase 57: Admin UI & Observability** - Dashboard card, settings tab controls, mimicry status API
 
@@ -135,7 +135,7 @@ Plans:
   4. The whatsapp-messenger skill routes all sends through the proxy endpoint instead of calling WAHA directly
 **Plans:** 1 plan
 Plans:
-- [ ] 55-01-PLAN.md — Proxy-send endpoint in monitor.ts + update whatsapp-messenger SKILL.md
+- [x] 55-01-PLAN.md — Proxy-send endpoint in monitor.ts + update whatsapp-messenger SKILL.md
 
 ### Phase 56: Adaptive Activity Patterns
 **Goal**: The system learns per-chat active hours from message history and automatically aligns send gates to observed human activity patterns
@@ -166,6 +166,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 53. MimicryGate Core | 2/2 | Complete    | 2026-03-26 |
 | 54. Send Pipeline Enforcement | 2/2 | Complete    | 2026-03-26 |
-| 55. Claude Code Integration | 0/1 | Not started | - |
+| 55. Claude Code Integration | 1/1 | Complete | 2026-03-27 |
 | 56. Adaptive Activity Patterns | 0/? | Not started | - |
 | 57. Admin UI & Observability | 0/? | Not started | - |
