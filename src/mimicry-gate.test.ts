@@ -88,41 +88,41 @@ describe("resolveCapLimit", () => {
     expect(resolveCapLimit(undefined, "stable", {})).toBe(50);
   });
 
-  it("global hourlyCap.limits overrides defaults", () => {
-    const cfg = { hourlyCap: { limits: { new: 20 } } };
+  it("global hourlyCap flat limits override defaults", () => {
+    const cfg = { hourlyCap: { limitNew: 20 } };
     expect(resolveCapLimit(undefined, "new", cfg)).toBe(20);
     expect(resolveCapLimit(undefined, "warming", cfg)).toBe(30); // still default
   });
 
   it("per-session override wins over global", () => {
     const cfg = {
-      hourlyCap: { limits: { new: 20 } },
-      accounts: { mySession: { hourlyCap: { limits: { new: 25 } } } },
+      hourlyCap: { limitNew: 20 },
+      accounts: { mySession: { hourlyCap: { limitNew: 25 } } },
     };
     expect(resolveCapLimit("mySession", "new", cfg)).toBe(25);
   });
 
   it("per-target override wins over per-session (CAP-04)", () => {
     const cfg = {
-      hourlyCap: { limits: { new: 20 } },
-      accounts: { mySession: { hourlyCap: { limits: { new: 25 } } } },
+      hourlyCap: { limitNew: 20 },
+      accounts: { mySession: { hourlyCap: { limitNew: 25 } } },
     };
-    const targetOverride = { limits: { new: 10 } };
+    const targetOverride = { limitNew: 10 };
     expect(resolveCapLimit("mySession", "new", cfg, targetOverride)).toBe(10);
   });
 
   it("per-target with no limits falls through to session/global", () => {
     const cfg = {
-      hourlyCap: { limits: { new: 20 } },
-      accounts: { mySession: { hourlyCap: { limits: { new: 25 } } } },
+      hourlyCap: { limitNew: 20 },
+      accounts: { mySession: { hourlyCap: { limitNew: 25 } } },
     };
-    const targetOverride = {}; // no limits field
+    const targetOverride = {}; // no limit fields
     expect(resolveCapLimit("mySession", "new", cfg, targetOverride)).toBe(25);
   });
 
   it("per-target null falls through to session/global", () => {
     const cfg = {
-      accounts: { mySession: { hourlyCap: { limits: { new: 25 } } } },
+      accounts: { mySession: { hourlyCap: { limitNew: 25 } } },
     };
     expect(resolveCapLimit("mySession", "new", cfg, null)).toBe(25);
   });
