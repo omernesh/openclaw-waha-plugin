@@ -15,6 +15,18 @@ vi.mock("./send.js", () => ({
   sendWahaPresence: vi.fn().mockResolvedValue(undefined),
 }));
 
+// ─── Mock directory.js for activity profile tests ────────────────────────────
+// Default: getDmSettings returns null, getActivityProfile returns null.
+// Individual tests override via vi.mocked(getDirectoryDb).mockReturnValue(...).
+const mockGetDmSettings = vi.fn().mockReturnValue(null);
+const mockGetActivityProfile = vi.fn().mockReturnValue(null);
+vi.mock("./directory.js", () => ({
+  getDirectoryDb: vi.fn(() => ({
+    getDmSettings: mockGetDmSettings,
+    getActivityProfile: mockGetActivityProfile,
+  })),
+}));
+
 // ─── Fixed timestamps ─────────────────────────────────────────────────────────
 // 2025-01-15 14:00:00 UTC — within default 7am-1am window for any UTC+X timezone
 const BASE_NOW = 1736949600000; // new Date(1736949600000).toISOString() = "2025-01-15T14:00:00.000Z"
@@ -347,5 +359,134 @@ describe("enforceMimicry", () => {
 
     const typingDurationCall = sleepTimes[sleepTimes.length - 1];
     expect(typingDurationCall).toBe(8000);
+  });
+});
+
+// ─── Activity profile gate adaptation tests ───────────────────────────────────
+// Phase 56 (ADAPT-04, ADAPT-05): Verify that enforceMimicry applies per-chat
+// activity profiles when no manual sendGateOverride is set, and falls back to
+// global config when no profile exists. Manual overrides always win.
+
+describe("activity profile gate adaptation", () => {
+  beforeEach(() => {
+    // Reset mocks to defaults before each test
+    mockGetDmSettings.mockReturnValue(null);
+    mockGetActivityProfile.mockReturnValue(null);
+    vi.clearAllMocks();
+    // Re-reset after clearAllMocks since clearAllMocks resets return values too
+    mockGetDmSettings.mockReturnValue(null);
+    mockGetActivityProfile.mockReturnValue(null);
+  });
+
+  // ADAPT-04: Activity profile peak hours used when no manual override.
+  // Global gate would BLOCK at 14:00 UTC (window: 20-23), but activity profile
+  // allows 10-18. With profile applied, the send should be allowed.
+  it("uses activity profile peak hours when no manual override (ADAPT-04)", async () => {
+    // Profile window: 10:00-18:00. BASE_NOW is 14:00 UTC — inside window.
+    mockGetActivityProfile.mockReturnValue({
+      jid: "chat-123@c.us",
+      accountId: "test-account",
+      peakStartHour: 10,
+      peakEndHour: 18,
+      messageCount: 50,
+      scannedAt: BASE_NOW - 1000,
+    });
+    mockGetDmSettings.mockReturnValue(null); // no manual override
+
+    // Global gate: 20:00-23:00 (would BLOCK at 14:00 UTC without profile override)
+    const cfg = makeCfg({ sendGate: { enabled: true, startHour: 20, endHour: 23, timezone: "UTC" } });
+
+    // enforceMimicry should NOT throw at 14:00 UTC because activity profile (10-18) overrides global gate
+    await expect(
+      enforceMimicry({
+        session: "test-session",
+        chatId: "chat-123@c.us",
+        accountId: "test-account",
+        cfg,
+        _db: db,
+        _now: BASE_NOW, // 14:00 UTC — inside profile (10-18) but outside global (20-23)
+        _sleep: () => Promise.resolve(),
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  // Manual sendGateOverride takes precedence over activity profile
+  it("manual sendGateOverride takes precedence over activity profile", async () => {
+    // Profile says peak 10-18, but manual override says only 22-23.
+    // At 14:00 (inside profile window, outside manual window) -> should throw.
+    mockGetDmSettings.mockReturnValue({
+      sendGateOverride: { startHour: 22, endHour: 23 },
+      hourlyCapOverride: null,
+    });
+    mockGetActivityProfile.mockReturnValue({
+      jid: "chat-123@c.us",
+      accountId: "test-account",
+      peakStartHour: 10,
+      peakEndHour: 18,
+      messageCount: 50,
+      scannedAt: BASE_NOW - 1000,
+    });
+
+    const cfg = makeCfg({ sendGate: { enabled: true, startHour: 7, endHour: 23, timezone: "UTC" } });
+
+    // 14:00 UTC is inside the profile window but outside manual override (22-23).
+    // Manual override wins -> should throw "Send blocked"
+    await expect(
+      enforceMimicry({
+        session: "test-session",
+        chatId: "chat-123@c.us",
+        accountId: "test-account",
+        cfg,
+        _db: db,
+        _now: BASE_NOW, // 14:00 UTC
+        _sleep: () => Promise.resolve(),
+      })
+    ).rejects.toThrow(/\[mimicry\] Send blocked/i);
+  });
+
+  // ADAPT-05: Falls back to global config when no activity profile
+  it("falls back to global config when no activity profile (ADAPT-05)", async () => {
+    mockGetActivityProfile.mockReturnValue(null); // no profile
+    mockGetDmSettings.mockReturnValue(null); // no manual override
+
+    // Global gate: 7am-11pm (23). BASE_NOW = 14:00 UTC — inside.
+    const cfg = makeCfg({ sendGate: { enabled: true, startHour: 7, endHour: 23, timezone: "UTC" } });
+
+    // Should NOT throw — global config allows 14:00
+    await expect(
+      enforceMimicry({
+        session: "test-session",
+        chatId: "chat-123@c.us",
+        accountId: "test-account",
+        cfg,
+        _db: db,
+        _now: BASE_NOW, // 14:00 UTC
+        _sleep: () => Promise.resolve(),
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  // Graceful error handling: getActivityProfile throws -> falls back silently
+  it("handles getActivityProfile errors gracefully (falls back to global config)", async () => {
+    mockGetActivityProfile.mockImplementation(() => {
+      throw new Error("DB not ready");
+    });
+    mockGetDmSettings.mockReturnValue(null);
+
+    // Global gate: 7am-11pm. BASE_NOW = 14:00 — inside.
+    const cfg = makeCfg({ sendGate: { enabled: true, startHour: 7, endHour: 23, timezone: "UTC" } });
+
+    // Should NOT throw — error caught, falls back to global
+    await expect(
+      enforceMimicry({
+        session: "test-session",
+        chatId: "chat-123@c.us",
+        accountId: "test-account",
+        cfg,
+        _db: db,
+        _now: BASE_NOW, // 14:00 UTC
+        _sleep: () => Promise.resolve(),
+      })
+    ).resolves.toBeUndefined();
   });
 });
