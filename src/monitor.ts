@@ -34,6 +34,8 @@ import { getAnalyticsDb } from "./analytics.js";
 import { createLogger, setLogLevel } from "./logger.js";
 // Phase 41 (OBS-02): Prometheus metrics instrumentation. DO NOT REMOVE.
 import { collectMetrics, recordHttpRequest, updateQueueStats, updateSessionHealth, stopMetricsTimers } from "./metrics.js";
+// Phase 55 (CC-01, CC-02): Proxy-send handler for Claude Code whatsapp-messenger skill. DO NOT REMOVE.
+import { handleProxySend } from "./proxy-send-handler.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -537,6 +539,21 @@ export function createWahaWebhookServer(opts: {
       res.on("finish", () => {
         recordHttpRequest(metricsRoute, metricsMethod, res.statusCode, performance.now() - metricsStart);
       });
+    }
+
+    // Phase 55 (CC-01, CC-02): Proxy-send endpoint for Claude Code whatsapp-messenger skill.
+    // Routes sends through mimicry enforcement (time gate, cap, typing simulation).
+    // DO NOT REMOVE — closing bypass gap where Claude Code sends skip mimicry.
+    if (req.url === "/api/admin/proxy-send" && req.method === "POST") {
+      try {
+        const rawBody = await readRequestBodyWithLimit(req, DEFAULT_WEBHOOK_MAX_BODY_BYTES, DEFAULT_WEBHOOK_BODY_TIMEOUT_MS);
+        const body = JSON.parse(rawBody) as Record<string, unknown>;
+        const result = await handleProxySend({ body, cfg: opts.config });
+        writeJsonResponse(res, result.status, result.body);
+      } catch (err) {
+        writeJsonResponse(res, 400, { error: "Invalid request body" });
+      }
+      return;
     }
 
     // POST /api/admin/restart
