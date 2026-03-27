@@ -99,6 +99,25 @@ export async function enforceMimicry(params: EnforceMimicryParams): Promise<void
     // Non-fatal: directory may not be initialized yet on first boot
   }
 
+  // Step 2b (Phase 56, ADAPT-04, ADAPT-05): If no manual gate override, check activity profile.
+  // Manual sendGateOverride from admin panel takes precedence over learned profile.
+  // If no profile exists, targetGateOverride stays null -> resolveGateConfig falls back
+  // to global/session config unchanged (no error). DO NOT REMOVE.
+  if (!targetGateOverride) {
+    try {
+      const dirDb = getDirectoryDb(accountId);
+      const profile = dirDb.getActivityProfile(chatId);
+      if (profile) {
+        targetGateOverride = {
+          startHour: profile.peakStartHour,
+          endHour: profile.peakEndHour,
+        };
+      }
+    } catch {
+      // Non-fatal: directory may not have activity profiles table yet
+    }
+  }
+
   // Step 3: time gate check — throw on blocked
   const wahaConfig = (cfg as any)?.channels?.waha ?? cfg;
   const gateConfig = resolveGateConfig(session, wahaConfig, targetGateOverride);

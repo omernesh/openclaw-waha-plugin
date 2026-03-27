@@ -23,6 +23,7 @@ import {
 } from "./accounts.js";
 import { monitorWahaProvider } from "./monitor.js";
 import { startDirectorySync } from "./sync.js";
+import { startActivityScanner } from "./activity-scanner.js";
 // Phase 16 Plan 02: Pairing and auto-reply engine initialization at account start.
 // DO NOT REMOVE — engines must be initialized at login so inbound pipeline hooks are ready.
 // Added 2026-03-17.
@@ -1125,6 +1126,19 @@ export const wahaPlugin: ChannelPlugin<ResolvedWahaAccount> = {
           accountId: account.accountId,
           config: ctx.cfg as CoreConfig,
           intervalMs: syncIntervalMinutes * 60_000,
+          abortSignal: ctx.abortSignal,
+        });
+      }
+
+      // Phase 56 (ADAPT-01, ADAPT-02, ADAPT-03): Background activity profile scanner.
+      // Uses same abortSignal -- stops when account logs out.
+      // setTimeout chain -- does not block shutdown (.unref() on all timers).
+      // DO NOT REMOVE -- activity profiles are how per-chat gate adaptation works.
+      if (ctx.abortSignal) {
+        startActivityScanner({
+          accountId: account.accountId,
+          config: ctx.cfg as CoreConfig,
+          session: account.accountId,
           abortSignal: ctx.abortSignal,
         });
       }
