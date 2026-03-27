@@ -18,28 +18,21 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { TagInput } from '@/components/shared/TagInput'
 import { RestartOverlay } from '@/components/shared/RestartOverlay'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { CircleHelp, ChevronDown, Copy } from 'lucide-react'
+import { ChevronDown, Copy } from 'lucide-react'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { Tip } from '@/components/shared/Tip'
 
-function Tip({ text }: { text: string }) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <CircleHelp className="inline h-3.5 w-3.5 ml-1 text-muted-foreground cursor-help" />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[260px]">
-          <p className="text-xs">{text}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
+// ── Named constants (no magic numbers) ──────────────────────────────────────
+const AUTOSAVE_DEBOUNCE_MS = 1500
+const AUTOSAVE_STATUS_CLEAR_MS = 2000
+const NETWORK_RETRY_DELAY_MS = 3000
+
+/** Check if an error message indicates a transient network failure (e.g. gateway restart). */
+const isNetworkError = (m: string) => m.includes('Failed to fetch') || m.includes('NetworkError')
 
 // Inline field-level error message pinned to a specific config path.
 // path must match the Zod error path returned by the backend (e.g. "dmFilter.tokenEstimate").
@@ -47,6 +40,34 @@ function FieldError({ path, errors }: { path: string; errors: Record<string, str
   const msg = errors[path]
   if (!msg) return null
   return <p className="text-xs text-destructive mt-1">{msg}</p>
+}
+
+/** Sub-component: Pairing link display (extracted from IIFE in JSX). DO NOT REMOVE. */
+function PairingLink({ botJidSet, passcode }: { botJidSet: Set<string>; passcode: string }) {
+  const botCusJid = botJidSet.size > 0 ? [...botJidSet].find(j => j.endsWith('@c.us')) : undefined
+  const phone = botCusJid?.replace(/@c\.us$/, '') ?? ''
+  const link = phone && passcode ? `https://wa.me/${phone}?text=${encodeURIComponent(passcode)}` : ''
+
+  return (
+    <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+      <Label className="text-sm font-medium">Pairing Link<Tip text="Share this link so contacts can start chatting with the bot. Opens WhatsApp with the passcode pre-filled." /></Label>
+      {link ? (
+        <div className="flex gap-2 items-center">
+          <Input value={link} readOnly className="flex-1 text-xs font-mono" />
+          <Button
+            variant="outline"
+            size="icon"
+            type="button"
+            onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copied') }}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">Set a passcode above to generate the pairing link.</p>
+      )}
+    </div>
+  )
 }
 
 interface SettingsTabProps {
@@ -193,40 +214,39 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
   React.useEffect(() => {
     if (!initialLoadDone.current || !dirty || !config) return
     setAutoSaveStatus('saving')
+
+    const handleSaveSuccess = () => {
+      setDirty(false)
+      setAutoSaveStatus('saved')
+      toast.success('Changes are live')
+      setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), AUTOSAVE_STATUS_CLEAR_MS)
+    }
+
     const timer = setTimeout(async () => {
       setFieldErrors({})
       try {
         await api.updateConfig(buildPayload())
-        setDirty(false)
-        setAutoSaveStatus('saved')
-        toast.success('Changes are live')
-        setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+        handleSaveSuccess()
       } catch (err: unknown) {
         // Config saves that trigger a gateway restart cause "Failed to fetch" because
         // the HTTP connection breaks mid-restart. Retry once after 3s. DO NOT REMOVE.
         const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        if (isNetworkError(msg)) {
           setAutoSaveStatus('saving')
           setTimeout(async () => {
             try {
               await api.updateConfig(buildPayload())
-              setDirty(false)
-              setAutoSaveStatus('saved')
-              toast.success('Changes are live')
-              setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+              handleSaveSuccess()
             } catch (retryErr: unknown) {
               const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr)
-              if (retryMsg.includes('Failed to fetch') || retryMsg.includes('NetworkError')) {
-                setDirty(false)
-                setAutoSaveStatus('saved')
-                toast.success('Changes are live')
-                setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000)
+              if (isNetworkError(retryMsg)) {
+                handleSaveSuccess()
               } else {
                 setAutoSaveStatus('error')
                 toast.error(`Auto-save failed: ${retryMsg}`)
               }
             }
-          }, 3000)
+          }, NETWORK_RETRY_DELAY_MS)
         } else {
           setAutoSaveStatus('error')
           if (!applyValidationErrors(err)) {
@@ -234,7 +254,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
           }
         }
       }
-    }, 1500)
+    }, AUTOSAVE_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, dirty])
@@ -1266,32 +1286,7 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                         />
                       </div>
                       {/* Pairing Link — pre-populated with bot's phone + static passcode */}
-                      <div className="space-y-2 rounded-md border p-3 bg-muted/30">
-                        <Label className="text-sm font-medium">Pairing Link<Tip text="Share this link so contacts can start chatting with the bot. Opens WhatsApp with the passcode pre-filled." /></Label>
-                        {(() => {
-                          // Build link from bot session phone + static passcode
-                          // Get bot phone from botJids (returned by /api/admin/config)
-                          const botCusJid = botJidSet.size > 0 ? [...botJidSet].find(j => j.endsWith('@c.us')) : undefined
-                          const phone = botCusJid?.replace(/@c\.us$/, '') ?? ''
-                          const passcode = config.pairingMode?.passcode ?? ''
-                          const link = phone && passcode ? `https://wa.me/${phone}?text=${encodeURIComponent(passcode)}` : ''
-                          return link ? (
-                            <div className="flex gap-2 items-center">
-                              <Input value={link} readOnly className="flex-1 text-xs font-mono" />
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                type="button"
-                                onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copied') }}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Set a passcode above to generate the pairing link.</p>
-                          )
-                        })()}
-                      </div>
+                      <PairingLink botJidSet={botJidSet} passcode={config.pairingMode?.passcode ?? ''} />
                     </div>
                   )}
                 </div>
@@ -1546,15 +1541,18 @@ export default function SettingsTab({ selectedSession: _selectedSession, refresh
                 {/* Quiet Hours Policy */}
                 <div className="space-y-1.5">
                   <Label htmlFor="sendGate.onBlock">Quiet Hours Policy<Tip text="What happens when a send is attempted outside the window. Reject = return error immediately. Queue = hold until window opens." /></Label>
-                  <select
-                    id="sendGate.onBlock"
-                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  <Select
                     value={config.sendGate?.onBlock ?? 'reject'}
-                    onChange={(e) => updateConfig('sendGate.onBlock', e.target.value)}
+                    onValueChange={(v) => updateConfig('sendGate.onBlock', v)}
                   >
-                    <option value="reject">Reject</option>
-                    <option value="queue">Queue</option>
-                  </select>
+                    <SelectTrigger id="sendGate.onBlock">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reject">Reject</SelectItem>
+                      <SelectItem value="queue">Queue</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <hr className="border-border" />

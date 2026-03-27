@@ -11,25 +11,10 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { TagInput } from '@/components/shared/TagInput'
-import { ChevronDown, CircleHelp } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-
-function Tip({ text }: { text: string }) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <CircleHelp className="inline h-3.5 w-3.5 ml-1 text-muted-foreground cursor-help" />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[260px]">
-          <p className="text-xs">{text}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
+import { Tip } from '@/components/shared/Tip'
 
 interface DashboardTabProps {
   selectedSession: string

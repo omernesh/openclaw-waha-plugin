@@ -119,14 +119,13 @@ const DEFAULT_DM_SETTINGS: ContactDmSettings = {
 const PENDING_SELECTION_TTL_MS = 60_000;
 
 export class DirectoryDb {
-  private db: ReturnType<typeof require>;
+  private db: import('better-sqlite3').Database;
   private _walTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(dbPath: string) {
     const dir = join(dbPath, "..");
     mkdirSync(dir, { recursive: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const Database = require("better-sqlite3") as any;
+    const Database = require("better-sqlite3") as new (path: string) => import('better-sqlite3').Database;
     this.db = new Database(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
@@ -286,10 +285,16 @@ export class DirectoryDb {
     // Safe to run repeatedly -- ALTER TABLE ADD COLUMN is a no-op if column exists in SQLite.
     try {
       this.db.prepare('ALTER TABLE dm_settings ADD COLUMN send_gate_json TEXT DEFAULT NULL').run();
-    } catch { /* column already exists */ }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('duplicate column')) throw err;
+    }
     try {
       this.db.prepare('ALTER TABLE dm_settings ADD COLUMN hourly_cap_json TEXT DEFAULT NULL').run();
-    } catch { /* column already exists */ }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('duplicate column')) throw err;
+    }
 
     // TTL-02: Add expires_at column to allow_list for time-limited access grants.
     // NULL = permanent (never expires). Unix timestamp (seconds) = time-limited.

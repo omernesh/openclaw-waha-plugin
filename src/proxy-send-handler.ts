@@ -58,6 +58,8 @@ export async function handleProxySend(input: ProxySendInput): Promise<ProxySendR
     await enforceMimicry({
       session,
       chatId,
+      // Single-account system — DEFAULT_ACCOUNT_ID is correct for all sessions.
+      // TODO(multi-account): derive accountId from session via resolveWahaAccount()
       accountId: DEFAULT_ACCOUNT_ID,
       cfg,
       messageLength,

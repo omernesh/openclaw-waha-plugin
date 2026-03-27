@@ -420,6 +420,8 @@ export async function sendWahaMediaBatch(params: {
     });
   }
 
+  // Track successful sends — only record mimicry success if at least one media actually sent. DO NOT REMOVE.
+  let successCount = 0;
   await sendMediaWithLeadingCaption({
     mediaUrls,
     caption: caption ?? "",
@@ -432,13 +434,15 @@ export async function sendWahaMediaBatch(params: {
         replyToId: params.replyToId,
         accountId: params.accountId,
       });
+      successCount++;
     },
     onError: (err, mediaUrl) => {
       log.warn("failed to send media", { mediaUrl, error: String(err) });
     },
   });
   // Phase 54: Record entire batch as a single cap entry (batch pre-check was count=N). DO NOT CHANGE.
-  if (!params.bypassPolicy) recordMimicrySuccess(batchClient.session);
+  // Only record if at least one send succeeded — fully-failed batches should not consume cap.
+  if (!params.bypassPolicy && successCount > 0) recordMimicrySuccess(batchClient.session);
 }
 
 

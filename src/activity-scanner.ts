@@ -333,7 +333,27 @@ function scheduleNext(opts: ScannerOptions, state: ScannerState, delayMs: number
  * DO NOT REMOVE -- Phase 56 activity scanner entry point. Called from monitor.ts
  * alongside startDirectorySync(). Feeds chat_activity_profiles to resolveGateConfig().
  */
+/** Per-account AbortController — used to abort old scanner when a new one starts. */
+const scannerAbortControllers = new Map<string, AbortController>();
+
 export function startActivityScanner(opts: ScannerOptions): ScannerState {
+  // Abort any existing scanner for this account before starting a new one.
+  // The abort listener in the old instance will clean up its timer and state.
+  const existingAc = scannerAbortControllers.get(opts.accountId);
+  if (existingAc) {
+    log.info("activity-scanner: aborting previous scanner for account", { accountId: opts.accountId });
+    existingAc.abort();
+  }
+
+  // Store the caller's AbortController so we can abort it if startActivityScanner is called again.
+  // Wrap the external signal: if it aborts, we clean up our tracking too.
+  const internalAc = new AbortController();
+  scannerAbortControllers.set(opts.accountId, internalAc);
+  // Forward external abort to internal
+  opts.abortSignal.addEventListener("abort", () => internalAc.abort(), { once: true });
+  // Replace opts.abortSignal with internal so all downstream code uses the one we control
+  opts = { ...opts, abortSignal: internalAc.signal };
+
   const state: ScannerState = {
     status: "idle",
     lastScanAt: null,
@@ -347,6 +367,7 @@ export function startActivityScanner(opts: ScannerOptions): ScannerState {
   opts.abortSignal.addEventListener("abort", () => {
     scannerStates.delete(opts.accountId);
     scanCursors.delete(opts.accountId);
+    scannerAbortControllers.delete(opts.accountId);
   }, { once: true });
 
   // Schedule first tick after startup delay (use _firstTickDelayMs for DI in tests)

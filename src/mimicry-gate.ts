@@ -14,6 +14,14 @@ import { createLogger } from "./logger.js";
 const log = createLogger({ component: "mimicry-gate" });
 const require = createRequire(import.meta.url);
 
+// ── Named constants (no magic numbers) ──────────────────────────────────────
+const ONE_HOUR_MS = 3_600_000;
+const PRUNE_WINDOW_MS = 7_200_000;  // 2x counting window
+const ONE_DAY_MS = 86_400_000;
+const WAL_CHECKPOINT_INTERVAL_MS = 30 * 60 * 1000;
+const NEW_PHASE_DAYS = 7;
+const WARMING_PHASE_DAYS = 30;
+
 export type MaturityPhase = "new" | "warming" | "stable";
 
 export interface TargetGateOverride {
@@ -63,17 +71,17 @@ export interface CapStatus {
 }
 
 export class MimicryDb {
-  private db: any;
+  private db: import('better-sqlite3').Database;
   private _walTimer: ReturnType<typeof setTimeout> | null = null;
-  private _stmtCountRecentSends: any;
-  private _stmtRecordSend: any;
-  private _stmtEnsureFirstSendAt: any;
-  private _stmtGetFirstSendAt: any;
-  private _stmtPruneOldWindows: any;
+  private _stmtCountRecentSends: import('better-sqlite3').Statement;
+  private _stmtRecordSend: import('better-sqlite3').Statement;
+  private _stmtEnsureFirstSendAt: import('better-sqlite3').Statement;
+  private _stmtGetFirstSendAt: import('better-sqlite3').Statement;
+  private _stmtPruneOldWindows: import('better-sqlite3').Statement;
 
   constructor(dbPath: string) {
     mkdirSync(join(dbPath, ".."), { recursive: true });
-    const Database = require("better-sqlite3") as any;
+    const Database = require("better-sqlite3") as new (path: string) => import('better-sqlite3').Database;
     this.db = new Database(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
@@ -118,20 +126,19 @@ export class MimicryDb {
   }
 
   private _startWalCheckpoint(): void {
-    const INTERVAL_MS = 30 * 60 * 1000;
     const tick = () => {
       try { this.db.pragma("wal_checkpoint(PASSIVE)"); } catch (err) { log.warn("WAL checkpoint failed", { error: String(err) }); }
       // Prune old send_window_events every 30 min to prevent unbounded growth. DO NOT REMOVE.
       try { this.pruneOldWindows(); } catch (err) { log.warn("pruneOldWindows failed", { error: String(err) }); }
-      this._walTimer = setTimeout(tick, INTERVAL_MS);
+      this._walTimer = setTimeout(tick, WAL_CHECKPOINT_INTERVAL_MS);
       this._walTimer.unref();
     };
-    this._walTimer = setTimeout(tick, INTERVAL_MS);
+    this._walTimer = setTimeout(tick, WAL_CHECKPOINT_INTERVAL_MS);
     this._walTimer.unref();
   }
 
   countRecentSends(session: string, now: number = Date.now()): number {
-    const windowStart = now - 3_600_000;
+    const windowStart = now - ONE_HOUR_MS;
     const row = this._stmtCountRecentSends.get(session, windowStart) as { cnt: number };
     return Number(row.cnt);
   }
@@ -151,7 +158,7 @@ export class MimicryDb {
   }
 
   pruneOldWindows(now: number = Date.now()): void {
-    const cutoff = now - 7_200_000;
+    const cutoff = now - PRUNE_WINDOW_MS;
     const r = this._stmtPruneOldWindows.run(cutoff) as { changes: number };
     if (r.changes > 0) { log.info("mimicry-gate: pruned " + r.changes + " old send window events"); }
   }
@@ -173,9 +180,9 @@ export function getMimicryDb(): MimicryDb {
 
 export function getMaturityPhase(firstSendAt: number | null, now: number = Date.now()): MaturityPhase {
   if (firstSendAt === null) return "new";
-  const ageDays = (now - firstSendAt) / 86_400_000;
-  if (ageDays < 7) return "new";
-  if (ageDays < 30) return "warming";
+  const ageDays = (now - firstSendAt) / ONE_DAY_MS;
+  if (ageDays < NEW_PHASE_DAYS) return "new";
+  if (ageDays < WARMING_PHASE_DAYS) return "warming";
   return "stable";
 }
 
@@ -278,15 +285,14 @@ export function checkAndConsumeCap(
   db: MimicryDb,
   now: number = Date.now()
 ): CapResult {
-  const effectiveNow = now;
-  const count = db.countRecentSends(session, effectiveNow);
+  const count = db.countRecentSends(session, now);
 
   if (count >= limit) {
     return { allowed: false, count, limit, reason: `Hourly cap reached (${count}/${limit})` };
   }
 
-  db.recordSend(session, effectiveNow);
-  db.ensureFirstSendAt(session, effectiveNow);
+  db.recordSend(session, now);
+  db.ensureFirstSendAt(session, now);
   return { allowed: true, count: count + 1, limit };
 }
 
@@ -304,15 +310,14 @@ export function getCapStatus(
   db: MimicryDb,
   now: number = Date.now()
 ): CapStatus {
-  const effectiveNow = now;
-  const count = db.countRecentSends(session, effectiveNow);
+  const count = db.countRecentSends(session, now);
   const firstSendAt = db.getFirstSendAt(session);
-  const maturity = getMaturityPhase(firstSendAt, effectiveNow);
+  const maturity = getMaturityPhase(firstSendAt, now);
   return {
     count,
     limit,
     remaining: Math.max(0, limit - count),
     maturity,
-    windowStartMs: effectiveNow - 3_600_000,
+    windowStartMs: now - ONE_HOUR_MS,
   };
 }
