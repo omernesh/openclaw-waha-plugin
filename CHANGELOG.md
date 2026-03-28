@@ -2,6 +2,52 @@
 
 All notable changes to the OpenClaw WAHA Plugin are documented here.
 
+## [2.0.0] - 2026-03-28 — Chatlytics Universal Agent Platform
+
+v2.0 transforms the WAHA OpenClaw plugin into **Chatlytics**, a standalone universal agent platform for WhatsApp automation. 8 phases, 33 requirements delivered.
+
+### Phase 58: SDK Decoupling
+- Zero OpenClaw imports outside `channel.ts` and `index.ts` — all other modules use a platform-agnostic `RuntimeBridge` interface.
+- Full test coverage for the bridge abstraction layer.
+
+### Phase 59: Standalone Entry + Docker
+- `standalone.ts` entry point — runs Chatlytics without OpenClaw gateway dependency.
+- `Dockerfile` and `docker-compose.yml` for containerized deployment.
+- `.dockerignore` for lean image builds.
+
+### Phase 60: Public REST API + OpenAPI + CLI
+- `/api/v1/` RESTful endpoints for messages, groups, contacts, channels, sessions.
+- `openapi.yaml` spec with Swagger UI served at `/api/docs`.
+- `npx chatlytics` CLI tool (`bin/chatlytics.mjs`) for local management.
+
+### Phase 61: Webhook Forwarding
+- HMAC-SHA256 signed webhook delivery to external consumers.
+- Exponential backoff with jitter on delivery failures.
+- Circuit breaker pattern to avoid hammering dead endpoints.
+
+### Phase 62: MCP Server
+- 10 MCP tools and 5 MCP resources for Claude Desktop / IDE integration.
+- HTTP and stdio transports supported.
+- `dist/mcp-stdio.mjs` binary entry point.
+
+### Phase 63: Dashboard Auth + Onboarding
+- `better-auth` integration for dashboard authentication.
+- QR code pairing flow for new WhatsApp sessions.
+- API key management and integration wizard for onboarding.
+
+### Phase 64: Multi-Tenant Process Isolation
+- `child_process.fork` per workspace for tenant isolation.
+- Per-workspace SQLite databases with session namespacing.
+- Graceful shutdown and orphan process cleanup.
+
+### Phase 65: Admin Standalone + Distribution
+- Workspace CRUD management in admin panel.
+- SKILL.md v4 rewrite for standalone context.
+- Landing page at `docs/site/` and full API documentation.
+
+### Fixed (Code Review)
+- 27 issues resolved across all phases (unused imports, error handling, resource cleanup, type safety, edge cases).
+
 ## [1.20.0] - 2026-03-28 — Human Mimicry Hardening
 
 ### Added
