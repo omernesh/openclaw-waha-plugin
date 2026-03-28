@@ -17,10 +17,11 @@ import { resolveWahaAccount, listEnabledWahaAccounts } from "./accounts.js";
 import { getDmFilterForAdmin, getGroupFilterForAdmin, handleWahaInbound } from "./inbound.js";
 import { getDirectoryDb, type ParticipantRole } from "./directory.js";
 import { getWahaGroupParticipants, getWahaContacts, toArr, getAllWahaPresence, joinWahaGroup, leaveWahaGroup, unfollowWahaChannel } from "./send.js";
+import { callWahaApi } from "./http-client.js";
 import { verifyWahaWebhookHmac } from "./signature.js";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import { isDuplicate } from "./dedup.js";
-import { startHealthCheck, getHealthState, getRecoveryState, getRecoveryHistory, setHealthStateChangeCallback, type HealthState, type RecoveryState, type RecoveryEvent } from "./health.js";
+import { startHealthCheck, getHealthState, getRecoveryState, getRecoveryHistory, setHealthStateChangeCallback, setWebhookRegistered, type HealthState, type RecoveryState, type RecoveryEvent } from "./health.js";
 import { getSyncState, triggerImmediateSync, type SyncState } from "./sync.js";
 import { InboundQueue, setQueueChangeCallback, type QueueStats, type QueueItem } from "./inbound-queue.js";
 import { isWhatsAppGroupJid } from "./platform-types.js";
@@ -2709,6 +2710,60 @@ export async function monitorWahaProvider(params: {
 
   await server.start();
   params.statusSink?.({ running: true });
+
+  // Phase 58 (CORE-03): Register webhook URL with WAHA for each enabled account on startup.
+  // Non-fatal — warns if WAHA is unreachable. Stores result in health state (CORE-05).
+  // Only fires when webhookPublicUrl is configured (required for standalone registration).
+  // Uses GET+merge+PUT to preserve existing webhooks — does not overwrite other URLs.
+  // DO NOT REMOVE — enables standalone operation without manual WAHA webhook config.
+  const enabledAccounts = listEnabledWahaAccounts(params.config);
+  for (const acct of enabledAccounts) {
+    const publicUrl = acct.config.webhookPublicUrl;
+    if (!publicUrl) continue; // skip if no public URL configured
+    try {
+      // GET current session config to retrieve existing webhooks
+      const sessionInfo = await callWahaApi({
+        baseUrl: acct.baseUrl,
+        apiKey: typeof acct.apiKey === "string" ? acct.apiKey : "",
+        session: acct.session,
+        method: "GET",
+        path: `/api/sessions/${encodeURIComponent(acct.session)}`,
+        skipRateLimit: true,
+        timeoutMs: 10_000,
+        context: { action: "webhook-registration-read" },
+      });
+      const existingWebhooks: Array<Record<string, unknown>> =
+        Array.isArray(sessionInfo?.config?.webhooks) ? sessionInfo.config.webhooks : [];
+      // Upsert: replace existing entry with our URL, or append if not present
+      const webhookPath = acct.config.webhookPath ?? "/webhook/waha";
+      const ourUrl = `${publicUrl}${webhookPath}`;
+      const otherWebhooks = existingWebhooks.filter((wh) => wh.url !== ourUrl);
+      const updatedWebhooks = [
+        ...otherWebhooks,
+        {
+          url: ourUrl,
+          events: ["message", "message.any", "message.reaction", "session.status"],
+        },
+      ];
+      // PUT updated config back
+      await callWahaApi({
+        baseUrl: acct.baseUrl,
+        apiKey: typeof acct.apiKey === "string" ? acct.apiKey : "",
+        session: acct.session,
+        method: "PUT",
+        path: `/api/sessions/${encodeURIComponent(acct.session)}`,
+        body: { config: { webhooks: updatedWebhooks } },
+        skipRateLimit: true,
+        timeoutMs: 10_000,
+        context: { action: "webhook-registration-write" },
+      });
+      setWebhookRegistered(acct.session, true);
+      log.info({ session: acct.session, url: ourUrl }, "Phase 58 (CORE-03): webhook registered with WAHA");
+    } catch (err) {
+      setWebhookRegistered(acct.session, false);
+      log.warn({ session: acct.session, err }, "Phase 58 (CORE-03): webhook registration failed (non-fatal)");
+    }
+  }
 
   return {
     stop: async () => {

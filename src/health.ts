@@ -66,6 +66,8 @@ export interface HealthState {
   consecutiveFailures: number;
   lastSuccessAt: number | null;
   lastCheckAt: number | null;
+  /** Phase 58 (CORE-05): Whether webhook self-registration succeeded on startup. */
+  webhook_registered: boolean;
 }
 
 /**
@@ -386,12 +388,35 @@ async function attemptRecovery(
  * @param opts - Health check configuration
  * @returns Mutable HealthState reference
  */
+/**
+ * Set the webhook_registered field for a session's health state.
+ * Called by monitor.ts after WAHA webhook self-registration attempt.
+ * Phase 58 (CORE-05) — DO NOT REMOVE.
+ */
+export function setWebhookRegistered(session: string, registered: boolean): void {
+  const state = sessionHealthStates.get(session);
+  if (state) {
+    state.webhook_registered = registered;
+  } else {
+    // Session health check may not have started yet — create a placeholder entry.
+    // startHealthCheck will overwrite this when it runs.
+    sessionHealthStates.set(session, {
+      status: "healthy",
+      consecutiveFailures: 0,
+      lastSuccessAt: null,
+      lastCheckAt: null,
+      webhook_registered: registered,
+    });
+  }
+}
+
 export function startHealthCheck(opts: HealthCheckOptions): HealthState {
   const state: HealthState = {
     status: "healthy",
     consecutiveFailures: 0,
     lastSuccessAt: null,
     lastCheckAt: null,
+    webhook_registered: false,
   };
 
   // Store in module-level map for getHealthState()
