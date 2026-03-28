@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { createLogger } from "./logger.js";
+import { getDataDir } from "./data-dir.js";
 
 
 const log = createLogger({ component: "analytics" });
@@ -78,7 +78,8 @@ export class AnalyticsDb {
 }
 let _analyticsDb: AnalyticsDb | null = null;
 export function getAnalyticsDb(): AnalyticsDb {
-  if (!_analyticsDb) { _analyticsDb = new AnalyticsDb(join(homedir(), ".openclaw", "data", "analytics.db")); }
+  // Phase 59 (CORE-06): getDataDir() respects CHATLYTICS_DATA_DIR for Docker volume persistence.
+  if (!_analyticsDb) { _analyticsDb = new AnalyticsDb(join(getDataDir(), "analytics.db")); }
   return _analyticsDb;
 }
 export function recordAnalyticsEvent(event: AnalyticsEvent): void { getAnalyticsDb().recordEvent(event); }

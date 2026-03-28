@@ -7,9 +7,9 @@
 
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { createLogger } from "./logger.js";
+import { getDataDir } from "./data-dir.js";
 
 const log = createLogger({ component: "mimicry-gate" });
 const require = createRequire(import.meta.url);
@@ -173,7 +173,8 @@ let _mimicryDb: MimicryDb | null = null;
 
 export function getMimicryDb(): MimicryDb {
   if (!_mimicryDb) {
-    _mimicryDb = new MimicryDb(join(homedir(), ".openclaw", "data", "mimicry.db"));
+    // Phase 59 (CORE-06): getDataDir() respects CHATLYTICS_DATA_DIR for Docker volume persistence.
+    _mimicryDb = new MimicryDb(join(getDataDir(), "mimicry.db"));
   }
   return _mimicryDb;
 }

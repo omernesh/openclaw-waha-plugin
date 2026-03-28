@@ -1,9 +1,9 @@
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { createLogger } from "./logger.js";
 import type { TargetGateOverride, TargetCapOverride } from "./mimicry-gate.js";
+import { getDataDir } from "./data-dir.js";
 
 
 const log = createLogger({ component: "directory" });
@@ -1694,10 +1694,11 @@ export function getDirectoryDb(accountId: string, tenantId: string = "default"):
   const safeTenant = tenantId.replace(/[^a-zA-Z0-9_-]/g, "_");
   const cacheKey = `${safeTenant}:${safeId}`;
   if (!_directoryInstances.has(cacheKey)) {
-    // "default" tenant uses legacy path (no subdirectory) — DO NOT CHANGE for backward compat
+    // "default" tenant uses legacy path (no subdirectory) — DO NOT CHANGE for backward compat.
+    // Phase 59 (CORE-06): getDataDir() respects CHATLYTICS_DATA_DIR for Docker volume persistence.
     const dbPath = safeTenant === "default"
-      ? join(homedir(), ".openclaw", "data", `waha-directory-${safeId}.db`)
-      : join(homedir(), ".openclaw", "data", safeTenant, `waha-directory-${safeId}.db`);
+      ? join(getDataDir(), `waha-directory-${safeId}.db`)
+      : join(getDataDir(), safeTenant, `waha-directory-${safeId}.db`);
     _directoryInstances.set(cacheKey, new DirectoryDb(dbPath));
   }
   return _directoryInstances.get(cacheKey)!;
