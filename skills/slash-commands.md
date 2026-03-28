@@ -1,10 +1,10 @@
 # Slash Commands — Owner Commands
 
-> Part of the WAHA OpenClaw skill. See [SKILL.md](../SKILL.md) for overview and other categories.
+> Part of the Chatlytics WhatsApp skill. See [SKILL.md](../SKILL.md) for overview and other categories.
 
 > **Important:** Slash commands are NOT AI-invoked actions. They are processed **before** the message reaches the LLM. The agent cannot call these programmatically — they are sent as WhatsApp messages by authorized humans.
 
-## Actions
+## Commands
 
 Slash commands are sent as WhatsApp messages by authorized humans — they are not callable by the AI.
 
@@ -68,8 +68,8 @@ Slash commands give owners direct control over the bot without going through the
 | `/leave test group` | Fuzzy-searches groups and channels; leaves immediately on single high-confidence match |
 | `/leave dev` (ambiguous) | Lists numbered candidates; user replies with a number to confirm |
 
-- Groups: calls `leaveGroup` API
-- Channels/newsletters: calls `unfollowChannel` API
+- Groups: calls leaveGroup API
+- Channels/newsletters: calls unfollowChannel API
 - On success: replies `Left "<name>" ✓`
 
 ---
@@ -82,17 +82,7 @@ Slash commands give owners direct control over the bot without going through the
 | `/list groups` | Groups only |
 | `/list channels` | Channels/newsletters only |
 
-Results are sorted alphabetically and numbered. Example:
-
-```
-Groups (3):
-1. Dev Team
-2. Family Chat
-3. Test Group
-
-Channels (1):
-1. Announcements
-```
+Results are sorted alphabetically and numbered.
 
 ---
 
@@ -100,7 +90,7 @@ Channels (1):
 
 Interactive flow: the bot sends a numbered list of groups. User picks the group(s) and sets a mute duration. While muted, the bot ignores all messages in that group (including @mentions).
 
-- Muted state is stored persistently (survives gateway restarts)
+- Muted state is stored persistently (survives server restarts)
 - Duration options are presented as a menu
 
 ---
@@ -128,4 +118,3 @@ Takes effect immediately for that group. No parameters — it's a toggle.
 - Confirmation flows (ambiguous `/join`, `/leave`, `/shutup`) are stateful — the bot stores the pending selection and waits for a numbered reply from the same sender.
 - `/join` with a full `https://chat.whatsapp.com/` URL automatically extracts the invite code.
 - `/join` by name only matches groups already visible to WAHA (the bot must already be a member or the group must be in the directory).
-- When the bot sends messages from a human session on behalf of an action, they are prefixed with a robot emoji to distinguish bot-originated messages from human messages.

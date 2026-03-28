@@ -1,45 +1,44 @@
-# Chats — WhatsApp Actions
+# Chats — Chatlytics WhatsApp
 
-> Part of the WAHA OpenClaw skill. See [SKILL.md](../SKILL.md) for overview and other categories.
+> Part of the Chatlytics WhatsApp skill. See [SKILL.md](../SKILL.md) for overview and other categories.
+
+**MCP tool:** `read_messages` (for fetching messages), `update_settings` (for chat state)
 
 ## Actions
 
 ### Chat Listing & Overview
 
-| Action | Parameters | Notes |
-|--------|-----------|-------|
-| `getChats` | (none) | List all chats |
-| `getChatsOverview` | page?, limit? | Paginated chat list with summary info |
+| Action | REST Endpoint | Parameters | Notes |
+|--------|--------------|-----------|-------|
+| List all chats | `GET /api/v1/directory` | (none) | List all chats |
+| Paginated chat list | `GET /api/v1/directory` | page?, limit? | Chat list with summary info |
 
 ### Message Retrieval
 
-| Action | Parameters | Notes |
-|--------|-----------|-------|
-| `getChatMessages` | chatId, limit?, offset?, downloadMedia? | Get messages from a chat (chronological) |
-| `getChatMessage` | chatId, messageId | Get a single message by ID |
-| `getMessageById` | chatId, messageId | Alias for `getChatMessage` |
-| `readMessages` | chatId, limit? (1-50, default 10) | Fetch recent messages in lean format for LLM context |
+| Action | REST Endpoint | Parameters | Notes |
+|--------|--------------|-----------|-------|
+| Read recent messages | `GET /api/v1/messages` | chatId, limit? (1-50, default 10) | Lean format for LLM context |
+| Get full chat history | `GET /api/v1/messages` | chatId, limit?, offset?, downloadMedia? | Full messages with media info |
+| Get single message | `GET /api/v1/messages/{messageId}` | chatId, messageId | Get a single message by ID |
 
 ### Chat State
 
 | Action | Parameters | Notes |
 |--------|-----------|-------|
-| `archiveChat` | chatId | Archive a chat |
-| `unarchiveChat` | chatId | Unarchive a chat |
-| `read` | chatId | Mark chat as read (sends read receipts) |
-| `unreadChat` | chatId | Mark chat as unread |
-| `readChatMessages` | chatId | Alias for `read` — marks chat as read |
-| `muteChat` | chatId, duration? (seconds) | Mute chat notifications for N seconds |
-| `unmuteChat` | chatId | Unmute chat notifications |
-| `getChatPicture` | chatId | Get the chat's profile picture URL |
+| Archive chat | chatId | Archive a chat |
+| Unarchive chat | chatId | Unarchive a chat |
+| Mark as read | chatId | Sends read receipts |
+| Mark as unread | chatId | Mark chat as unread |
+| Mute chat | chatId, duration? (seconds) | Mute chat notifications for N seconds |
+| Unmute chat | chatId | Unmute chat notifications |
+| Get chat picture | chatId | Get the chat's profile picture URL |
 
 ### Chat Deletion & Clearing
 
 | Action | Parameters | Notes |
 |--------|-----------|-------|
-| `deleteChat` | chatId | Delete the entire chat (cannot be undone) |
-| `clearChatMessages` | chatId | Clear all messages in a chat (keep the chat) |
-| `clearMessages` | chatId | Alias for `clearChatMessages` |
+| Delete chat | chatId | Delete the entire chat (cannot be undone) |
+| Clear messages | chatId | Clear all messages in a chat (keep the chat) |
 
 ---
 
@@ -49,86 +48,51 @@
 
 | Action | Parameters | Notes |
 |--------|-----------|-------|
-| `getLabels` | (none) | List all labels |
-| `createLabel` | name, color? | Create a new label |
-| `updateLabel` | labelId, name?, color? | Update an existing label |
-| `deleteLabel` | labelId | Delete a label |
-| `getChatLabels` | chatId | Get all labels assigned to a chat |
-| `setChatLabels` | chatId, labels[{id}] | Set (replace) labels on a chat |
-| `getChatsByLabel` | labelId | List all chats with a specific label |
+| Get labels | (none) | List all labels |
+| Create label | name, color? | Create a new label |
+| Update label | labelId, name?, color? | Update an existing label |
+| Delete label | labelId | Delete a label |
+| Get chat labels | chatId | Get all labels assigned to a chat |
+| Set chat labels | chatId, labels[{id}] | Set (replace) labels on a chat |
+| Get chats by label | labelId | List all chats with a specific label |
 
 ## Examples
 
-### Get all chats
+### Read recent messages (REST)
 
-```
-Action: getChats
-Parameters: {}
-```
-
-### Read recent messages (for context)
-
-```
-Action: readMessages
-Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
+```bash
+curl "http://localhost:8050/api/v1/messages?chatId=120363421825201386@g.us&limit=20" \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY"
 ```
 
 Returns array of `{ id, from, text, timestamp, type }`. Does NOT send read receipts.
 
-### Get chat history (full messages with media info)
+### Get full chat history
 
-```
-Action: getChatMessages
-Parameters: {
-  "chatId": "120363421825201386@g.us",
-  "limit": 50,
-  "offset": 0,
-  "downloadMedia": false
-}
-```
-
-### Archive a chat
-
-```
-Action: archiveChat
-Parameters: { "chatId": "120363421825201386@g.us" }
+```bash
+curl "http://localhost:8050/api/v1/messages?chatId=120363421825201386@g.us&limit=50&offset=0" \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY"
 ```
 
 ### Mute a chat for 1 hour
 
-```
-Action: muteChat
-Parameters: { "chatId": "120363421825201386@g.us", "duration": 3600 }
+```json
+{ "action": "muteChat", "chatId": "120363421825201386@g.us", "duration": 3600 }
 ```
 
 `duration` is in seconds. Omit for indefinite mute.
 
-### Mark chat as unread
-
-```
-Action: unreadChat
-Parameters: { "chatId": "120363421825201386@g.us" }
-```
-
-### Clear all messages (keep chat)
-
-```
-Action: clearChatMessages
-Parameters: { "chatId": "120363421825201386@g.us" }
-```
-
 ### Create a label (WhatsApp Business only)
 
-```
-Action: createLabel
-Parameters: { "name": "VIP", "color": "red" }
+```json
+{ "action": "createLabel", "name": "VIP", "color": "red" }
 ```
 
 ### Assign a label to a chat
 
-```
-Action: setChatLabels
-Parameters: {
+```json
+{
+  "action": "setChatLabels",
   "chatId": "972544329000@c.us",
   "labels": [{ "id": "label-id-here" }]
 }
@@ -136,27 +100,20 @@ Parameters: {
 
 ### Get all chats with a specific label
 
-```
-Action: getChatsByLabel
-Parameters: { "labelId": "label-id-here" }
+```json
+{ "action": "getChatsByLabel", "labelId": "label-id-here" }
 ```
 
 ## Gotchas
 
 - **Labels are WhatsApp Business only** — `getLabels`, `createLabel`, `setChatLabels`, and related actions require a WhatsApp Business account. On personal WhatsApp, these return empty arrays or silently do nothing.
 
-- **`clearMessages` and `clearChatMessages` are aliases** — both clear the messages in a chat. Use either name.
-
-- **`readChatMessages` and `read` are aliases** — both mark the chat as read (send read receipts). Not to be confused with `readMessages` (which fetches message content).
-
-- **`readMessages` vs `read` vs `readChatMessages`**:
-  - `readMessages` → fetches message content for LLM context
-  - `read` / `readChatMessages` → marks chat as read (read receipts)
-
 - **`muteChat` duration is in seconds** — `3600` = 1 hour, `86400` = 1 day. Omit `duration` for indefinite mute.
 
-- **`getChatsOverview` supports pagination** — use `page` and `limit` for large chat lists. `getChats` returns all at once.
+- **`deleteChat` is permanent** — removes the entire chat from your view. The other participant's messages are not deleted. Use clear messages if you only want to clear the history.
 
-- **`deleteChat` is permanent** — removes the entire chat from your view. The other participant's messages are not deleted. Use `clearChatMessages` if you only want to clear the history.
+- **`GET /api/v1/messages` does NOT send read receipts** — it only fetches content. Use mark-as-read separately if you also want to send read receipts.
 
-- **`readMessages` does NOT send read receipts** — it only fetches content. Use `read` separately if you also want to send read receipts.
+- **Read messages vs mark-as-read**:
+  - `GET /api/v1/messages` → fetches message content for context
+  - Mark as read → marks chat as read (read receipts)

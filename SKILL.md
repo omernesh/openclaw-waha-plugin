@@ -1,79 +1,120 @@
 ---
-name: whatsapp-actions
-description: Use when the user asks to send a WhatsApp message, create a poll, share a location, manage groups, send a contact card, forward a message, react to a message, pin a message, edit or delete a message, create an event, manage labels, post a status/story, manage channels, join a group, follow a channel, change profile, block/unblock contacts, or perform any WhatsApp action through WAHA.
+name: chatlytics-whatsapp
+description: Use when the agent needs to send/receive WhatsApp messages, manage groups, contacts, channels, or perform any WhatsApp action via Chatlytics.
 metadata:
-  version: 6.0.0
+  version: 4.0.0
 ---
 
-> **IMPORTANT — Standard Action Names**: For targeted actions, use: `poll`, `send`, `edit`, `unsend`, `pin`/`unpin`, `read`, `react`. Do NOT use custom names like sendPoll, editMessage — they will be rejected.
+# Chatlytics WhatsApp — Skill Index
 
-# WhatsApp Actions — Skill Index
+## Authentication
 
-The plugin auto-resolves human-readable names (group names, contact names) to WhatsApp JIDs automatically. Standard actions (`send`, `poll`, `react`, `edit`, `unsend`, `pin`, `unpin`, `read`, `delete`, `reply`) support target resolution. Utility actions require an explicit `chatId` or `groupId` parameter. Each category file below has the full action table, examples, and gotchas.
+API key: `Authorization: Bearer ctl_YOUR_API_KEY`
+Server URL: `CHATLYTICS_URL` env var or `http://localhost:8050`
+
+---
+
+## MCP Config (Claude Desktop / Cursor / Continue)
+
+```json
+{
+  "mcpServers": {
+    "chatlytics": {
+      "type": "http",
+      "url": "http://localhost:8050/mcp",
+      "headers": { "Authorization": "Bearer ctl_YOUR_API_KEY" }
+    }
+  }
+}
+```
+
+Replace `ctl_YOUR_API_KEY` with your actual Chatlytics API key and `localhost:8050` with your server URL if self-hosting.
+
+---
+
+## MCP Tools Quick Reference
+
+| Tool | Description |
+|------|-------------|
+| `send_message` | Send text to any chat (auto-resolves names to JIDs) |
+| `send_media` | Send image, video, file, or voice message |
+| `read_messages` | Read recent messages from a chat |
+| `search` | Find contacts, groups, or channels by name |
+| `get_directory` | List contacts, groups, and newsletters |
+| `manage_group` | Create, delete, add/remove participants, rename group |
+| `get_status` | Health, mimicry status, and session info |
+| `update_settings` | Modify config (DM filter, group filter, mimicry) |
+| `send_poll` | Create a poll in a chat |
+| `send_reaction` | React to a message with an emoji |
+
+---
+
+## REST API Quick Start
+
+```
+POST /api/v1/send          { "chatId": "...", "text": "Hello!" }
+POST /api/v1/send-media    { "chatId": "...", "mediaUrl": "https://...", "type": "image", "caption": "..." }
+GET  /api/v1/messages      ?chatId=...&limit=20
+GET  /api/v1/search        ?query=marketing
+GET  /api/v1/directory     ?type=contact&search=john
+GET  /api/v1/sessions      (list active WhatsApp sessions)
+GET  /api/v1/status        (mimicry gate status + health)
+POST /api/v1/send-poll     { "chatId": "...", "title": "Lunch?", "options": ["Pizza", "Sushi"] }
+POST /api/v1/react         { "chatId": "...", "messageId": "true_...", "emoji": "👍" }
+```
+
+---
 
 ## Category Files
 
-| Category | File | Key Actions |
-|----------|------|-------------|
-| Messaging & Rich Messages | [skills/messaging.md](skills/messaging.md) | send, poll, react, reply, sendEvent, sendLocation, readMessages |
+| Category | File | Key Capabilities |
+|----------|------|-----------------|
+| Messaging & Rich Messages | [skills/messaging.md](skills/messaging.md) | send, poll, react, reply, event, location, readMessages |
 | Groups | [skills/groups.md](skills/groups.md) | createGroup, addParticipants, joinGroup, getInviteCode |
 | Contacts | [skills/contacts.md](skills/contacts.md) | getContacts, blockContact, sendContactVcard, createOrUpdateContact |
 | Channels (Newsletters) | [skills/channels.md](skills/channels.md) | followChannel, searchChannelsByText, createChannel |
 | Chat Management | [skills/chats.md](skills/chats.md) | archiveChat, getChatMessages, muteChat, labels |
 | Status / Stories | [skills/status.md](skills/status.md) | sendTextStatus, sendImageStatus, deleteStatus |
-| Presence | [skills/presence.md](skills/presence.md) | setPresenceStatus, setPresence, getPresence, subscribePresence |
+| Presence | [skills/presence.md](skills/presence.md) | setPresenceStatus, getPresence, subscribePresence |
 | Profile | [skills/profile.md](skills/profile.md) | getProfile, setProfileName, setProfilePicture |
 | Media + Utilities | [skills/media.md](skills/media.md) | sendImage, sendVideo, sendFile, convertVoice, LID lookups |
-| Slash Commands | [skills/slash-commands.md](skills/slash-commands.md) | /join, /leave, /list, /shutup |
+| Slash Commands | [skills/slash-commands.md](skills/slash-commands.md) | /join, /leave, /list, /shutup (human-only commands) |
 
 ---
 
-## Quick Start
+## Quick Start Examples
 
-```
-// Send a text message (auto-resolves name to JID)
-Action: send  |  Target: "test group"  |  Parameters: { "text": "hello world" }
+### Send a text message
 
-// Send to multiple recipients
-Action: sendMulti
-Parameters: { "recipients": ["972544329000@c.us", "120363421825201386@g.us"], "text": "hello" }
-
-// Send an image
-Action: sendImage
-Parameters: { "chatId": "120363421825201386@g.us", "file": "https://example.com/photo.jpg", "caption": "Look!" }
-
-// Create a poll
-Action: poll  |  Target: "test group"
-Parameters: { "name": "Favorite color?", "options": ["Red", "Blue", "Green"] }
-
-// Read recent messages for context
-Action: readMessages
-Parameters: { "chatId": "120363421825201386@g.us", "limit": 20 }
-
-// Search for a group by name
-Action: search
-Parameters: { "query": "dev team", "scope": "group" }
+```bash
+curl -X POST http://localhost:8050/api/v1/send \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"chatId": "120363421825201386@g.us", "text": "Hello everyone!"}'
 ```
 
----
+### Read recent messages
 
-## Auto-Resolution (Preferred)
-
-Use human-readable names as targets in send/poll/edit/unsend/pin/unpin/read. The plugin fuzzy-matches names to JIDs automatically.
-
-```
-Action: send  |  Target: "test group"   |  Parameters: { "text": "hello" }
-Action: send  |  Target: "zeev nesher"  |  Parameters: { "text": "Hey Zeev!" }
+```bash
+curl "http://localhost:8050/api/v1/messages?chatId=120363421825201386@g.us&limit=20" \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY"
 ```
 
-If the name is ambiguous you'll get an error listing possible matches — ask the user which one they meant.
+### Search for a contact or group
 
-**`search` action** — find groups/contacts/channels by name. No target — parameters only:
+```bash
+curl "http://localhost:8050/api/v1/search?query=dev+team" \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY"
 ```
-Action: search
-Parameters: { "query": "test group", "scope": "group" }
+
+### Send an image
+
+```bash
+curl -X POST http://localhost:8050/api/v1/send-media \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"chatId": "972544329000@c.us", "mediaUrl": "https://example.com/photo.jpg", "type": "image", "caption": "Check this out!"}'
 ```
-`scope`: `"group"` | `"contact"` | `"channel"` | `"auto"` (all). Empty `query` = list all.
 
 ---
 
@@ -86,61 +127,41 @@ Parameters: { "query": "test group", "scope": "group" }
 
 ---
 
-## Error Handling and Recovery
+## Error Handling
 
-| Error Pattern | Cause | Recovery |
-|---------------|-------|----------|
-| `"Session '...' has sub-role 'listener' and cannot send"` | Sent from listener session | Use the bot session — listeners are receive-only |
-| `"Could not resolve '...' to a WhatsApp JID"` | Name not found | Run `search` first, retry with exact JID |
-| `"Ambiguous target '...'. Possible matches: ..."` | Multiple matches | Ask user which one, or use exact JID |
-| `"WAHA API rate limited (429)"` | Too many requests | Plugin auto-retries 3x with backoff (1s/2s/4s). If still failing, wait 5-10s |
-| `"timed out after Xms"` | WAHA unresponsive | Timeout configurable via `timeoutMs` (default 30s). Mutation ops may have succeeded despite timeout |
-| `"aborted — session ... is unhealthy (circuit breaker)"` | Session disconnected | Reconnect session in WAHA dashboard first |
-| `"Session health: unhealthy"` | WhatsApp disconnected | All outbound calls fast-fail until session reconnects. Check admin panel Status tab |
-
-**General:** Failed sends → verify JID with `search`. Multiple failures → check Status tab.
+| Error | Cause | Recovery |
+|-------|-------|----------|
+| `401 Unauthorized` | Missing or invalid API key | Set `Authorization: Bearer ctl_YOUR_API_KEY` header |
+| `"Could not resolve '...' to a WhatsApp JID"` | Name not found | Use `/api/v1/search` first, retry with exact JID |
+| `"Ambiguous target '...'"` | Multiple name matches | Use exact JID from search results |
+| `"WAHA API rate limited (429)"` | Too many requests | Auto-retried 3x with backoff (1s/2s/4s). If still failing, wait 5-10s |
+| `"timed out after Xms"` | WAHA unresponsive | Default timeout 30s. Mutation ops may have succeeded despite timeout |
+| `"Session health: unhealthy"` | WhatsApp disconnected | All outbound calls fast-fail until session reconnects |
 
 ---
 
 ## Rate Limiting
 
-Token-bucket: 20 tokens capacity, 15 tokens/sec refill. Each API call = 1 token. Overflow is queued. HTTP 429 triggers auto-retry with exponential backoff (1s/2s/4s, 3 attempts).
-
-Config: `rateLimitCapacity` (default 20), `rateLimitRefillRate` (default 15) in `channels.waha`.
-
-Rate limiting is automatic — no delays needed. For bulk sends, use `sendMulti`. Each account has its own independent token bucket.
+Token-bucket: 20 tokens capacity, 15 tokens/sec refill. Each API call = 1 token. Overflow is queued. HTTP 429 triggers auto-retry with exponential backoff.
 
 ---
 
 ## Multi-Session
 
-| Role | Sub-Role | Sends? | Receives? | Purpose |
-|------|----------|--------|-----------|---------|
-| `bot` | `full-access` | Yes | All chats | AI agent's active session |
-| `human` | `listener` | No | Monitored chats | Monitor-only human session |
-| `human` | `full-access` | Yes | Yes | Human session with send access |
-
-Only `full-access` sessions can send. `listener` sessions fail with an error on send attempts.
-
-**Trigger word:** When `triggerWord` is set (e.g., `"!bot"`), the bot only activates in groups when messages start with that word. `triggerResponseMode`: `"dm"` (default) or `"group"`.
-
-**Cross-session routing** is automatic — the bot uses its own session for groups it belongs to.
+| Role | Sends? | Receives? | Purpose |
+|------|--------|-----------|---------|
+| `bot` (full-access) | Yes | All chats | AI agent's active session |
+| `human` (listener) | No | Monitored chats | Monitor-only human session |
+| `human` (full-access) | Yes | Yes | Human session with send access |
 
 ---
 
 ## Access Control
 
-**DM Policy** (`dmPolicy`):
+**DM Policy** (`dmPolicy`): `pairing` (default — challenges unknown senders) | `allowlist` | `open` | `disabled`
 
-| Mode | Behavior |
-|------|----------|
-| `pairing` | Default. Unknown senders receive a pairing code challenge. |
-| `allowlist` | Only contacts in `allowFrom` can message. Others silently blocked. |
-| `open` | Anyone can message. Requires `allowFrom: ["*"]`. |
-| `disabled` | All DMs blocked. |
+**Group Policy** (`groupPolicy`): `open` | `allowlist` | `disabled`
 
-**Group Policy** (`groupPolicy`): `open` (anyone in allowed groups) | `allowlist` (sender must be in `groupAllowFrom`) | `disabled`.
+**God Mode:** `godModeSuperUsers` JIDs bypass all filters.
 
-**God Mode:** `godModeSuperUsers` JIDs bypass all filters. Always processed regardless of policy.
-
-**Can Initiate:** `canInitiateGlobal` controls whether the bot can start new conversations. Per-contact overrides available in the directory.
+**Can Initiate:** `canInitiateGlobal` controls whether the bot can start new conversations.

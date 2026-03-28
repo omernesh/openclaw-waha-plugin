@@ -1,52 +1,53 @@
-# Contacts — WhatsApp Actions
+# Contacts — Chatlytics WhatsApp
 
-> Part of the WAHA OpenClaw skill. See [SKILL.md](../SKILL.md) for overview and other categories.
+> Part of the Chatlytics WhatsApp skill. See [SKILL.md](../SKILL.md) for overview and other categories.
 >
 > For sending contact cards (vCards) to chats, see the vCard section below. For media/file sends, see [messaging.md](./messaging.md).
 
+**MCP tool:** `get_directory` (for listing/search), `send_message` (for sending vCards)
+
 ## Actions
 
-| Action | Parameters | Notes |
-|--------|-----------|-------|
-| `getContacts` | (none) | List all contacts (requires NOWEB store enabled) |
-| `getContact` | contactId | Get details for a specific contact |
-| `checkContactExists` | phone | Check if a phone number has WhatsApp |
-| `getContactAbout` | contactId | Get a contact's "About" status text |
-| `getContactPicture` | contactId | Get a contact's profile picture URL |
-| `blockContact` | contactId | Block a contact |
-| `unblockContact` | contactId | Unblock a contact |
-| `createOrUpdateContact` | phone, firstName?, lastName?, company? | Create or update a local contact entry |
+| Action | REST Endpoint | Parameters | Notes |
+|--------|--------------|-----------|-------|
+| List contacts | `GET /api/v1/directory?type=contact` | search? | List all contacts (requires NOWEB store enabled) |
+| Get contact | `GET /api/v1/directory/{contactId}` | contactId | Get details for a specific contact |
+| Check exists | (manage endpoint) | phone | Check if a phone number has WhatsApp |
+| Get about text | (manage endpoint) | contactId | Get a contact's "About" status text |
+| Get picture | (manage endpoint) | contactId | Get a contact's profile picture URL |
+| Block contact | (manage endpoint) | contactId | Block a contact |
+| Unblock contact | (manage endpoint) | contactId | Unblock a contact |
+| Create/update contact | (manage endpoint) | phone, firstName?, lastName?, company? | Create or update a local contact entry |
 
 ## Examples
 
+### List contacts (REST)
+
+```bash
+curl "http://localhost:8050/api/v1/directory?type=contact&search=john" \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY"
+```
+
 ### Check if a number has WhatsApp
 
-```
-Action: checkContactExists
-Parameters: { "phone": "972544329000" }
+```json
+{ "action": "checkContactExists", "phone": "972544329000" }
 ```
 
 Returns `{ exists: true/false }`.
 
 ### Get contact details
 
-```
-Action: getContact
-Parameters: { "contactId": "972544329000@c.us" }
-```
-
-### Get contact's About text
-
-```
-Action: getContactAbout
-Parameters: { "contactId": "972544329000@c.us" }
+```bash
+curl "http://localhost:8050/api/v1/directory/972544329000@c.us" \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY"
 ```
 
 ### Create or update a contact
 
-```
-Action: createOrUpdateContact
-Parameters: {
+```json
+{
+  "action": "createOrUpdateContact",
   "phone": "972544329000",
   "firstName": "John",
   "lastName": "Doe",
@@ -58,56 +59,59 @@ Creates a local contact entry. If the phone already exists, updates the fields.
 
 ### Block a contact
 
-```
-Action: blockContact
-Parameters: { "contactId": "972544329000@c.us" }
+```json
+{ "action": "blockContact", "contactId": "972544329000@c.us" }
 ```
 
 ---
 
 ## Sending Contact Cards (vCards)
 
-Three approaches to share a contact card with another user:
+Three approaches to share a contact card:
 
-### Method 1: `send` with `contacts[]` — Native WhatsApp card (recommended)
+### Method 1: `send_message` with `contacts[]` — Native WhatsApp card (recommended)
 
-```
-Action: send
-Target: "zeev nesher"
-Parameters: {
-  "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }]
-}
+```bash
+curl -X POST http://localhost:8050/api/v1/send \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chatId": "972544329000@c.us",
+    "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }]
+  }'
 ```
 
 - Generates a native WhatsApp contact card bubble
-- Supports target auto-resolution (use a name, not just JID)
 - Multiple contacts: add more objects to the array
 - Optional field: `organization`
 
-### Method 2: `sendContactVcard` — Explicit chatId variant
+### Method 2: Explicit chatId variant
 
-```
-Action: sendContactVcard
-Parameters: {
+```json
+{
+  "action": "sendContactVcard",
   "chatId": "120363421825201386@g.us",
   "contacts": [{ "fullName": "John Doe", "phoneNumber": "972544329000" }]
 }
 ```
 
-Same as Method 1 but requires an explicit `chatId` instead of using target resolution.
+Same as Method 1 but with explicit chatId parameter.
 
-### Method 3: `sendFile` with `.vcf` — File-based (for import to contacts app)
+### Method 3: `send-media` with `.vcf` — File-based (for import to contacts app)
 
+```bash
+curl -X POST http://localhost:8050/api/v1/send-media \
+  -H "Authorization: Bearer ctl_YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chatId": "972544329000@c.us",
+    "mediaUrl": "/tmp/john-doe.vcf",
+    "type": "file",
+    "caption": "John'\''s contact card"
+  }'
 ```
-Action: sendFile
-Parameters: {
-  "chatId": "972544329000@c.us",
-  "file": "/tmp/john-doe.vcf",
-  "caption": "John's contact card"
-}
-```
 
-Sends the `.vcf` file as a document. The recipient can tap to import it directly into their contacts app. Use this when the recipient needs to save the contact on their device.
+Sends the `.vcf` file as a document. The recipient can tap to import it directly into their contacts app.
 
 ### When to use which method
 
@@ -115,7 +119,7 @@ Sends the `.vcf` file as a document. The recipient can tap to import it directly
 |--------|---------|
 | `send` with `contacts[]` | Sharing a contact inline — recipient taps to save |
 | `sendContactVcard` | Same as above with explicit chatId |
-| `sendFile` with `.vcf` | Sharing a machine-readable vCard the recipient can bulk-import |
+| `send-media` with `.vcf` | Sharing a machine-readable vCard the recipient can bulk-import |
 
 ---
 
