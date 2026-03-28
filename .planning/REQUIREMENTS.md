@@ -47,8 +47,8 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 
 ### Auth & Onboarding
 
-- [ ] **AUTH-01**: User registration with email and password (better-auth)
-- [ ] **AUTH-02**: Workspace creation (isolated tenant with own sessions, DBs, API keys)
+- [x] **AUTH-01**: User registration with email and password (better-auth)
+- [x] **AUTH-02**: Workspace creation (isolated tenant with own sessions, DBs, API keys)
 - [ ] **AUTH-03**: QR code scanning flow in dashboard (provision WAHA session, poll QR, detect connected)
 - [ ] **AUTH-04**: API key generation UI (show plaintext once, copy button, stored hashed)
 - [ ] **AUTH-05**: API key rotation (old key invalidated immediately)
@@ -138,8 +138,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-03 | Phase 62 | Complete |
 | MCP-04 | Phase 62 | Complete |
 | MCP-05 | Phase 62 | Complete |
-| AUTH-01 | Phase 63 | Pending |
-| AUTH-02 | Phase 63 | Pending |
+| AUTH-01 | Phase 63 | Complete |
+| AUTH-02 | Phase 63 | Complete |
 | AUTH-03 | Phase 63 | Pending |
 | AUTH-04 | Phase 63 | Pending |
 | AUTH-05 | Phase 63 | Pending |
