@@ -66,6 +66,7 @@ export function readRequestBodyWithLimit(
       if (total > maxBytes) {
         settled = true;
         if (timer) clearTimeout(timer);
+        req.destroy();
         reject(new RequestBodyLimitError("size"));
       } else {
         chunks.push(chunk);

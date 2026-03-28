@@ -84,6 +84,7 @@ export function requirePublicApiAuth(
 }
 
 function writeAuthError(res: ServerResponse, status: number, message: string): void {
+  setCorsHeaders(res);
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: message }));
 }

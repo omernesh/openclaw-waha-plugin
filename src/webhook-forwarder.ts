@@ -218,17 +218,26 @@ export async function forwardWebhook(params: ForwardWebhookParams): Promise<void
     "X-Chatlytics-Signature": signature,
   };
 
-  // Deliver to each matching enabled subscription
-  for (const sub of subscriptions) {
-    if (!sub.enabled) continue;
-    if (!sub.events.includes(eventType)) continue;
+  // Deliver to all matching enabled subscriptions in parallel
+  const matchingSubs = subscriptions.filter(sub => sub.enabled && sub.events.includes(eventType));
 
-    try {
-      const result = await deliverWithRetry(sub.url, body, headers, _fetch, _sleep, _now);
-      log.info("webhook forward result", { url: sub.url, eventType, result });
-    } catch (err) {
-      // Never let delivery errors propagate — fire-and-forget safety net
-      log.warn("webhook forward unexpected error", { url: sub.url, error: String(err) });
+  const results = await Promise.allSettled(
+    matchingSubs.map(async (sub) => {
+      try {
+        const result = await deliverWithRetry(sub.url, body, headers, _fetch, _sleep, _now);
+        log.info("webhook forward result", { url: sub.url, eventType, result });
+        return result;
+      } catch (err) {
+        // Never let delivery errors propagate — fire-and-forget safety net
+        log.warn("webhook forward unexpected error", { url: sub.url, error: String(err) });
+        throw err;
+      }
+    })
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    if (results[i].status === "rejected") {
+      log.warn("webhook forward failed", { url: matchingSubs[i].url, eventType });
     }
   }
 }

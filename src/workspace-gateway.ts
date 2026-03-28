@@ -259,7 +259,17 @@ export class WorkspaceGateway {
     try {
       rawBody = await new Promise<string>((resolve, reject) => {
         const chunks: Buffer[] = [];
-        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        let size = 0;
+        const MAX_BYTES = 10 * 1024 * 1024; // 10MB
+        req.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > MAX_BYTES) {
+            req.destroy();
+            reject(new Error("Request body too large"));
+            return;
+          }
+          chunks.push(chunk);
+        });
         req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
         req.on("error", reject);
       });

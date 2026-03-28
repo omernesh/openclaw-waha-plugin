@@ -639,6 +639,7 @@ export function createWahaWebhookServer(opts: {
         await server.connect(transport);
         await transport.handleRequest(req, res);
       } catch (err) {
+        log.error("MCP transport error", { error: err instanceof Error ? err.message : String(err) });
         if (!res.headersSent) {
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "MCP transport error" }));

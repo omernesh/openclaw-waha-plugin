@@ -255,9 +255,11 @@ describe("api-v1 route handlers", () => {
         { accountId: "default", session: "logan", tenantId: "default" }
       ]);
       (getHealthState as ReturnType<typeof vi.fn>).mockReturnValue({
-        healthy: true,
+        status: "healthy",
         consecutiveFailures: 0,
-        lastCheckedAt: 1711574400000,
+        lastCheckAt: 1711574400000,
+        lastSuccessAt: 1711574400000,
+        webhook_registered: true,
       });
       const req = makeMockReq({ url: "/api/v1/sessions" });
       const res = makeMockRes();

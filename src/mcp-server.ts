@@ -56,7 +56,7 @@ function getFirstAccountDb(cfg: CoreConfig) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getWahaCfg(cfg: CoreConfig) {
-  const wahaConfig = (cfg as any)?.channels?.waha ?? cfg;
+  const wahaConfig = ((cfg as Record<string, unknown>)?.channels as Record<string, unknown> | undefined)?.waha ?? cfg;
   return {
     baseUrl: (wahaConfig.apiUrl as string | undefined) ?? "http://127.0.0.1:3004",
     apiKey: (wahaConfig.apiKey as string | undefined) ?? "",
@@ -357,11 +357,12 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
           : accounts;
 
         const db = getMimicryDb();
-        const wahaConfig = (cfg as any)?.channels?.waha ?? cfg;
+        const wahaConfig = ((cfg as Record<string, unknown>)?.channels as Record<string, unknown> | undefined)?.waha ?? cfg;
 
         const statuses = filtered.map(acc => {
           const health = getHealthState(acc.session);
-          const maturity = getMaturityPhase(null); // fallback — actual firstSendAt from DB
+          const firstSendAt = db.getFirstSendAt(acc.session);
+          const maturity = getMaturityPhase(firstSendAt);
           const limit = resolveCapLimit(acc.session, maturity, wahaConfig, null);
           const cap = getCapStatus(acc.session, limit, db);
           return {
@@ -597,9 +598,10 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
     async () => {
       const accounts = listEnabledWahaAccounts(cfg);
       const db = getMimicryDb();
-      const wahaConfig = (cfg as any)?.channels?.waha ?? cfg;
+      const wahaConfig = ((cfg as Record<string, unknown>)?.channels as Record<string, unknown> | undefined)?.waha ?? cfg;
       const statuses = accounts.map(acc => {
-        const maturity = getMaturityPhase(null);
+        const firstSendAt = db.getFirstSendAt(acc.session);
+        const maturity = getMaturityPhase(firstSendAt);
         const limit = resolveCapLimit(acc.session, maturity, wahaConfig, null);
         const cap = getCapStatus(acc.session, limit, db);
         return { session: acc.session, ...cap };

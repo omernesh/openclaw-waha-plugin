@@ -184,6 +184,7 @@ export class WorkspaceProcessManager {
         const port = (msg as Record<string, unknown>).port as number;
         entry.port = port;
         entry.status = "ready";
+        entry.restartCount = 0;
         log.info("workspace ready", { workspaceId: entry.workspaceId, port });
       }
     });
@@ -219,7 +220,7 @@ export class WorkspaceProcessManager {
         }
         log.info("restarting workspace child", { workspaceId: entry.workspaceId });
         this._fork(entry);
-      }, delay);
+      }, delay).unref();
     });
   }
 
@@ -265,7 +266,7 @@ export class WorkspaceProcessManager {
           if (entry.status !== "crashed") {
             try {
               entry.child.kill();
-            } catch { /* already dead */ }
+            } catch (err) { log.debug("failed to kill child", { error: String(err) }); }
           }
         }
         resolve();
@@ -303,7 +304,7 @@ export class WorkspaceProcessManager {
     // Kill after 5s if still running
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        try { entry.child.kill(); } catch { /* already dead */ }
+        try { entry.child.kill(); } catch (err) { log.debug("failed to kill child", { error: String(err) }); }
         resolve();
       }, 5_000);
       timeout.unref();

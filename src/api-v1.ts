@@ -77,8 +77,15 @@ export async function handleApiV1Request(
     try {
       const raw = await readBodyString(req);
       body = JSON.parse(raw) as Record<string, unknown>;
-    } catch (_err) {
-      writeJson(res, 400, { error: "Invalid request body" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/too large/i.test(msg)) {
+        writeJson(res, 413, { error: "Request body too large" });
+      } else if (/timeout/i.test(msg)) {
+        writeJson(res, 408, { error: "Request body timeout" });
+      } else {
+        writeJson(res, 400, { error: "Invalid request body" });
+      }
       return;
     }
     try {
@@ -171,9 +178,9 @@ export async function handleApiV1Request(
         session: acc.session,
         accountId: acc.accountId,
         name: acc.name ?? acc.session,
-        healthy: health?.healthy ?? null,
+        healthy: health?.status === "healthy",
         consecutiveFailures: health?.consecutiveFailures ?? 0,
-        lastCheckedAt: health?.lastCheckedAt ?? null,
+        lastCheckedAt: health?.lastCheckAt ?? null,
       };
     });
     writeJson(res, 200, sessions);
