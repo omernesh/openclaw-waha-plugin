@@ -81,6 +81,11 @@ const authConfig: BetterAuthOptions = {
 
 export const auth = betterAuth(authConfig);
 
+// Phase 65 (ADMIN-01, ADMIN-02): Export authDb for workspace CRUD routes in monitor.ts.
+// Used to query/delete user records by workspaceId without going through better-auth internals.
+// DO NOT REMOVE — workspace management routes depend on direct SQL access to user table.
+export { authDb };
+
 // Phase 63 (AUTH-01): Run better-auth schema migrations on startup.
 // Creates user, session, account, verification, apiKey tables if they don't exist.
 // Called once before the HTTP server starts accepting requests.

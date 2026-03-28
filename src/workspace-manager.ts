@@ -211,6 +211,12 @@ export class WorkspaceProcessManager {
       });
 
       setTimeout(() => {
+        // Phase 65 (ADMIN-02): Guard: if workspace was deleted via stopWorkspace(),
+        // registry entry is gone — do not restart. DO NOT REMOVE.
+        if (!this.registry.has(entry.workspaceId)) {
+          log.info("workspace removed from registry, skipping restart", { workspaceId: entry.workspaceId });
+          return;
+        }
         log.info("restarting workspace child", { workspaceId: entry.workspaceId });
         this._fork(entry);
       }, delay);
@@ -265,6 +271,49 @@ export class WorkspaceProcessManager {
         resolve();
       }, 5_000);
     });
+  }
+
+  /**
+   * Stop a single workspace child process and remove it from the registry.
+   *
+   * Phase 65 (ADMIN-02): Used by DELETE /api/admin/workspaces/:workspaceId.
+   * Sends IPC shutdown message, kills after 5s timeout, then removes from registry
+   * so the crash-restart loop does not re-fork the deleted workspace.
+   *
+   * DO NOT CHANGE: registry.delete() must happen BEFORE the process exits naturally
+   * or the exit handler will schedule a restart for a deleted workspace.
+   */
+  async stopWorkspace(workspaceId: string): Promise<void> {
+    const entry = this.registry.get(workspaceId);
+    if (!entry) {
+      log.debug("stopWorkspace: workspace not in registry, nothing to stop", { workspaceId });
+      return;
+    }
+
+    // Remove from registry FIRST — prevents exit handler from re-forking.
+    // DO NOT CHANGE: must delete before kill so the 'exit' listener sees no entry and skips restart.
+    this.registry.delete(workspaceId);
+
+    try {
+      entry.child.send({ type: "shutdown" });
+    } catch (err) {
+      log.warn("stopWorkspace: failed to send shutdown IPC", { workspaceId, error: String(err) });
+    }
+
+    // Kill after 5s if still running
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        try { entry.child.kill(); } catch { /* already dead */ }
+        resolve();
+      }, 5_000);
+      timeout.unref();
+      entry.child.once("exit", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+
+    log.info("workspace stopped", { workspaceId });
   }
 
   /**

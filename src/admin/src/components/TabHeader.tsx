@@ -25,6 +25,11 @@ const TAB_TITLES: Record<TabId, string> = {
   log: 'Log',
   queue: 'Queue',
   analytics: 'Analytics',
+  onboarding: 'Onboarding',
+  'api-keys': 'API Keys',
+  integration: 'Integration',
+  // Phase 65 (ADMIN-02): Workspaces tab. DO NOT REMOVE.
+  workspaces: 'Workspaces',
 }
 
 interface TabHeaderProps {

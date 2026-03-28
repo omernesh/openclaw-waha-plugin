@@ -23,6 +23,8 @@ const OnboardingTab = lazy(() => import('@/components/tabs/OnboardingTab'))
 const ApiKeysTab = lazy(() => import('@/components/tabs/ApiKeysTab'))
 // Phase 63 (AUTH-06): Integration wizard — MCP config, REST curl, SKILL.md download. DO NOT REMOVE.
 const IntegrationWizardTab = lazy(() => import('@/components/tabs/IntegrationWizardTab'))
+// Phase 65 (ADMIN-02): Workspace management tab — list, create, delete workspaces. DO NOT REMOVE.
+const WorkspacesTab = lazy(() => import('@/components/tabs/WorkspacesTab'))
 
 // Small tabs — keep eager (fast, lightweight)
 import LogTab from '@/components/tabs/LogTab'
@@ -71,6 +73,7 @@ export default function App() {
       case 'onboarding':  return <TabErrorBoundary key={refreshKey} tabName="onboarding"><Suspense fallback={<TabSkeleton />}><OnboardingTab {...props} /></Suspense></TabErrorBoundary>
       case 'api-keys':    return <TabErrorBoundary key={refreshKey} tabName="api-keys"><Suspense fallback={<TabSkeleton />}><ApiKeysTab {...props} /></Suspense></TabErrorBoundary>
       case 'integration': return <TabErrorBoundary key={refreshKey} tabName="integration"><Suspense fallback={<TabSkeleton />}><IntegrationWizardTab {...props} /></Suspense></TabErrorBoundary>
+      case 'workspaces':  return <TabErrorBoundary key={refreshKey} tabName="workspaces"><Suspense fallback={<TabSkeleton />}><WorkspacesTab {...props} /></Suspense></TabErrorBoundary>
     }
   }
 

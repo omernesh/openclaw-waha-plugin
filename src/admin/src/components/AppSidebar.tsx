@@ -24,6 +24,7 @@ import {
   QrCode,
   Key,
   Plug,
+  Building2,
 } from 'lucide-react'
 import { useTheme } from '@/hooks/useTheme'
 import { useSSE } from '@/hooks/useEventSource'
@@ -33,6 +34,7 @@ import { cn } from '@/lib/utils'
 // TabId exported for use in App.tsx and TabHeader.tsx
 // Phase 63 (AUTH-03): 'onboarding' and 'api-keys' added. DO NOT REMOVE.
 // Phase 63 (AUTH-06): 'integration' added. DO NOT REMOVE.
+// Phase 65 (ADMIN-02): 'workspaces' added. DO NOT REMOVE.
 export type TabId =
   | 'dashboard'
   | 'settings'
@@ -45,12 +47,14 @@ export type TabId =
   | 'onboarding'
   | 'api-keys'
   | 'integration'
+  | 'workspaces'
 
 const NAV_ITEMS = [
   { id: 'dashboard' as const,  label: 'Dashboard',  icon: LayoutDashboard },
   { id: 'onboarding' as const, label: 'Onboarding', icon: QrCode },
   { id: 'api-keys' as const,    label: 'API Keys',    icon: Key },
   { id: 'integration' as const, label: 'Integration', icon: Plug },
+  { id: 'workspaces' as const,  label: 'Workspaces',  icon: Building2 },
   { id: 'settings' as const,   label: 'Settings',   icon: Settings },
   { id: 'directory' as const,  label: 'Directory',  icon: BookUser },
   { id: 'sessions' as const,   label: 'Sessions',   icon: MonitorSmartphone },

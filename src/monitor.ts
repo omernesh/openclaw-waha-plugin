@@ -53,7 +53,10 @@ import { createMcpServer } from "./mcp-server.js";
 // toNodeHandler bridges better-auth's Web Request/Response API to raw Node.js HTTP streams.
 // initAuthDb() creates tables on startup — must be called before server accepts requests.
 import { toNodeHandler } from "better-auth/node";
-import { auth, initAuthDb } from "./auth.js";
+import { auth, authDb, initAuthDb } from "./auth.js";
+// Phase 65 (ADMIN-02): WorkspaceProcessManager for workspace CRUD routes.
+// Passed in via opts — only populated in multi-tenant mode.
+import type { WorkspaceProcessManager } from "./workspace-manager.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -429,6 +432,9 @@ export function createWahaWebhookServer(opts: {
   abortSignal?: AbortSignal;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number }) => void;
   readBody?: (req: IncomingMessage, maxBodyBytes: number) => Promise<string>;
+  // Phase 65 (ADMIN-02): WorkspaceProcessManager for workspace CRUD routes.
+  // Only provided in multi-tenant mode. Routes gracefully degrade when absent.
+  manager?: WorkspaceProcessManager;
 }): { server: Server; start: () => Promise<void>; stop: () => Promise<void> } {
   const account = resolveWahaAccount({ cfg: opts.config, accountId: opts.accountId });
   const cfg = account.config;
@@ -1761,6 +1767,125 @@ export function createWahaWebhookServer(opts: {
     }
 
     // =========================================================================
+    // Phase 65 (ADMIN-02): Workspace CRUD routes
+    // Requires multi-tenant mode (opts.manager must be set).
+    // All routes use the same /api/admin/* auth guard applied above.
+    // =========================================================================
+
+    // GET /api/admin/workspaces — list all workspaces with runtime status
+    if (req.url === "/api/admin/workspaces" && req.method === "GET") {
+      try {
+        // Query user table for all users with a workspaceId
+        const rows = authDb
+          .prepare("SELECT id, name, email, workspaceId, createdAt FROM user WHERE workspaceId IS NOT NULL ORDER BY createdAt DESC")
+          .all() as Array<{ id: string; name: string; email: string; workspaceId: string; createdAt: string }>;
+
+        // Cross-reference with WorkspaceProcessManager for runtime status
+        const runtimeMap = new Map<string, { status: string; port: number | null }>();
+        if (opts.manager) {
+          for (const ws of opts.manager.listWorkspaces()) {
+            runtimeMap.set(ws.workspaceId, { status: ws.status, port: ws.port });
+          }
+        }
+
+        const workspaces = rows.map((row) => {
+          const runtime = runtimeMap.get(row.workspaceId);
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            workspaceId: row.workspaceId,
+            status: runtime?.status ?? "stopped",
+            port: runtime?.port ?? null,
+            createdAt: row.createdAt,
+          };
+        });
+
+        writeJsonResponse(res, 200, workspaces);
+      } catch (err) {
+        log.error("GET /api/admin/workspaces failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to fetch workspaces" });
+      }
+      return;
+    }
+
+    // POST /api/admin/workspaces — create a new workspace (sign up user via better-auth)
+    if (req.url === "/api/admin/workspaces" && req.method === "POST") {
+      let body: Record<string, unknown>;
+      try {
+        const rawBody = await readRequestBodyWithLimit(req, DEFAULT_WEBHOOK_MAX_BODY_BYTES, DEFAULT_WEBHOOK_BODY_TIMEOUT_MS);
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch (err) {
+        writeJsonResponse(res, 400, { error: "Invalid request body" });
+        return;
+      }
+
+      const { name, email, password } = body as { name?: string; email?: string; password?: string };
+      if (!name || !email || !password) {
+        writeJsonResponse(res, 400, { error: "Missing required fields: name, email, password" });
+        return;
+      }
+
+      try {
+        // Check for existing user with this email
+        const existing = authDb
+          .prepare("SELECT id FROM user WHERE email = ?")
+          .get(email) as { id: string } | undefined;
+        if (existing) {
+          writeJsonResponse(res, 409, { error: "A user with this email already exists" });
+          return;
+        }
+
+        // Create user via better-auth signUpEmail — databaseHooks.user.create.after auto-assigns workspaceId
+        const result = await auth.api.signUpEmail({
+          body: { name, email, password },
+        });
+
+        // Fetch the created user with workspaceId (databaseHooks runs after, need fresh read)
+        const created = authDb
+          .prepare("SELECT id, name, email, workspaceId, createdAt FROM user WHERE email = ?")
+          .get(email) as { id: string; name: string; email: string; workspaceId: string; createdAt: string } | undefined;
+
+        writeJsonResponse(res, 201, created ?? result);
+        log.info("Workspace created", { email, workspaceId: created?.workspaceId });
+      } catch (err) {
+        log.error("POST /api/admin/workspaces failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to create workspace" });
+      }
+      return;
+    }
+
+    // DELETE /api/admin/workspaces/:workspaceId — stop child process + delete user record
+    if (req.method === "DELETE" && req.url?.match(/^\/api\/admin\/workspaces\/[^/]+$/)) {
+      const workspaceId = req.url.match(/\/api\/admin\/workspaces\/([^/]+)$/)![1];
+      try {
+        // Check workspace exists
+        const existing = authDb
+          .prepare("SELECT id FROM user WHERE workspaceId = ?")
+          .get(workspaceId) as { id: string } | undefined;
+        if (!existing) {
+          writeJsonResponse(res, 404, { error: "Workspace not found" });
+          return;
+        }
+
+        // Stop child process FIRST (Pitfall: must stop before removing DB record)
+        if (opts.manager) {
+          await opts.manager.stopWorkspace(workspaceId);
+        }
+
+        // Delete user record from auth.db
+        authDb.prepare("DELETE FROM user WHERE workspaceId = ?").run(workspaceId);
+
+        writeJsonResponse(res, 200, { ok: true });
+        log.info("Workspace deleted", { workspaceId });
+      } catch (err) {
+        log.error("DELETE /api/admin/workspaces failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to delete workspace" });
+      }
+      return;
+    }
+
+    // =========================================================================
     // Phase 63 (AUTH-03): QR pairing proxy routes
     // =========================================================================
 
@@ -3086,6 +3211,9 @@ export async function monitorWahaProvider(params: {
   runtime: RuntimeEnv;
   abortSignal?: AbortSignal;
   statusSink?: (patch: { lastInboundAt?: number; lastOutboundAt?: number; running?: boolean }) => void;
+  // Phase 65 (ADMIN-02): WorkspaceProcessManager for workspace CRUD routes.
+  // Only provided in multi-tenant mode.
+  manager?: WorkspaceProcessManager;
 }) {
   // Phase 37 (MEM-02): clean up orphaned temp files before starting server
   sweepOrphanedMediaFiles().catch((err) => log.warn("media sweep failed", { error: String(err) }));
@@ -3096,6 +3224,7 @@ export async function monitorWahaProvider(params: {
     runtime: params.runtime,
     abortSignal: params.abortSignal,
     statusSink: params.statusSink,
+    manager: params.manager,
   });
 
   await server.start();
