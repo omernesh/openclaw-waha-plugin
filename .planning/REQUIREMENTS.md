@@ -11,9 +11,9 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 
 - [x] **CORE-01**: Standalone process boots without any OpenClaw SDK dependency at runtime
 - [x] **CORE-02**: Config reads from standalone JSON file (CHATLYTICS_CONFIG_PATH env var or ~/.chatlytics/config.json)
-- [ ] **CORE-03**: WAHA webhook self-registration on startup (POST /api/{session}/webhooks)
+- [x] **CORE-03**: WAHA webhook self-registration on startup (POST /api/{session}/webhooks)
 - [ ] **CORE-04**: Docker container starts with env var config and serves admin panel
-- [ ] **CORE-05**: Health endpoint reports webhook_registered and session connection status
+- [x] **CORE-05**: Health endpoint reports webhook_registered and session connection status
 - [ ] **CORE-06**: SQLite databases persist via named Docker volume
 
 ### Public API
@@ -117,8 +117,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CORE-01 | Phase 58 | Complete |
 | CORE-02 | Phase 58 | Complete |
-| CORE-03 | Phase 58 | Pending |
-| CORE-05 | Phase 58 | Pending |
+| CORE-03 | Phase 58 | Complete |
+| CORE-05 | Phase 58 | Complete |
 | CORE-04 | Phase 59 | Pending |
 | CORE-06 | Phase 59 | Pending |
 | API-01 | Phase 60 | Pending |

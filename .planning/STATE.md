@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
 status: executing
-stopped_at: Completed 58-01-PLAN.md
-last_updated: "2026-03-28T02:26:18.719Z"
+stopped_at: Completed 58-02-PLAN.md
+last_updated: "2026-03-28T02:47:42.676Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 ## Current Position
 
 Phase: 58 (sdk-decoupling) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-03-28
 
@@ -55,6 +55,9 @@ Progress: [░░░░░░░░░░] 0%
 - **jose for HMAC** (Phase 61) — ESM-first, unlike jsonwebtoken (CommonJS-only)
 - [Phase 58]: StandaloneConfig uses open index signature to remain structurally compatible with OpenClawConfig in channel.ts
 - [Phase 58]: CHATLYTICS_CONFIG_PATH primary, OPENCLAW_CONFIG_PATH backward compat, ~/.chatlytics/config.json new default (CORE-02)
+- [Phase 58]: detectMime local stub always returns undefined — SDK function was called with string not object, extension fallback handles all MIME resolution
+- [Phase 58]: GET+merge+PUT for WAHA webhook registration — PUT /api/sessions replaces entire webhooks array, must fetch+upsert to preserve existing entries
+- [Phase 58]: webhookPublicUrl gates CORE-03 — webhook registration silently skipped when not configured, non-fatal on failure
 
 ### Pending Todos
 
@@ -68,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T02:26:18.711Z
-Stopped at: Completed 58-01-PLAN.md
+Last session: 2026-03-28T02:47:42.671Z
+Stopped at: Completed 58-02-PLAN.md
 Resume file: None
