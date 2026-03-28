@@ -233,7 +233,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
-- [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
+- [x] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 **UI hint**: yes
 
 ### Phase 66: OpenClaw Thin Wrapper
@@ -247,8 +247,8 @@ Plans:
   4. Action response times measured at the gateway remain under 300ms at p95 (accounting for HTTP round-trip)
 **Plans**: 2 plans
 Plans:
-- [ ] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
-- [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
+- [x] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
+- [x] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 
 ## Progress
 
