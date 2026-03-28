@@ -137,7 +137,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   5. Stopping and restarting the container re-registers the WAHA webhook and resumes normal operation
 **Plans**: 2 plans
 Plans:
-- [ ] 59-01-PLAN.md -- Standalone entry point, /health route, CHATLYTICS_DATA_DIR for SQLite
+- [x] 59-01-PLAN.md -- Standalone entry point, /health route, CHATLYTICS_DATA_DIR for SQLite
 - [ ] 59-02-PLAN.md -- Dockerfile, docker-compose.yml, container verification
 **UI hint**: yes
 
@@ -237,7 +237,7 @@ Plans:
 | 56. Adaptive Activity Patterns | v1.20 | 2/2 | Complete | 2026-03-27 |
 | 57. Admin UI & Observability | v1.20 | 1/1 | Complete | 2026-03-27 |
 | 58. SDK Decoupling | v2.0 | 3/3 | Complete   | 2026-03-28 |
-| 59. Standalone Entry + Docker | v2.0 | 0/2 | Not started | - |
+| 59. Standalone Entry + Docker | v2.0 | 1/2 | In Progress|  |
 | 60. Public REST API + OpenAPI | v2.0 | 0/? | Not started | - |
 | 61. Webhook Forwarding | v2.0 | 0/? | Not started | - |
 | 62. MCP Server | v2.0 | 0/? | Not started | - |

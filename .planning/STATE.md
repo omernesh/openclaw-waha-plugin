@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.18
-milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
-status: completed
-stopped_at: Completed 58-03-PLAN.md
-last_updated: "2026-03-28T03:00:32.238Z"
-last_activity: 2026-03-27
+milestone: v2.0
+milestone_name: Chatlytics Universal Agent Platform
+status: executing
+stopped_at: Completed 59-01-PLAN.md
+last_updated: "2026-03-28T11:40:42.236Z"
+last_activity: 2026-03-28
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 8
-  completed_plans: 8
+  total_phases: 9
+  completed_phases: 1
+  total_plans: 5
+  completed_plans: 4
   percent: 70
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 55 — Claude Code Integration (complete)
+**Current focus:** Phase 59 — standalone-docker
 
 ## Current Position
 
-Phase: 56
-Plan: 02 (complete)
-Status: Active — 56-02 done
-Last activity: 2026-03-27
+Phase: 59 (standalone-docker) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-03-28
 
 Progress: [███████░░░] 70%
 
@@ -57,6 +57,7 @@ Progress: [███████░░░] 70%
 | Phase 56 P01 | 602 | 2 tasks | 4 files |
 | Phase 57 P01 | 15 | 2 tasks | 5 files |
 | Phase 58 P03 | 28m 39s | 2 tasks | 4 files |
+| Phase 59 P01 | 8m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Progress: [███████░░░] 70%
 - [Phase 57]: buildPayload() in SettingsTab extended with sendGate/hourlyCap to wire auto-save for new mimicry config fields
 - [Phase 58-03]: Use string[] for allowlist entries in resolveDmGroupAccessWithCommandGate — matches normalizeWahaAllowEntry return type
 - [Phase 58-03]: createReplyPrefixOptions shim returns prefixContext + onModelSelected without gateway-specific identity resolution
+- [Phase 59]: getDataDir() returns CHATLYTICS_DATA_DIR or falls back to ~/.openclaw/data for backward compat
+- [Phase 59]: standalone.ts calls monitorWahaProvider() directly — reuses existing HTTP server, no code duplication
+- [Phase 59]: C:/Program Files/Git/health route is public (before auth guard) — Docker HEALTHCHECK cannot pass API tokens
 
 ### Architecture Notes
 
@@ -119,6 +123,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T03:00:32.233Z
-Stopped at: Completed 58-03-PLAN.md
+Last session: 2026-03-28T11:40:42.231Z
+Stopped at: Completed 59-01-PLAN.md
 Resume file: None
