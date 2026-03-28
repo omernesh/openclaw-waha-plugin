@@ -1,22 +1,279 @@
-import {
-  GROUP_POLICY_BLOCKED_LABEL,
-  resolveAllowlistProviderRuntimeGroupPolicy,
-  resolveDefaultGroupPolicy,
-  warnMissingProviderGroupPolicyFallbackOnce,
-} from "openclaw/plugin-sdk/config-runtime";
-import {
-  createNormalizedOutboundDeliverer,
-  formatTextWithAttachmentLinks,
-  resolveOutboundMediaUrls,
-  type OutboundReplyPayload,
-} from "openclaw/plugin-sdk/reply-payload";
-import { createReplyPrefixOptions } from "openclaw/plugin-sdk/channel-runtime";
-import { logInboundDrop } from "openclaw/plugin-sdk/channel-inbound";
-import { readStoreAllowFromForDmPolicy, resolveDmGroupAccessWithCommandGate } from "openclaw/plugin-sdk/security-runtime";
-import { isWhatsAppGroupJid } from "openclaw/plugin-sdk/whatsapp-shared";
-import { normalizeAccountId } from "openclaw/plugin-sdk/account-id";
-import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
-import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
+// Phase 58: Local shims — replaces all openclaw/plugin-sdk imports. DO NOT CHANGE.
+import type { RuntimeEnv, OutboundReplyPayload } from "./platform-types.js";
+import { normalizeAccountId } from "./account-utils.js";
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/config-runtime. DO NOT CHANGE.
+// GROUP_POLICY_BLOCKED_LABEL: verified against SDK source (2026-03-28).
+const GROUP_POLICY_BLOCKED_LABEL = {
+  group: "group messages",
+  guild: "guild messages",
+  room: "room messages",
+  channel: "channel messages",
+  space: "space messages",
+} as const;
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/config-runtime resolveDefaultGroupPolicy. DO NOT CHANGE.
+// SDK behavior: returns cfg.channels?.defaults?.groupPolicy.
+function resolveDefaultGroupPolicy(cfg: Record<string, unknown>): string | undefined {
+  const channels = cfg.channels as Record<string, unknown> | undefined;
+  const defaults = channels?.defaults as Record<string, unknown> | undefined;
+  return defaults?.groupPolicy as string | undefined;
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/config-runtime resolveAllowlistProviderRuntimeGroupPolicy. DO NOT CHANGE.
+// SDK behavior: resolves group policy with allowlist fallback.
+// Returns { groupPolicy, providerMissingFallbackApplied }
+function resolveAllowlistProviderRuntimeGroupPolicy(params: {
+  providerConfigPresent: boolean;
+  groupPolicy: string | undefined;
+  defaultGroupPolicy: string | undefined;
+}): { groupPolicy: string; providerMissingFallbackApplied: boolean } {
+  if (params.groupPolicy) {
+    return { groupPolicy: params.groupPolicy, providerMissingFallbackApplied: false };
+  }
+  if (params.defaultGroupPolicy) {
+    return { groupPolicy: params.defaultGroupPolicy, providerMissingFallbackApplied: false };
+  }
+  // Fall back to "allowlist" with warning flag
+  const fallback = "allowlist";
+  const providerMissingFallbackApplied = !params.providerConfigPresent;
+  return { groupPolicy: fallback, providerMissingFallbackApplied };
+}
+
+// Phase 58: One-shot warning — replaces openclaw/plugin-sdk/config-runtime warnMissingProviderGroupPolicyFallbackOnce. DO NOT CHANGE.
+const _warnedMissingProviderGroupPolicyKeys = new Set<string>();
+function warnMissingProviderGroupPolicyFallbackOnce(params: {
+  providerMissingFallbackApplied: boolean;
+  providerKey: string;
+  accountId?: string;
+  blockedLabel?: string;
+  log: (message: string) => void;
+}): boolean {
+  if (!params.providerMissingFallbackApplied) return false;
+  const key = `${params.providerKey}:${params.accountId ?? "*"}`;
+  if (_warnedMissingProviderGroupPolicyKeys.has(key)) return false;
+  _warnedMissingProviderGroupPolicyKeys.add(key);
+  const blockedLabel = params.blockedLabel?.trim() || "group messages";
+  params.log(`${params.providerKey}: channels.${params.providerKey} is missing; defaulting groupPolicy to "allowlist" (${blockedLabel} blocked until explicitly configured).`);
+  return true;
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/reply-payload resolveOutboundMediaUrls. DO NOT CHANGE.
+function resolveOutboundMediaUrls(payload: OutboundReplyPayload): string[] {
+  if (payload.mediaUrls?.length) return payload.mediaUrls;
+  if (payload.mediaUrl) return [payload.mediaUrl];
+  return [];
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/reply-payload createNormalizedOutboundDeliverer. DO NOT CHANGE.
+// SDK behavior: wraps handler with payload normalization (non-object payloads become {}).
+function createNormalizedOutboundDeliverer(
+  handler: (payload: OutboundReplyPayload) => Promise<void>
+): (payload: OutboundReplyPayload) => Promise<void> {
+  return async (payload) => {
+    await handler(payload && typeof payload === "object" ? payload : {});
+  };
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/channel-inbound logInboundDrop. DO NOT CHANGE.
+// SDK behavior: logs a drop message with optional target info.
+function logInboundDrop(params: { log: (message: string) => void; channel: string; reason: string; target?: string }): void {
+  const target = params.target ? ` target=${params.target}` : "";
+  params.log(`${params.channel}: drop ${params.reason}${target}`);
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/security-runtime readStoreAllowFromForDmPolicy. DO NOT CHANGE.
+// SDK behavior: returns [] when dmPolicy is "allowlist" or shouldRead is false.
+// Otherwise reads from the store, catching errors and returning [].
+// readStore may return Promise<unknown> — we cast to string[] since the store returns string arrays.
+async function readStoreAllowFromForDmPolicy(params: {
+  provider: string;
+  accountId: string;
+  dmPolicy: string;
+  readStore?: (provider: string, accountId: string) => Promise<unknown>;
+  shouldRead?: boolean;
+}): Promise<string[]> {
+  if (params.shouldRead === false || params.dmPolicy === "allowlist") return [];
+  if (!params.readStore) return [];
+  const result = await params.readStore(params.provider, params.accountId).catch(() => []);
+  return Array.isArray(result) ? result.filter((x): x is string => typeof x === "string") : [];
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/security-runtime resolveDmGroupAccessWithCommandGate. DO NOT CHANGE.
+// This implements the DM/group access decision logic that determines whether a message should be
+// allowed, blocked, or needs pairing. Business logic extracted from SDK source (verified 2026-03-28).
+//
+// Return shape: { decision, reasonCode, reason, effectiveAllowFrom, effectiveGroupAllowFrom,
+//                 commandAuthorized, shouldBlockControlCommand }
+// decision: "allow" | "block" | "pairing"
+type DmAccessResult = {
+  decision: "allow" | "block" | "pairing";
+  reasonCode: string;
+  reason: string;
+  effectiveAllowFrom: string[];
+  effectiveGroupAllowFrom: string[];
+  commandAuthorized: boolean;
+  shouldBlockControlCommand: boolean;
+};
+function resolveDmGroupAccessWithCommandGate(params: {
+  isGroup: boolean;
+  dmPolicy: string;
+  groupPolicy: string;
+  allowFrom: string[];
+  groupAllowFrom: string[];
+  storeAllowFrom: string[];
+  isSenderAllowed: (allowFrom: string[]) => boolean;
+  command?: {
+    useAccessGroups: boolean;
+    allowTextCommands: boolean;
+    hasControlCommand: boolean;
+  };
+  groupAllowFromFallbackToAllowFrom?: boolean;
+}): DmAccessResult {
+  const allowFrom = params.allowFrom ?? [];
+  const groupAllowFrom = params.groupAllowFrom ?? [];
+  const storeAllowFrom = params.storeAllowFrom ?? [];
+
+  // Resolve effective group allow-from (merge with allowFrom if groupAllowFrom empty)
+  const effectiveGroupAllowFrom: string[] =
+    groupAllowFrom.length > 0
+      ? [...groupAllowFrom, ...storeAllowFrom]
+      : params.groupAllowFromFallbackToAllowFrom !== false
+      ? [...allowFrom, ...storeAllowFrom]
+      : [...storeAllowFrom];
+
+  const effectiveAllowFrom: string[] = [...allowFrom, ...storeAllowFrom];
+
+  let decision: "allow" | "block" | "pairing";
+  let reasonCode: string;
+  let reason: string;
+
+  if (params.isGroup) {
+    // Group policy resolution
+    const gp = params.groupPolicy ?? "allowlist";
+    if (gp === "open") {
+      decision = "allow";
+      reasonCode = "group_policy_allowed";
+      reason = "groupPolicy=open";
+    } else if (gp === "disabled") {
+      decision = "block";
+      reasonCode = "group_policy_disabled";
+      reason = "groupPolicy=disabled";
+    } else {
+      // allowlist: check if sender is in the effective group allow-from list
+      if (effectiveGroupAllowFrom.length === 0) {
+        decision = "block";
+        reasonCode = "group_policy_empty_allowlist";
+        reason = "groupPolicy=allowlist (empty allowlist)";
+      } else if (params.isSenderAllowed(effectiveGroupAllowFrom)) {
+        decision = "allow";
+        reasonCode = "group_policy_allowed";
+        reason = "groupPolicy=allowlist (allowlisted)";
+      } else {
+        decision = "block";
+        reasonCode = "group_policy_not_allowlisted";
+        reason = "groupPolicy=allowlist (not allowlisted)";
+      }
+    }
+  } else {
+    // DM policy resolution
+    const dp = params.dmPolicy ?? "allowlist";
+    if (dp === "open") {
+      decision = "allow";
+      reasonCode = "dm_policy_open";
+      reason = "dmPolicy=open";
+    } else if (dp === "disabled") {
+      decision = "block";
+      reasonCode = "dm_policy_disabled";
+      reason = "dmPolicy=disabled";
+    } else if (dp === "pairing") {
+      if (params.isSenderAllowed(effectiveAllowFrom)) {
+        decision = "allow";
+        reasonCode = "dm_policy_allowlisted";
+        reason = "dmPolicy=pairing (allowlisted)";
+      } else {
+        decision = "pairing";
+        reasonCode = "dm_policy_pairing_required";
+        reason = "dmPolicy=pairing (not allowlisted)";
+      }
+    } else {
+      // allowlist
+      if (params.isSenderAllowed(effectiveAllowFrom)) {
+        decision = "allow";
+        reasonCode = "dm_policy_allowlisted";
+        reason = "dmPolicy=allowlist (allowlisted)";
+      } else {
+        decision = "block";
+        reasonCode = "dm_policy_not_allowlisted";
+        reason = "dmPolicy=allowlist (not allowlisted)";
+      }
+    }
+  }
+
+  // Command gate: determine if control commands are authorized
+  let commandAuthorized = true;
+  let shouldBlockControlCommand = false;
+  if (params.command) {
+    const { allowTextCommands, hasControlCommand, useAccessGroups } = params.command;
+    // If text commands are allowed, any sender can use control commands (gateway handles auth)
+    if (allowTextCommands) {
+      commandAuthorized = true;
+    } else if (useAccessGroups) {
+      // Access groups: check if sender is in DM or group allow-from
+      const inDmAllowFrom = params.isSenderAllowed(allowFrom);
+      const inGroupAllowFrom = params.isSenderAllowed(effectiveGroupAllowFrom);
+      commandAuthorized = inDmAllowFrom || inGroupAllowFrom;
+    } else {
+      commandAuthorized = true;
+    }
+    shouldBlockControlCommand = params.isGroup && hasControlCommand && !commandAuthorized;
+  }
+
+  return {
+    decision,
+    reasonCode,
+    reason,
+    effectiveAllowFrom,
+    effectiveGroupAllowFrom,
+    commandAuthorized,
+    shouldBlockControlCommand,
+  };
+}
+
+// Phase 58: Local shim — replaces openclaw/plugin-sdk/channel-runtime createReplyPrefixOptions. DO NOT CHANGE.
+// Returns the prefix options shape expected by dispatchReplyWithBufferedBlockDispatcher.
+// In gateway mode, responsePrefix/onModelSelected are used for model-labeled prefixes on bot replies.
+// Standalone mode returns safe defaults that don't break dispatch but omit gateway-specific prefix resolution.
+function createReplyPrefixOptions(_params: {
+  cfg: Record<string, unknown>;
+  agentId: string;
+  channel: string;
+  accountId?: string;
+}): {
+  responsePrefix?: string;
+  enableSlackInteractiveReplies?: boolean;
+  responsePrefixContextProvider?: () => Record<string, unknown>;
+  onModelSelected?: (ctx: { provider: string; model: string; thinkLevel?: string }) => void;
+} {
+  // prefixContext is mutated by onModelSelected callback to carry model info.
+  // responsePrefixContextProvider returns the current prefixContext for the dispatcher.
+  const prefixContext: Record<string, unknown> = {};
+  return {
+    responsePrefix: undefined,
+    enableSlackInteractiveReplies: undefined,
+    responsePrefixContextProvider: () => prefixContext,
+    onModelSelected: (ctx) => {
+      prefixContext.provider = ctx.provider;
+      prefixContext.model = ctx.model;
+      prefixContext.thinkingLevel = ctx.thinkLevel ?? "off";
+    },
+  };
+}
+
+// Phase 58: OpenClawConfig type alias — inbound.ts casts config as OpenClawConfig for runtime.* calls.
+// Using 'any' cast approach: keep as CoreConfig (which is a superset) and cast where needed.
+// This avoids importing from SDK while satisfying TypeScript at the runtime.* call sites.
+type OpenClawConfig = Record<string, unknown>;
 import type { ResolvedWahaAccount } from "./accounts.js";
 import { resolveSessionForTarget } from "./accounts.js";
 import { checkGroupMembership } from "./channel.js";

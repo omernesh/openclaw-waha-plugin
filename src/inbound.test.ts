@@ -42,19 +42,25 @@ vi.mock("./runtime.js", () => ({
         hasControlCommand: vi.fn().mockReturnValue(false),
       },
       routing: {
-        resolveAgentRoute: vi.fn().mockReturnValue({ agentId: "default-agent" }),
+        resolveAgentRoute: vi.fn().mockReturnValue({ agentId: "default-agent", sessionKey: "test-session-key" }),
       },
       session: {
         resolveStorePath: vi.fn().mockReturnValue("/tmp/store"),
         readSessionUpdatedAt: vi.fn().mockReturnValue(null),
         writeSessionUpdatedAt: vi.fn(),
+        // Phase 58: Added recordInboundSession mock — called after all filters pass.
+        // Used as proxy to verify message reached the end of the pipeline. DO NOT REMOVE.
+        recordInboundSession: vi.fn().mockResolvedValue(undefined),
       },
       reply: {
         resolveEnvelopeFormatOptions: vi.fn().mockReturnValue({}),
         formatAgentEnvelope: vi.fn().mockReturnValue("formatted envelope"),
-        finalizeInboundContext: vi.fn().mockReturnValue({}),
+        finalizeInboundContext: vi.fn().mockReturnValue({ SessionKey: "test-session-key" }),
         deliverFormattedInbound: vi.fn().mockResolvedValue(undefined),
         buildInboundPayload: vi.fn().mockReturnValue({}),
+        // Phase 58: Added dispatchReplyWithBufferedBlockDispatcher mock — final delivery call.
+        // Used as proxy to verify message reached LLM dispatch stage. DO NOT REMOVE.
+        dispatchReplyWithBufferedBlockDispatcher: vi.fn().mockResolvedValue(undefined),
       },
       pairing: {
         buildPairingReply: vi.fn().mockReturnValue("Pairing code: 1234"),
@@ -130,73 +136,17 @@ vi.mock("./module-registry.js", () => ({
 }));
 
 vi.mock("./presence.js", () => ({
-  startHumanPresence: vi.fn().mockReturnValue({ finishTyping: vi.fn().mockResolvedValue(undefined) }),
+  startHumanPresence: vi.fn().mockReturnValue({
+    finishTyping: vi.fn().mockResolvedValue(undefined),
+    cancelTyping: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
-vi.mock("openclaw/plugin-sdk", async () => ({
-  isWhatsAppGroupJid: vi.fn().mockImplementation((jid: string) => jid?.endsWith("@g.us") ?? false),
-  GROUP_POLICY_BLOCKED_LABEL: "GROUP_POLICY_BLOCKED",
-  createNormalizedOutboundDeliverer: vi.fn().mockReturnValue(vi.fn().mockResolvedValue(undefined)),
-  createReplyPrefixOptions: vi.fn().mockReturnValue({}),
-  createScopedPairingAccess: vi.fn().mockReturnValue({ grantAccess: vi.fn(), checkAccess: vi.fn().mockReturnValue(false) }),
-  formatTextWithAttachmentLinks: vi.fn().mockReturnValue(""),
-  logInboundDrop: vi.fn(),
-  readStoreAllowFromForDmPolicy: vi.fn().mockResolvedValue([]),
-  resolveAllowlistProviderRuntimeGroupPolicy: vi.fn().mockResolvedValue(null),
-  resolveDefaultGroupPolicy: vi.fn().mockReturnValue("allowlist"),
-  resolveDmGroupAccessWithCommandGate: vi.fn().mockResolvedValue({ access: "allow", deliverer: vi.fn().mockResolvedValue(undefined) }),
-  warnMissingProviderGroupPolicyFallbackOnce: vi.fn(),
-  resolveOutboundMediaUrls: vi.fn().mockReturnValue([]),
-  DEFAULT_ACCOUNT_ID: "__default__",
-}));
-
-// Sub-path mocks for openclaw/plugin-sdk/* imports used by inbound.ts
-vi.mock("openclaw/plugin-sdk/config-runtime", () => ({
-  GROUP_POLICY_BLOCKED_LABEL: "GROUP_POLICY_BLOCKED",
-  resolveAllowlistProviderRuntimeGroupPolicy: vi.fn().mockResolvedValue(null),
-  resolveDefaultGroupPolicy: vi.fn().mockReturnValue("allowlist"),
-  warnMissingProviderGroupPolicyFallbackOnce: vi.fn(),
-}));
-
-vi.mock("openclaw/plugin-sdk/reply-payload", () => ({
-  createNormalizedOutboundDeliverer: vi.fn().mockReturnValue(vi.fn().mockResolvedValue(undefined)),
-  formatTextWithAttachmentLinks: vi.fn().mockReturnValue(""),
-  resolveOutboundMediaUrls: vi.fn().mockReturnValue([]),
-}));
-
-vi.mock("openclaw/plugin-sdk/channel-runtime", () => ({
-  createReplyPrefixOptions: vi.fn().mockReturnValue({}),
-}));
-
-vi.mock("openclaw/plugin-sdk/channel-inbound", () => ({
-  logInboundDrop: vi.fn(),
-}));
-
-vi.mock("openclaw/plugin-sdk/security-runtime", () => ({
-  readStoreAllowFromForDmPolicy: vi.fn().mockResolvedValue([]),
-  resolveDmGroupAccessWithCommandGate: vi.fn().mockResolvedValue({ access: "allow", deliverer: vi.fn().mockResolvedValue(undefined) }),
-}));
-
-vi.mock("openclaw/plugin-sdk/whatsapp-shared", () => ({
-  isWhatsAppGroupJid: vi.fn().mockImplementation((jid: string) => jid?.endsWith("@g.us") ?? false),
-}));
-
-vi.mock("openclaw/plugin-sdk/account-id", () => ({
-  normalizeAccountId: vi.fn().mockImplementation((id: string) => id ?? "__default__"),
-  DEFAULT_ACCOUNT_ID: "__default__",
-}));
-
-vi.mock("openclaw/plugin-sdk/account-resolution", () => ({
-  DEFAULT_ACCOUNT_ID: "__default__",
-  normalizeAccountId: vi.fn().mockImplementation((id: string) => id ?? "__default__"),
-  listConfiguredAccountIds: vi.fn().mockReturnValue(["default"]),
-  resolveAccountWithDefaultFallback: vi.fn().mockImplementation((id: string) => id ?? "__default__"),
-}));
-
-vi.mock("openclaw/plugin-sdk/secret-input", () => ({
-  hasConfiguredSecretInput: vi.fn().mockReturnValue(false),
-  normalizeResolvedSecretInputString: vi.fn().mockImplementation((s: unknown) => String(s ?? "")),
-}));
+// Phase 58: All openclaw/plugin-sdk/* mocks removed — SDK symbols are now local shims in inbound.ts.
+// resolveDmGroupAccessWithCommandGate, readStoreAllowFromForDmPolicy, resolveOutboundMediaUrls, etc.
+// are all inline functions in inbound.ts and run with real logic in tests.
+// Tests that previously checked "was resolveDmGroupAccessWithCommandGate called?" now check
+// "was core.channel.session.recordInboundSession called?" as the proxy for pipeline progression.
 
 // Mock ./accounts.js to prevent deep openclaw sub-path loading
 vi.mock("./accounts.js", () => ({
@@ -392,12 +342,12 @@ describe("handleWahaInbound", () => {
       const account = makeAccount();
       const config = makeConfig();
       const runtime = makeRuntime();
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
+      const { getWahaRuntime } = await import("./runtime.js");
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // resolveDmGroupAccessWithCommandGate should NOT be called — message was skipped
-      expect(resolveDmGroupAccessWithCommandGate).not.toHaveBeenCalled();
+      // Message was skipped — pipeline should NOT reach session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).not.toHaveBeenCalled();
     });
 
     it("processes messages that are successfully claimed", async () => {
@@ -421,35 +371,35 @@ describe("handleWahaInbound", () => {
       const account = makeAccount();
       const config = makeConfig();
       const runtime = makeRuntime();
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
+      const { getWahaRuntime } = await import("./runtime.js");
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // With empty body and no media, pipeline returns before reaching DM access check
-      expect(resolveDmGroupAccessWithCommandGate).not.toHaveBeenCalled();
+      // With empty body and no media, pipeline returns before reaching session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).not.toHaveBeenCalled();
     });
   });
 
   describe("DM filtering", () => {
-    it("allows DMs from an allowed sender via SDK deliverer", async () => {
+    it("allows DMs from an allowed sender — pipeline reaches session recording", async () => {
       const message = makeWahaMessage({ body: "hello", from: "972000000001@c.us" });
       const account = makeAccount();
       const config = makeConfig();
       const runtime = makeRuntime();
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
+      const { getWahaRuntime } = await import("./runtime.js");
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // With allowed sender, pipeline should reach the DM access/deliverer step
-      expect(resolveDmGroupAccessWithCommandGate).toHaveBeenCalled();
+      // With allowed sender (in allowFrom), pipeline should reach session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).toHaveBeenCalled();
     });
   });
 
   describe("group filtering", () => {
     it("drops group messages not matching group filter", async () => {
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
       const { getDirectoryDb } = await import("./directory.js");
       (getDirectoryDb as ReturnType<typeof vi.fn>)().getGroupFilterOverride.mockReturnValue(null);
+      const { getWahaRuntime } = await import("./runtime.js");
 
       const groupJid = "120363421825201386@g.us";
       const message = makeWahaMessage({
@@ -480,15 +430,15 @@ describe("handleWahaInbound", () => {
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // Group filter drops "just chatting" — should NOT reach DM/group access check
-      expect(resolveDmGroupAccessWithCommandGate).not.toHaveBeenCalled();
+      // Group filter drops "just chatting" — should NOT reach session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).not.toHaveBeenCalled();
     });
 
-    it("allows group messages matching group filter keyword", async () => {
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
+    it("allows group messages matching group filter keyword — pipeline reaches session recording", async () => {
       const { getDirectoryDb } = await import("./directory.js");
       (getDirectoryDb as ReturnType<typeof vi.fn>)().isGroupMuted.mockReturnValue(false);
       (getDirectoryDb as ReturnType<typeof vi.fn>)().getGroupFilterOverride.mockReturnValue(null);
+      const { getWahaRuntime } = await import("./runtime.js");
 
       const groupJid = "120363421825201386@g.us";
       const message = makeWahaMessage({
@@ -498,6 +448,7 @@ describe("handleWahaInbound", () => {
         participant: "972000000001@c.us",
       });
 
+      // groupPolicy: "open" so the group allow check passes (no allowlist needed)
       const config = makeConfig({
         groupFilter: { enabled: true, mentionPatterns: ["bot"] },
         allowedGroups: [],
@@ -511,20 +462,21 @@ describe("handleWahaInbound", () => {
           allowFrom: [],
           groupAllowFrom: [],
           dmPolicy: "allowlist",
-          groupPolicy: "allowlist",
+          groupPolicy: "open",
         } as never,
       });
       const runtime = makeRuntime();
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // "hey bot help me" matches "bot" — should reach group policy check
-      expect(resolveDmGroupAccessWithCommandGate).toHaveBeenCalled();
+      // "hey bot help me" matches "bot" — should reach session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).toHaveBeenCalled();
     });
 
     it("drops group message when group is muted", async () => {
       const { getDirectoryDb } = await import("./directory.js");
       (getDirectoryDb as ReturnType<typeof vi.fn>)().isGroupMuted.mockReturnValue(true);
+      const { getWahaRuntime } = await import("./runtime.js");
 
       const groupJid = "120363421825201386@g.us";
       const message = makeWahaMessage({
@@ -545,12 +497,11 @@ describe("handleWahaInbound", () => {
         } as never,
       });
       const runtime = makeRuntime();
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // Muted group — should NOT reach access check
-      expect(resolveDmGroupAccessWithCommandGate).not.toHaveBeenCalled();
+      // Muted group — should NOT reach session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).not.toHaveBeenCalled();
     });
   });
 
@@ -559,18 +510,18 @@ describe("handleWahaInbound", () => {
       const { checkShutupAuthorization, handleShutupCommand } = await import("./shutup.js");
       (checkShutupAuthorization as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
       (handleShutupCommand as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
+      const { getWahaRuntime } = await import("./runtime.js");
 
       const message = makeWahaMessage({ body: "/shutup", from: "972000000001@c.us" });
       const account = makeAccount();
       const config = makeConfig();
       const runtime = makeRuntime();
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
       expect(handleShutupCommand).toHaveBeenCalled();
-      // Should NOT reach DM access check — command handled
-      expect(resolveDmGroupAccessWithCommandGate).not.toHaveBeenCalled();
+      // Should NOT reach session recording — command handled before access check
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).not.toHaveBeenCalled();
     });
 
     it("does NOT intercept /shutup if sender is not authorized", async () => {
@@ -641,14 +592,8 @@ describe("handleWahaInbound", () => {
       const autoReplyMock = (getAutoReplyEngine as ReturnType<typeof vi.fn>)();
       autoReplyMock.shouldReply.mockReturnValue(true);
       autoReplyMock.sendRejection.mockResolvedValue(undefined);
-      // resolveDmGroupAccessWithCommandGate: return deny so newsletter drops before delivery
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
-      (resolveDmGroupAccessWithCommandGate as ReturnType<typeof vi.fn>).mockReturnValueOnce({
-        decision: "deny",
-        reason: "not_allowed",
-        effectiveGroupAllowFrom: [],
-        shouldBlockControlCommand: false,
-      });
+      // Phase 58: resolveDmGroupAccessWithCommandGate is now a local inline shim — no mock needed.
+      // Real shim returns decision="block" for empty allowFrom, which drops the newsletter.
 
       const newsletterJid = "120363421825201386@newsletter";
       const message = makeWahaMessage({
@@ -803,7 +748,7 @@ describe("handleWahaInbound", () => {
 
   describe("allowedGroups filtering", () => {
     it("drops group messages when group not in allowedGroups", async () => {
-      const { resolveDmGroupAccessWithCommandGate } = await import("openclaw/plugin-sdk/security-runtime");
+      const { getWahaRuntime } = await import("./runtime.js");
 
       const groupJid = "999999999999@g.us"; // not in allowedGroups
       const message = makeWahaMessage({
@@ -828,8 +773,8 @@ describe("handleWahaInbound", () => {
 
       await handleWahaInbound({ message, account, config, runtime: runtime as never });
 
-      // Not in allowedGroups — should NOT reach access check
-      expect(resolveDmGroupAccessWithCommandGate).not.toHaveBeenCalled();
+      // Not in allowedGroups — should NOT reach session recording
+      expect((getWahaRuntime as ReturnType<typeof vi.fn>)().channel.session.recordInboundSession).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,63 +1,113 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Chatlytics Universal Agent Platform
-status: executing
-stopped_at: Completed 58-02-PLAN.md
-last_updated: "2026-03-28T02:47:42.676Z"
-last_activity: 2026-03-28
+milestone: v1.18
+milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
+status: completed
+stopped_at: Completed 58-03-PLAN.md
+last_updated: "2026-03-28T03:00:32.238Z"
+last_activity: 2026-03-27
 progress:
-  total_phases: 9
-  completed_phases: 0
-  total_plans: 3
-  completed_plans: 1
-  percent: 0
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 8
+  completed_plans: 8
+  percent: 70
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-28)
+See: .planning/PROJECT.md (updated 2026-03-26)
 
-**Core value:** Any AI agent framework can send/receive WhatsApp messages through Chatlytics with mimicry enforcement, policy controls, and directory features — zero framework-specific code required.
-**Current focus:** Phase 58 — sdk-decoupling
+**Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
+**Current focus:** Phase 55 — Claude Code Integration (complete)
 
 ## Current Position
 
-Phase: 58 (sdk-decoupling) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-03-28
+Phase: 56
+Plan: 02 (complete)
+Status: Active — 56-02 done
+Last activity: 2026-03-27
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0 (v2.0)
+- Total plans completed: 0
 - Average duration: —
 - Total execution time: —
 
-*Updated after each plan completion*
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 53. MimicryGate Core | - | - | - |
+| 54. Send Pipeline Enforcement | - | - | - |
+| 55. Claude Code Integration | - | - | - |
+| 56. Adaptive Activity Patterns | - | - | - |
+| 57. Admin UI & Observability | - | - | - |
+| Phase 53 P01 | 9 | 2 tasks | 3 files |
+| Phase 53 P02 | 358 | 2 tasks | 2 files |
+| Phase 54 P01 | 4 | 1 task (TDD) | 2 files |
+| Phase 54 P02 | 10 | 2 tasks | 3 files |
+| Phase 55 P01 | 22 | 2 tasks | 4 files |
+| Phase 56 P01 | 602 | 2 tasks | 4 files |
+| Phase 57 P01 | 15 | 2 tasks | 5 files |
+| Phase 58 P03 | 28m 39s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
 ### Decisions
 
-- **Strictly additive architecture** — new files (standalone.ts, mcp-server.ts, api-router.ts, webhook-forwarder.ts, platform-types.ts, account-utils.ts, request-utils.ts) do all new work; channel.ts and 15+ core modules untouched
-- **StreamableHTTPServerTransport only** — MCP SSE transport deprecated 2025-03-26; do not use SSEServerTransport
-- **Phases 58-62 = Docker Alpha (v2.0)** — must ship before auth/multi-tenant
-- **Phases 63-66 = v2.1 SaaS scope** — do not let them delay Docker Alpha
-- **Phase 66 gated** — OpenClaw thin wrapper only after 30 days of production stability post Phase 62
-- **better-auth for auth** (Phase 63) — toNodeHandler() for raw Node HTTP, better-sqlite3 adapter
-- **jose for HMAC** (Phase 61) — ESM-first, unlike jsonwebtoken (CommonJS-only)
-- [Phase 58]: StandaloneConfig uses open index signature to remain structurally compatible with OpenClawConfig in channel.ts
-- [Phase 58]: CHATLYTICS_CONFIG_PATH primary, OPENCLAW_CONFIG_PATH backward compat, ~/.chatlytics/config.json new default (CORE-02)
-- [Phase 58]: detectMime local stub always returns undefined — SDK function was called with string not object, extension fallback handles all MIME resolution
-- [Phase 58]: GET+merge+PUT for WAHA webhook registration — PUT /api/sessions replaces entire webhooks array, must fetch+upsert to preserve existing entries
-- [Phase 58]: webhookPublicUrl gates CORE-03 — webhook registration silently skipped when not configured, non-fatal on failure
+- **2026-03-26 (Roadmap)**: Reject-not-queue as default quiet hours policy — avoids message loss on restart and SQLite queue complexity
+- **2026-03-26 (Roadmap)**: Rolling window hourly counter (SQLite per-timestamp rows) over fixed top-of-hour bucket — prevents 2x burst exploit at hour boundaries
+- **2026-03-26 (Roadmap)**: Phase 53 is the hard dependency for all others — no live deploy needed until Phase 54
+- **2026-03-26 (Roadmap)**: Phases 54, 55, 56 are all independent after Phase 53 (can be sequenced in any order; Phase 55 is highest ban-risk gap)
+- **2026-03-26 (Roadmap)**: Cap keyed by WAHA session name, not plugin accountId — logan and Omer sends share the same hourly bucket per session
+- [Phase 53]: Rolling window via per-row timestamps (not fixed buckets) prevents 2x burst at hour boundary
+- [Phase 53]: Reject-not-queue as default onBlock policy eliminates queue complexity and message loss on restart
+- [Phase 53]: 3-level config merge (global -> session -> target) for both gate and cap; most-specific wins
+- [Phase 53]: Intl.DateTimeFormat with formatToParts for timezone-aware hour extraction (not getHours())
+- [Phase 53]: Cross-midnight window: endHour <= startHour means hour >= startHour OR hour < endHour
+- [Phase 53]: getCapStatus is read-only -- never calls recordSend
+- [Phase 54]: Separate mimicry-enforcer.ts avoids circular import between send.ts and mimicry-gate.ts
+- [Phase 54]: DI params _db/_now/_sleep for enforcer test isolation without fake timers
+- [Phase 54]: recordMimicrySuccess called by caller AFTER WAHA success -- failed sends don't consume cap
+- [Phase 54]: sendWahaMediaBatch calls enforceMimicry once with count=N before the batch loop (not per-media)
+- [Phase 54]: deliverWahaReply calls enforceMimicry AFTER presenceCtrl typing stop to avoid two concurrent typing indicators
+- [Phase 54]: Status sends pass isStatusSend=true so they honour time gate but skip hourly cap
+- [Phase 55]: Extracted handleProxySend into proxy-send-handler.ts for testability (avoids mocking full HTTP server)
+- [Phase 55]: Proxy calls callWahaApi directly, not sendWahaText, to avoid double mimicry enforcement
+- [Phase 55]: recordMimicrySuccess called only after WAHA success -- failed proxy sends don't consume cap
+- [Phase 56]: _firstTickDelayMs DI param in ScannerOptions for test isolation without fake timers
+- [Phase 56]: computePeakWindow uses contiguous span of top-60% hours (permissive for bimodal activity patterns)
+- [Phase 56]: isOffPeak delegates to resolveGateConfig + checkTimeOfDay from mimicry-gate.ts (no logic duplication)
+- [Phase 56-02]: Step 2b guard `if (!targetGateOverride)` ensures manual admin override always wins over learned profile
+- [Phase 56-02]: getActivityProfile error swallowed (non-fatal) — falls back to global gate config silently
+- [Phase 56-02]: startActivityScanner receives session: account.accountId (same as accountId per ScannerOptions)
+- [Phase 57]: Route placed after /api/admin/sessions, getCapStatus used (read-only) never checkAndConsumeCap — status API must not consume quota
+- [Phase 57]: buildPayload() in SettingsTab extended with sendGate/hourlyCap to wire auto-save for new mimicry config fields
+- [Phase 58-03]: Use string[] for allowlist entries in resolveDmGroupAccessWithCommandGate — matches normalizeWahaAllowEntry return type
+- [Phase 58-03]: createReplyPrefixOptions shim returns prefixContext + onModelSelected without gateway-specific identity resolution
+
+### Architecture Notes
+
+- `src/mimicry-gate.ts` is new file — all enforcement primitives live here
+- Integration points confirmed: `sendWahaText`, `sendWahaImage`, `sendWahaVideo`, `sendWahaFile` in `send.ts`; `handleAction()` dispatch in `channel.ts`; `monitor.ts` HTTP server for proxy-send + mimicry status API
+- `bypassPolicy` flag in `send.ts` already exists — preserves `/shutup`, `/join`, `/leave` bypass behavior
+- Typing simulation entry point: `sendWahaPresence()` at `send.ts:176` (existing, working)
+- SQLite infrastructure: follow `AnalyticsDb` pattern for rolling window table + `account_metadata` table
+- All new Zod fields MUST use `.optional().default()` — production configs must load without error
+- `src/mimicry-enforcer.ts` is the chokepoint — Plan 02 wires it into sendWahaText/Image/Video/File/etc in send.ts
+- `src/proxy-send-handler.ts` is the Claude Code proxy — calls enforceMimicry + callWahaApi + recordMimicrySuccess
+
+### Research Flags
+
+- **Phase 55**: Verify exact call sites in `whatsapp-messenger` skill before implementing proxy-send — confirm which endpoints the skill calls directly
+- **Phase 53**: Confirm rolling window query performance against existing `message_events` table structure before choosing table design
 
 ### Pending Todos
 
@@ -65,12 +115,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 58 is highest-risk: inbound.ts couples to 8+ SDK symbols containing real business logic, not just types. Each must be behaviorally replaced, not just removed. Run full test suite after each file change.
-- better-sqlite3 Alpine Docker: must be compiled inside Alpine container (python3/make/g++ in builder stage). Verify at Phase 59 start.
-- MCP session cleanup: confirm StreamableHTTPServerTransport handles onsessionclose to prevent mcpTransports map leak. Check at Phase 62 start.
+None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T02:47:42.671Z
-Stopped at: Completed 58-02-PLAN.md
+Last session: 2026-03-28T03:00:32.233Z
+Stopped at: Completed 58-03-PLAN.md
 Resume file: None
