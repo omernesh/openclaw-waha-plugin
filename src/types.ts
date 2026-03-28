@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "openclaw/plugin-sdk/core";
+import type { StandaloneConfig } from "./platform-types.js";
 import type { DmFilterConfig } from "./dm-filter.js";
 export type { DmFilterConfig } from "./dm-filter.js";
 
@@ -120,7 +120,7 @@ export type WahaChannelConfig = WahaAccountConfig & {
   adminToken?: string;
 };
 
-export type CoreConfig = OpenClawConfig & {
+export type CoreConfig = StandaloneConfig & {
   channels?: {
     waha?: WahaChannelConfig;
   };

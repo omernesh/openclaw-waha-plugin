@@ -15,7 +15,7 @@
 // ===========================================================================
 
 import type { CoreConfig, WahaInboundMessage } from "./types.js";
-import type { RuntimeEnv } from "openclaw/plugin-sdk/runtime";
+import type { RuntimeEnv } from "./platform-types.js";
 import type { resolveWahaAccount } from "./accounts.js";
 import { createLogger } from "./logger.js";
 

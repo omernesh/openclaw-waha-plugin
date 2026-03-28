@@ -30,16 +30,33 @@ beforeEach(() => {
 
 describe("config-io", () => {
   describe("getConfigPath", () => {
-    it("returns default path when no env var set", () => {
+    it("returns default path when no env var set (Phase 58 CORE-02: ~/.chatlytics/config.json)", () => {
+      delete process.env.CHATLYTICS_CONFIG_PATH;
       delete process.env.OPENCLAW_CONFIG_PATH;
       const p = getConfigPath();
-      expect(p).toContain(".openclaw");
-      expect(p).toContain("openclaw.json");
+      expect(p).toContain(".chatlytics");
+      expect(p).toContain("config.json");
     });
 
-    it("respects OPENCLAW_CONFIG_PATH env var", () => {
+    it("respects CHATLYTICS_CONFIG_PATH env var (Phase 58 CORE-02: primary)", () => {
+      process.env.CHATLYTICS_CONFIG_PATH = "/standalone/config.json";
+      delete process.env.OPENCLAW_CONFIG_PATH;
+      expect(getConfigPath()).toBe("/standalone/config.json");
+      delete process.env.CHATLYTICS_CONFIG_PATH;
+    });
+
+    it("respects OPENCLAW_CONFIG_PATH env var (backward compat)", () => {
+      delete process.env.CHATLYTICS_CONFIG_PATH;
       process.env.OPENCLAW_CONFIG_PATH = "/custom/config.json";
       expect(getConfigPath()).toBe("/custom/config.json");
+      delete process.env.OPENCLAW_CONFIG_PATH;
+    });
+
+    it("CHATLYTICS_CONFIG_PATH takes priority over OPENCLAW_CONFIG_PATH", () => {
+      process.env.CHATLYTICS_CONFIG_PATH = "/standalone/config.json";
+      process.env.OPENCLAW_CONFIG_PATH = "/legacy/config.json";
+      expect(getConfigPath()).toBe("/standalone/config.json");
+      delete process.env.CHATLYTICS_CONFIG_PATH;
       delete process.env.OPENCLAW_CONFIG_PATH;
     });
   });

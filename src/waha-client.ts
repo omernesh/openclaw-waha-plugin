@@ -13,7 +13,7 @@
 // ║  Import only from http-client.ts and accounts.ts.                  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
-import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
+import { DEFAULT_ACCOUNT_ID } from "./account-utils.js";
 import { callWahaApi, type CallWahaApiParams } from "./http-client.js";
 import { resolveWahaAccount, type ResolvedWahaAccount } from "./accounts.js";
 import type { CoreConfig } from "./types.js";
