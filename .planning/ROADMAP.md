@@ -172,7 +172,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 61-01-PLAN.md — Forwarder module with HMAC signing, retry, circuit breaker + config schema (HOOK-01, HOOK-02, HOOK-03, HOOK-04)
-- [ ] 61-02-PLAN.md — Wire into monitor.ts inbound path + admin subscription routes (HOOK-01, HOOK-04)
+- [x] 61-02-PLAN.md — Wire into monitor.ts inbound path + admin subscription routes (HOOK-01, HOOK-04)
 
 ### Phase 62: MCP Server
 **Goal**: Any MCP-compatible AI agent (Claude, Cursor, etc.) can connect to Chatlytics and send/receive WhatsApp messages using 8-10 consolidated tools
