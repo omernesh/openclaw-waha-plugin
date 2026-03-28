@@ -59,7 +59,7 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 - [x] **TENANT-01**: Per-workspace process isolation (crash containment)
 - [x] **TENANT-02**: Per-workspace SQLite databases (directory, mimicry, analytics)
 - [x] **TENANT-03**: Per-workspace WAHA session namespacing (ctl_{workspaceId}_{sessionName})
-- [ ] **TENANT-04**: API gateway routes by API key to workspace process
+- [x] **TENANT-04**: API gateway routes by API key to workspace process
 
 ### Admin & Distribution
 
@@ -147,7 +147,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TENANT-01 | Phase 64 | Complete |
 | TENANT-02 | Phase 64 | Complete |
 | TENANT-03 | Phase 64 | Complete |
-| TENANT-04 | Phase 64 | Pending |
+| TENANT-04 | Phase 64 | Complete |
 | ADMIN-01 | Phase 65 | Pending |
 | ADMIN-02 | Phase 65 | Pending |
 | SKILL-01 | Phase 65 | Pending |

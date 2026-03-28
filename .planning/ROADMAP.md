@@ -107,7 +107,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [ ] **Phase 61: Webhook Forwarding** — HMAC-signed inbound delivery to callback URLs, exponential backoff, circuit breaker
 - [ ] **Phase 62: MCP Server** — 8-10 consolidated tools via StreamableHTTPServerTransport + stdio mode for npx chatlytics-mcp
 - [x] **Phase 63: Dashboard Auth + Onboarding** — better-auth registration, workspace creation, QR pairing, API key UI (v2.1) (completed 2026-03-28)
-- [ ] **Phase 64: Multi-Tenant Process Isolation** — per-workspace process, SQLite DBs, WAHA session namespacing, API gateway routing (v2.1)
+- [x] **Phase 64: Multi-Tenant Process Isolation** — per-workspace process, SQLite DBs, WAHA session namespacing, API gateway routing (v2.1) (completed 2026-03-28)
 - [ ] **Phase 65: Admin Standalone + Distribution** — standalone admin auth, workspace management, SKILL.md v4, landing page + docs site (v2.1)
 - [ ] **Phase 66: OpenClaw Thin Wrapper** — refactor channel.ts to HTTP client delegating to Chatlytics API (gated: 30-day production stability)
 
@@ -218,7 +218,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
-- [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
+- [x] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 
 ### Phase 65: Admin Standalone + Distribution
 **Goal**: The admin panel has its own authentication independent of OpenClaw, operators can manage multiple workspaces, and integration materials are publicly available
@@ -232,7 +232,7 @@ Plans:
   5. The documentation site has interactive API examples and copy-paste MCP config snippets
 **Plans**: 2 plans
 Plans:
-- [ ] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
+- [x] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
 - [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 **UI hint**: yes
 
@@ -265,6 +265,6 @@ Plans:
 | 61. Webhook Forwarding | v2.0 | 1/2 | In Progress|  |
 | 62. MCP Server | v2.0 | 1/2 | In Progress|  |
 | 63. Dashboard Auth + Onboarding | v2.1 | 3/3 | Complete   | 2026-03-28 |
-| 64. Multi-Tenant Process Isolation | v2.1 | 1/2 | In Progress|  |
+| 64. Multi-Tenant Process Isolation | v2.1 | 2/2 | Complete   | 2026-03-28 |
 | 65. Admin Standalone + Distribution | v2.1 | 0/? | Not started | - |
 | 66. OpenClaw Thin Wrapper | v2.1 | 0/? | Not started | - |
