@@ -33,10 +33,10 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 
 ### CLI Tool
 
-- [ ] **CLI-01**: `npx chatlytics` CLI with subcommands for core actions (send, read, search, groups, contacts, status)
-- [ ] **CLI-02**: CLI reads API key from CHATLYTICS_API_KEY env var or --api-key flag
-- [ ] **CLI-03**: CLI reads server URL from CHATLYTICS_URL env var or --url flag (default http://localhost:8050)
-- [ ] **CLI-04**: Human-friendly output with color and tables, plus --json flag for machine-readable output
+- [x] **CLI-01**: `npx chatlytics` CLI with subcommands for core actions (send, read, search, groups, contacts, status)
+- [x] **CLI-02**: CLI reads API key from CHATLYTICS_API_KEY env var or --api-key flag
+- [x] **CLI-03**: CLI reads server URL from CHATLYTICS_URL env var or --url flag (default http://localhost:8050)
+- [x] **CLI-04**: Human-friendly output with color and tables, plus --json flag for machine-readable output
 
 ### Webhook Forwarding
 
@@ -125,10 +125,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | API-02 | Phase 60 | Complete |
 | API-03 | Phase 60 | Complete |
 | API-04 | Phase 60 | Complete |
-| CLI-01 | Phase 60 | Pending |
-| CLI-02 | Phase 60 | Pending |
-| CLI-03 | Phase 60 | Pending |
-| CLI-04 | Phase 60 | Pending |
+| CLI-01 | Phase 60 | Complete |
+| CLI-02 | Phase 60 | Complete |
+| CLI-03 | Phase 60 | Complete |
+| CLI-04 | Phase 60 | Complete |
 | HOOK-01 | Phase 61 | Pending |
 | HOOK-02 | Phase 61 | Pending |
 | HOOK-03 | Phase 61 | Pending |
