@@ -186,6 +186,11 @@ export function getMaturityPhase(firstSendAt: number | null, now: number = Date.
   return "stable";
 }
 
+// sendGate and hourlyCap fields are intentionally NOT in the Zod config schema
+// (config-schema.ts) to avoid OpenClaw gateway AJV validation errors. These functions
+// read them from the raw config object with ?? fallback defaults. DO NOT add these
+// fields back to WahaAccountSchemaBase.
+
 export function resolveGateConfig(
   session: string | undefined,
   cfg: { sendGate?: Partial<ResolvedGateConfig>; accounts?: Record<string, { sendGate?: Partial<ResolvedGateConfig> }> },
