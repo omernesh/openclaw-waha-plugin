@@ -187,7 +187,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 62-01-PLAN.md � MCP server factory with 10 tools + 5 resources (MCP-01, MCP-04, MCP-05)
-- [ ] 62-02-PLAN.md � HTTP transport wiring + stdio entry point (MCP-02, MCP-03)
+- [x] 62-02-PLAN.md � HTTP transport wiring + stdio entry point (MCP-02, MCP-03)
 
 ### Phase 63: Dashboard Auth + Onboarding
 **Goal**: A new user can sign up, connect a WhatsApp number via QR code, and get an API key or MCP config — entirely self-service with no manual server config

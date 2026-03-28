@@ -26,8 +26,8 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 ### MCP Server
 
 - [x] **MCP-01**: 8-10 consolidated MCP tools (send_message, send_media, read_messages, search, get_directory, manage_group, get_status, update_settings, send_poll, send_reaction)
-- [ ] **MCP-02**: Streamable HTTP transport on /mcp path (not deprecated SSE)
-- [ ] **MCP-03**: stdio transport mode for npx chatlytics-mcp local installs
+- [x] **MCP-02**: Streamable HTTP transport on /mcp path (not deprecated SSE)
+- [x] **MCP-03**: stdio transport mode for npx chatlytics-mcp local installs
 - [x] **MCP-04**: MCP resources for contacts, groups, sessions, config, mimicry status
 - [x] **MCP-05**: Actionable error messages with recovery hints in tool responses
 
@@ -134,8 +134,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOOK-03 | Phase 61 | Complete |
 | HOOK-04 | Phase 61 | Complete |
 | MCP-01 | Phase 62 | Complete |
-| MCP-02 | Phase 62 | Pending |
-| MCP-03 | Phase 62 | Pending |
+| MCP-02 | Phase 62 | Complete |
+| MCP-03 | Phase 62 | Complete |
 | MCP-04 | Phase 62 | Complete |
 | MCP-05 | Phase 62 | Complete |
 | AUTH-01 | Phase 63 | Pending |
