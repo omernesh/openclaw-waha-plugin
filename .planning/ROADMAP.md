@@ -103,7 +103,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 - [ ] **Phase 58: SDK Decoupling** — Remove all openclaw/plugin-sdk imports outside channel.ts; new platform-types.ts, account-utils.ts, request-utils.ts
 - [ ] **Phase 59: Standalone Entry + Docker** — standalone.ts boots HTTP server, registers WAHA webhook; Dockerfile + Docker Compose with named volume
-- [ ] **Phase 60: Public REST API + OpenAPI** — /api/v1/ route groups, API key auth, openapi.yaml, Spectral CI lint, Swagger UI
+- [ ] **Phase 60: Public REST API + OpenAPI + CLI** — /api/v1/ route groups, API key auth, openapi.yaml, Spectral CI lint, Swagger UI, `npx chatlytics` CLI tool
 - [ ] **Phase 61: Webhook Forwarding** — HMAC-signed inbound delivery to callback URLs, exponential backoff, circuit breaker
 - [ ] **Phase 62: MCP Server** — 8-10 consolidated tools via StreamableHTTPServerTransport + stdio mode for npx chatlytics-mcp
 - [ ] **Phase 63: Dashboard Auth + Onboarding** — better-auth registration, workspace creation, QR pairing, API key UI (v2.1)
@@ -138,16 +138,19 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 60: Public REST API + OpenAPI
-**Goal**: External callers can send WhatsApp messages, read messages, search contacts, and query sessions via authenticated REST endpoints with a machine-readable spec
+### Phase 60: Public REST API + OpenAPI + CLI
+**Goal**: External callers can send WhatsApp messages, read messages, search contacts, and query sessions via authenticated REST endpoints, a machine-readable spec, and a CLI tool
 **Depends on**: Phase 59
-**Requirements**: API-01, API-02, API-03, API-04
+**Requirements**: API-01, API-02, API-03, API-04, CLI-01, CLI-02, CLI-03, CLI-04
 **Success Criteria** (what must be TRUE):
   1. `curl -H "Authorization: Bearer ctl_xxx" http://localhost:PORT/api/v1/send` sends a WhatsApp message and returns the WAHA message ID
   2. A request with a wrong or missing API key receives HTTP 401 — timing-safe comparison is used (no timing leak)
   3. `GET /openapi.yaml` returns a valid OpenAPI 3.1 document and `spectral lint` passes with zero errors in CI
   4. `GET /docs` renders a Swagger UI with all /api/v1/ endpoints listed and interactive
   5. Cross-origin requests from the admin panel dashboard succeed (CORS headers present)
+  6. `npx chatlytics send "hello" --to "John"` sends a WhatsApp message via the REST API and prints the result
+  7. `npx chatlytics search "marketing"` returns matching contacts/groups with colored table output
+  8. `npx chatlytics --json status` returns machine-readable JSON for scripting
 **Plans**: TBD
 
 ### Phase 61: Webhook Forwarding
