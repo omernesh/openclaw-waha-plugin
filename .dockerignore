@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.git/
+.planning/
+.claude/
+.firecrawl/
+.playwright-cli/
+.playwright-mcp/
+src/**/*.bak.*
+*.bak.*
+*.png
+*.yaml
+!docker-compose.yml
+docs/extra phase/

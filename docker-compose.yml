@@ -1,0 +1,35 @@
+# Phase 59-02 (CORE-04, CORE-06): Chatlytics standalone server Docker Compose definition.
+#
+# Usage:
+#   cp config-example.json config.json   # fill in your WAHA credentials
+#   docker compose up -d
+#   curl http://localhost:8050/health
+#
+# Port: CHATLYTICS_PORT env var on host overrides the default 8050.
+# Config: bind-mounted read-only from ./config.json (must exist before first start).
+# Data: chatlytics-data named volume persists SQLite databases across container restarts.
+#
+# DO NOT CHANGE volume name chatlytics-data without migrating existing data.
+# DO NOT REMOVE restart: unless-stopped — required for production resilience.
+
+services:
+  chatlytics:
+    build: .
+    ports:
+      - "${CHATLYTICS_PORT:-8050}:8050"
+    environment:
+      - CHATLYTICS_CONFIG_PATH=/config/config.json
+      - CHATLYTICS_DATA_DIR=/data
+    volumes:
+      # Config bind-mounted read-only from host — create from config-example.json.
+      # DO NOT CHANGE mount path /config/config.json — matches CHATLYTICS_CONFIG_PATH above.
+      - ./config.json:/config/config.json:ro
+      # Named volume for SQLite persistence across container restarts.
+      # DO NOT CHANGE volume name — chatlytics-data is the canonical data volume.
+      - chatlytics-data:/data
+    restart: unless-stopped
+
+volumes:
+  # Named volume for persistent SQLite databases (directory, analytics, mimicry counters).
+  # Remove with `docker compose down -v` to wipe all data.
+  chatlytics-data:
