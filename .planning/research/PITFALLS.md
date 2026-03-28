@@ -1,207 +1,193 @@
 # Pitfalls Research
 
-**Domain:** Adding human mimicry features (time-of-day gates, hourly caps, Claude Code integration) to existing brittle WhatsApp plugin
-**Researched:** 2026-03-26
-**Confidence:** HIGH (codebase analysis, established patterns, specific integration points verified)
+**Domain:** Plugin-to-SaaS extraction — WhatsApp automation platform (Chatlytics v2.0)
+**Researched:** 2026-03-28
+**Confidence:** HIGH (based on direct codebase analysis + verified external sources)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Hourly Cap Fights the Existing Token Bucket
+### Pitfall 1: Decoupling inbound.ts from OpenClaw SDK — the hardest cut
 
 **What goes wrong:**
-The existing `TokenBucket` in `http-client.ts` is a per-second throughput limiter (20-burst, 15 tokens/sec). A new hourly cap is a per-hour count limiter. If you place the hourly check AFTER the token bucket `acquire()`, a burst of 30 messages can exhaust the hourly cap in 2 seconds while the token bucket happily allows it. If you place it BEFORE, you block the token bucket queue drain, causing silent hung requests (promises that never resolve because `release()` was never called).
+`inbound.ts` imports 8+ symbols directly from `openclaw/plugin-sdk/*`:
+`resolveDefaultGroupPolicy`, `createNormalizedOutboundDeliverer`, `resolveAllowlistProviderRuntimeGroupPolicy`,
+`resolveOutboundMediaUrls`, `readStoreAllowFromForDmPolicy`, `resolveDmGroupAccessWithCommandGate`, `logInboundDrop`.
+
+These are not thin type aliases — they implement real business logic (group policy resolution, DM access rules, reply formatting, media URL resolution). If you cut the import without replacing the logic, inbound message processing silently drops to unsafe defaults or throws at runtime.
 
 **Why it happens:**
-Two independent rate-limiting layers with different time windows. Developers assume they compose cleanly, but the token bucket drains an async queue — if you gate on hourly cap inside `acquire()`, you stall the drainer. If you gate outside, you can't block in-flight token bucket requests.
+The decoupling PR focuses on "remove the import" and forgets that each SDK symbol contains logic that must be re-implemented or the behavior changes. Developers assume the function names are descriptive enough to recreate — they often aren't.
 
 **How to avoid:**
-Keep the hourly cap as a hard check at the `sendWahaText` / `callWahaApi` entry point, BEFORE the token bucket acquires. Throw an error rather than queuing. The token bucket is for burst shaping, not for deferring sends across hours. A rejected send should surface to the caller with a meaningful error ("hourly cap reached, try again at HH:MM") rather than silently hanging. Never await on the hourly cap — check and throw or pass.
+Before removing any SDK import from `inbound.ts`, audit what the function actually does in the SDK source at `/usr/lib/node_modules/openclaw/dist/`. Implement local equivalents that match behavior exactly. Test against the existing plugin's test suite (594 tests) before considering any SDK cut "done." Treat each SDK symbol as a potential behavior contract, not just a dependency.
 
 **Warning signs:**
-- Send requests that hang for >30 seconds when hourly cap is nearly full
-- Token bucket queue depth climbing with no corresponding outbound traffic
-- `acquire()` never logging "queue full" even though hourly cap is exceeded
+- Tests pass but live WhatsApp messages stop triggering agent responses
+- Group messages marked as allowed suddenly start getting dropped
+- DM filter logs show `resolveDefaultGroupPolicy` returning different values in standalone vs plugin mode
 
-**Phase to address:**
-Phase: Time-of-Day Gates & Hourly Caps (core implementation phase)
+**Phase to address:** Phase 1 (Core Extraction) — must be resolved before standalone.ts can boot correctly
 
 ---
 
-### Pitfall 2: Message Loss on Restart When Queuing Gated Sends
+### Pitfall 2: monitor.ts still imports from OpenClaw SDK after "extraction"
 
 **What goes wrong:**
-If the time-of-day gate queues blocked messages in memory (e.g., "send this at 7am"), a gateway restart wipes the queue. The agent doesn't know the message was never sent. Duplicate send on retry is worse than loss — double-messages to real humans are visually jarring.
+`monitor.ts` imports `readRequestBodyWithLimit`, `isRequestBodyLimitError`, `requestBodyErrorToText`, `DEFAULT_ACCOUNT_ID`, `isWhatsAppGroupJid` from `openclaw/plugin-sdk/*` and also `createLoggerBackedRuntime` from `openclaw/plugin-sdk/runtime`.
+
+If the standalone entry point loads monitor.ts before these are replaced, Node.js throws a module-not-found error at startup — not at the first API call. The container boots, logs a startup error, and silently dies. With Docker health checks looking at HTTP responses, the container may appear healthy (health check not yet reached) while being completely non-functional.
 
 **Why it happens:**
-The plugin has no persisted outbound queue. The inbound queue (`inbound-queue.ts`) is in-memory and explicitly documented as acceptable to lose on restart (webhook flood protection only). Applying the same in-memory approach to outbound queuing is wrong because the semantics differ — inbound drops are acceptable, outbound drops are silent message loss.
+Developers iterate on `standalone.ts` first and only discover monitor.ts SDK coupling when they try to boot the container end-to-end.
 
 **How to avoid:**
-Do NOT queue rejected messages across restarts. Choose one of two strategies:
-1. **Reject, don't queue**: When a send is gated (wrong time window or hourly cap), throw synchronously. The gateway will retry, which is correct — it's designed for transient failures. This is the simpler and safer approach for v1.20.
-2. **Persist queue in SQLite**: Only if deferred delivery is required. Use the existing `analytics.ts` SQLite infrastructure. Add a `send_queue` table. Re-drain on startup. This is complex and not needed for the initial feature.
-
-The `MutationDedup` class in `http-client.ts` already prevents gateway retry double-sends within a 60s TTL — lean on this rather than building a queue.
+Run `grep -r "openclaw/plugin-sdk" src/` before declaring "decoupled." The full list of affected files is: `channel.ts`, `inbound.ts`, `config-schema.ts`, `accounts.ts`, `monitor.ts`, `normalize.ts`. Create local implementations with identical function signatures. Keep original files untouched — the OpenClaw plugin must continue to work.
 
 **Warning signs:**
-- `setTimeout` used to hold a send until the gate opens
-- Any in-memory array that accumulates pending outbound sends
-- No SQLite persistence for queued sends but restart recovery is implied
+- `Cannot find module 'openclaw/plugin-sdk/webhook-ingress'` in container logs
+- Health endpoint responds but admin panel routes 500
 
-**Phase to address:**
-Phase: Time-of-Day Gates & Hourly Caps (core implementation phase) — establish reject-don't-queue as the contract
+**Phase to address:** Phase 1 (Core Extraction)
 
 ---
 
-### Pitfall 3: Timezone Hell in Time-of-Day Gate
+### Pitfall 3: MCP SSE transport is deprecated — building on a dead spec
 
 **What goes wrong:**
-The server (hpg6) runs UTC. `new Date().getHours()` returns UTC hours. A 7am-1am gate configured in Israel Standard Time (UTC+3) will fire 3 hours late — gate opens at 10:00 UTC instead of 07:00 UTC, closes at 04:00 UTC instead of 01:00 UTC. Cross-midnight windows (`7am-1am` spans two calendar days) require modular arithmetic that naive `startHour <= currentHour <= endHour` breaks entirely.
+The PRD specifies "SSE transport for remote (cloud deployment)." The MCP specification was updated on 2025-03-26 to deprecate standalone SSE transport. The TypeScript SDK version 1.10.0+ (April 2025) uses Streamable HTTP as the primary remote transport. Building the MCP server on the legacy SSE transport means it will not connect to current Claude Code builds, requires two endpoints (GET `/sse` + POST `/messages`), and breaks under load balancers (requires sticky sessions).
 
 **Why it happens:**
-Node.js `Date` has no timezone awareness without an explicit IANA timezone string and `Intl.DateTimeFormat`. Developers use `getHours()` assuming local time, but Node on a Linux server is almost always UTC.
+The PRD was written before the spec change. The old SSE pattern is heavily documented in older tutorials and still appears to "work" in local testing with pinned SDK versions.
 
 **How to avoid:**
-- Store `timezone` in config alongside `sendWindowStart`/`sendWindowEnd` (e.g., `timezone: "Asia/Jerusalem"`).
-- Use `Intl.DateTimeFormat` with `timeZone` to extract the local hour: `new Intl.DateTimeFormat('en', { timeZone, hour: 'numeric', hour12: false }).format(now)`.
-- Handle the cross-midnight case explicitly: if `startHour > endHour` (e.g., `7 > 1` is false, but `22 > 6` is true), the window wraps midnight. Check: `currentHour >= startHour || currentHour < endHour`.
-- Default timezone to `"Asia/Jerusalem"` (the primary user's timezone) — not UTC, not server local.
-- Test with hours 0, 1, 6, 7, 13, 22, 23 in the configured timezone.
+Use Streamable HTTP transport (single POST endpoint `/mcp`, can optionally upgrade to SSE stream per-request). The `@modelcontextprotocol/sdk` npm package supports both — use `StreamableHTTPServerTransport` from `@modelcontextprotocol/sdk/server/streamableHttp.js`. Keep the legacy SSE endpoint as a fallback for older clients, but make Streamable HTTP the primary path.
 
 **Warning signs:**
-- `new Date().getHours()` anywhere in the gate logic without a timezone conversion
-- Config that stores only `startHour` and `endHour` with no `timezone` field
-- End-to-end tests running correctly on a developer machine (Windows local time) but failing on hpg6 (UTC)
+- Claude Code (latest) fails to connect to the MCP server
+- Error: `SSE endpoint deprecated` in MCP client logs
+- Works locally with pinned SDK but fails in production
 
-**Phase to address:**
-Phase: Time-of-Day Gates & Hourly Caps (core implementation phase)
+**Phase to address:** Phase 3 (MCP Server)
 
 ---
 
-### Pitfall 4: Config Schema Breaks Zod Validation on Existing Configs
+### Pitfall 4: SQLite WAL mode corruption on Docker volume mounts
 
 **What goes wrong:**
-`validateWahaConfig` in `config-schema.ts` uses `WahaConfigSchema` which ends with `.strict()`. Adding new fields to `WahaAccountSchemaBase` adds them to the strict schema. If the existing `openclaw.json` on hpg6 has fields from OTHER subsystems (it does — see the strip-unknown-keys comment in `validateWahaConfig`), the strip logic in `validateWahaConfig` already handles this. However, if new fields are added with default values but the schema runs in strict mode on the raw config object from disk, the strip happens BEFORE validation, so new fields with defaults will resolve correctly. The real risk is if new fields are optional but the Zod type infers them as `required` due to a missing `.optional()` — causing every config save from the admin panel to fail validation until the new keys are present.
+The existing codebase uses SQLite WAL mode (enabled in `directory.ts` and `mimicry-gate.ts`) which creates `.wal` and `.shm` sidecar files. When the SQLite file lives on a Docker named volume mounted over a network filesystem (NFS, certain cloud storage backends), WAL mode corrupts the database. The container reports startup success, the admin panel loads, but write operations silently fail or return `SQLITE_IOERR`.
 
 **Why it happens:**
-`WahaAccountSchemaBase` uses `.strict()` which rejects unknown keys. The `validateWahaConfig` function strips unknown keys before validating, but this only helps for keys unknown to the schema, not for new required keys missing from existing configs. A new field added as `z.number().min(0)` without `.optional().default(X)` will cause all existing configs to fail validation immediately after deploy.
+WAL mode requires OS-level file locking primitives that don't work correctly over networked filesystems. Local volumes on the same Docker host are fine. The problem only surfaces in cloud deployments (ECS, Fly.io, Railway) where volumes are not local block storage.
 
 **How to avoid:**
-Every new config field MUST use `.optional().default(value)`. Never add a required field to `WahaAccountSchemaBase`. Test by running `validateWahaConfig` against the current production config JSON (copy from hpg6) before deploying. Add the new field names to the `knownKeys` set in `validateWahaConfig` so they aren't stripped.
+In the Dockerfile, document that the data volume MUST be backed by local block storage (not EFS, not GCS FUSE). Add a startup check that writes a test row and reads it back — fail fast if WAL is broken. Use a local named volume in Docker Compose. For cloud deployments, document using Fly.io volumes (local NVMe) or EBS, not shared filesystems.
 
 **Warning signs:**
-- New config field in schema without `.optional()`
-- Admin panel config save returning 400 after deploy
-- Gateway logs showing `validation_failed` immediately on startup
+- `SQLITE_IOERR_SHORT_READ` in container logs
+- `.shm` file missing after container restarts
+- Admin panel directory tab loads empty despite data existing before restart
 
-**Phase to address:**
-Phase: Config Schema Extension (any phase that adds new config keys)
+**Phase to address:** Phase 1 (Core Extraction — Dockerfile design)
 
 ---
 
-### Pitfall 5: Claude Code Skill Bypasses the Entire Plugin
+### Pitfall 5: Multi-tenant SQLite file leakage via path traversal in workspaceId
 
 **What goes wrong:**
-The `whatsapp-messenger` Claude Code skill calls the WAHA API directly via `curl` or HTTP (it calls `sendText` endpoint directly on `http://127.0.0.1:3004`). It does NOT go through `sendWahaText` in the plugin, does NOT go through `callWahaApi`, does NOT hit the token bucket or any plugin-level rate limiter. This is explicitly documented in the milestone context. Adding hourly caps to the plugin does nothing to limit Claude Code sends. If Claude Code sends 200 messages via the skill in an hour and the plugin caps the agent at 30, Meta sees 230 messages from the session — cap is meaningless.
+If workspace IDs are user-supplied and used directly in file paths like `~/.chatlytics/workspaces/{workspaceId}/directory.db`, a malicious workspace ID of `../../admin` or `../other-tenant` allows reading or writing another tenant's database.
 
 **Why it happens:**
-The Claude Code skill was designed for direct API access for simplicity (no gateway). It predates the mimicry system. There is no intercept point at the WAHA API level.
+Path construction looks like `path.join(baseDir, workspaceId, 'directory.db')` — which `path.join` sanitizes partially but does NOT prevent `../` traversal if `workspaceId` contains them.
 
 **How to avoid:**
-The only integration path is: (a) make the Claude Code skill call a new plugin HTTP endpoint (e.g., `POST /api/admin/send` that enforces all mimicry logic), or (b) add a WAHA-level proxy layer (complex, fragile). Option (a) is the correct approach. The admin panel server in `monitor.ts` already runs an HTTP server on port 8050 — add a `POST /api/admin/proxy-send` route that runs through time gate + hourly cap + token bucket + typing delay before calling WAHA. Update the `whatsapp-messenger` skill to hit this endpoint instead of WAHA directly. This is the entire "Claude Code mimicry integration" phase.
+Always generate workspace IDs as UUIDs internally (never accept them from user input for path construction). Validate with `/^[a-z0-9-]{36}$/` before constructing any file path. Use `path.resolve()` and verify the resolved path starts with the expected base directory — reject if not. This is a single 3-line check that prevents a critical multi-tenant isolation breach.
 
 **Warning signs:**
-- Hourly cap implemented in plugin but Claude Code sends not counted in the same bucket
-- `whatsapp-messenger` skill still contains direct `curl http://127.0.0.1:3004/api/sendText` calls
-- No new route added to `monitor.ts`
+- Workspace IDs accepted from user-facing registration forms without validation
+- `path.join(baseDir, req.body.workspaceId, ...)` pattern anywhere in onboarding code
 
-**Phase to address:**
-Phase: Claude Code Mimicry Integration (dedicated phase, after time gate + cap are working)
+**Phase to address:** Phase 6 (Multi-Tenant) — but the validation pattern must be established in Phase 1 so it is never accidentally skipped
 
 ---
 
-### Pitfall 6: Progressive Limits State Not Persisting Across Restarts
+### Pitfall 6: OpenClaw plugin regression from "thin wrapper" refactor
 
 **What goes wrong:**
-Progressive limits track "account maturity" — a new account gets 10 msgs/hour, after 30 days gets 30, after 90 days gets 50. If this maturity state is stored in memory, every gateway restart resets it. The account appears "new" again. Worse, if the maturity calculation uses the plugin startup timestamp as "account age start", the account never matures because restarts keep resetting the clock.
+The PRD's Phase 7 goal is to refactor the OpenClaw plugin as a "thin wrapper that delegates to Chatlytics API." This is the highest-regression-risk operation in the entire roadmap. The current plugin has 50+ phases of battle-tested logic, 594 passing tests, and DO NOT CHANGE markers throughout. A thin wrapper that calls the HTTP API introduces: network latency on every action, error serialization differences (WAHA API errors vs HTTP errors), and loss of in-process optimizations like the 30s TTL cache for name resolution.
 
 **Why it happens:**
-In-memory state is the default pattern in this codebase (the inbound queue, SSE clients, rate limiter state). It works for ephemeral state but not for maturity tracking.
+The "thin wrapper" pattern seems clean architecturally. But the OpenClaw gateway's `handleAction()` is called synchronously, and the current plugin can resolve a target and call WAHA in <50ms in-process. Adding an HTTP round-trip to the wrapper makes every action take 100-300ms minimum, which the gateway may timeout on complex actions.
 
 **How to avoid:**
-Store the "account first seen" timestamp in the existing SQLite database (either `DirectoryDb` or `AnalyticsDb`). A single `account_metadata` table with `(session_id TEXT PRIMARY KEY, first_seen_at INTEGER, message_count_total INTEGER)` is sufficient. Do not recalculate maturity from restart time — read it from SQLite on startup. The hourly message count should be stored as a rolling window in SQLite with a timestamp, not as an in-memory counter, so restarts don't lose count accuracy.
+Do NOT refactor the OpenClaw plugin to thin-wrapper until the Chatlytics API has proven itself in production for at least 30 days. Keep the plugin as-is (running its own embedded logic) as the primary deployment. Mark Phase 7 "thin wrapper" explicitly as "optional, post-stability." The plugin's existing test suite (594 tests) is the regression guard: if any test fails after the wrapper refactor, stop.
 
 **Warning signs:**
-- Maturity stage stored as a module-level variable initialized at startup
-- `Date.now() - pluginStartTime` used anywhere in maturity calculation
-- No SQLite migration adding maturity state tables
+- Action response times increase from <100ms to >300ms after wrapper refactor
+- `does not accept a target` errors reappear (target resolution moved to HTTP layer, gateway timing differs)
+- Tests pass but live agent stops responding to group messages
 
-**Phase to address:**
-Phase: Hourly Caps & Progressive Limits (core implementation phase)
+**Phase to address:** Phase 7 (Distribution) — explicitly blocked until Phase 2-4 prove Chatlytics API stability
 
 ---
 
-### Pitfall 7: Hourly Count Reset at Wrong Boundary
+### Pitfall 7: Webhook forwarding retry storms on slow consumer endpoints
 
 **What goes wrong:**
-"Hourly cap" is ambiguous: does it reset at the top of the clock hour (00:00, 01:00, 02:00) or is it a rolling 60-minute window? If it resets at the top of the hour, the agent can send 30 messages at 12:59 and 30 more at 13:00 — 60 in 2 minutes, which looks automated. If it's a rolling window, implementation is more complex but more accurate to human behavior.
+The webhook forwarder retries failed deliveries with exponential backoff. If a consumer's endpoint is slow (responds in 8s+) rather than down, the retry queue fills with "in-flight" requests that haven't timed out yet. Each new inbound WhatsApp message adds another delivery attempt. At 100 messages/hour to a slow consumer, the queue grows unboundedly and memory usage climbs until the process crashes.
 
 **Why it happens:**
-"Hourly cap" defaults to "reset at top of hour" in naive implementations because `Math.floor(Date.now() / 3_600_000)` gives a bucket key. Rolling windows require storing timestamps.
+Retry logic was designed for "endpoint is down" (connection refused, 5xx). Slow endpoints that eventually return 200 exhaust the timeout budget, causing the next retry to start before the previous one completes.
 
 **How to avoid:**
-Use a rolling 60-minute window. Store each outbound message's timestamp in a SQLite table. Count of rows where `sent_at > (now - 3_600_000)` is the current hourly usage. This is accurate and restart-safe. The query is fast on a small table (max ~50 rows if cap is enforced). Prune rows older than 2 hours periodically to keep the table bounded.
+Per-tenant bounded delivery queue (max 500 items). Per-endpoint circuit breaker: after 5 consecutive timeouts, mark the endpoint as "degraded" and stop retrying until a health check succeeds. Delivery timeout of 10s (AbortController) — distinct from the retry schedule. Log delivery failures prominently in the admin panel so operators can see endpoint health.
 
 **Warning signs:**
-- Hourly bucket counter reset with `setInterval` at 60-minute boundaries
-- Counter stored as a single integer in memory
-- No per-timestamp record of outbound sends
+- Memory climbing steadily after a consumer endpoint slows down
+- Delivery queue depth growing in metrics
+- Process restart resolves the issue (confirms unbounded queue)
 
-**Phase to address:**
-Phase: Hourly Caps & Progressive Limits
+**Phase to address:** Phase 4 (Webhook Forwarding)
 
 ---
 
-### Pitfall 8: Testing Time-Based Logic Is Broken Without Dependency Injection
+### Pitfall 8: QR code session pairing race — two tenants claim the same WAHA session
 
 **What goes wrong:**
-`sendWahaText` calls `Date.now()` directly. Time gate checks call `new Date().getHours()`. Tests that run in CI run at a fixed moment in real time — if the gate is configured for 7am-1am and tests run at 2am UTC on a CI server, all gated send tests fail. You can't mock `Date.now()` in vitest without either global mocking (which leaks between tests) or dependency injection.
+In a shared WAHA instance (one WAHA for all tenants), provisioning a new session for a tenant involves: (1) call WAHA to create session, (2) poll for QR code, (3) display QR in dashboard. If two tenants are onboarding simultaneously and the session name derivation has a collision, WAHA creates one session and the second request silently reuses it. Tenant B scans the QR and gets connected to Tenant A's session slot.
 
 **Why it happens:**
-Inline `Date.now()` calls are the path of least resistance. The existing codebase already does this throughout (`http-client.ts`, `dedup.ts`, `policy-cache.ts`). v1.20 adds time-sensitive logic that changes behavior based on the current clock — making the problem much more acute.
+WAHA session names are strings. If the name already exists, WAHA returns 200 and the existing session — it does not error. The tenant isolation model breaks silently.
 
 **How to avoid:**
-Extract a `now: () => number` parameter or a `clock: { now: () => number; getLocalHour: (tz: string) => number }` injectable. The gate enforcement function should accept `now` as a parameter with `Date.now()` as the default: `function isWithinSendWindow(config, now = Date.now()): boolean`. Tests pass a fixed timestamp. This is the pure-function extraction pattern already established in `mentions.ts` for testability. The hourly count query also needs a `now` parameter for the rolling window boundary calculation.
+Session names MUST be globally unique and include a collision-resistant component: `ctl_{workspaceId}_{randomSuffix}`. Verify after creation that the returned session name matches exactly what was requested. Store the WAHA session name in the workspace record and re-verify on every QR poll. Add a uniqueness constraint on session names in the workspace database.
 
 **Warning signs:**
-- Tests using `vi.useFakeTimers()` globally (leaks state across test files in vitest)
-- Gate logic test that always passes at the same real-world hour range
-- No `now` parameter on the gate or cap enforcement functions
+- Two users in onboarding see the same QR code
+- Session health shows correct but messages route to wrong workspace
+- WAHA `/sessions` list shows fewer sessions than expected workspace count
 
-**Phase to address:**
-Phase: Testing (dedicated test phase, but the injectable pattern must be built into the implementation phase)
+**Phase to address:** Phase 5 (Dashboard + Onboarding) / Phase 6 (Multi-Tenant)
 
 ---
 
-### Pitfall 9: Per-Session vs. Per-Account Cap Confusion
+### Pitfall 9: WAHA webhook self-registration skipped in standalone mode
 
 **What goes wrong:**
-The plugin has two WAHA sessions: `3cf11776_logan` (bot) and `3cf11776_omer` (human). Meta tracks ban risk per WhatsApp account (phone number), not per plugin session name. If the hourly cap is enforced per `accountId` (plugin concept) but Claude Code sends use `session` directly, the two caps are separate and the combined outbound volume can be double the safe limit.
+Currently, OpenClaw registers WAHA webhooks automatically when the plugin loads. In standalone mode, nothing does this. If `standalone.ts` doesn't call `POST /api/{session}/webhooks` on startup to register its own callback URL, no inbound messages are delivered — silently. The webhook server starts fine, health endpoint responds, but the platform never receives any WhatsApp events.
 
 **Why it happens:**
-The plugin's multi-account architecture separates `accountId` (plugin config key) from `session` (WAHA session name). Rate limiting was designed around `accountId`. Claude Code sends specify the WAHA `session` directly and bypass `accountId` routing entirely.
+The developer tests standalone.ts by sending outbound messages (which work immediately) and assumes inbound is also working. Inbound only breaks on the first real incoming message, which may not happen during a brief smoke test.
 
 **How to avoid:**
-The hourly cap must be keyed by the underlying WhatsApp phone number (or WAHA session name), not by `accountId`. When the Claude Code mimicry endpoint in `monitor.ts` receives a send request specifying session `3cf11776_omer`, it should use the same hourly cap bucket as the plugin's `omer` account. Use the WAHA session name as the cap key, not `accountId`. The session name is stable and unique per phone number.
+`standalone.ts` startup sequence must include: (1) start HTTP server, (2) register webhook URL with WAHA for each configured session, (3) verify registration by reading back `/api/{session}/webhooks`. Make this a hard startup step, not a background task. Log the registered webhook URL on startup. Add a `/api/v1/health` endpoint that includes `webhook_registered: true/false` in its response.
 
 **Warning signs:**
-- Hourly cap keyed by `accountId` without mapping to a WAHA session name
-- Separate cap buckets for Logan sends vs. Omer sends when they share a phone-level risk
-- Claude Code proxy route accepting a `session` parameter but looking up cap by `accountId`
+- Outbound send works, but inbound messages never appear in logs
+- WAHA webhook list is empty after container start
 
-**Phase to address:**
-Phase: Claude Code Mimicry Integration
+**Phase to address:** Phase 1 (Core Extraction)
 
 ---
 
@@ -209,11 +195,12 @@ Phase: Claude Code Mimicry Integration
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| In-memory hourly counter | Simple, no SQLite migration | Resets on restart, counts missed after crash | Never — maturity tracking requires persistence |
-| Top-of-hour bucket reset | Trivial implementation | Burst window exploit (2x cap at hour boundary) | Never — rolling window is only slightly more code |
-| Hard-code timezone to "Asia/Jerusalem" without config | Zero config complexity | Breaks for any user in different timezone | Only acceptable as a default, not as the sole behavior |
-| Gate sends at plugin level only, ignore Claude Code skill | Only one system to change | Cap is meaningless if Claude Code bypasses it | Never for v1.20 — both paths must be gated |
-| Throw generic "rate limited" on cap exceeded | Simple error path | Agent retries immediately, hammers cap check | Never — include "retry after" timestamp in error |
+| Hand-written OpenAPI YAML only, no validation in CI | Faster initial spec creation | Spec drifts from implementation within 2 weeks of first bug fix | Never — add `spectral lint` to CI in Phase 2 |
+| Single SQLite file for all tenants in v2.0-alpha | No file management complexity | Impossible to migrate to per-tenant when multi-tenant launches | Never — always use per-workspace paths even for single-tenant v2.0 |
+| Reuse existing admin API key for standalone mode | No auth work needed initially | Exposes internal key to public API surface | Acceptable for Phase 1 local dev only — add `ctl_` keys before any external exposure |
+| Skip HMAC on outbound webhooks for v2.0-alpha | Simpler initial implementation | Consumers cannot verify payload authenticity | Never if the spec says webhooks ship in Phase 4 — include HMAC from day one |
+| Keep `jiti` runtime for standalone TypeScript execution | Avoids build step, matches existing plugin workflow | Cold start adds 2-3s, jiti cache bugs persist, unsuitable for Docker production | Acceptable for local dev only — compile with `tsx` or `tsc` in Docker |
+| Process-level singleton for config/DB in standalone.ts | Simple to implement | Breaks multi-tenant isolation — all tenants share one config instance | Never — use constructor injection with workspace-scoped instances from Phase 1 |
 
 ---
 
@@ -221,12 +208,15 @@ Phase: Claude Code Mimicry Integration
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Existing `TokenBucket` + new hourly cap | Check hourly cap inside `acquire()` — hangs drainer | Check hourly cap before calling `acquire()`, throw if exceeded |
-| Claude Code skill + mimicry system | Assume plugin sends cover all outbound | Add `POST /api/admin/proxy-send` to `monitor.ts`; update skill to call it |
-| Config schema + new fields | Add field without `.optional().default(X)` | Every new field must have `.optional().default(X)` or validation breaks on existing configs |
-| SQLite hourly count + rolling window | Use `COUNT(*)` on entire table | Add `WHERE sent_at > ?` with `now - 3_600_000` to bound the count to 60-min window |
-| Zod `knownKeys` set in `validateWahaConfig` | Forget to add new field names to `knownKeys` | New fields get stripped before validation if not added to `knownKeys` set |
-| `MutationDedup` + gated sends | Gated-then-retried send hits dedup TTL | Dedup key includes timestamp-of-request — if retry comes after cap window opens, key will differ and send proceeds correctly; no action needed |
+| MCP SDK (`@modelcontextprotocol/sdk`) | Use `SSEServerTransport` (legacy) | Use `StreamableHTTPServerTransport` — SSE deprecated 2025-03-26 |
+| MCP SDK + existing HTTP server | Create a new Express app for MCP alongside raw `http.createServer` | Mount MCP handler on the same `http.createServer` instance — route by `req.url` prefix |
+| WAHA webhooks in standalone mode | Assume WAHA knows the new webhook URL | `standalone.ts` must call `POST /api/{session}/webhooks` on startup to register itself |
+| WAHA session listing | Call `/api/sessions` and treat empty as "no sessions" | WAHA returns 400 if NOWEB store is not enabled — check for 400 before treating as empty |
+| SQLite + Docker volume | Use WAL mode on any volume | Verify volume is local block storage; add startup write-test; document in README |
+| Webhook retry + HMAC | Regenerate HMAC on each retry attempt | Use the ORIGINAL payload bytes + ORIGINAL timestamp in the signature — regenerating changes it |
+| API key middleware on raw `http` | Parse `Authorization` header as-is | Node.js lowercases headers automatically; strip `Bearer ` prefix; trim whitespace before comparison |
+| OpenAPI spec + `http.createServer` | Use tsoa/swagger-jsdoc (require Express decorators) | Write YAML by hand; validate with `@stoplight/spectral-cli` in CI |
+| `better-sqlite3` + Docker Alpine | Install on host OS, copy to Alpine container | `better-sqlite3` is a native addon — must compile inside the Alpine container or use `linux/amd64` base |
 
 ---
 
@@ -234,9 +224,11 @@ Phase: Claude Code Mimicry Integration
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Rolling window query on unbounded table | Slow hourly cap check after weeks of sends | Prune rows older than 2 hours in the same transaction as the insert | After ~10k rows (~200 hours of capped operation) |
-| Timezone conversion via `Intl.DateTimeFormat` on every send | CPU spike on high-volume sends | Cache the resolved local hour with a 1-minute TTL (not per-call) | Not a real concern at 30-50 msgs/hour, but worth noting |
-| SQLite WAL + high-frequency writes for hourly count | Write contention with `DirectoryDb` | Use the same WAL-mode SQLite connection with `PRAGMA journal_mode=WAL` already set | Not a concern at this message volume |
+| Unbounded resolveTarget cache in multi-tenant | Memory climbs with tenant count — each tenant's contacts fill the same cache | Scope the LRU cache by workspaceId, not globally | At ~20 active tenants with large contact lists |
+| SQLite write serialization across tenants (shared-process) | High-traffic tenants starve low-traffic ones | File-per-tenant SQLite + separate `better-sqlite3` connection per workspace | At ~5 concurrent high-traffic tenants |
+| MCP tool count × description length in context | LLM responses slow down, token costs increase | Keep tool count ≤ 15 for primary MCP tools; group by category | Immediately — tool descriptions injected every request |
+| Webhook delivery queue per tenant in memory | Large tenant onboarding dumps hundreds of queued messages — OOM | Persist webhook queue to SQLite for any queue >100 items | At webhook queue depth >500 per tenant |
+| WAHA media URL expiration on retry | Media retries after >5 minutes return 404 for the attachment | Download media immediately on first delivery attempt; store locally; use local URL in retries | Every time a media message goes to a slow consumer endpoint |
 
 ---
 
@@ -244,9 +236,12 @@ Phase: Claude Code Mimicry Integration
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Proxy-send endpoint in `monitor.ts` has no auth check | Any process on hpg6 can send WhatsApp messages through Omer's session | Apply the existing `requireAuth` middleware (adminToken check) to the new `/api/admin/proxy-send` route |
-| Config stores send window as string "07:00-01:00" without validation | Malformed config causes gate to fail open (always allows send) | Validate hours as integers 0-23 in Zod schema; gate should fail CLOSED (block send) on parse error |
-| Hourly cap bypass via direct WAHA API when plugin rejects | Attacker or misbehaving agent calls WAHA directly | Can't prevent at plugin level — WAHA API key is in config and visible to all processes on hpg6; not a concern for this threat model |
+| API key stored unhashed in workspace DB | Database compromise exposes all API keys | Store `sha256(apiKey)` — display full key only on generation, never again |
+| HMAC webhook secret same as API key | Rotating the API key invalidates all webhook signatures | Use separate secrets: `ctl_` prefix for API keys, `whsec_` prefix for webhook signing secrets |
+| Admin routes accessible without workspace scoping | `GET /api/admin/directory` returns contacts from ALL tenants | Every admin route must extract `workspaceId` from the authenticated request before any DB query |
+| WAHA API key embedded in Docker image | Image push to registry exposes credentials | Accept via env var `WAHA_API_KEY` only — never bake into Dockerfile |
+| Timing attack on API key comparison | Attacker can brute-force key byte-by-byte via response time | Use `crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(stored))` — never `===` |
+| Webhook callback URLs pointing to internal services | Tenant registers `http://localhost:6379` and gets Redis responses | Validate callback URLs: reject `localhost`, `127.x`, `10.x`, `172.16-31.x`, `192.168.x` ranges |
 
 ---
 
@@ -254,25 +249,28 @@ Phase: Claude Code Mimicry Integration
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Gate rejects send with no info about when it will be allowed | Agent (and user) can't tell when to retry | Error message must include "send window opens at HH:MM {timezone}" |
-| Hourly cap shows current count but not the reset time | User sees "28/30 used" with no ETA | Admin panel cap widget shows count + "resets in X minutes" (oldest send timestamp + 60min) |
-| Progressive limit stage changes silently | Admin can't tell why the cap changed | Log a structured event when maturity stage advances (stored in analytics SQLite) |
-| New config fields appear in admin panel with no labels | User doesn't know what "sendWindowStart" means | Use descriptive labels: "Earliest send time (24h)" with timezone selector |
+| QR code expires without feedback | User stares at expired QR, thinks onboarding is broken, abandons | Poll WAHA QR endpoint every 20s; show countdown timer; auto-refresh QR before expiry |
+| API key shown only once but no copy button | User closes the modal, key is lost forever | Add clipboard copy button + "I've saved this" confirmation checkbox before dismissal |
+| Mimicry gate blocks first message with no explanation | New user sends first message, nothing happens — no error, no delay indicator | When mimicry gate blocks, return `queued` status in the API response with `retry_after` timestamp |
+| Session disconnects silently | Agent stops responding; user doesn't know until they check dashboard | Email or webhook notification on session disconnect — not just a dashboard indicator |
+| OpenAPI spec at a different URL than dashboard | Developers cannot find it | Embed Swagger UI at `/docs` on the same server — one URL to share |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Time gate:** Tested cross-midnight window (e.g., 22:00-06:00 config) — verify `22 <= currentHour || currentHour < 6` logic, not `22 <= currentHour <= 6`
-- [ ] **Timezone:** Gate uses `Intl.DateTimeFormat` with configured `timezone`, not `new Date().getHours()` (UTC)
-- [ ] **Claude Code bypass:** Verified that `whatsapp-messenger` skill has been updated to call proxy endpoint, not WAHA directly — check by sending a test message via the skill at 2am (outside window) and confirming it is blocked
-- [ ] **Config migration:** Ran `validateWahaConfig` against the actual production `openclaw.json` before deploying — confirmed no validation errors
-- [ ] **Cap persistence:** Restarted the gateway during an active send session — confirmed hourly count was read from SQLite, not reset to 0
-- [ ] **Cap key:** Confirmed both Logan (bot) and Omer (Claude Code) sends share the same cap bucket keyed by WAHA session name
-- [ ] **Token bucket interaction:** Confirmed hourly cap check happens BEFORE `acquire()` — not inside the token bucket queue drain
-- [ ] **Error messages:** Confirmed cap-exceeded error includes retry-after timestamp, not a generic "rate limited" string
-- [ ] **Admin panel:** Send window settings and cap status visible in React admin panel with correct shadcn/ui components (not raw HTML)
-- [ ] **Progressive limits:** Confirmed maturity stage stored in SQLite, not computed from `Date.now() - pluginStartTime`
+- [ ] **SDK Decoupling:** `grep -r "openclaw/plugin-sdk" src/` returns zero results in standalone build — verify before Phase 1 exit
+- [ ] **OpenClaw plugin still works:** Run full test suite (`npm test`) after any standalone changes — 594 tests must still pass
+- [ ] **WAHA webhook registration:** `standalone.ts` actively registers its webhook URL with WAHA on startup — not just assumes OpenClaw did it
+- [ ] **Config migration:** Existing users' `openclaw.json` settings are migrated (or at minimum documented as manual migration) — not silently ignored
+- [ ] **MCP transport:** `StreamableHTTPServerTransport` used, not deprecated `SSEServerTransport` — verify by checking `@modelcontextprotocol/sdk` version ≥ 1.10.0
+- [ ] **Docker data persistence:** SQLite file is on a named volume — not inside the container layer (lost on every restart)
+- [ ] **Multi-tenant isolation:** Every DB query in admin routes has a `WHERE workspace_id = ?` clause — no global queries
+- [ ] **Webhook HMAC:** Signatures use `crypto.timingSafeEqual` — not `===`
+- [ ] **API key format:** All generated keys use `ctl_` prefix with sufficient entropy (≥ 128 bits) — not sequential IDs
+- [ ] **Retry payload integrity:** Webhook retries send the exact same bytes as the original attempt — not re-serialized JSON
+- [ ] **MCP tool descriptions:** Total token cost of all tool descriptions is measured — not assumed to be fine
+- [ ] **Container health check:** Dockerfile `HEALTHCHECK` probes `/api/v1/health` — not just `CMD node` exit code
 
 ---
 
@@ -280,12 +278,13 @@ Phase: Claude Code Mimicry Integration
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Config validation breaks on deploy | LOW | Roll back `WahaAccountSchemaBase` change, re-add `.optional().default()` wrappers, redeploy both hpg6 locations |
-| Message loss from in-memory queue on restart | MEDIUM | No recovery from lost messages; prevent by using reject-not-queue strategy; if already built as queue, migrate to SQLite store |
-| Timezone bug sends at wrong hours | LOW | Add `timezone` config field with default, fix gate logic, redeploy |
-| Claude Code bypass not caught until after deploy | MEDIUM | Update skill to point to proxy endpoint; retest by sending at 2am in IST |
-| Hourly cap resets on restart (in-memory counter) | LOW | Migrate counter to SQLite rolling window table; one migration script |
-| Token bucket hangs from cap check inside `acquire()` | HIGH | Restart gateway immediately; move cap check to before `acquire()` call |
+| OpenClaw plugin broken by standalone refactor | HIGH | Revert to pre-refactor commit; apply decoupling changes only to `src/standalone/` copies of affected files; never modify originals |
+| SDK symbols removed without logic replacement | HIGH | Restore from `src/inbound.ts.bak.*` backups; add SDK function behavior to a local `src/openclaw-compat.ts` before retry |
+| SQLite corruption from WAL on bad volume | MEDIUM | Restore from last `.backup` file; switch volume to local block storage; re-run directory sync |
+| Tenant data leak via path traversal | HIGH | Rotate all API keys; audit access logs for cross-tenant file opens; add path validation and redeploy |
+| MCP server built on deprecated SSE transport | LOW | Update `@modelcontextprotocol/sdk` to ≥ 1.10.0; swap `SSEServerTransport` for `StreamableHTTPServerTransport`; old SSE endpoint can coexist during transition |
+| Webhook retry storm on slow endpoint | MEDIUM | Add per-endpoint circuit breaker; flush in-flight queue by restarting the worker; add bounded queue depth limit before redeploying |
+| WAHA webhook not registered on startup | LOW | Add explicit startup registration step to `standalone.ts`; add health check flag `webhook_registered` |
 
 ---
 
@@ -293,29 +292,32 @@ Phase: Claude Code Mimicry Integration
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Token bucket vs hourly cap race condition | Phase: Time-of-Day Gates & Hourly Caps | Unit test: send 30 msgs, verify 31st throws before `acquire()` is called |
-| Message loss on restart | Phase: Time-of-Day Gates & Hourly Caps | Restart gateway mid-session, verify no queued sends are silently dropped |
-| Timezone bug | Phase: Time-of-Day Gates & Hourly Caps | Test with `timezone: "Asia/Jerusalem"` on UTC server, verify IST hour is used |
-| Config schema breaks existing configs | Phase: Config Schema Extension | Run `validateWahaConfig` against production `openclaw.json` before every deploy |
-| Claude Code bypass | Phase: Claude Code Mimicry Integration | Send via skill at 2am IST, confirm blocked; send at noon, confirm allowed |
-| Progressive limits not persisted | Phase: Hourly Caps & Progressive Limits | Restart gateway, confirm maturity stage unchanged and hourly count correct |
-| Hourly reset at top-of-hour vs rolling window | Phase: Hourly Caps & Progressive Limits | Send 30 msgs at :59, verify 31st blocked even after clock rolls to next hour |
-| Testability of time logic | Phase: Core Implementation | All gate/cap functions accept `now` parameter; CI tests pass with injected timestamps |
-| Per-session vs per-account cap key | Phase: Claude Code Mimicry Integration | Confirm Logan sends and Omer sends share cap bucket in SQLite |
+| inbound.ts SDK decoupling without logic replacement | Phase 1: Core Extraction | All 594 existing tests pass; send a test WhatsApp message and verify agent response |
+| monitor.ts SDK imports cause container boot failure | Phase 1: Core Extraction | `docker run` starts with zero `openclaw/plugin-sdk` module errors in logs |
+| WAHA webhook not self-registered on startup | Phase 1: Core Extraction | Health endpoint reports `webhook_registered: true`; send a WhatsApp message and see it in logs |
+| MCP SSE transport deprecated | Phase 3: MCP Server | Claude Code connects and calls `send_message` tool successfully |
+| SQLite WAL corruption on Docker volume | Phase 1: Core Extraction (Dockerfile) | Container restarts 5x with data volume mounted; all data persists; no SQLITE_IOERR |
+| Multi-tenant path traversal in workspaceId | Phase 6: Multi-Tenant | Register workspace ID `../../admin` — verify 400 rejection |
+| OpenClaw thin-wrapper regression | Phase 7: Distribution (blocked) | 594 tests pass after wrapper refactor; live agent test passes |
+| Webhook retry storm | Phase 4: Webhook Forwarding | Simulate slow consumer (10s response); verify queue depth stays bounded; circuit breaker activates |
+| QR session collision in multi-tenant | Phase 5/6: Onboarding + Multi-Tenant | Simulate concurrent onboarding — verify unique session names; verify no cross-tenant session reuse |
+| OpenAPI spec drift | Phase 2: Public REST API (CI gate) | `spectral lint openapi.yaml` passes in CI; spec validated against live endpoints |
+| API key timing attack | Phase 1: Core Extraction | Code review confirms `crypto.timingSafeEqual` used everywhere key comparison occurs |
 
 ---
 
 ## Sources
 
-- Codebase: `src/http-client.ts` — `TokenBucket` implementation, `MutationDedup`, drain loop structure
-- Codebase: `src/rate-limiter.ts` — `RateLimiter` class (concurrent + delay limiter, separate from token bucket)
-- Codebase: `src/config-schema.ts` — `WahaAccountSchemaBase` `.strict()` schema, `validateWahaConfig` strip-then-validate pattern, `knownKeys` set
-- Codebase: `src/send.ts` — `sendWahaText` entry point showing policy/mute checks before WAHA API call
-- Codebase: `src/inbound-queue.ts` — in-memory queue pattern (acceptable for inbound, not for outbound)
-- Codebase: `.planning/PROJECT.md` — v1.20 requirements, multi-session context, two-location deploy constraints
-- Memory: `project_v1_20_human_mimicry.md` — original feature intent, bypass concern explicitly noted
-- Prior art: `docs/LESSONS_LEARNED.md` (existing lessons from prior milestones about SQLite persistence, jiti cache, deploy pitfalls)
+- Direct codebase analysis: `src/monitor.ts` lines 1-41, `src/inbound.ts` lines 1-50 — SDK import audit (HIGH confidence)
+- [MCP Transports specification 2025-03-26](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports) — SSE deprecation (HIGH confidence)
+- [Why MCP Deprecated SSE and Went with Streamable HTTP](https://blog.fka.dev/blog/2025-06-06-why-mcp-deprecated-sse-and-go-with-streamable-http/) — Transport migration rationale (HIGH confidence)
+- [SQLite WAL mode permissions in Docker volumes](https://sqlite.org/forum/info/87824f1ed837cdbb) — WAL corruption on networked filesystems (HIGH confidence)
+- [How to Run SQLite in Docker 2026](https://oneuptime.com/blog/post/2026-02-08-how-to-run-sqlite-in-docker-when-and-how/view) — Container best practices (MEDIUM confidence)
+- [Database-per-Tenant SQLite patterns](https://medium.com/@dmitry.s.mamonov/database-per-tenant-consider-sqlite-9239113c936c) — Multi-tenant isolation trade-offs (MEDIUM confidence)
+- [Building Reliable Webhook Delivery 2026](https://dev.to/young_gao/building-reliable-webhook-delivery-retries-signatures-and-failure-handling-40ff) — Retry + HMAC pitfalls (MEDIUM confidence)
+- [Webhook Security Best Practices](https://hooque.io/guides/webhook-security/) — HMAC replay prevention (MEDIUM confidence)
+- CLAUDE.md + project memory — WAHA quirks, deploy pitfalls, DO NOT CHANGE markers (HIGH confidence, directly verified)
 
 ---
-*Pitfalls research for: v1.20 Human Mimicry Hardening — time-of-day gates, hourly caps, Claude Code integration*
-*Researched: 2026-03-26*
+*Pitfalls research for: Chatlytics v2.0 — Plugin extraction to standalone multi-tenant SaaS*
+*Researched: 2026-03-28*

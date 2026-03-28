@@ -4,7 +4,7 @@ import {
   normalizeAccountId,
   listConfiguredAccountIds as listConfiguredAccountIdsFromSection,
   resolveAccountWithDefaultFallback,
-} from "openclaw/plugin-sdk/account-resolution";
+} from "./account-utils.js";
 import { LRUCache } from "lru-cache";
 import { normalizeResolvedSecretInputString } from "./secret-input.js";
 import type { CoreConfig, WahaAccountConfig } from "./types.js";

@@ -1,4 +1,4 @@
-# Roadmap: WAHA OpenClaw Plugin
+# Roadmap: WAHA OpenClaw Plugin → Chatlytics
 
 ## Milestones
 
@@ -8,7 +8,8 @@
 - ✅ **v1.13 Close All Gaps** — Phases 25-32 (shipped 2026-03-20)
 - ✅ **v1.18 Join/Leave/List & Skill Completeness** — Phases 43-47 (shipped 2026-03-25)
 - ✅ **v1.19 Full WAHA Capabilities & Modular Skill Architecture** — Phases 48-52 (shipped 2026-03-26)
-- 🟡 **v1.20 Human Mimicry Hardening** — Phases 53-57 (active)
+- ✅ **v1.20 Human Mimicry Hardening** — Phases 53-57 (shipped 2026-03-27)
+- 🚧 **v2.0 Chatlytics Universal Agent Platform** — Phases 58-66 (active)
 
 ## Phases
 
@@ -84,93 +85,160 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 ## v1.19 Full WAHA Capabilities & Modular Skill Architecture — ✅ SHIPPED 2026-03-26 ([archive](.planning/milestones/v1.19-ROADMAP.md))
 
-## v1.20 Human Mimicry Hardening — Active
+## v1.20 Human Mimicry Hardening — ✅ SHIPPED 2026-03-27
 
-- [x] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (mimicry-gate.ts, Zod schemas, SQLite tables) (completed 2026-03-26)
-- [x] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (jitter, typing, drain throttle) (completed 2026-03-26)
-- [x] **Phase 55: Claude Code Integration** - Proxy-send endpoint + route whatsapp-messenger skill through mimicry
-- [x] **Phase 56: Adaptive Activity Patterns** - Scan group/contact history to build per-chat activity profiles, store in SQLite, adapt gate timing (2/2 plans complete 2026-03-27)
+- [x] **Phase 53: MimicryGate Core** - Config schema + enforcement primitives (completed 2026-03-26)
+- [x] **Phase 54: Send Pipeline Enforcement** - Wire gate/cap into send.ts + behavioral polish (completed 2026-03-26)
+- [x] **Phase 55: Claude Code Integration** - Proxy-send endpoint + mimicry routing (completed 2026-03-27)
+- [x] **Phase 56: Adaptive Activity Patterns** - Per-chat activity profiles, auto-adapt gate timing (completed 2026-03-27)
 - [x] **Phase 57: Admin UI & Observability** - Dashboard card, settings tab controls, mimicry status API (completed 2026-03-27)
+
+---
+
+## v2.0 Chatlytics Universal Agent Platform — Active
+
+**Milestone Goal:** Extract the WAHA OpenClaw plugin into Chatlytics — a standalone, Docker-distributable WhatsApp platform that any AI agent framework can connect to via MCP server, REST API, or SKILL.md. Phases 58-62 are Docker Alpha scope. Phases 63-66 are v2.1 SaaS scope.
+
+### Phases
+
+- [ ] **Phase 58: SDK Decoupling** — Remove all openclaw/plugin-sdk imports outside channel.ts; new platform-types.ts, account-utils.ts, request-utils.ts
+- [ ] **Phase 59: Standalone Entry + Docker** — standalone.ts boots HTTP server, registers WAHA webhook; Dockerfile + Docker Compose with named volume
+- [ ] **Phase 60: Public REST API + OpenAPI + CLI** — /api/v1/ route groups, API key auth, openapi.yaml, Spectral CI lint, Swagger UI, `npx chatlytics` CLI tool
+- [ ] **Phase 61: Webhook Forwarding** — HMAC-signed inbound delivery to callback URLs, exponential backoff, circuit breaker
+- [ ] **Phase 62: MCP Server** — 8-10 consolidated tools via StreamableHTTPServerTransport + stdio mode for npx chatlytics-mcp
+- [ ] **Phase 63: Dashboard Auth + Onboarding** — better-auth registration, workspace creation, QR pairing, API key UI (v2.1)
+- [ ] **Phase 64: Multi-Tenant Process Isolation** — per-workspace process, SQLite DBs, WAHA session namespacing, API gateway routing (v2.1)
+- [ ] **Phase 65: Admin Standalone + Distribution** — standalone admin auth, workspace management, SKILL.md v4, landing page + docs site (v2.1)
+- [ ] **Phase 66: OpenClaw Thin Wrapper** — refactor channel.ts to HTTP client delegating to Chatlytics API (gated: 30-day production stability)
 
 ## Phase Details
 
-### Phase 53: MimicryGate Core
-**Goal**: All mimicry enforcement logic exists as a tested, standalone module with no live send paths touched yet
-**Depends on**: Nothing (first phase of v1.20)
-**Requirements**: INFRA-01, INFRA-02, INFRA-03, INFRA-04, GATE-01, GATE-02, GATE-03, GATE-04, CAP-01, CAP-02, CAP-03, CAP-04, CAP-05
+### Phase 58: SDK Decoupling
+**Goal**: Zero openclaw/plugin-sdk imports exist outside channel.ts and index.ts — the codebase can load and run without the OpenClaw SDK present
+**Depends on**: Phase 57 (last v1.20 phase)
+**Requirements**: CORE-01, CORE-02, CORE-03, CORE-05
 **Success Criteria** (what must be TRUE):
-  1. `src/mimicry-gate.ts` exists with `checkTimeOfDay`, `checkAndConsumeCap`, `resolveGateConfig`, `resolveCapLimit`, and `getCapStatus` functions that accept an injectable `now` clock parameter
-  2. Calling `checkTimeOfDay` with a time outside the configured window returns a "blocked" result without touching any WAHA API
-  3. Hourly cap counts are stored per-session in SQLite using a rolling window (not a fixed top-of-hour bucket) and survive a gateway restart
-  4. Account maturity phase (New/Warming/Stable) is derived from persisted `first_send_at` in the `account_metadata` SQLite table, not from process uptime
-  5. All new Zod schema fields in `config-schema.ts` use `.optional().default()` and existing production configs load without error
-**Plans:** 2/2 plans complete
-Plans:
-- [x] 53-01-PLAN.md — Config schema extension + MimicryDb class + types + config resolution
-- [x] 53-02-PLAN.md — Gate enforcement functions (checkTimeOfDay, checkAndConsumeCap, getCapStatus) + TDD tests
+  1. `grep -r "openclaw/plugin-sdk" src/` returns zero results outside src/channel.ts and index.ts
+  2. `platform-types.ts`, `account-utils.ts`, and `request-utils.ts` exist and cover all replaced SDK symbols
+  3. All 594 tests pass after every file modification (no regressions)
+  4. `monitor.ts` loads without importing any SDK symbol (confirmed by starting the HTTP server in isolation)
+  5. CHATLYTICS_CONFIG_PATH env var is respected by the config loader and overrides the default path
+**Plans**: 3 plans
 
-### Phase 54: Send Pipeline Enforcement
-**Goal**: Every outbound message from the agent passes through time gate and hourly cap checks, with human-like timing variance
-**Depends on**: Phase 53
-**Requirements**: BEH-01, BEH-02, BEH-03
+### Phase 59: Standalone Entry + Docker
+**Goal**: A Docker container starts, serves the admin panel on a configured port, registers its webhook with WAHA, and reports healthy — zero OpenClaw gateway involved
+**Depends on**: Phase 58
+**Requirements**: CORE-04, CORE-06
 **Success Criteria** (what must be TRUE):
-  1. Sending a message outside the configured window returns an error to the caller instead of reaching WAHA
-  2. Sending more messages than the hourly cap in a rolling 60-minute window is rejected after the cap is hit, without resetting at the top of the hour
-  3. The `/shutup`, `/join`, and `/leave` commands bypass the gate and cap enforcements via `bypassPolicy` flag
-  4. Consecutive sends from the queue have 3-8 second jittered delays between them (drain rate throttling)
-  5. Inter-message delays include random variance of +/-30-50% of base delay so timing is not mechanically uniform
-**Plans:** 2/2 plans complete
-Plans:
-- [x] 54-01-PLAN.md — enforceMimicry chokepoint + recordMimicrySuccess (TDD in mimicry-enforcer.ts)
-- [x] 54-02-PLAN.md — Wire enforcement into send.ts + inbound.ts send paths
-
-### Phase 55: Claude Code Integration
-**Goal**: Sends from the whatsapp-messenger Claude Code skill are subject to the same time gate, hourly cap, and typing simulation as agent sends
-**Depends on**: Phase 53
-**Requirements**: CC-01, CC-02
-**Success Criteria** (what must be TRUE):
-  1. `POST /api/admin/proxy-send` route exists in `monitor.ts` with authentication required
-  2. A Claude Code send that would exceed the hourly cap is rejected by the proxy endpoint with a clear error, not forwarded to WAHA
-  3. A Claude Code send inside the window and under cap triggers a typing indicator proportional to message length before the message is delivered
-  4. The whatsapp-messenger skill routes all sends through the proxy endpoint instead of calling WAHA directly
-**Plans:** 1 plan
-Plans:
-- [x] 55-01-PLAN.md — Proxy-send endpoint in monitor.ts + update whatsapp-messenger SKILL.md
-
-### Phase 56: Adaptive Activity Patterns
-**Goal**: The system learns per-chat active hours from message history and automatically aligns send gates to observed human activity patterns
-**Depends on**: Phase 53
-**Requirements**: ADAPT-01, ADAPT-02, ADAPT-03, ADAPT-04, ADAPT-05
-**Success Criteria** (what must be TRUE):
-  1. A SQLite table (`chat_activity_profiles`) exists storing per-chat busiest hours and days derived from the last 7 days of message history
-  2. Activity profile scans run incrementally during off-peak hours without stalling other send operations
-  3. When a chat has an activity profile, the time gate uses that chat's peak hours instead of the global/session default window
-  4. When no profile exists for a chat, the system falls back to the global or session-level gate configuration without error
-  5. Activity profiles are rescanned automatically each week, overwriting stale data
-**Plans:** 1/2 plans executed
-Plans:
-- [x] 56-01-PLAN.md — SQLite schema + activity scanner module + tests (ADAPT-01, ADAPT-02, ADAPT-03)
-- [ ] 56-02-PLAN.md — Wire scanner into enforcer + channel startup (ADAPT-04, ADAPT-05)
-
-### Phase 57: Admin UI & Observability
-**Goal**: Operators can see the mimicry system's current state and configure send gates and caps from the admin panel
-**Depends on**: Phase 54, Phase 55
-**Requirements**: UI-01, UI-02, UI-03
-**Success Criteria** (what must be TRUE):
-  1. The dashboard shows a "Send Gates" card per session with: maturity phase label, days until next phase upgrade, current hourly cap usage (N/max), and gate open/closed badge
-  2. The settings tab has inputs for send window start/end hours, timezone selector (IANA string), hourly cap limit, and the progressive limits table (New/Warming/Stable)
-  3. `GET /api/admin/mimicry` returns gate open/closed status, cap usage, and maturity phase for each active session
-**Plans:** 1/1 plans complete
-Plans:
-- [x] 57-01-PLAN.md — API route + dashboard card + settings section (UI-01, UI-02, UI-03)
+  1. `docker compose up` completes and the container reports ready within 30 seconds
+  2. `GET /health` returns `{ status: "ok", webhook_registered: true }` after startup
+  3. The admin panel loads in a browser at the configured port with all existing tabs functional
+  4. SQLite databases persist across container restarts via named Docker volume
+  5. Stopping and restarting the container re-registers the WAHA webhook and resumes normal operation
+**Plans**: TBD
 **UI hint**: yes
+
+### Phase 60: Public REST API + OpenAPI + CLI
+**Goal**: External callers can send WhatsApp messages, read messages, search contacts, and query sessions via authenticated REST endpoints, a machine-readable spec, and a CLI tool
+**Depends on**: Phase 59
+**Requirements**: API-01, API-02, API-03, API-04, CLI-01, CLI-02, CLI-03, CLI-04
+**Success Criteria** (what must be TRUE):
+  1. `curl -H "Authorization: Bearer ctl_xxx" http://localhost:PORT/api/v1/send` sends a WhatsApp message and returns the WAHA message ID
+  2. A request with a wrong or missing API key receives HTTP 401 — timing-safe comparison is used (no timing leak)
+  3. `GET /openapi.yaml` returns a valid OpenAPI 3.1 document and `spectral lint` passes with zero errors in CI
+  4. `GET /docs` renders a Swagger UI with all /api/v1/ endpoints listed and interactive
+  5. Cross-origin requests from the admin panel dashboard succeed (CORS headers present)
+  6. `npx chatlytics send "hello" --to "John"` sends a WhatsApp message via the REST API and prints the result
+  7. `npx chatlytics search "marketing"` returns matching contacts/groups with colored table output
+  8. `npx chatlytics --json status` returns machine-readable JSON for scripting
+**Plans**: TBD
+
+### Phase 61: Webhook Forwarding
+**Goal**: Every inbound WhatsApp message is delivered to the operator's registered callback URL with a cryptographic signature and automatic retry on failure
+**Depends on**: Phase 59
+**Requirements**: HOOK-01, HOOK-02, HOOK-03, HOOK-04
+**Success Criteria** (what must be TRUE):
+  1. Sending a WhatsApp message to the connected account causes an HTTP POST to the configured callback URL within 2 seconds
+  2. The delivered payload includes an `X-Chatlytics-Signature` header containing an HMAC-SHA256 digest of the raw body, verifiable with the API key
+  3. A callback URL that returns 5xx triggers exponential backoff retries (1s, 2s, 4s) before the delivery is dead-lettered
+  4. A callback URL that never responds is abandoned after three timeouts and the circuit breaker opens to prevent queue saturation
+**Plans**: TBD
+
+### Phase 62: MCP Server
+**Goal**: Any MCP-compatible AI agent (Claude, Cursor, etc.) can connect to Chatlytics and send/receive WhatsApp messages using 8-10 consolidated tools
+**Depends on**: Phase 60, Phase 61
+**Requirements**: MCP-01, MCP-02, MCP-03, MCP-04, MCP-05
+**Success Criteria** (what must be TRUE):
+  1. Claude Code connects to `http://localhost:PORT/mcp` and lists all tools including send_message, read_messages, search, get_directory, and manage_group
+  2. Calling `send_message` via MCP sends a real WhatsApp message through the mimicry gate, identical to a REST send
+  3. `npx chatlytics-mcp` (stdio mode) connects without a running HTTP server and routes all tool calls to the same business logic
+  4. MCP resources expose contacts, groups, sessions, and mimicry status at `chatlytics://` URIs
+  5. A tool call that would be blocked by the mimicry gate returns a human-readable error with a recovery hint (e.g., "Gate closed until 09:00 — retry then")
+**Plans**: TBD
+
+### Phase 63: Dashboard Auth + Onboarding
+**Goal**: A new user can sign up, connect a WhatsApp number via QR code, and get an API key or MCP config — entirely self-service with no manual server config
+**Depends on**: Phase 62
+**Requirements**: AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06
+**Success Criteria** (what must be TRUE):
+  1. A new visitor to the dashboard can register with email and password and is redirected to workspace setup
+  2. The dashboard QR code flow shows a live QR code, refreshes every 20 seconds, and transitions to "Connected" when the phone scans it
+  3. API keys are displayed in full exactly once after creation with a copy button; subsequent views show only the last 4 characters
+  4. Rotating an API key invalidates the old key immediately — a request using the old key returns 401 within milliseconds
+  5. The integration wizard presents MCP config, REST curl example, and SKILL.md download options after connection is confirmed
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 64: Multi-Tenant Process Isolation
+**Goal**: Multiple workspaces run in isolated processes so a crash or SQLite write storm in one workspace cannot affect any other
+**Depends on**: Phase 63
+**Requirements**: TENANT-01, TENANT-02, TENANT-03, TENANT-04
+**Success Criteria** (what must be TRUE):
+  1. Creating two workspaces and crashing one process does not interrupt message delivery in the other workspace
+  2. Each workspace has its own directory.db, mimicry.db, and analytics.db at a workspace-scoped path — no shared SQLite files
+  3. WAHA sessions are namespaced as `ctl_{workspaceId}_{sessionName}` — two workspaces cannot share or interfere with each other's sessions
+  4. An API request authenticated with workspace A's key cannot read or write to workspace B's data under any request path
+**Plans**: TBD
+
+### Phase 65: Admin Standalone + Distribution
+**Goal**: The admin panel has its own authentication independent of OpenClaw, operators can manage multiple workspaces, and integration materials are publicly available
+**Depends on**: Phase 64
+**Requirements**: ADMIN-01, ADMIN-02, SKILL-01, SITE-01, SITE-02
+**Success Criteria** (what must be TRUE):
+  1. The admin panel login page works without an OpenClaw gateway running — auth is handled by the Chatlytics process
+  2. Operators can create, switch between, and delete workspaces from the admin panel without editing config files
+  3. SKILL.md v4 references the Chatlytics API key and MCP endpoint with no OpenClaw-specific instructions
+  4. chatlytics.ai serves a landing page with a product overview, feature list, and getting started link
+  5. The documentation site has interactive API examples and copy-paste MCP config snippets
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 66: OpenClaw Thin Wrapper
+**Goal**: The OpenClaw plugin delegates all action handling to the Chatlytics REST API so the plugin becomes a thin HTTP client with no duplicated business logic
+**Depends on**: Phase 62 (Docker Alpha must be production-stable for 30+ days before this phase starts)
+**Requirements**: COMPAT-01, COMPAT-02, COMPAT-03
+**Success Criteria** (what must be TRUE):
+  1. All 594 existing tests pass after channel.ts is refactored to an HTTP client
+  2. All existing SKILL.md action names continue to work via the REST API with identical response shapes
+  3. The existing admin panel routes (/api/admin/*) remain functional and return the same data as before
+  4. Action response times measured at the gateway remain under 300ms at p95 (accounting for HTTP round-trip)
+**Plans**: TBD
 
 ## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 53. MimicryGate Core | 2/2 | Complete    | 2026-03-26 |
-| 54. Send Pipeline Enforcement | 2/2 | Complete    | 2026-03-26 |
-| 55. Claude Code Integration | 1/1 | Complete | 2026-03-27 |
-| 56. Adaptive Activity Patterns | 1/2 | In Progress|  |
-| 57. Admin UI & Observability | 1/1 | Complete   | 2026-03-27 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 53. MimicryGate Core | v1.20 | 2/2 | Complete | 2026-03-26 |
+| 54. Send Pipeline Enforcement | v1.20 | 2/2 | Complete | 2026-03-26 |
+| 55. Claude Code Integration | v1.20 | 1/1 | Complete | 2026-03-27 |
+| 56. Adaptive Activity Patterns | v1.20 | 2/2 | Complete | 2026-03-27 |
+| 57. Admin UI & Observability | v1.20 | 1/1 | Complete | 2026-03-27 |
+| 58. SDK Decoupling | v2.0 | 1/3 | In Progress|  |
+| 59. Standalone Entry + Docker | v2.0 | 0/? | Not started | - |
+| 60. Public REST API + OpenAPI | v2.0 | 0/? | Not started | - |
+| 61. Webhook Forwarding | v2.0 | 0/? | Not started | - |
+| 62. MCP Server | v2.0 | 0/? | Not started | - |
+| 63. Dashboard Auth + Onboarding | v2.1 | 0/? | Not started | - |
+| 64. Multi-Tenant Process Isolation | v2.1 | 0/? | Not started | - |
+| 65. Admin Standalone + Distribution | v2.1 | 0/? | Not started | - |
+| 66. OpenClaw Thin Wrapper | v2.1 | 0/? | Not started | - |

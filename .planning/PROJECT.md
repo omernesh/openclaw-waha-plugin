@@ -90,41 +90,57 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 
 ### Active
 
-#### v1.20 — Human Mimicry Hardening
+#### v2.0 — Chatlytics Universal Agent Platform
 
-- [ ] Time-of-day send gates (block outbound outside configurable hours, default 7am-1am)
-- [ ] Hourly message caps (hard limit per session, progressive as account matures)
-- [ ] Configuration hierarchy: global → per session → per contact/group/newsletter (applies to both gates and caps)
-- [ ] Claude Code mimicry integration (route whatsapp-messenger sends through typing delay + rate limiting)
+- [ ] Standalone HTTP server (decouple from OpenClaw gateway, own process, Docker container)
+- [ ] Public REST API with API key authentication (send, read, search, directory, config, sessions, mimicry status)
+- [ ] OpenAPI 3.1 spec for all public endpoints
+- [ ] MCP server exposing agent-facing tools (mimicry enforced server-side, transparent to clients)
+- [ ] Webhook forwarding for inbound messages (callback URLs, HMAC signatures, retry with backoff)
+- [ ] Config abstraction (standalone JSON file, not openclaw.json)
+- [ ] Multi-tenant workspace isolation (per-workspace API keys, WAHA sessions, SQLite databases)
+- [ ] User onboarding (registration, API key generation, QR code session pairing)
+- [ ] Admin panel standalone (own auth, not embedded in OpenClaw gateway)
+- [ ] Framework-agnostic SKILL.md v4 (references API key + MCP config)
+- [ ] Documentation site + landing page (chatlytics.ai)
 
 ### Out of Scope
 
-- Claude Code / Cursor adapter — deferred to Phase 6 (platform abstraction)
 - Scheduled messages — WAHA doesn't support
 - WhatsApp Business templates — not applicable for personal assistant
 - Broadcast lists — WAHA limitation
 - Call initiation — WAHA limitation
 - Disappearing messages — low priority
-- Hot-reload — gateway requires restart, not worth engineering around
 - Media multi-send (sendMulti v2) — deferred; text-only v1 shipped in Phase 3
+- Usage billing / plan limits — deferred to v2.2+
+- Team management (multi-user workspaces) — deferred to v2.2+
+- Custom WAHA instance (bring your own) — deferred to v2.2+
+- Audit log — deferred to v2.2+
+- Framework-specific auto-generated SDK clients — deferred to v2.2+
 
-## Current Milestone: v1.20 Human Mimicry Hardening
+## Current Milestone: v2.0 Chatlytics Universal Agent Platform
 
-**Goal:** Make the agent indistinguishable from a human to Meta's bot detection by adding time-based send gates, hourly message caps with progressive limits, and routing Claude Code sends through the mimicry system.
+**Goal:** Extract the WAHA OpenClaw plugin into Chatlytics (chatlytics.ai) — a standalone, multi-tenant WhatsApp platform that any AI agent framework can connect to via MCP server, OpenAPI, or SKILL.md.
 
 **Target features:**
-- Time-of-day send gates — block outbound messages outside configurable hours (default 7am-1am). Queue or reject. Configurable globally, per session, per contact/group/newsletter.
-- Hourly message caps — hard limit of 30-50 outbound messages/hour per session. Progressive limits as account matures. Configurable globally, per session, per contact/group/newsletter.
-- Claude Code mimicry integration — when whatsapp-messenger skill sends via Omer's session, route through typing delay + rate limiting system (currently bypasses all mimicry).
+- Standalone HTTP server — decouple from OpenClaw gateway. Own process, own config, Docker container. Reuse monitor.ts HTTP server + admin panel.
+- Public REST API — /api/v1/ endpoints for send, read, search, directory, config, sessions, mimicry. API key auth (Bearer ctl_xxx).
+- OpenAPI 3.1 spec — hand-written YAML, validated, published at api.chatlytics.ai/openapi.yaml.
+- MCP server — tools for send, read, search, directory, config. SSE + stdio transports. Mimicry enforcement server-side and invisible to clients.
+- Webhook forwarding — inbound messages forwarded to registered callback URLs. HMAC signatures, retry with backoff, event filters.
+- Multi-tenant — per-workspace processes, SQLite databases, WAHA sessions, API keys.
+- User onboarding — sign up, connect WhatsApp via QR, get API key, choose integration method.
+- Admin panel — standalone auth, workspace management, existing admin features preserved.
+- Distribution — OpenAPI spec, MCP server, SKILL.md v4, OpenClaw plugin as thin wrapper.
 
-## Last Shipped: v1.19 Full WAHA Capabilities & Modular Skill Architecture (2026-03-26)
+## Last Shipped: v1.20 Human Mimicry Hardening (2026-03-27)
 
 **Key accomplishments:**
-- 109 UTILITY_ACTIONS exposed to agent (group admin, chats, contacts, status, presence, profile, media)
-- 10 modular skill category files with SKILL.md v6.0.0 index
-- 8 skill evals via Anthropic skill-creator (30/30 expectations passed)
-- whatsapp-messenger Claude Code skill v2.0.0
-- 12/12 live WhatsApp tests passed on real sessions
+- MimicryGate core (time-of-day send gates, rolling window hourly caps, 3-level config merge)
+- Send pipeline enforcement (mimicry-enforcer.ts as chokepoint for all outbound sends)
+- Claude Code proxy-send integration (whatsapp-messenger skill routes through mimicry)
+- Adaptive activity patterns (scanner learns per-chat peak hours, auto-adjusts gate windows)
+- Admin UI mimicry observability (cap status API, settings panel for gate/cap config)
 
 ## Context
 
@@ -185,5 +201,22 @@ Reliable, always-on WhatsApp communication for AI agents — messages must send,
 | SQLite analytics event store | Reuses existing SQLite infrastructure, no external dependencies, simple aggregation queries | ✓ Good |
 | 5-failure threshold for auto-recovery | Prevents premature restarts from transient blips while catching real failures | ✓ Good |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-27 — Phase 57 (Admin UI & Observability) complete — v1.20 MILESTONE COMPLETE*
+*Last updated: 2026-03-28 — Milestone v2.0 started*

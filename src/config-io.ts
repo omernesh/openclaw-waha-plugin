@@ -22,13 +22,22 @@ const log = createLogger({ component: "config-io" });
 // ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * Returns the path to the OpenClaw config file.
- * Respects OPENCLAW_CONFIG_PATH env var, defaults to ~/.openclaw/openclaw.json.
- * Config save path: must write to ~/.openclaw/openclaw.json (NOT workspace subfolder).
- * DO NOT CHANGE — matches monitor.ts getConfigPath behavior.
+ * Returns the path to the Chatlytics/OpenClaw config file.
+ *
+ * Phase 58 (CORE-02): Standalone config path. CHATLYTICS_CONFIG_PATH takes priority.
+ * Priority order:
+ *   1. CHATLYTICS_CONFIG_PATH — standalone Chatlytics deployments
+ *   2. OPENCLAW_CONFIG_PATH — backward compat for existing hpg6 deployments
+ *   3. ~/.chatlytics/config.json — new standalone default
+ *
+ * DO NOT CHANGE order — backward compat for hpg6 requires OPENCLAW_CONFIG_PATH fallback.
  */
 export function getConfigPath(): string {
-  return process.env.OPENCLAW_CONFIG_PATH ?? join(homedir(), ".openclaw", "openclaw.json");
+  return (
+    process.env.CHATLYTICS_CONFIG_PATH ??
+    process.env.OPENCLAW_CONFIG_PATH ?? // backward compat
+    join(homedir(), ".chatlytics", "config.json")
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@
 
 import { enforceMimicry, recordMimicrySuccess } from "./mimicry-enforcer.js";
 import { callWahaApi } from "./http-client.js";
-import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
+import { DEFAULT_ACCOUNT_ID } from "./account-utils.js";
 import type { CoreConfig } from "./types.js";
 
 // Phase 55 (CC-01): Maps proxy-send type field to WAHA API path. DO NOT REMOVE.
