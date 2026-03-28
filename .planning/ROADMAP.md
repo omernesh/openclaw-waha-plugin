@@ -169,7 +169,10 @@ Plans:
   2. The delivered payload includes an `X-Chatlytics-Signature` header containing an HMAC-SHA256 digest of the raw body, verifiable with the API key
   3. A callback URL that returns 5xx triggers exponential backoff retries (1s, 2s, 4s) before the delivery is dead-lettered
   4. A callback URL that never responds is abandoned after three timeouts and the circuit breaker opens to prevent queue saturation
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 61-01-PLAN.md — Forwarder module with HMAC signing, retry, circuit breaker + config schema (HOOK-01, HOOK-02, HOOK-03, HOOK-04)
+- [ ] 61-02-PLAN.md — Wire into monitor.ts inbound path + admin subscription routes (HOOK-01, HOOK-04)
 
 ### Phase 62: MCP Server
 **Goal**: Any MCP-compatible AI agent (Claude, Cursor, etc.) can connect to Chatlytics and send/receive WhatsApp messages using 8-10 consolidated tools
@@ -243,7 +246,7 @@ Plans:
 | 58. SDK Decoupling | v2.0 | 3/3 | Complete   | 2026-03-28 |
 | 59. Standalone Entry + Docker | v2.0 | 1/2 | In Progress|  |
 | 60. Public REST API + OpenAPI | v2.0 | 0/3 | Planned    |  |
-| 61. Webhook Forwarding | v2.0 | 0/? | Not started | - |
+| 61. Webhook Forwarding | v2.0 | 0/2 | Not started | - |
 | 62. MCP Server | v2.0 | 0/? | Not started | - |
 | 63. Dashboard Auth + Onboarding | v2.1 | 0/? | Not started | - |
 | 64. Multi-Tenant Process Isolation | v2.1 | 0/? | Not started | - |
