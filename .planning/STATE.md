@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
-status: active
-stopped_at: null
-last_updated: "2026-03-28"
+status: executing
+stopped_at: Completed 58-01-PLAN.md
+last_updated: "2026-03-28T02:26:18.719Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,20 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any AI agent framework can send/receive WhatsApp messages through Chatlytics with mimicry enforcement, policy controls, and directory features — zero framework-specific code required.
-**Current focus:** Phase 58 — SDK Decoupling (first phase, highest risk)
+**Current focus:** Phase 58 — sdk-decoupling
 
 ## Current Position
 
-Phase: 58 of 66 (SDK Decoupling)
-Plan: Not yet planned
-Status: Ready to plan
-Last activity: 2026-03-28 — Roadmap created for v2.0
+Phase: 58 (sdk-decoupling) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-03-28
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0 (v2.0)
 - Average duration: —
 - Total execution time: —
@@ -52,6 +53,8 @@ Progress: [░░░░░░░░░░] 0%
 - **Phase 66 gated** — OpenClaw thin wrapper only after 30 days of production stability post Phase 62
 - **better-auth for auth** (Phase 63) — toNodeHandler() for raw Node HTTP, better-sqlite3 adapter
 - **jose for HMAC** (Phase 61) — ESM-first, unlike jsonwebtoken (CommonJS-only)
+- [Phase 58]: StandaloneConfig uses open index signature to remain structurally compatible with OpenClawConfig in channel.ts
+- [Phase 58]: CHATLYTICS_CONFIG_PATH primary, OPENCLAW_CONFIG_PATH backward compat, ~/.chatlytics/config.json new default (CORE-02)
 
 ### Pending Todos
 
@@ -65,6 +68,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28
-Stopped at: Roadmap created — Phase 58 ready to plan
+Last session: 2026-03-28T02:26:18.711Z
+Stopped at: Completed 58-01-PLAN.md
 Resume file: None
