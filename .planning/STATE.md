@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
-status: verifying
-stopped_at: Completed 61-02-PLAN.md
-last_updated: "2026-03-28T13:33:50.816Z"
+status: executing
+stopped_at: Completed 62-01-PLAN.md
+last_updated: "2026-03-28T14:03:53.629Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 10
-  completed_plans: 5
+  total_plans: 12
+  completed_plans: 6
   percent: 70
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 61 — webhook-forwarding
+**Current focus:** Phase 62 — mcp-server
 
 ## Current Position
 
-Phase: 61 (webhook-forwarding) — EXECUTING
+Phase: 62 (mcp-server) — EXECUTING
 Plan: 2 of 2
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-03-28
 
 Progress: [███████░░░] 70%
@@ -62,6 +62,7 @@ Progress: [███████░░░] 70%
 | Phase 60 P03 | 17m 49s | 2 tasks | 5 files |
 | Phase 61 P01 | 15 | 1 tasks | 3 files |
 | Phase 61 P02 | 8m | 1 tasks | 1 files |
+| Phase 62 P01 | 12m | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,9 @@ Progress: [███████░░░] 70%
 - [Phase 61]: Use publicApiKey as HMAC signing secret for webhook forwarding (operators already have this key)
 - [Phase 61]: In-memory circuit breaker per URL (Map<string, CircuitState>), not opossum library
 - [Phase 61]: Forwarding uses startup-time cfg.webhookSubscriptions — config changes take effect after server restart (consistent with existing pattern)
+- [Phase 62-01]: McpServer instance created fresh per createMcpServer(cfg) — transport connected externally by Plan 02
+- [Phase 62-01]: update_settings restricted to channels.waha paths to prevent unintended config corruption
+- [Phase 62-01]: sanitizeCfg redacts api key/secret/password/token fields before exposing via chatlytics://config resource
 
 ### Architecture Notes
 
@@ -137,6 +141,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T13:33:50.811Z
-Stopped at: Completed 61-02-PLAN.md
+Last session: 2026-03-28T14:03:53.623Z
+Stopped at: Completed 62-01-PLAN.md
 Resume file: None

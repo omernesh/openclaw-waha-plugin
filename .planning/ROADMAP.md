@@ -186,8 +186,8 @@ Plans:
   5. A tool call that would be blocked by the mimicry gate returns a human-readable error with a recovery hint (e.g., "Gate closed until 09:00 â€” retry then")
 **Plans**: 2 plans
 Plans:
-- [ ] 62-01-PLAN.md — MCP server factory with 10 tools + 5 resources (MCP-01, MCP-04, MCP-05)
-- [ ] 62-02-PLAN.md — HTTP transport wiring + stdio entry point (MCP-02, MCP-03)
+- [x] 62-01-PLAN.md ï¿½ MCP server factory with 10 tools + 5 resources (MCP-01, MCP-04, MCP-05)
+- [ ] 62-02-PLAN.md ï¿½ HTTP transport wiring + stdio entry point (MCP-02, MCP-03)
 
 ### Phase 63: Dashboard Auth + Onboarding
 **Goal**: A new user can sign up, connect a WhatsApp number via QR code, and get an API key or MCP config â€” entirely self-service with no manual server config
@@ -250,7 +250,7 @@ Plans:
 | 59. Standalone Entry + Docker | v2.0 | 1/2 | In Progress|  |
 | 60. Public REST API + OpenAPI | v2.0 | 0/3 | Planned    |  |
 | 61. Webhook Forwarding | v2.0 | 1/2 | In Progress|  |
-| 62. MCP Server | v2.0 | 0/2 | Planned    |  |
+| 62. MCP Server | v2.0 | 1/2 | In Progress|  |
 | 63. Dashboard Auth + Onboarding | v2.1 | 0/? | Not started | - |
 | 64. Multi-Tenant Process Isolation | v2.1 | 0/? | Not started | - |
 | 65. Admin Standalone + Distribution | v2.1 | 0/? | Not started | - |
