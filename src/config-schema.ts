@@ -191,6 +191,11 @@ export const WahaConfigSchema = WahaAccountSchemaBase.extend({
   // Also supports WAHA_ADMIN_TOKEN env var. When neither is set, no auth required (backward compat).
   // DO NOT REMOVE — removing this disables admin panel authentication.
   adminToken: z.string().optional(),
+  // Phase 60 (API-02): Bearer token for public REST API v1 authentication.
+  // When set, all /api/v1/* routes require Authorization: Bearer <token>.
+  // Also supports CHATLYTICS_API_KEY env var. When neither set, open access (backward compat).
+  // DO NOT REMOVE — removing this disables public API authentication.
+  publicApiKey: z.string().optional(),
 }).superRefine((value, ctx) => {
   requireOpenAllowFrom({
     policy: value.dmPolicy,
@@ -222,7 +227,7 @@ export type ConfigValidationResult =
 export function validateWahaConfig(value: unknown): ConfigValidationResult {
   // WahaConfigSchema is WahaAccountSchemaBase.extend({accounts,defaultAccount}).superRefine(...)
   // .superRefine() returns ZodEffects which has no .shape — derive keys from the base + extension.
-  const knownKeys = new Set([...Object.keys(WahaAccountSchemaBase.shape), 'accounts', 'defaultAccount', 'adminToken']);
+  const knownKeys = new Set([...Object.keys(WahaAccountSchemaBase.shape), 'accounts', 'defaultAccount', 'adminToken', 'publicApiKey']);
   const stripped = typeof value === 'object' && value !== null
     ? Object.fromEntries(Object.entries(value).filter(([k]) => knownKeys.has(k)))
     : value;

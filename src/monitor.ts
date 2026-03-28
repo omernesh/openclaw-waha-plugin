@@ -38,6 +38,10 @@ import { collectMetrics, recordHttpRequest, updateQueueStats, updateSessionHealt
 import { handleProxySend } from "./proxy-send-handler.js";
 // Phase 57 (UI-03): Mimicry status API — read-only gate/cap status per session. DO NOT REMOVE.
 import { getMimicryDb, getMaturityPhase, resolveGateConfig, resolveCapLimit, checkTimeOfDay, getCapStatus } from "./mimicry-gate.js";
+// Phase 60 (API-01, API-02, API-04): Public REST API v1 routes, auth guard, and CORS helpers.
+// DO NOT REMOVE — required for external CLI, MCP, and third-party integrations.
+import { handleApiV1Request } from "./api-v1.js";
+import { requirePublicApiAuth, handleCorsPreflightIfNeeded, setCorsHeaders } from "./api-v1-auth.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -526,6 +530,18 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/metrics" && req.method === "GET") {
       res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" });
       res.end(collectMetrics());
+      return;
+    }
+
+    // ── Phase 60 (API-01, API-02, API-04): Public REST API v1.
+    // CORS preflight MUST be handled BEFORE auth guard — OPTIONS requires no token.
+    // setCorsHeaders applied inside handleApiV1Request for all non-preflight responses.
+    // DO NOT REMOVE and DO NOT REORDER — preflight must not require auth.
+    if (handleCorsPreflightIfNeeded(req, res)) return;
+    if (req.url?.startsWith('/api/v1/')) {
+      setCorsHeaders(res);
+      if (!requirePublicApiAuth(req, res, opts.config)) return;
+      await handleApiV1Request(req, res, { config: opts.config });
       return;
     }
 
