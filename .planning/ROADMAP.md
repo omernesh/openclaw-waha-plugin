@@ -123,7 +123,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
   3. All 594 tests pass after every file modification (no regressions)
   4. `monitor.ts` loads without importing any SDK symbol (confirmed by starting the HTTP server in isolation)
   5. CHATLYTICS_CONFIG_PATH env var is respected by the config loader and overrides the default path
-**Plans**: TBD
+**Plans**: 3 plans
 
 ### Phase 59: Standalone Entry + Docker
 **Goal**: A Docker container starts, serves the admin panel on a configured port, registers its webhook with WAHA, and reports healthy — zero OpenClaw gateway involved
@@ -233,7 +233,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 | 55. Claude Code Integration | v1.20 | 1/1 | Complete | 2026-03-27 |
 | 56. Adaptive Activity Patterns | v1.20 | 2/2 | Complete | 2026-03-27 |
 | 57. Admin UI & Observability | v1.20 | 1/1 | Complete | 2026-03-27 |
-| 58. SDK Decoupling | v2.0 | 0/? | Not started | - |
+| 58. SDK Decoupling | v2.0 | 0/3 | Not started | - |
 | 59. Standalone Entry + Docker | v2.0 | 0/? | Not started | - |
 | 60. Public REST API + OpenAPI | v2.0 | 0/? | Not started | - |
 | 61. Webhook Forwarding | v2.0 | 0/? | Not started | - |
