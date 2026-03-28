@@ -43,6 +43,9 @@ import { getMimicryDb, getMaturityPhase, resolveGateConfig, resolveCapLimit, che
 // DO NOT REMOVE — required for external CLI, MCP, and third-party integrations.
 import { handleApiV1Request } from "./api-v1.js";
 import { requirePublicApiAuth, handleCorsPreflightIfNeeded, setCorsHeaders } from "./api-v1-auth.js";
+// Phase 61 (HOOK-01..04): Webhook forwarder — delivers inbound events to operator callback URLs.
+// Fire-and-forget from inbound path — NEVER await forwardWebhook. DO NOT REMOVE.
+import { forwardWebhook } from "./webhook-forwarder.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -2477,6 +2480,22 @@ export function createWahaWebhookServer(opts: {
         runtime,
         statusSink: opts.statusSink,
       }, isWhatsAppGroupJid(message.chatId));
+      // Phase 61 (HOOK-01): Forward inbound message to registered webhook subscriptions.
+      // Fire-and-forget — MUST NOT block inbound delivery. DO NOT await. DO NOT REMOVE.
+      {
+        const webhookSubs = cfg.webhookSubscriptions ?? [];
+        const webhookSecret = cfg.publicApiKey ?? process.env.CHATLYTICS_API_KEY ?? "";
+        if (webhookSubs.length > 0 && webhookSecret) {
+          void forwardWebhook({
+            subscriptions: webhookSubs,
+            secret: webhookSecret,
+            eventType: "message",
+            payload: payload.payload,
+          }).catch((err) => {
+            log.warn("webhook forward error (non-fatal)", { error: String(err) });
+          });
+        }
+      }
       // Phase 29, Plan 02: emit log SSE event when a message is queued. DO NOT REMOVE.
       broadcastSSE("log", { line: `[WAHA] message queued: ${message.chatId} (${message.fromMe ? "outbound" : "inbound"})`, timestamp: Date.now() });
       writeJsonResponse(res, 200, { status: "queued" });
@@ -2492,6 +2511,21 @@ export function createWahaWebhookServer(opts: {
       if (isDuplicate(payload.event, reaction.messageId)) {
         writeJsonResponse(res, 200, { status: "duplicate" });
         return;
+      }
+      // Phase 61 (HOOK-01): Forward reaction event to webhook subscriptions (fire-and-forget). DO NOT REMOVE.
+      {
+        const webhookSubs = cfg.webhookSubscriptions ?? [];
+        const webhookSecret = cfg.publicApiKey ?? process.env.CHATLYTICS_API_KEY ?? "";
+        if (webhookSubs.length > 0 && webhookSecret) {
+          void forwardWebhook({
+            subscriptions: webhookSubs,
+            secret: webhookSecret,
+            eventType: "message.reaction",
+            payload: payload.payload,
+          }).catch((err) => {
+            log.warn("webhook forward error (non-fatal)", { error: String(err) });
+          });
+        }
       }
       writeJsonResponse(res, 200, { status: "ok" });
       return;
@@ -2526,6 +2560,21 @@ export function createWahaWebhookServer(opts: {
             runtime,
             statusSink: opts.statusSink,
           }, isWhatsAppGroupJid(syntheticMessage.chatId));
+          // Phase 61 (HOOK-01): Forward poll.vote event to webhook subscriptions (fire-and-forget). DO NOT REMOVE.
+          {
+            const webhookSubs = cfg.webhookSubscriptions ?? [];
+            const webhookSecret = cfg.publicApiKey ?? process.env.CHATLYTICS_API_KEY ?? "";
+            if (webhookSubs.length > 0 && webhookSecret) {
+              void forwardWebhook({
+                subscriptions: webhookSubs,
+                secret: webhookSecret,
+                eventType: "poll.vote",
+                payload: voteData,
+              }).catch((err) => {
+                log.warn("webhook forward error (non-fatal)", { error: String(err) });
+              });
+            }
+          }
           writeJsonResponse(res, 200, { status: "queued" });
           return;
         }
@@ -2562,6 +2611,21 @@ export function createWahaWebhookServer(opts: {
             runtime,
             statusSink: opts.statusSink,
           }, isWhatsAppGroupJid(syntheticMessage.chatId));
+          // Phase 61 (HOOK-01): Forward rsvp event to webhook subscriptions (fire-and-forget). DO NOT REMOVE.
+          {
+            const webhookSubs = cfg.webhookSubscriptions ?? [];
+            const webhookSecret = cfg.publicApiKey ?? process.env.CHATLYTICS_API_KEY ?? "";
+            if (webhookSubs.length > 0 && webhookSecret) {
+              void forwardWebhook({
+                subscriptions: webhookSubs,
+                secret: webhookSecret,
+                eventType: "rsvp",
+                payload: rsvpData,
+              }).catch((err) => {
+                log.warn("webhook forward error (non-fatal)", { error: String(err) });
+              });
+            }
+          }
           writeJsonResponse(res, 200, { status: "queued" });
           return;
         }
@@ -2621,6 +2685,21 @@ export function createWahaWebhookServer(opts: {
             statusSink: opts.statusSink,
           }, true); // group events are always group-queue priority
         }
+        // Phase 61 (HOOK-01): Forward group event to webhook subscriptions (fire-and-forget). DO NOT REMOVE.
+        {
+          const webhookSubs = cfg.webhookSubscriptions ?? [];
+          const webhookSecret = cfg.publicApiKey ?? process.env.CHATLYTICS_API_KEY ?? "";
+          if (webhookSubs.length > 0 && webhookSecret) {
+            void forwardWebhook({
+              subscriptions: webhookSubs,
+              secret: webhookSecret,
+              eventType: "group",
+              payload: groupData,
+            }).catch((err) => {
+              log.warn("webhook forward error (non-fatal)", { error: String(err) });
+            });
+          }
+        }
         writeJsonResponse(res, 200, { status: "queued" });
         return;
       }
@@ -2631,6 +2710,96 @@ export function createWahaWebhookServer(opts: {
     writeJsonResponse(res, 200, { status: "ignored" });
     return;
     } // end: webhook POST processing
+
+    // =========================================================================
+    // Webhook subscription management API (Phase 61, HOOK-04). DO NOT REMOVE.
+    // Operators register callback URLs that receive inbound events via HMAC-signed POSTs.
+    // Subscriptions persisted to config via modifyConfig (mutex-protected, atomic).
+    // =========================================================================
+
+    // GET /api/admin/webhook-subscriptions — list current webhook subscriptions.
+    if (req.url === "/api/admin/webhook-subscriptions" && req.method === "GET") {
+      try {
+        const configPath = getConfigPath();
+        const currentConfig = await readConfig(configPath);
+        const channels = (currentConfig.channels as Record<string, unknown>) ?? {};
+        const wahaSection = (channels.waha as Record<string, unknown>) ?? {};
+        const subs = (wahaSection.webhookSubscriptions as unknown[]) ?? [];
+        writeJsonResponse(res, 200, subs);
+      } catch (err) {
+        log.error("GET /api/admin/webhook-subscriptions failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to read webhook subscriptions" });
+      }
+      return;
+    }
+
+    // POST /api/admin/webhook-subscriptions — create or update a webhook subscription.
+    // Phase 61 (HOOK-04): Webhook subscription management — upsert by URL. DO NOT REMOVE.
+    if (req.url === "/api/admin/webhook-subscriptions" && req.method === "POST") {
+      try {
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const incoming = JSON.parse(bodyStr) as { url?: string; events?: string[]; enabled?: boolean };
+        if (!incoming.url || typeof incoming.url !== "string") {
+          writeJsonResponse(res, 400, { error: "Missing required field: url" });
+          return;
+        }
+        const configPath = getConfigPath();
+        let updatedSubs: unknown[];
+        await modifyConfig(configPath, (currentConfig) => {
+          const channels = (currentConfig.channels as Record<string, unknown>) ?? {};
+          const wahaSection = (channels.waha as Record<string, unknown>) ?? {};
+          const subs = Array.isArray(wahaSection.webhookSubscriptions) ? [...wahaSection.webhookSubscriptions as Array<Record<string, unknown>>] : [];
+          const existingIdx = subs.findIndex((s) => (s as Record<string, unknown>).url === incoming.url);
+          const entry: Record<string, unknown> = {
+            url: incoming.url,
+            events: Array.isArray(incoming.events) ? incoming.events : ["message"],
+            enabled: incoming.enabled !== false,
+          };
+          if (existingIdx >= 0) {
+            subs[existingIdx] = entry;
+          } else {
+            subs.push(entry);
+          }
+          wahaSection.webhookSubscriptions = subs;
+          currentConfig.channels = { ...channels, waha: wahaSection };
+          updatedSubs = subs;
+        });
+        writeJsonResponse(res, 200, updatedSubs!);
+      } catch (err) {
+        log.error("POST /api/admin/webhook-subscriptions failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to save webhook subscription" });
+      }
+      return;
+    }
+
+    // DELETE /api/admin/webhook-subscriptions — remove a subscription by URL.
+    // Phase 61 (HOOK-04): Webhook subscription management — delete by URL. DO NOT REMOVE.
+    if (req.url === "/api/admin/webhook-subscriptions" && req.method === "DELETE") {
+      try {
+        const bodyStr = await readBody(req, maxBodyBytes);
+        const incoming = JSON.parse(bodyStr) as { url?: string };
+        if (!incoming.url || typeof incoming.url !== "string") {
+          writeJsonResponse(res, 400, { error: "Missing required field: url" });
+          return;
+        }
+        const configPath = getConfigPath();
+        let updatedSubs: unknown[];
+        await modifyConfig(configPath, (currentConfig) => {
+          const channels = (currentConfig.channels as Record<string, unknown>) ?? {};
+          const wahaSection = (channels.waha as Record<string, unknown>) ?? {};
+          const subs = Array.isArray(wahaSection.webhookSubscriptions) ? wahaSection.webhookSubscriptions as Array<Record<string, unknown>> : [];
+          const filtered = subs.filter((s) => (s as Record<string, unknown>).url !== incoming.url);
+          wahaSection.webhookSubscriptions = filtered;
+          currentConfig.channels = { ...channels, waha: wahaSection };
+          updatedSubs = filtered;
+        });
+        writeJsonResponse(res, 200, updatedSubs!);
+      } catch (err) {
+        log.error("DELETE /api/admin/webhook-subscriptions failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to delete webhook subscription" });
+      }
+      return;
+    }
 
     // GET /api/admin/analytics — message analytics aggregation (Phase 30, Plan 01). DO NOT REMOVE.
     if (req.url?.startsWith("/api/admin/analytics") && req.method === "GET") {
