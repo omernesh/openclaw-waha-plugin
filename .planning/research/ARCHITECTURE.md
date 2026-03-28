@@ -1,8 +1,10 @@
 # Architecture Research
 
-**Domain:** Human Mimicry Hardening — time-of-day send gates, hourly message caps, Claude Code mimicry integration
-**Researched:** 2026-03-26
-**Confidence:** HIGH (code directly inspected, all integration points verified in source)
+**Domain:** Chatlytics v2.0 — standalone multi-tenant WhatsApp automation platform extraction
+**Researched:** 2026-03-28
+**Confidence:** HIGH — based on direct source inspection of all 6 coupled files, MCP SDK v1.27.1 API review
+
+---
 
 ## Standard Architecture
 
@@ -10,24 +12,47 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         OpenClaw Gateway (READ-ONLY)                │
-│   handleAction() → plugin.handleAction() → send.ts functions        │
+│                     Clients / Consumers                             │
+│  ┌──────────┐  ┌────────────┐  ┌───────────────┐  ┌─────────────┐  │
+│  │ MCP Tool │  │ REST curl/ │  │  Admin Panel  │  │  OpenClaw   │  │
+│  │ (Claude) │  │ SDK client │  │  (React SPA)  │  │ thin plugin │  │
+│  └────┬─────┘  └─────┬──────┘  └───────┬───────┘  └──────┬──────┘  │
+└───────┼──────────────┼─────────────────┼─────────────────┼─────────┘
+        │              │                 │                 │
+┌───────┴──────────────┴─────────────────┴─────────────────┴─────────┐
+│              standalone.ts  —  Entry Point (NEW)                    │
+│                                                                     │
+│   monitor.ts (http.createServer)                                    │
+│   ├─ /mcp            — MCP StreamableHTTP transport (NEW)           │
+│   ├─ /api/v1/*       — Public REST API, API-key auth (NEW)          │
+│   ├─ /webhook/waha   — WAHA webhook receiver (EXISTING)             │
+│   ├─ /api/admin/*    — Admin dashboard API (EXISTING)               │
+│   └─ /dist/admin/*   — React SPA static files (EXISTING)           │
 ├─────────────────────────────────────────────────────────────────────┤
-│                  NEW: MimicryGate (src/mimicry-gate.ts)             │
-│  ┌──────────────────┐  ┌───────────────────┐  ┌─────────────────┐  │
-│  │  TimeOfDayGate   │  │  HourlyCapTracker │  │  MimicryRouter  │  │
-│  │  (gate.check())  │  │  (cap.consume())  │  │  (delay+type)   │  │
-│  └────────┬─────────┘  └────────┬──────────┘  └───────┬─────────┘  │
-│           │                     │                     │             │
-├───────────┴─────────────────────┴─────────────────────┴────────────┤
-│                 Existing: send.ts (sendWahaText, sendWahaImage...)  │
-│  sendWahaText → [assertCanSend] → [assertPolicyCanSend] → WAHA API  │
+│              Core Business Logic (zero SDK deps — reuse as-is)      │
+│                                                                     │
+│   send.ts          directory.ts      mimicry-gate.ts                │
+│   mimicry-enforcer.ts  activity-scanner.ts  http-client.ts          │
+│   adapter.ts       logger.ts         dedup.ts    dm-filter.ts       │
+│   health.ts        rules-resolver.ts inbound-queue.ts               │
 ├─────────────────────────────────────────────────────────────────────┤
-│              Existing: http-client.ts (callWahaApi)                 │
-│   [TokenBucket] → [circuit breaker] → [429 backoff] → fetch()      │
+│              SDK-Decoupled Layer (NEW/MODIFIED)                     │
+│                                                                     │
+│   platform-types.ts    — local type defs replacing SDK interfaces   │
+│   standalone-inbound.ts — inbound without OC delivery               │
+│   webhook-forwarder.ts — outbound callback with HMAC + backoff      │
+│   config-io.ts         — EXISTING, already OC-agnostic              │
+│   account-utils.ts     — DEFAULT_ACCOUNT_ID + local normalizers     │
+│   request-utils.ts     — readRequestBodyWithLimit replacement        │
 ├─────────────────────────────────────────────────────────────────────┤
-│              Existing: Config Layer (config-schema.ts)              │
-│  WahaConfigSchema (global) → accounts.{id} (per-session override)  │
+│              Data Layer                                             │
+│   ┌──────────────┐  ┌─────────────┐  ┌────────────────┐            │
+│   │ directory.db │  │ mimicry.db  │  │ analytics.db   │            │
+│   │ (SQLite/WAL) │  │ (SQLite/WAL)│  │ (SQLite/WAL)   │            │
+│   └──────────────┘  └─────────────┘  └────────────────┘            │
+│   ┌──────────────────────────────────────────────────────┐         │
+│   │  standalone.json  — config (replaces openclaw.json)  │         │
+│   └──────────────────────────────────────────────────────┘         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -35,384 +60,563 @@
 
 | Component | Responsibility | Status |
 |-----------|----------------|--------|
-| `src/mimicry-gate.ts` | Time-of-day gate + hourly cap enforcement + progression table | NEW |
-| `src/send.ts` | All WAHA API calls; mimicry gate inserted here for outbound sends | MODIFIED (light) |
-| `src/channel.ts` | Action dispatch; Claude Code sends routed through typing simulation | MODIFIED (light) |
-| `src/config-schema.ts` | New Zod fields: `sendGate`, `hourlyCap`, `mimicry` | MODIFIED |
-| `src/monitor.ts` | New admin API route: GET /api/admin/mimicry for cap status | MODIFIED |
-| `src/admin/` (React) | New UI in DashboardTab/SettingsTab for gate and cap config | MODIFIED |
-| `src/presence.ts` | Existing typing simulation — reused by Claude Code path | UNCHANGED |
+| `standalone.ts` | New entry point — boot HTTP server, register WAHA webhook, skip OC plugin registration | NEW |
+| `monitor.ts` | HTTP server, admin routes, SSE, MCP route, public API route — add route branches | MODIFY |
+| `platform-types.ts` | Local definitions for types currently imported from `openclaw/plugin-sdk/*` | NEW |
+| `webhook-forwarder.ts` | Deliver inbound messages to registered callback URLs with HMAC + retry | NEW |
+| `account-utils.ts` | `DEFAULT_ACCOUNT_ID`, `normalizeAccountId`, `listConfiguredAccountIds` — local impls | NEW |
+| `request-utils.ts` | `readRequestBodyWithLimit`, `isRequestBodyLimitError` replacement | NEW |
+| `mcp-server.ts` | MCP `McpServer` factory + tools, mounted via `StreamableHTTPServerTransport` on `/mcp` | NEW |
+| `mcp-stdio.ts` | stdio transport entry point for `npx chatlytics-mcp` | NEW |
+| `api-router.ts` | `/api/v1/*` REST route handlers, API key middleware | NEW |
+| `config-io.ts` | Already OC-agnostic — swap config path via `CHATLYTICS_CONFIG_PATH` env var only | NO CHANGE |
+| `send.ts` | All WAHA API wrappers — zero SDK deps | NO CHANGE |
+| `directory.ts` | SQLite directory — zero SDK deps | NO CHANGE |
+| `mimicry-gate.ts` | Time gate + hourly caps — zero SDK deps | NO CHANGE |
+| `inbound.ts` | Inbound pipeline — inject `IReplyDeliverer`, localize `isWhatsAppGroupJid` | MINOR MODIFY |
+| `accounts.ts` | Account resolution — swap SDK imports for `account-utils.ts` | MINOR MODIFY |
+| `channel.ts` | OpenClaw adapter — keep for backward compat, not used in standalone | KEEP (OC only) |
+| `adapter.ts` | PlatformAdapter interface — zero SDK deps | NO CHANGE |
 
 ---
 
-## Recommended Project Structure
+## Decoupling the 6 SDK-Dependent Files
+
+### 1. `channel.ts` — Heaviest Coupling, No Standalone Work Needed
+
+**SDK imports used:**
+- `ChannelPlugin`, `OpenClawConfig`, `buildChannelConfigSchema`, `deleteAccountFromConfigSection`, etc. from `openclaw/plugin-sdk/core`
+- `buildBaseChannelStatusSummary`, `createDefaultChannelRuntimeState` from `plugin-sdk/status-helpers`
+- `resolveDefaultGroupPolicy` from `plugin-sdk/config-runtime`
+- `waitUntilAbort` from `plugin-sdk/channel-runtime`
+- `ChannelMessageActionAdapter` from `plugin-sdk/channel-contract`
+
+**Strategy: Keep as-is for OpenClaw mode. Not imported in standalone.**
+
+`channel.ts` is the OpenClaw plugin adapter — it is only instantiated when the plugin runs inside the OC gateway. `standalone.ts` never imports it. The action dispatch surface that `channel.ts` provides (`handleAction` / `listActions`) is replaced in standalone mode by `api-router.ts` (REST) and `mcp-server.ts` (MCP).
+
+The one piece of logic to extract: `autoResolveTarget` / name-to-JID resolution. Extract to `target-resolver.ts` (no SDK dep) so it can be shared between `channel.ts` and the REST API layer.
+
+### 2. `inbound.ts` — Multi-layered Coupling, Minor Modification
+
+**SDK imports used:**
+- `resolveDefaultGroupPolicy`, `resolveAllowlistProviderRuntimeGroupPolicy` from `plugin-sdk/config-runtime`
+- `createNormalizedOutboundDeliverer`, `OutboundReplyPayload`, `formatTextWithAttachmentLinks`, `resolveOutboundMediaUrls` from `plugin-sdk/reply-payload`
+- `createReplyPrefixOptions`, `logInboundDrop` from `plugin-sdk/channel-runtime`
+- `readStoreAllowFromForDmPolicy`, `resolveDmGroupAccessWithCommandGate` from `plugin-sdk/security-runtime`
+- `isWhatsAppGroupJid` from `plugin-sdk/whatsapp-shared`
+- `normalizeAccountId` from `plugin-sdk/account-id`
+
+**Strategy: Dependency injection + trivial one-liner replacements.**
+
+The bulk of `inbound.ts` (dedup, slash commands, pairing, module hooks, analytics, mimicry) is already SDK-free. SDK coupling is at two narrow boundaries:
+
+**Boundary 1 — Group policy resolution** (`resolveDefaultGroupPolicy` etc.): In standalone mode, policy lives entirely in `standalone.json`. Replace with local `resolveStandaloneGroupPolicy()` that reads config directly — no SDK needed.
+
+**Boundary 2 — Reply delivery** (`createNormalizedOutboundDeliverer`, `OutboundReplyPayload`): In OC mode, replies go to the OC agent pipeline. In standalone mode, they go to `WebhookForwarder`. Introduce `IReplyDeliverer` in `platform-types.ts` and inject it:
+
+```typescript
+// platform-types.ts (NEW)
+export interface IReplyDeliverer {
+  deliver(payload: StandaloneReplyPayload): Promise<void>;
+}
+export interface StandaloneReplyPayload {
+  chatId: string;
+  text?: string;
+  mediaUrls?: string[];
+  accountId: string;
+  sessionId: string;
+}
+```
+
+`inbound.ts` accepts `IReplyDeliverer` via `setReplyDeliverer()`. OC entry (`index.ts`) passes the OC deliverer. `standalone.ts` passes `WebhookForwarder`.
+
+**Boundary 3 — `isWhatsAppGroupJid`**: Already noted in source at line 468 — "direct JID check replaces SDK isWhatsAppGroupJid." The inline version is `jid.endsWith("@g.us")`. Add this one-liner to `platform-types.ts` as `export function isGroupJid(jid: string): boolean { return jid.endsWith("@g.us"); }` and use it everywhere.
+
+**`normalizeAccountId`**: Delegates to `account-utils.ts` after Phase 1.
+
+### 3. `config-schema.ts` — Already Decoupled
+
+**SDK imports claimed in PRD:** `buildSecretInputSchema` from plugin SDK.
+
+**Actual state (verified by inspection):** `config-schema.ts` imports `buildSecretInputSchema` from `./secret-input.js` — a local file. The file header comment explicitly states: "Local schema definitions — previously imported from openclaw/plugin-sdk but restructured in OpenClaw v2026.3.22. Defined locally. DO NOT REMOVE."
+
+**Action: None.** Verify `src/secret-input.ts` has zero SDK imports (confirm before Phase 1 starts) and consider this file already free.
+
+### 4. `accounts.ts` — Medium Coupling, Trivial Fix
+
+**SDK imports used:**
+- `DEFAULT_ACCOUNT_ID`, `normalizeAccountId`, `listConfiguredAccountIds`, `resolveAccountWithDefaultFallback` from `openclaw/plugin-sdk/account-resolution`
+
+**Strategy: Create `account-utils.ts` with local implementations. ~25 lines total.**
+
+```typescript
+// account-utils.ts (NEW)
+export const DEFAULT_ACCOUNT_ID = "default";
+
+export function normalizeAccountId(id: string): string {
+  return id.trim().toLowerCase();
+}
+
+export function listConfiguredAccountIds(
+  accounts: Record<string, unknown> | undefined,
+  normalize: (id: string) => string = normalizeAccountId
+): string[] {
+  return Object.keys(accounts ?? {}).map(normalize);
+}
+
+export function resolveAccountWithDefaultFallback(
+  accountId: string | undefined
+): string {
+  return accountId ? normalizeAccountId(accountId) : DEFAULT_ACCOUNT_ID;
+}
+```
+
+Update `accounts.ts` to import from `./account-utils.js` instead of the SDK. Zero behavioral change.
+
+### 5. `monitor.ts` — Light Coupling, 3 Replaceable Imports
+
+**SDK imports used:**
+- `readRequestBodyWithLimit`, `isRequestBodyLimitError`, `requestBodyErrorToText` from `plugin-sdk/webhook-ingress`
+- `isWhatsAppGroupJid` from `plugin-sdk/whatsapp-shared`
+- `DEFAULT_ACCOUNT_ID` from `plugin-sdk/account-id`
+- `createLoggerBackedRuntime` from `plugin-sdk/runtime`
+
+**Strategy:**
+
+- `readRequestBodyWithLimit` / `isRequestBodyLimitError` / `requestBodyErrorToText`: Implement in `request-utils.ts` (~25 lines). Body reader with size and timeout limits using Node.js streams.
+- `isWhatsAppGroupJid`: One-liner from `platform-types.ts`.
+- `DEFAULT_ACCOUNT_ID`: Import from `account-utils.ts`.
+- `createLoggerBackedRuntime`: Used only to construct a runtime env for OC pairing calls inside `monitor.ts`. In standalone mode, OC pairing is not applicable — guard this with a runtime mode check or stub the dependency. Do NOT remove — it serves OC mode.
+
+```typescript
+// request-utils.ts (NEW)
+import type { IncomingMessage } from "node:http";
+
+export class RequestBodyLimitError extends Error {
+  constructor(public readonly reason: "too_large" | "timeout") {
+    super(`Request body ${reason}`);
+  }
+}
+
+export async function readRequestBodyWithLimit(
+  req: IncomingMessage,
+  maxBytes: number,
+  timeoutMs: number
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    const timer = setTimeout(
+      () => reject(new RequestBodyLimitError("timeout")),
+      timeoutMs
+    );
+    req.on("data", (chunk: Buffer) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        clearTimeout(timer);
+        req.destroy();
+        reject(new RequestBodyLimitError("too_large"));
+      } else {
+        chunks.push(chunk);
+      }
+    });
+    req.on("end", () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
+    req.on("error", (e) => { clearTimeout(timer); reject(e); });
+  });
+}
+
+export function isRequestBodyLimitError(e: unknown): e is RequestBodyLimitError {
+  return e instanceof RequestBodyLimitError;
+}
+
+export function requestBodyErrorToText(e: RequestBodyLimitError): string {
+  return e.reason === "too_large" ? "Payload too large" : "Request timeout";
+}
+```
+
+### 6. `normalize.ts` — Already Decoupled
+
+**Actual state (verified by inspection):** `normalize.ts` contains only pure functions (`normalizeWahaMessagingTarget`, `normalizeWahaAllowEntry`, `resolveWahaAllowlistMatch`). Zero SDK imports. The PRD's inclusion of this file as SDK-dependent is outdated.
+
+**Action: None.**
+
+---
+
+## MCP Server Integration with `http.createServer`
+
+### Transport
+
+MCP SDK v1.27.1 (installed) ships `StreamableHTTPServerTransport` in `server/streamableHttp.ts`. This transport accepts `(req: IncomingMessage, res: ServerResponse, body?: unknown)` directly — no Express or Hono required. It supports both streaming SSE responses and direct JSON responses per the MCP Streamable HTTP spec.
+
+The legacy `SSEServerTransport` (also present in the SDK) is the older MCP SSE-only transport. Use `StreamableHTTPServerTransport` instead — it is the current spec and handles both SSE and non-streaming in one transport.
+
+### Co-hosting Pattern
+
+Mount on the existing `http.createServer` instance in `monitor.ts` via a new route branch. This preserves all existing routes with zero risk:
+
+```typescript
+// monitor.ts — add inside existing request dispatcher
+// DO NOT restructure the dispatcher — add /mcp as a new branch
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from
+  "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { randomUUID } from "node:crypto";
+
+let mcpServer: McpServer | null = null;
+const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
+
+export function setMcpServer(s: McpServer): void { mcpServer = s; }
+
+// In HTTP handler (new branch):
+if (url.pathname === "/mcp") {
+  if (!mcpServer) { res.writeHead(503); res.end("MCP not initialized"); return; }
+  const rawBody = await readRequestBodyWithLimit(req, 1_048_576, 30_000);
+  const body = rawBody.length ? JSON.parse(rawBody.toString()) : undefined;
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  let transport = sessionId ? mcpTransports.get(sessionId) : undefined;
+  if (!transport) {
+    transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sid) => mcpTransports.set(sid, transport!),
+    });
+    await mcpServer.connect(transport);
+  }
+  await transport.handleRequest(req, res, body);
+  return;
+}
+```
+
+### MCP Server Factory
+
+```typescript
+// mcp-server.ts (NEW)
+// McpServer is instantiated in standalone.ts, passed to setMcpServer() in monitor.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
+
+export interface McpDeps {
+  sendText(params: { chatId: string; text: string; accountId?: string }): Promise<{ id: string }>;
+  getMessages(params: { chatId: string; limit?: number }): Promise<unknown[]>;
+  search(params: { q: string; scope?: string }): Promise<unknown[]>;
+  getDirectory(params: { type?: string; search?: string }): Promise<unknown[]>;
+  getMimicryStatus(params: { accountId?: string }): Promise<unknown>;
+}
+
+export function createMcpServer(deps: McpDeps): McpServer {
+  const server = new McpServer({ name: "chatlytics", version: "2.0.0" });
+
+  server.tool(
+    "send_message",
+    { chatId: z.string(), text: z.string(), accountId: z.string().optional() },
+    async (args) => ({
+      content: [{ type: "text" as const, text: JSON.stringify(await deps.sendText(args)) }],
+    })
+  );
+  // ... remaining tools
+  return server;
+}
+```
+
+The same `deps` object is built in `standalone.ts` and passed to both `createMcpServer()` and `api-router.ts` — no logic duplication.
+
+### stdio Transport (Local `npx` Mode)
+
+```typescript
+// mcp-stdio.ts (NEW) — separate entry point
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createMcpServer, buildMcpDeps } from "./mcp-server.js";
+
+const transport = new StdioServerTransport();
+await createMcpServer(buildMcpDeps()).connect(transport);
+```
+
+Does not start an HTTP server. Packaged as `bin.mcp-stdio` in `package.json`.
+
+---
+
+## Multi-Tenant Isolation Model
+
+### v2.0: Single-Process, Single-Workspace (Recommended)
+
+For the initial Docker container, run one process per workspace. The `accountId`-scoped SQLite instances already provide data isolation. No architectural change from v1.x.
+
+Config path via env var (`CHATLYTICS_CONFIG_PATH`) — one env var, one workspace per container.
+
+### v2.1: Process-Per-Workspace (50+ workspaces)
+
+```
+nginx / API gateway
+  ├─ routes by API key header → workspace registry lookup → upstream port
+  │
+  ├─ workspace-abc (port 8100) → Chatlytics process
+  ├─ workspace-def (port 8101) → Chatlytics process
+  └─ workspace-xyz (port 8102) → Chatlytics process
+```
+
+Each workspace process starts with its own config path. Crash isolation is complete — one runaway workspace cannot affect others. Memory overhead: ~50MB per idle process.
+
+Workspace registry: `~/.chatlytics/registry.json` maps `{ workspaceId: port }`. The API gateway (nginx map or a 50-line Node.js proxy) reads this file to route by API key.
+
+**Why not shared-process?** The `DirectoryDb` and `MimicryDb` are already per-`accountId`, so SQL is isolated. But shared-process exposes risks: a panic in one tenant's inbound handler could crash the process serving all tenants. SQLite's single-writer-per-database model also means long-running tenant operations could cause lock contention despite WAL mode.
+
+### Tenant Data Layout
+
+```
+~/.chatlytics/
+├── registry.json              # workspaceId → port mapping (v2.1)
+└── workspaces/
+    └── {workspaceId}/
+        ├── standalone.json    # workspace config (replaces openclaw.json)
+        ├── directory.db       # contacts, groups, participants
+        ├── mimicry.db         # gate windows, cap buckets
+        └── analytics.db       # event store
+```
+
+WAHA session naming: `{workspaceId}_{sessionName}` — enforced at session provisioning time. Already supported by WAHA's multi-session architecture.
+
+---
+
+## Recommended Project Structure (v2.0)
 
 ```
 src/
-├── mimicry-gate.ts          # NEW — time gate + hourly cap + cap state tracker
-├── send.ts                  # MODIFIED — gate/cap checked before outbound sends
-├── channel.ts               # MODIFIED — Claude Code sends routed through presence.ts
-├── config-schema.ts         # MODIFIED — new sendGate/hourlyCap Zod schemas
-├── presence.ts              # UNCHANGED — reused for Claude Code typing simulation
-├── http-client.ts           # UNCHANGED — token bucket stays (different concern)
-├── monitor.ts               # MODIFIED — /api/admin/mimicry GET route for cap status
-└── admin/src/
-    └── components/tabs/
-        └── DashboardTab.tsx # MODIFIED — new Mimicry card showing gate + cap state
+├── standalone.ts           # NEW: entry point for standalone/Docker mode
+├── mcp-server.ts           # NEW: McpServer factory (tools)
+├── mcp-stdio.ts            # NEW: stdio entry for npx chatlytics-mcp
+├── webhook-forwarder.ts    # NEW: callback URL delivery, HMAC, backoff
+├── api-router.ts           # NEW: /api/v1/* REST route handlers
+├── platform-types.ts       # NEW: IReplyDeliverer, StandaloneReplyPayload, isGroupJid
+├── request-utils.ts        # NEW: readRequestBodyWithLimit, isRequestBodyLimitError
+├── account-utils.ts        # NEW: DEFAULT_ACCOUNT_ID, normalizeAccountId (local impls)
+│
+├── monitor.ts              # MODIFY: add /mcp and /api/v1/ route branches
+├── inbound.ts              # MODIFY: inject IReplyDeliverer, swap isWhatsAppGroupJid
+├── accounts.ts             # MODIFY: import from account-utils.ts instead of SDK
+│
+├── channel.ts              # KEEP UNCHANGED (OpenClaw mode only)
+├── config-schema.ts        # NO CHANGE (already decoupled)
+├── normalize.ts            # NO CHANGE (already zero SDK deps)
+│
+├── send.ts                 # NO CHANGE
+├── directory.ts            # NO CHANGE
+├── mimicry-gate.ts         # NO CHANGE
+├── mimicry-enforcer.ts     # NO CHANGE
+├── activity-scanner.ts     # NO CHANGE
+├── http-client.ts          # NO CHANGE
+├── adapter.ts              # NO CHANGE
+├── logger.ts               # NO CHANGE
+├── dedup.ts                # NO CHANGE
+├── dm-filter.ts            # NO CHANGE
+├── health.ts               # NO CHANGE
+├── config-io.ts            # NO CHANGE (add CHATLYTICS_CONFIG_PATH env support if not present)
+└── admin/                  # NO CHANGE (React SPA)
 ```
-
-### Structure Rationale
-
-- **`mimicry-gate.ts` is new, standalone:** Keeps time-gate and cap logic isolated from the existing token bucket in `http-client.ts`. The token bucket manages per-second API burst; mimicry-gate manages per-hour human volume. These are different timescales and different concerns — do not merge.
-- **Gate check in `send.ts`, not `http-client.ts`:** `callWahaApi` handles ALL WAHA calls including health checks, directory syncs, and group fetches. Caps must only count outbound message sends, not every API call. The right chokepoint is the `sendWahaText` / `sendWahaImage` / `sendWahaVideo` / `sendWahaFile` layer.
-- **Claude Code path goes through `channel.ts`:** The whatsapp-messenger skill calls `handleAction()` which dispatches to `send.ts` functions. The `handleAction()` in `channel.ts` is the correct injection point for pre-send typing delay + presence simulation, keeping `send.ts` free of double-simulation.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Gate Check as Pre-Send Guard
+### Pattern 1: Dependency Injection for Reply Delivery
 
-**What:** `mimicry-gate.ts` exports a single `checkMimicryGate(accountId, chatId, cfg)` function. Call it at the top of `sendWahaText`, `sendWahaImage`, `sendWahaVideo`, `sendWahaFile` — the four outbound message sends that count against the cap. Non-message calls (group info, contacts, presence) skip it.
+**What:** `inbound.ts` receives an `IReplyDeliverer` via `setReplyDeliverer()` at startup. OC mode passes the OC pipeline deliverer. Standalone mode passes `WebhookForwarder`.
 
-**When to use:** Any outbound call that creates a visible WhatsApp message.
+**When to use:** Wherever behavior must differ between OC mode and standalone mode. Replaces SDK-coupled behavior at module boundaries without forking core logic.
 
-**Trade-offs:** Minor per-send overhead (single Map lookup + time arithmetic). Negligible at this scale.
+**Trade-offs:** One init-time call adds to startup sequence. The injected collaborator must be set before the first webhook arrives — enforced by `standalone.ts` boot order.
 
-**Example:**
 ```typescript
-// src/send.ts — top of sendWahaText(), sendWahaImage(), sendWahaVideo(), sendWahaFile()
-import { checkMimicryGate } from "./mimicry-gate.js";
-
-export async function sendWahaText(params: { cfg, to, text, accountId, bypassPolicy, ... }) {
-  const client = getClient(params.cfg, params.accountId);
-  assertCanSend(client.session, params.cfg);
-  // NEW: time gate + hourly cap check (after assertCanSend, before policy check)
-  // bypassPolicy also bypasses gate (system commands like /shutup confirmations)
-  if (!params.bypassPolicy) {
-    checkMimicryGate(client.accountId, chatId, params.cfg); // throws GateError | CapError
-  }
-  // ... rest of existing logic unchanged
+// inbound.ts
+let _replyDeliverer: IReplyDeliverer | null = null;
+export function setReplyDeliverer(d: IReplyDeliverer): void {
+  _replyDeliverer = d;
 }
+
+// standalone.ts
+setReplyDeliverer(new WebhookForwarder(config.webhooks));
+
+// index.ts (OpenClaw)
+setReplyDeliverer(createOpenClawDeliverer(ocRuntime));
 ```
 
-### Pattern 2: In-Memory Cap Tracker with Hourly Buckets
+### Pattern 2: Single HTTP Server, Additive Route Branching
 
-**What:** `mimicry-gate.ts` tracks sent message counts in a `Map<accountId, HourlyWindow>` where `HourlyWindow = { hour: number, count: number }`. On each send, if `Date.now()` is in a new hour, reset count. Compare against configured `hourlyCap.limit`.
+**What:** Keep one `http.createServer` in `monitor.ts`. Add `/mcp` and `/api/v1/` as new `if` branches at the top of the request dispatcher — before existing branches.
 
-**When to use:** Hourly message cap enforcement.
+**When to use:** Adding new route namespaces to an existing raw-HTTP server with DO NOT CHANGE sections.
 
-**Trade-offs:** In-memory only — resets on gateway restart. Acceptable: gateway restart is a rare ops action, not a normal event. Persisting to SQLite adds complexity without meaningful benefit (cap is a rate limiter, not an audit log). If you need historical outbound counts, `analytics.ts` already stores `message_events` with `direction='outbound'`.
+**Trade-offs:** Raw HTTP routing is verbose. Acceptable for the ~10 new REST routes in v2.0. If v2.1 adds >30 new routes, extract `api-router.ts` into a micro-framework or consider Express for the v1 namespace only.
 
-**Example:**
-```typescript
-// src/mimicry-gate.ts
-interface HourlyWindow { hour: number; count: number; }
-const capWindows = new Map<string, HourlyWindow>();
+### Pattern 3: Shared Deps Object, Dual Surfaces
 
-function currentHour(): number { return Math.floor(Date.now() / 3_600_000); }
+**What:** Build a `deps` object in `standalone.ts` containing function references. Pass it to both `createMcpServer(deps)` and `apiRouter(deps)`. Same function references, two consumer surfaces.
 
-export function checkAndConsumeCap(accountId: string, cfg: CoreConfig): void {
-  const limit = resolveCapLimit(accountId, cfg); // global → per-session merge
-  if (!limit) return; // cap disabled
-  const h = currentHour();
-  const win = capWindows.get(accountId) ?? { hour: h, count: 0 };
-  if (win.hour !== h) { win.hour = h; win.count = 0; }
-  if (win.count >= limit) throw new CapError(`Hourly cap reached (${win.count}/${limit})`);
-  win.count++;
-  capWindows.set(accountId, win);
-}
-```
-
-### Pattern 3: Config Hierarchy — Global → Per-Session Merge
-
-**What:** Mirrors the existing pattern in `config-schema.ts` where `WahaConfigSchema` has top-level fields that per-account entries can override. New `sendGate` and `hourlyCap` objects follow the same pattern: top-level defaults, `accounts.{id}` can override. `resolveGateConfig(accountId, cfg)` merges: per-session value takes priority over global, global is the fallback.
-
-**When to use:** All gate and cap resolution in `mimicry-gate.ts`.
-
-**Trade-offs:** No per-contact/group overrides in v1.20. The `DirectoryDb.dm_settings` table has a natural place for per-contact cap settings in a future phase — leave that door open by keeping `resolveCapLimit` as a function (not inline logic), so the signature can later accept `chatId`.
-
-**Example config schema addition (`config-schema.ts`):**
-```typescript
-const SendGateSchema = z.object({
-  enabled: z.boolean().optional().default(true),
-  startHour: z.number().int().min(0).max(23).optional().default(7),   // 7am
-  endHour: z.number().int().min(0).max(23).optional().default(1),     // 1am (next day)
-  timezone: z.string().optional().default("Asia/Jerusalem"),
-  onBlock: z.enum(["reject", "queue"]).optional().default("reject"),
-}).optional();
-
-const HourlyCapSchema = z.object({
-  enabled: z.boolean().optional().default(true),
-  limit: z.number().int().positive().optional().default(40),
-  progressiveLimits: z.array(
-    z.object({
-      daysOld: z.number().int().min(0),
-      limit: z.number().int().positive()
-    })
-  ).optional(), // [{daysOld:0, limit:15}, {daysOld:30, limit:30}, {daysOld:90, limit:50}]
-}).optional();
-```
-
-Add both to `WahaAccountSchemaBase`: `sendGate: SendGateSchema`, `hourlyCap: HourlyCapSchema`.
-
-### Pattern 4: Claude Code Mimicry Integration Point
-
-**What:** The whatsapp-messenger skill calls `handleAction("send", { target, params })` in `channel.ts`. `handleAction` currently dispatches directly to `sendWahaText`. To route through typing delay, inject a presence simulation step before the WAHA send.
-
-**Key insight:** The existing `startHumanPresence()` in `presence.ts` is designed for inbound replies (it takes `incomingText` to calibrate read delay). For Claude Code outbound sends (no incoming message), use a simplified path: `sendWahaPresence(typing: true)` → sleep(calcTypingDuration) → `sendWahaPresence(typing: false)` → send. The `calcTypingDuration` helper is private to `presence.ts` — either export it or duplicate the simple formula in `mimicry-gate.ts`.
-
-**Where exactly:** In `channel.ts` → `handleAction()`, when action is `send` (or any message-creating action), check if the session has `mimicry.simulateTyping` enabled. If yes, run typing simulation before dispatching to `send.ts`. This is exclusively the external tool call path — bot replies go through `inbound.ts` → `startHumanPresence()` and never touch `handleAction()`.
-
-**Example:**
-```typescript
-// src/channel.ts — inside handleAction(), before send dispatch
-if (action === "send" && shouldSimulateTyping(resolvedAccountId, cfg)) {
-  const chatId = resolveTarget(...);
-  const text = params.text ?? "";
-  await simulateOutboundTyping({ cfg, chatId, text, accountId: resolvedAccountId });
-}
-// then dispatch to sendWahaText as before
-```
+**When to use:** When REST API and MCP tools expose the same capabilities. Prevents duplicating business logic between surfaces.
 
 ```typescript
-// src/mimicry-gate.ts — new exported helper
-export async function simulateOutboundTyping(params: {
-  cfg: CoreConfig; chatId: string; text: string; accountId?: string;
-}): Promise<void> {
-  const presenceCfg = resolvePresenceConfig(params.cfg);
-  if (!presenceCfg.enabled) return;
-  await sendWahaPresence({ ...params, typing: true }).catch(warnOnError("mimicry typing-start"));
-  const charsPerSecond = (presenceCfg.wpm * 5) / 60;
-  const baseMs = (params.text.length / charsPerSecond) * 1000;
-  const jitter = presenceCfg.jitter;
-  const jittered = baseMs * (jitter[0] + Math.random() * (jitter[1] - jitter[0]));
-  const duration = Math.min(Math.max(jittered, presenceCfg.typingDurationMs[0]), presenceCfg.typingDurationMs[1]);
-  await sleep(duration);
-  await sendWahaPresence({ ...params, typing: false }).catch(warnOnError("mimicry typing-stop"));
-}
+// standalone.ts
+const deps = {
+  sendText: (p) => sendWahaText(p, config),
+  getMessages: (p) => getWahaChatMessages(p, config),
+  search: (p) => searchDirectory(p, dirDb),
+  getDirectory: (p) => queryDirectory(p, dirDb),
+  getMimicryStatus: (p) => getCapStatus(p, mimicryDb),
+};
+const mcpServer = createMcpServer(deps);
+const apiHandler = createApiRouter(deps);
+setMcpServer(mcpServer);
+setApiRouter(apiHandler);
 ```
 
 ---
 
 ## Data Flow
 
-### Outbound Send Flow (v1.20)
+### Outbound (REST API or MCP Tool → WhatsApp)
 
 ```
-handleAction("send", params)              [channel.ts]
-    |
-    v
-shouldSimulateTyping(accountId, cfg)?
-    | YES
-    v
-simulateOutboundTyping()                  [mimicry-gate.ts]
-  --> sendWahaPresence(typing=true)
-  --> sleep(calcTypingDuration(text))
-  --> sendWahaPresence(typing=false)
-    |
-    v
-sendWahaText(params)                      [send.ts]
-    |
-    v
-checkMimicryGate(accountId, cfg)          [mimicry-gate.ts]
-  --> checkTimeOfDay(accountId, cfg)      -- throws GateError if outside hours
-  --> checkAndConsumeCap(accountId, cfg)  -- throws CapError if over limit
-    |
-    v
-assertCanSend()                           [existing -- unchanged]
-assertPolicyCanSend()                     [existing -- unchanged]
-    |
-    v
-callWahaApi()                             [http-client.ts -- unchanged]
-  --> TokenBucket.acquire()
-  --> fetch()
+Client (REST or MCP tool call)
+    ↓ API key validation middleware
+    ↓ Request parsing (api-router.ts or mcp-server.ts)
+    ↓ Mimicry enforcement (mimicry-enforcer.ts — time gate + hourly cap check)
+    ↓ Rate limiting (http-client.ts token bucket)
+    ↓ WAHA API call (send.ts)
+    ↓ Response → client
 ```
 
-### Inbound Bot Reply Flow (UNCHANGED — for contrast)
+### Inbound (WAHA webhook → registered callback URL)
 
 ```
-handleWahaInbound()                       [inbound.ts]
-    |
-    v
-startHumanPresence()                      [presence.ts]
-  --> sendSeen + readDelay + typing flicker
-    |
-    v
-deliverWahaReply()                        [inbound.ts]
-    |
-    v
-sendWahaText() / sendWahaMediaBatch()     [send.ts]
-  --> checkMimicryGate()                  -- ALSO applies here (bot replies count too)
-  --> callWahaApi()
+WAHA POST /webhook/waha
+    ↓ HMAC signature check (signature.ts)
+    ↓ Always return HTTP 200 immediately (prevents WAHA retry storms)
+    ↓ Dedup by messageId (dedup.ts)
+    ↓ Inbound queue (inbound-queue.ts — bounded, priority DMs)
+    ↓ handleWahaInbound() (inbound.ts)
+    ↓ Policy check (dm-filter, rules-resolver)
+    ↓ Slash command detection (commands.ts, shutup.ts)
+    ↓ Module hooks (module-registry.ts)
+    ↓ IReplyDeliverer.deliver()
+         ├─ OpenClaw mode: OC agent delivery pipeline (unchanged)
+         └─ Standalone mode: WebhookForwarder
+               ↓ POST to registered callback URL
+               ↓ X-Chatlytics-Signature: HMAC-SHA256 header
+               ↓ Retry with exponential backoff (3 attempts, 1s/2s/4s)
+               ↓ Dead-letter log on final failure
 ```
 
-Note: bot inbound replies will also be counted against the hourly cap via the `send.ts` gate check. This is intentional — the cap limits all outbound messages from the session, regardless of trigger source.
-
-### Config Resolution Flow
+### MCP Request/Response Flow
 
 ```
-resolveGateConfig(accountId, cfg):
-  accounts[accountId].sendGate        (per-session, highest priority)
-    | fallback
-  cfg.channels.waha.sendGate          (global)
-    | fallback
-  DEFAULTS                            (enabled=true, 7am-1am, reject)
-
-resolveCapLimit(accountId, cfg):
-  accounts[accountId].hourlyCap.limit (per-session)
-    | fallback
-  cfg.channels.waha.hourlyCap.limit   (global)
-    | fallback + progression check
-  progressiveLimits[accountAge].limit (if progressive table set)
+Claude Code / MCP client
+    ↓ POST /mcp with mcp-session-id header (or new session)
+    ↓ monitor.ts routes to StreamableHTTPServerTransport
+    ↓ Transport parses JSON-RPC, dispatches to McpServer
+    ↓ Tool handler calls shared deps function
+    ↓ (same path as REST outbound from here)
+    ↓ Response via SSE stream (tools/call) or direct JSON (init)
 ```
 
-### Admin Panel Data Flow (new routes)
+---
 
-```
-GET /api/admin/mimicry
-  Response: [{ accountId, session,
-               gate: { enabled, startHour, endHour, timezone, currentlyOpen },
-               cap:  { enabled, limit, usedThisHour, resetsAt } }]
+## Build Order (Phase Dependencies)
 
-SSE stream (existing /api/admin/events) -- optional: push cap_consumed events
-```
+| Phase | Deliverable | New Files | Modified Files | Depends On |
+|-------|-------------|-----------|----------------|------------|
+| **Phase 1** | SDK decoupling | `platform-types.ts`, `account-utils.ts`, `request-utils.ts` | `accounts.ts`, `monitor.ts` (swap imports), `inbound.ts` (IReplyDeliverer inject + isGroupJid) | Nothing — all parallel |
+| **Phase 1** | Config path abstraction | — | `config-io.ts` (if CHATLYTICS_CONFIG_PATH not yet supported) | Nothing |
+| **Phase 2** | Standalone entry + Docker | `standalone.ts`, `Dockerfile` | — | Phase 1 complete |
+| **Phase 2** | Webhook forwarder | `webhook-forwarder.ts` | — | `platform-types.ts` (IReplyDeliverer) |
+| **Phase 3** | Public REST API | `api-router.ts` | `monitor.ts` (add /api/v1/ branch) | `standalone.ts` booting |
+| **Phase 4** | MCP server | `mcp-server.ts` | `monitor.ts` (add /mcp branch) | `api-router.ts` (reuse deps), Phase 3 |
+| **Phase 4** | MCP stdio | `mcp-stdio.ts` | `package.json` (bin entry) | `mcp-server.ts` |
+| **Phase 5** | Dashboard auth + onboarding | `auth-middleware.ts` | `monitor.ts` (auth guards) | Phase 3 |
+| **Phase 6** | Multi-tenant process isolation | `workspace-registry.ts`, `gateway-proxy.ts` | `standalone.ts` | All above stable |
+
+Phase 1 can be done in a single PR — it is pure import substitution with no behavioral change. Phases 2-4 are the core v2.0 deliverables.
 
 ---
 
 ## Integration Points
 
-### New vs Modified — Explicit Breakdown
+### External Services
 
-| File | Change Type | What Changes |
-|------|-------------|-------------|
-| `src/mimicry-gate.ts` | **NEW** | Time gate + cap tracker + config resolution + `simulateOutboundTyping` + `getCapStatus` |
-| `src/config-schema.ts` | **MODIFIED** | Add `sendGate` and `hourlyCap` Zod schemas to `WahaAccountSchemaBase` |
-| `src/send.ts` | **MODIFIED** | Add `checkMimicryGate()` call at top of 4 send functions; respect existing `bypassPolicy` flag |
-| `src/channel.ts` | **MODIFIED** | Add typing simulation for tool-call `send` action; guard with `shouldSimulateTyping()` |
-| `src/monitor.ts` | **MODIFIED** | Add `GET /api/admin/mimicry` route returning gate+cap status per session |
-| `src/admin/src/components/tabs/DashboardTab.tsx` | **MODIFIED** | New "Send Gates" card: gate open/closed badge + cap progress bar |
-| `src/admin/src/components/tabs/SettingsTab.tsx` | **MODIFIED** | New sendGate/hourlyCap config section (enable toggle, hours inputs, cap limit) |
-| `src/admin/src/types.ts` | **MODIFIED** | Add `SendGateStatus`, `HourlyCapStatus` types |
-| `src/presence.ts` | **UNCHANGED** | Reused via `simulateOutboundTyping` calling `sendWahaPresence` + `sleep` |
-| `src/http-client.ts` | **UNCHANGED** | Token bucket stays; different concern (burst vs hourly) |
-| `src/directory.ts` | **UNCHANGED** | No per-contact cap in v1.20; `dm_settings` available for Phase 2 |
-| `src/analytics.ts` | **UNCHANGED** | Existing outbound event tracking covers cap audit if needed |
-| `src/inbound.ts` | **UNCHANGED** | Bot reply path unchanged; gate applies via `send.ts` layer automatically |
+| Service | Integration | Notes |
+|---------|-------------|-------|
+| WAHA API | `http-client.ts` → `send.ts` | Existing, stable. 30s AbortController timeouts. Token bucket rate limiter. |
+| Registered callback URLs | `webhook-forwarder.ts` POST | NEW. HMAC-SHA256 per webhook. Exponential backoff. Store URLs in `standalone.json`. |
+| MCP clients (Claude Code, Claude Desktop) | `StreamableHTTPServerTransport` on `/mcp` | MCP SDK v1.27.1 already installed. Native Node.js HTTP — no framework needed. |
 
-### Internal Boundaries
+### Internal Module Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| `channel.ts` → `mimicry-gate.ts` | Direct import — `simulateOutboundTyping()` | Before `sendWahaText` dispatch in `handleAction()` |
-| `send.ts` → `mimicry-gate.ts` | Direct import — `checkMimicryGate()` | At start of 4 send functions |
-| `mimicry-gate.ts` → `send.ts` | Direct import — `sendWahaPresence()` | For typing start/stop in `simulateOutboundTyping` |
-| `mimicry-gate.ts` → `http-client.ts` | Direct import — `sleep()` | For typing delay in `simulateOutboundTyping` |
-| `monitor.ts` → `mimicry-gate.ts` | Direct import — `getCapStatus()` | For admin API route |
-| `config-schema.ts` | Extended in place | Schema is source of truth; no circular dep added |
-
----
-
-## Build Order
-
-Dependencies flow: schema → enforcement → UI. Phases 2 and 3 are independent and can build in parallel.
-
-**Phase 1 — Config Schema + MimicryGate core** (no external deps)
-- Add `sendGate` + `hourlyCap` Zod schemas to `config-schema.ts`
-- Write `src/mimicry-gate.ts`: `checkTimeOfDay`, `checkAndConsumeCap`, `resolveGateConfig`, `resolveCapLimit`, `getCapStatus`
-- Unit tests for gate + cap logic
-- Gate: `vitest` passes, config validates without error
-
-**Phase 2 — Wire gate/cap into send.ts** (depends on Phase 1)
-- Add `checkMimicryGate()` call to `sendWahaText`, `sendWahaImage`, `sendWahaVideo`, `sendWahaFile`
-- Respect `bypassPolicy` flag — gate skipped when `bypassPolicy: true`
-- Integration test: send outside hours throws `GateError`, exceed cap throws `CapError`
-- Gate: deploy + live test, confirm messages blocked correctly, `/shutup` confirm still works
-
-**Phase 3 — Claude Code mimicry integration** (depends on Phase 1, parallel with Phase 2)
-- Add `simulateOutboundTyping()` to `mimicry-gate.ts`
-- Wire into `channel.ts` `handleAction()` for `send` action
-- Gate: live test via whatsapp-messenger skill — typing indicator appears in WhatsApp before message
-
-**Phase 4 — Admin UI + API route** (depends on Phases 1-3)
-- Add `GET /api/admin/mimicry` to `monitor.ts`
-- DashboardTab: new "Send Gates" card with gate status badge + hourly cap progress bar
-- SettingsTab: sendGate hours pickers + hourlyCap limit input + progressive limits table
-- Gate: Playwright test
-
-### Critical Dependency Notes
-
-- `bypassPolicy` is the existing escape hatch — all gate/cap enforcement MUST check it. System commands (`/shutup`, `/join`, `/leave`) pass `bypassPolicy: true` and must continue to bypass the gate.
-- Bot inbound replies go through `send.ts` and WILL be counted against the hourly cap. This is intentional — the cap is a per-session outbound rate, regardless of trigger source. If this needs to be optional, add a separate `skipMimicryGate` boolean to `sendWahaText` params.
-- The `resolvePresenceConfig()` function in `presence.ts` is unexported. Either export it (preferred) or duplicate the config resolution in `mimicry-gate.ts`.
-
----
-
-## Scaling Considerations
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 1-5 sessions | In-memory cap tracker per accountId — no changes needed |
-| 10+ sessions (SaaS) | Move cap state to SQLite `mimicry_caps` table, same pattern as `analytics.ts` |
-| High-volume | Progressive limits table in config handles account maturity automatically |
-
-The in-memory approach is correct for the current single-node hpg6 deployment. The `Map<accountId, ...>` keying already supports multiple sessions.
+| `monitor.ts` ↔ `mcp-server.ts` | `setMcpServer()` + shared http.Server | Transport takes IncomingMessage/ServerResponse directly |
+| `monitor.ts` ↔ `api-router.ts` | `setApiRouter(handler)` + route branch call | Keep route logic in api-router.ts, not inlined in monitor.ts |
+| `inbound.ts` ↔ `webhook-forwarder.ts` | `IReplyDeliverer` interface (injected) | No direct import — loose coupling via interface |
+| `standalone.ts` ↔ `channel.ts` | None | `channel.ts` is only imported by `index.ts` (OC entry) |
+| `api-router.ts` ↔ `mcp-server.ts` | Shared `McpDeps` / `ApiDeps` object | Same function references, no logic duplication |
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Gate Check in `callWahaApi`
+### Anti-Pattern 1: Forking Core Logic with `if (standalone)` Branches
 
-**What people do:** Put the gate/cap check in `http-client.ts` since all WAHA calls go through it.
+**What people do:** Add `if (process.env.STANDALONE_MODE)` checks inside `inbound.ts` or `send.ts`.
 
-**Why it's wrong:** `callWahaApi` is called for health checks, group syncs, presence updates, contact fetches — none of which are message sends. The hourly cap would count every API call, not just user-visible messages. At 15 tokens/sec (token bucket default), the cap would be exhausted in seconds.
+**Why wrong:** Turns core modules into mode-aware state machines. Tests must simulate modes. Future changes must reason about both branches. Regressions are invisible.
 
-**Do this instead:** Check at the `sendWahaText` / `sendWahaImage` / `sendWahaVideo` / `sendWahaFile` layer in `send.ts`. These four functions are the only ones that create visible WhatsApp messages.
+**Do this instead:** Dependency injection (Pattern 1). Core modules accept collaborators at init time. Entry points wire the right collaborators for their mode.
 
-### Anti-Pattern 2: Double-Simulate Typing for Bot Replies
+### Anti-Pattern 2: Rewriting the HTTP Router with Express
 
-**What people do:** Add `simulateOutboundTyping()` to `sendWahaText` unconditionally.
+**What people do:** "Now that we're standalone, let's clean up monitor.ts with Express."
 
-**Why it's wrong:** Inbound bot replies already go through `startHumanPresence()` in `inbound.ts` which runs a full read delay + typing flicker. Calling it again in `send.ts` would stack two typing simulations, causing the bot to show typing for 2x the expected duration.
+**Why wrong:** `monitor.ts` has 2,400+ lines of battle-tested routes with DO NOT CHANGE markers. Migrating to Express requires touching every handler, risks regressions on admin panel, SSE, WAHA webhook, and proxy-send paths. Express provides no benefit for the ~10 new REST routes needed.
 
-**Do this instead:** `simulateOutboundTyping()` is only called from `channel.ts` `handleAction()` — the code path exclusive to external tool calls (Claude Code / skill invocations). The `send.ts` gate check has no typing simulation, only the gate/cap enforcement.
+**Do this instead:** Add `/mcp` and `/api/v1/` as new branches in the existing dispatcher. Use `api-router.ts` as a sub-handler to keep new code separate from existing routes. Mark the addition clearly — do not move existing route code.
 
-### Anti-Pattern 3: Persist Cap State to SQLite on Every Send
+### Anti-Pattern 3: Second HTTP Server for MCP
 
-**What people do:** Write cap counters to `analytics.ts` or a new `mimicry_caps` table for persistence across restarts.
+**What people do:** `const mcpHttpServer = http.createServer(...); mcpHttpServer.listen(8051)`.
 
-**Why it's wrong:** Gateway restarts are rare and intentional (deploy cycle). Writing to SQLite on every outbound message adds I/O overhead with no practical benefit. The `analytics.ts` already stores `message_events` with `direction='outbound'` — if you need post-restart cap reconstruction, that data is there.
+**Why wrong:** Two ports in Docker, two TLS termination points, two auth boundaries, doubled CORS config. The MCP SDK's `StreamableHTTPServerTransport` is designed to mount on a route of an existing server.
 
-**Do this instead:** In-memory `Map<accountId, HourlyWindow>`. Cap resets on restart are acceptable behavior.
+**Do this instead:** Mount `/mcp` on the existing monitor.ts server. One port (8050), one TLS cert, one auth middleware.
 
-### Anti-Pattern 4: Timezone Handling with `Date.getHours()`
+### Anti-Pattern 4: Shared WAHA Sessions Across Workspaces
 
-**What people do:** Use `new Date().getHours()` for time-of-day gate.
+**What people do:** Multi-tenant deployment reuses the same WAHA session names across workspaces.
 
-**Why it's wrong:** Returns server local time. hpg6 is UTC+3, but if server timezone changes or user wants a different timezone in config, the gate breaks silently.
+**Why wrong:** WAHA session names are global webhook routing identifiers. Two workspaces sharing a session receive each other's webhooks and could send messages impersonating each other.
 
-**Do this instead:** Use `Intl.DateTimeFormat` with configurable timezone from `sendGate.timezone` (default `"Asia/Jerusalem"`):
+**Do this instead:** Prefix all session names: `{workspaceId}_{sessionName}`. Enforced at provisioning time. Zero WAHA API changes needed — it already supports multi-session.
 
-```typescript
-function getHourInTimezone(tz: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric", hour12: false, timeZone: tz
-  }).formatToParts(new Date());
-  return parseInt(parts.find(p => p.type === "hour")!.value, 10);
-}
-```
+---
 
-Pure JS, no library needed, handles DST correctly.
+## Scaling Considerations
+
+| Scale | Architecture |
+|-------|-------------|
+| 1 workspace (v2.0) | Single process, single Docker container — existing architecture unchanged |
+| 10-50 workspaces (v2.1) | Process-per-workspace, nginx upstream routing by API key → workspace registry, shared WAHA with session namespacing |
+| 100k+ workspaces | WAHA-per-tenant cluster, SQLite → Postgres for directory. Out of scope for v2.x. |
+
+**First bottleneck:** SQLite WAL write contention on a busy single workspace under high inbound message volume. Mitigation: per-workspace database files (already planned) with `PRAGMA busy_timeout = 5000`.
+
+**Second bottleneck:** Activity scanner periodic WAHA API polls (one poll per active chat per scan interval). At 50 workspaces × 20 active chats = 1,000 periodic HTTP calls. Mitigation: per-workspace jitter on scan intervals, WAHA API call budget enforcement in `http-client.ts` token bucket.
 
 ---
 
 ## Sources
 
-- Direct code inspection: `src/send.ts`, `src/channel.ts`, `src/http-client.ts`, `src/config-schema.ts`, `src/presence.ts`, `src/rate-limiter.ts`, `src/analytics.ts`, `src/inbound.ts`
-- `.planning/PROJECT.md` — v1.20 requirements and existing architecture decisions table
-- `CLAUDE.md` — critical rules, deploy constraints, send.ts DO NOT CHANGE markers
+- Direct source inspection: `src/channel.ts`, `src/inbound.ts`, `src/monitor.ts`, `src/accounts.ts`, `src/config-schema.ts`, `src/normalize.ts`, `src/adapter.ts` (all inspected 2026-03-28)
+- `docs/PRD-v2.md` — target architecture diagram, SDK coupling list (T01), multi-tenant model recommendation
+- `.planning/PROJECT.md` — milestone history, existing architectural decisions
+- `node_modules/@modelcontextprotocol/sdk` v1.27.1 — `server/streamableHttp.d.ts` confirms native Node.js HTTP transport, no Express dependency; `server/mcp.d.ts`, `server/stdio.d.ts`
 
 ---
-*Architecture research for: WAHA OpenClaw Plugin v1.20 Human Mimicry Hardening*
-*Researched: 2026-03-26*
+*Architecture research for: Chatlytics v2.0 standalone extraction from OpenClaw plugin*
+*Researched: 2026-03-28*

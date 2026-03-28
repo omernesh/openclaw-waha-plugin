@@ -1,230 +1,162 @@
 # Stack Research
 
-**Domain:** WhatsApp bot human mimicry — time gates, hourly caps, typing delay
-**Researched:** 2026-03-26
+**Domain:** Standalone multi-tenant WhatsApp automation platform (Chatlytics v2.0)
+**Researched:** 2026-03-28
 **Confidence:** HIGH
 
-## Context: What's Already in the Codebase
+---
 
-This is an additive milestone. The following are confirmed present and must NOT be re-added:
+## Context: What Already Exists (Do Not Re-evaluate)
 
-| Capability | Where | Notes |
-|------------|-------|-------|
-| `better-sqlite3` ^11.10.0 | `package.json` | Used by `AnalyticsDb`, `DirectoryDb` |
-| `zod` ^4.3.6 | `package.json` | Config schema validation |
-| Token bucket rate limiter | `src/rate-limiter.ts` | Per-API-call concurrency, NOT per-hour message counting |
-| `sendWahaPresence()` | `src/send.ts:176` | Calls `/api/startTyping` / `/api/stopTyping` — already implemented |
-| `AnalyticsDb` (SQLite event store) | `src/analytics.ts` | Pattern to follow for hourly counter table |
-| Multi-session config hierarchy | `src/config-schema.ts` | Global + per-account fields via `WahaConfigSchema.accounts` |
-| `createRequire` + `better-sqlite3` pattern | `src/analytics.ts:9` | How to open SQLite in TypeScript with jiti |
+The following stack is validated and in production (16,000+ LOC, 594 passing tests). These are not up for debate.
+
+| Layer | Technology | Notes |
+|-------|------------|-------|
+| Runtime | TypeScript + Node.js 22 (ESM) | `"type": "module"`, tsx used by jiti for dev |
+| HTTP Server | `http.createServer` (raw Node) | monitor.ts — self-contained, ~30 admin routes |
+| Database | `better-sqlite3` ^11.10.0 | directory, mimicry, analytics — per-account instances |
+| Admin SPA | React 19 + shadcn/ui + Tailwind CSS v4 + Vite v8 | Fully built, deployed |
+| Testing | vitest ^4 | 594 passing, React Testing Library |
+| Validation | `zod` ^4.3.6 | Config schema, inbound |
+| Caching | `lru-cache` ^11.2.6 | Bounded LRU throughout |
+| YAML | `yaml` ^2 | Rules engine |
+
+**Do not replace any of the above.**
 
 ---
 
-## New Capabilities Needed
+## New Additions Required for v2.0
 
-### 1. Timezone-Aware Time-of-Day Check
+These are the only new packages needed for the features listed in the milestone question.
 
-**Recommendation: Use `Intl.DateTimeFormat` (Node.js built-in — zero new dependencies)**
+### Core New Technologies
 
-No library needed. `Intl.DateTimeFormat` with `timeZone` option is fully supported in Node.js 18+ and handles all IANA timezone strings (e.g., `"Asia/Jerusalem"`, `"America/New_York"`).
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| `@modelcontextprotocol/sdk` | ^1.28.0 | MCP server — tools, resources, prompts via StreamableHTTP + stdio | Official Anthropic TypeScript SDK. Only viable option for MCP protocol. v1.28.0 is current stable (v2 anticipated but not yet released). Peer dep on zod already satisfied by project's zod ^4.3.6. |
+| `better-auth` | ^1.5.6 | User registration, email/password sessions, API key management | Has `toNodeHandler()` that mounts onto raw `http.createServer` — critical given existing server architecture. Built-in API key plugin (generate, hash, rotate, revoke). Has a `better-sqlite3` adapter so the existing DB infrastructure is reused. Most actively maintained TypeScript auth library in 2026 (weekly releases). |
+| `@stoplight/spectral-cli` | ^6.15.0 | OpenAPI 3.1 spec linting and validation | De-facto standard for OpenAPI spec validation. Has built-in OAS 3.1 ruleset. PRD mandates hand-written YAML spec — spectral validates it without requiring Express or code decorators. Runs in CI with zero config. |
+| `openapi-typescript` | ^7.13.0 | Generate TypeScript types from the hand-written OpenAPI spec | Runtime-free type generation. Keeps `/api/v1/` handler signatures in sync with the YAML spec. Does NOT generate a full client — only types, which is all that is needed to type-check the raw `http.createServer` route handlers. |
 
-```typescript
-function isWithinSendWindow(
-  nowMs: number,
-  timezone: string,   // IANA string, e.g. "Asia/Jerusalem"
-  startHour: number,  // 0-23, e.g. 7
-  endHour: number     // 0-23, e.g. 25 (next day 1am = 25)
-): boolean {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour: "numeric",
-    hour12: false,
-  });
-  const hour = parseInt(formatter.format(new Date(nowMs)), 10);
-  // endHour > 23 = spans midnight (e.g. 7..25 means 7am to 1am next day)
-  if (endHour > 24) {
-    return hour >= startHour || hour < (endHour - 24);
-  }
-  return hour >= startHour && hour < endHour;
-}
-```
+### Supporting Libraries
 
-**Why not Luxon:** Adds 68KB. The project already avoids date libraries (no `date-fns`, no `luxon` in `package.json`). Native `Intl` handles all IANA timezones since Node 18.
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `jose` | ^6.2.2 | JWT signing/verification, HMAC-SHA256 webhook signatures | Generate workspace API key JWTs; sign outbound webhook payloads with HMAC-SHA256 for verification. ESM-first — required since project is `"type": "module"`. |
+| `ulid` | ^3.0.2 | Sortable unique IDs for workspace, API key, webhook subscription records | ULIDs are lexicographically sortable (useful for SQLite ordering). Zero dependencies. Same effort as uuid, better properties for row ordering. |
+| `@hey-api/openapi-ts` | ^0.94.5 | Generate TypeScript + Python SDK clients from the OpenAPI spec | Only needed for Phase 7 (distribution/SDK clients). Do not add until that phase — it generates heavy client boilerplate and its output format moves between versions. |
 
-**Why not Temporal API:** Stage 3 proposal, requires polyfill (`@js-temporal/polyfill`). Not production-ready without extra dependency. Overkill for a single hour-of-day check.
+### Development Tools (no install — run via npx)
 
-**Confidence:** HIGH — MDN docs + Node.js 18 confirmed support.
-
----
-
-### 2. Hourly Message Counter (Sliding Window)
-
-**Recommendation: Custom SQLite table using existing `better-sqlite3` — zero new dependencies**
-
-**Why not `rate-limiter-flexible`:** The library supports `better-sqlite3` but adds a new dependency for functionality that is trivially implemented with 3 SQL statements against the existing SQLite infrastructure. The analytics and directory DBs establish a clean pattern to follow.
-
-**Implementation pattern** (new file `src/send-limiter.ts`):
-
-```typescript
-// Table: send_counts
-// Columns: account_id TEXT, window_start INTEGER, count INTEGER
-// window_start = floor(timestamp / 3600000) * 3600000 (1-hour buckets)
-
-// Check if under cap
-function canSend(db: Database, accountId: string, cap: number): boolean {
-  const windowStart = Math.floor(Date.now() / 3600_000) * 3600_000;
-  const row = db.prepare(
-    "SELECT count FROM send_counts WHERE account_id = ? AND window_start = ?"
-  ).get(accountId, windowStart) as { count: number } | undefined;
-  return (row?.count ?? 0) < cap;
-}
-
-// Increment counter
-function recordSend(db: Database, accountId: string): void {
-  const windowStart = Math.floor(Date.now() / 3600_000) * 3600_000;
-  db.prepare(`
-    INSERT INTO send_counts (account_id, window_start, count) VALUES (?, ?, 1)
-    ON CONFLICT(account_id, window_start) DO UPDATE SET count = count + 1
-  `).run(accountId, windowStart);
-}
-```
-
-This is a **fixed window** (hourly buckets), not sliding window. Sliding window requires per-message timestamp storage — unnecessary complexity for an anti-bot use case where "roughly 30 messages per hour" is the goal, not exact enforcement.
-
-**Progressive limits** (account maturity) are a config value, not algorithmic — no extra library needed. Config field: `hourlyCapBaseline: number`, `hourlyCapMature: number`, `matureAfterDays: number`.
-
-**Persistence across restarts:** Yes — SQLite survives restarts, unlike in-memory counters.
-
-**Prune old rows:** Add `DELETE FROM send_counts WHERE window_start < ?` with 24h retention on init (same pattern as `AnalyticsDb.prune()`).
-
-**Confidence:** HIGH — pattern directly mirrors existing `AnalyticsDb` and `DirectoryDb` implementations.
-
----
-
-### 3. Claude Code Mimicry Integration (whatsapp-messenger skill routing)
-
-**Recommendation: Wrap `sendWahaText` with a new `sendWithMimicry()` function — no new dependencies**
-
-The existing `sendWahaPresence()` (src/send.ts:176) already calls `/api/startTyping` and `/api/stopTyping`. The typing delay logic is pure `setTimeout` math.
-
-**Integration point:** The `whatsapp-messenger` Claude Code skill calls `sendWahaText` directly via the plugin's action handler in `channel.ts`. Mimicry wrapping should happen at the `send` action dispatch layer.
-
-**Typing delay formula:**
-```typescript
-function typingDelayMs(text: string): number {
-  // Human average: ~200 chars/min = ~3.3 chars/sec
-  // Add jitter: +/-20%
-  const baseMs = (text.length / 3.3) * 1000;
-  const jitter = baseMs * (0.8 + Math.random() * 0.4);
-  return Math.min(Math.max(jitter, 500), 8000); // clamp 0.5s to 8s
-}
-```
-
-**No new library needed.** TheaterJS and similar libraries are browser-only typing animation tools, not server-side delay calculators.
-
-**Config flag to control mimicry:** `humanMimicry.enabled: boolean` per-account. When `false` (default for bot session), sends fire immediately. When `true` (for `omer` session / Claude Code sends), typing indicator + delay is applied.
-
-**Confidence:** HIGH — `sendWahaPresence` already works (confirmed in CLAUDE.md and send.ts).
-
----
-
-## Recommended Stack (New Additions Only)
-
-### Core Technologies — No New Dependencies
-
-| Capability | Approach | Why |
-|------------|----------|-----|
-| Timezone check | `Intl.DateTimeFormat` (built-in) | Zero deps, full IANA support, Node 18+ |
-| Hourly counter | New SQLite table on existing `better-sqlite3` | Reuses established DB pattern, persists across restarts |
-| Typing delay | `setTimeout` + existing `sendWahaPresence()` | Already implemented, just needs orchestration wrapper |
-| Progressive limits | Config fields on `WahaAccountSchemaBase` | Zod already present, no new validation library |
-| Time gate enforcement | Inline at `sendWahaText` call site | No middleware framework needed |
-
-### Supporting Libraries — No New Additions
-
-| Library | Already Present | Usage |
-|---------|----------------|-------|
-| `better-sqlite3` ^11.10.0 | YES | Add `send_counts` table alongside `message_events` |
-| `zod` ^4.3.6 | YES | Extend `WahaAccountSchemaBase` with mimicry config fields |
-| `lru-cache` ^11.2.6 | YES | Cache per-account config lookups if needed |
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| `@modelcontextprotocol/inspector` | Visual debug UI for MCP server | `npx @modelcontextprotocol/inspector` — no local install needed. Use during Phase 3 to verify tool schemas, request/response shapes, and transport behavior. |
 
 ---
 
 ## Installation
 
 ```bash
-# No new packages needed.
-# All capabilities implemented using existing dependencies.
+# New production dependencies
+npm install @modelcontextprotocol/sdk better-auth jose ulid
+
+# New dev dependencies
+npm install -D @stoplight/spectral-cli openapi-typescript
 ```
-
----
-
-## Config Schema Additions (Zod)
-
-New fields on `WahaAccountSchemaBase` in `src/config-schema.ts`:
-
-```typescript
-humanMimicry: z.object({
-  enabled: z.boolean().optional().default(false),
-  timezone: z.string().optional().default("UTC"),
-  sendWindowStart: z.number().int().min(0).max(23).optional().default(7),   // 7am
-  sendWindowEnd: z.number().int().min(0).max(48).optional().default(25),    // 1am next day
-  hourlyCapBaseline: z.number().int().positive().optional().default(30),    // new accounts
-  hourlyCapMature: z.number().int().positive().optional().default(50),      // mature accounts
-  matureAfterDays: z.number().int().positive().optional().default(30),
-  typingDelayEnabled: z.boolean().optional().default(false),
-}).optional().default({})
-```
-
-Config hierarchy: global `humanMimicry` block + per-account override via `accounts[id].humanMimicry`. Resolver merges shallow (per-account wins) — matches existing pattern from `dmFilter`/`groupFilter`.
 
 ---
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `Intl.DateTimeFormat` (built-in) | `luxon` ^3.x | Only if project already uses Luxon for other reasons — not this project |
-| `Intl.DateTimeFormat` (built-in) | `@js-temporal/polyfill` | When Temporal reaches Stage 4 + Node native support (not yet) |
-| Custom SQLite table | `rate-limiter-flexible` | When you need Redis or distributed rate limiting across multiple nodes |
-| Custom SQLite table | In-memory counter | Never for this use case — restarts reset the counter |
-| `setTimeout` + existing `sendWahaPresence` | Any typing animation library | Never — these are browser-only tools |
+| Recommended | Alternative | Why Not |
+|-------------|-------------|---------|
+| `better-auth` | Clerk / Auth0 | External SaaS — adds latency, vendor lock-in, cost at scale, and breaks self-hosted Docker deployments that have no internet. Better Auth is fully self-contained. |
+| `better-auth` | Passport.js | Unmaintained ecosystem (last major release ~2019). No built-in API key support. Would require 5+ separate plugins wired manually. No ESM-first design. |
+| `better-auth` | Custom JWT auth | Reinventing token rotation, session management, key revocation, CSRF protection — weeks of error-prone work. Better Auth ships all of it. |
+| `@stoplight/spectral-cli` | `swagger-parser` | swagger-parser validates structure only. Spectral runs both schema validation and style/completeness rules. OAS 3.1 support is native in spectral, patchy in swagger-parser. |
+| `@stoplight/spectral-cli` | Redocly CLI | Redocly includes bundler + preview + lint (heavy). Spectral is CI-focused, lighter, pure validation. |
+| MCP StreamableHTTP transport | MCP SSE transport | SSE deprecated in MCP spec 2025-03-26. Multiple providers (Atlassian, Keboola) announcing hard cutoffs April–June 2026. Implement StreamableHTTP from the start; optionally add SSE fallback for backward compat. |
+| `openapi-typescript` | `@hey-api/openapi-ts` | hey-api generates full client SDK code — heavyweight for a server-side type-checking use case. `openapi-typescript` generates only types, which is exactly what is needed to type-check raw `http` handlers without adding a framework. |
+| `jose` | `jsonwebtoken` | `jsonwebtoken` is CommonJS-only with no native ESM support. The project is `"type": "module"`. `jose` is ESM-first, actively maintained, FIPS-compliant. |
+| `ulid` | `uuid` | Both are trivially small. ULIDs add lexicographic sort ordering for free, useful for SQLite workspace and API key tables. |
 
 ---
 
-## What NOT to Use
+## What NOT to Add
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `luxon` / `date-fns-tz` / `dayjs` | Zero additional capability over `Intl.DateTimeFormat` for hour-of-day check | `Intl.DateTimeFormat` |
-| `@js-temporal/polyfill` | Stage 3 API, polyfill overhead, no production track record in Node.js | `Intl.DateTimeFormat` |
-| `rate-limiter-flexible` | Adds a new dependency for 3-line SQLite queries; library's SQLite backend still requires `better-sqlite3` anyway | Direct `better-sqlite3` with custom table |
-| `cron` / `node-cron` | No periodic jobs needed — time gates check current time on each send, no background scheduler | Inline `Date.now()` + `Intl` check |
-| `p-limit` / `async-mutex` | `better-sqlite3` is synchronous, no async concurrency issue; existing `RateLimiter` covers API-call concurrency | Existing `RateLimiter` class |
+| Express / Fastify / Hono | PRD explicitly says reuse `http.createServer`. Adding a framework means migrating 30+ existing admin routes, risking regressions on working code. The raw Node server already handles routing via if/switch. | Keep `http.createServer`; extend existing route dispatcher |
+| `tsoa` / `swagger-jsdoc` | Both require Express or class-based controllers to auto-generate OpenAPI. Existing code is functional, not class-based. PRD explicitly specifies hand-written YAML. | Hand-write YAML, validate with spectral |
+| `openapi-generator-cli` (Java) | Requires Java runtime in build environment. `@hey-api/openapi-ts` achieves the same result in Node. | `@hey-api/openapi-ts` deferred to Phase 7 |
+| `passport.js` | No ESM support, no API key plugin, fragmented ecosystem, unmaintained. | `better-auth` |
+| `helmet` | HTTP security headers middleware designed for Express. For raw Node, set headers manually in the response handler (5 lines). No dep needed. | Manual headers in monitor.ts |
+| `dotenv` | Node 20+ has `--env-file` flag. Docker passes env vars directly. Adding dotenv for env loading is unnecessary. | `node --env-file=.env` in dev, Docker ENV in prod |
+| `pino` / `winston` | Structured logging already fully implemented in `logger.ts` (JSON, child pattern, 594 tests depend on it). Do not replace. | Existing `logger.ts` |
+| `rate-limiter-flexible` | Per-workspace rate limiting is a config enforcement layer, not a distributed rate limiter. The existing token bucket in `rate-limiter.ts` handles WAHA API calls. API-level limits can be enforced with simple counter logic against existing SQLite. | Extend existing `RateLimiter` or plain SQLite counters |
+| `node-cron` / `cron` | No periodic jobs needed. Time gates check `Date.now()` inline on each send. No background scheduler required. | Inline time checks in existing send pipeline |
 
 ---
 
-## Integration Points in Existing Code
+## Stack Patterns by Variant
 
-| File | Change Needed |
-|------|---------------|
-| `src/config-schema.ts` | Add `humanMimicry` object to `WahaAccountSchemaBase` |
-| `src/send.ts` | Add gate + cap check before `callWahaApi` in `sendWahaText`; call `sendWahaPresence` + delay when `typingDelayEnabled` |
-| `src/send-limiter.ts` | New file: `SendLimiterDb` class (hourly counter) + `isWithinSendWindow()` (time gate) |
-| `src/monitor.ts` | Admin API endpoint to expose current hourly count + gate status per session |
-| `src/admin/` | React UI additions: mimicry config section, hourly cap gauge per session |
+**MCP transport — cloud/remote (api.chatlytics.ai/mcp):**
+- Use `StreamableHTTPServerTransport` from `@modelcontextprotocol/sdk/server/streamableHttp.js`
+- Mount on existing `http.createServer` under `/mcp` path — check `Authorization: Bearer ctl_xxx` before handing off to transport
+- Single `McpServer` instance per workspace, created on first authenticated request
+
+**MCP transport — local install (`npx chatlytics-mcp`):**
+- Separate entry point `src/mcp-stdio.ts`
+- Use `StdioServerTransport` from `@modelcontextprotocol/sdk/server/stdio.js`
+- Reads `CHATLYTICS_API_KEY` + `CHATLYTICS_BASE_URL` from env, proxies all tool calls to the HTTP API
+- No business logic in this entry point — thin HTTP proxy only
+
+**Auth — API surface (REST + MCP):**
+- API keys: `Authorization: Bearer ctl_xxx` header — validate hash in SQLite via `better-auth` API key plugin before route handlers run
+- Admin dashboard: session cookie via `better-auth` email/password flow, mounted under `/auth/*`
+- Two separate middleware contexts: `apiKeyAuth` for `/api/v1/` and `/mcp`, `sessionAuth` for `/admin/`
+- Store API keys hashed (SHA-256) — display raw key only once at generation time
+
+**Docker — production:**
+- Multi-stage build: `node:22-alpine` builder stage compiles TypeScript → `node:22-alpine` runtime stage runs compiled JS
+- Do NOT use `--import=tsx` in production image — compile first with `tsc`, run output JS directly
+- Single `EXPOSE 8050`, env vars: `WAHA_BASE_URL`, `WAHA_API_KEY`, `CHATLYTICS_API_KEY`
+- Admin panel `dist/admin/` served as static files from same HTTP server process (existing behavior preserved)
+
+**Multi-tenant (Phase 6):**
+- No new dependencies needed — existing `accountId` pattern already scopes `DirectoryDb`, `MimicryDb`, `AnalyticsDb` per account
+- Per-workspace file paths: `~/.chatlytics/workspaces/{workspaceId}/` — SQLite files isolated by directory
+- Process isolation: `child_process.fork()` (built-in Node) or Docker-per-tenant — no new library
+- WAHA session namespacing: prefix sessions with workspace ID (already supported via `tenantId` in `ResolvedWahaAccount`)
+
+---
+
+## Version Compatibility
+
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `@modelcontextprotocol/sdk@1.28.0` | `zod@4.x` | SDK requires zod as peer dep; project has zod ^4.3.6 — satisfied |
+| `better-auth@1.5.6` | `better-sqlite3@11.x` | better-auth SQLite adapter wraps better-sqlite3 — already installed |
+| `openapi-typescript@7.x` | `typescript@5.x` | Requires TS 5+; project has typescript ^5.9.3 |
+| MCP StreamableHTTP | Claude Code, Claude Desktop | Both support StreamableHTTP as of early 2026; SDK also ships SSE for backward compat |
+| `jose@6.x` | Node.js 22 ESM | ESM-only from v5+; project is `"type": "module"` — compatible |
+| `better-auth@1.5.6` | Node.js 22 | Confirmed Node 18+ support per official docs |
 
 ---
 
 ## Sources
 
-- Node.js `Intl.DateTimeFormat` — [MDN docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat) — HIGH confidence (official spec)
-- `better-sqlite3` ^11.10.0 — confirmed in `package.json` — HIGH confidence
-- `rate-limiter-flexible` SQLite support — [GitHub wiki](https://github.com/animir/node-rate-limiter-flexible/wiki/SQLite) — MEDIUM (confirmed supported but not used here)
-- Temporal API status — [MDN Temporal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Temporal) — HIGH (Stage 3, polyfill required as of 2026)
-- WAHA `/api/startTyping` — `src/send.ts:185` (existing working implementation) — HIGH confidence
-- Existing SQLite pattern — `src/analytics.ts`, `src/directory.ts` — HIGH confidence
+- [@modelcontextprotocol/sdk npm](https://www.npmjs.com/package/@modelcontextprotocol/sdk) — v1.28.0 confirmed, StreamableHTTP recommended (HIGH confidence)
+- [MCP SSE Deprecation — fka.dev](https://blog.fka.dev/blog/2025-06-06-why-mcp-deprecated-sse-and-go-with-streamable-http/) — SSE deprecated in spec 2025-03-26 (HIGH confidence)
+- [MCP Transports official spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) — StreamableHTTP is current recommendation (HIGH confidence)
+- [better-auth npm](https://www.npmjs.com/package/better-auth) — v1.5.6, `toNodeHandler()` for raw Node HTTP (HIGH confidence)
+- [better-auth GitHub](https://github.com/better-auth/better-auth) — SQLite adapter, API key plugin confirmed (HIGH confidence)
+- [@stoplight/spectral-cli npm](https://www.npmjs.com/package/@stoplight/spectral-cli) — v6.15.0, OAS 3.1 ruleset built-in (HIGH confidence)
+- [openapi-typescript](https://openapi-ts.dev/) — v7.13.0, runtime-free types, OAS 3.1 (HIGH confidence)
+- [tsx vs ts-node vs Bun 2026 — pkgpulse](https://www.pkgpulse.com/blog/tsx-vs-ts-node-vs-bun-2026) — tsx for dev, compile for Docker production (MEDIUM confidence)
+- `npm show` CLI — version numbers verified locally against npm registry 2026-03-28 (HIGH confidence)
 
 ---
-*Stack research for: WAHA OpenClaw Plugin v1.20 Human Mimicry Hardening*
-*Researched: 2026-03-26*
+
+*Stack research for: Chatlytics v2.0 standalone platform*
+*Researched: 2026-03-28*
