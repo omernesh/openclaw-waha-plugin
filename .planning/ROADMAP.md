@@ -215,7 +215,10 @@ Plans:
   2. Each workspace has its own directory.db, mimicry.db, and analytics.db at a workspace-scoped path — no shared SQLite files
   3. WAHA sessions are namespaced as `ctl_{workspaceId}_{sessionName}` — two workspaces cannot share or interfere with each other's sessions
   4. An API request authenticated with workspace A's key cannot read or write to workspace B's data under any request path
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
+- [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 
 ### Phase 65: Admin Standalone + Distribution
 **Goal**: The admin panel has its own authentication independent of OpenClaw, operators can manage multiple workspaces, and integration materials are publicly available
@@ -227,7 +230,10 @@ Plans:
   3. SKILL.md v4 references the Chatlytics API key and MCP endpoint with no OpenClaw-specific instructions
   4. chatlytics.ai serves a landing page with a product overview, feature list, and getting started link
   5. The documentation site has interactive API examples and copy-paste MCP config snippets
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
+- [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 **UI hint**: yes
 
 ### Phase 66: OpenClaw Thin Wrapper
@@ -239,7 +245,10 @@ Plans:
   2. All existing SKILL.md action names continue to work via the REST API with identical response shapes
   3. The existing admin panel routes (/api/admin/*) remain functional and return the same data as before
   4. Action response times measured at the gateway remain under 300ms at p95 (accounting for HTTP round-trip)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
+- [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 
 ## Progress
 
