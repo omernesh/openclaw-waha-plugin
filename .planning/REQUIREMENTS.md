@@ -20,7 +20,7 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 
 - [x] **API-01**: REST endpoints for send, read messages, search, directory, sessions, mimicry status under /api/v1/
 - [x] **API-02**: API key authentication via Bearer ctl_xxx header with timing-safe comparison
-- [ ] **API-03**: OpenAPI 3.1 spec served at /openapi.yaml and validated with Spectral in CI
+- [x] **API-03**: OpenAPI 3.1 spec served at /openapi.yaml and validated with Spectral in CI
 - [x] **API-04**: CORS headers for dashboard cross-origin requests
 
 ### MCP Server
@@ -123,7 +123,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CORE-06 | Phase 59 | Complete |
 | API-01 | Phase 60 | Complete |
 | API-02 | Phase 60 | Complete |
-| API-03 | Phase 60 | Pending |
+| API-03 | Phase 60 | Complete |
 | API-04 | Phase 60 | Complete |
 | CLI-01 | Phase 60 | Pending |
 | CLI-02 | Phase 60 | Pending |

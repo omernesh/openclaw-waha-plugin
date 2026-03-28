@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
 status: executing
-stopped_at: "Checkpoint: Task 2 awaiting user verification (59-02)"
-last_updated: "2026-03-28T12:21:50.310Z"
-last_activity: 2026-03-28 -- Phase 60 execution started
+stopped_at: Completed 60-02-PLAN.md
+last_updated: "2026-03-28T12:57:08.284Z"
+last_activity: 2026-03-28
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
   percent: 70
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 60 (rest-api-cli) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 60
-Last activity: 2026-03-28 -- Phase 60 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-03-28
 
 Progress: [███████░░░] 70%
 
@@ -58,6 +58,7 @@ Progress: [███████░░░] 70%
 | Phase 57 P01 | 15 | 2 tasks | 5 files |
 | Phase 58 P03 | 28m 39s | 2 tasks | 4 files |
 | Phase 59 P01 | 8m | 2 tasks | 7 files |
+| Phase 60-rest-api-cli P02 | 20 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Progress: [███████░░░] 70%
 - [Phase 59]: node:22-slim over alpine: better-sqlite3 native bindings require glibc
 - [Phase 59]: HEALTHCHECK probes /healthz (always public liveness) not /health (may gain auth later)
 - [Phase 59]: chatlytics-data named volume (not bind mount): Docker manages lifecycle, survives container recreation
+- [Phase 60-02]: Hand-authored OpenAPI 3.1 YAML over code-gen — simpler, reviewable, no AST extraction needed
+- [Phase 60-02]: swagger-ui-dist bundled not CDN — Docker/air-gapped deployments need self-contained Swagger UI
 
 ### Architecture Notes
 
@@ -126,6 +129,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T11:45:55.427Z
-Stopped at: Checkpoint: Task 2 awaiting user verification (59-02)
+Last session: 2026-03-28T12:57:08.279Z
+Stopped at: Completed 60-02-PLAN.md
 Resume file: None
