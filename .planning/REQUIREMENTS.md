@@ -1,78 +1,106 @@
-# Requirements: WAHA OpenClaw Plugin v1.20
+# Requirements: Chatlytics v2.0
 
-**Defined:** 2026-03-26
-**Core Value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
+**Defined:** 2026-03-28
+**Core Value:** Any AI agent framework can send/receive WhatsApp messages through Chatlytics with mimicry enforcement, policy controls, and directory features — zero framework-specific code required.
 
-## v1.20 Requirements
+## v2.0 Requirements
 
-Requirements for Human Mimicry Hardening. Each maps to roadmap phases.
+Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap phases.
 
-### Time Gates
+### Core Extraction
 
-- [x] **GATE-01**: Outbound messages are blocked outside configurable send window (default 7am-1am local time)
-- [x] **GATE-02**: Send window is configurable at global, per-session, and per-contact/group/newsletter levels
-- [x] **GATE-03**: Quiet hours policy is configurable as "reject" (return error) or "queue" (hold until window opens)
-- [x] **GATE-04**: Timezone is configurable per session via IANA timezone string (e.g., Asia/Jerusalem)
+- [ ] **CORE-01**: Standalone process boots without any OpenClaw SDK dependency at runtime
+- [ ] **CORE-02**: Config reads from standalone JSON file (CHATLYTICS_CONFIG_PATH env var or ~/.chatlytics/config.json)
+- [ ] **CORE-03**: WAHA webhook self-registration on startup (POST /api/{session}/webhooks)
+- [ ] **CORE-04**: Docker container starts with env var config and serves admin panel
+- [ ] **CORE-05**: Health endpoint reports webhook_registered and session connection status
+- [ ] **CORE-06**: SQLite databases persist via named Docker volume
 
-### Hourly Caps
+### Public API
 
-- [x] **CAP-01**: Hard hourly message cap enforced per session using rolling window counter (not top-of-hour reset)
-- [x] **CAP-02**: Account maturity tracked in 3 phases: New (0-7d), Warming (8-30d), Stable (30d+) derived from first_send_at
-- [x] **CAP-03**: Progressive default caps tied to maturity: New=15/hr, Warming=30/hr, Stable=50/hr (all configurable)
-- [x] **CAP-04**: Cap configurable at global, per-session, and per-contact/group/newsletter levels
-- [x] **CAP-05**: Cap counter persisted in SQLite to survive gateway restarts
+- [ ] **API-01**: REST endpoints for send, read messages, search, directory, sessions, mimicry status under /api/v1/
+- [ ] **API-02**: API key authentication via Bearer ctl_xxx header with timing-safe comparison
+- [ ] **API-03**: OpenAPI 3.1 spec served at /openapi.yaml and validated with Spectral in CI
+- [ ] **API-04**: CORS headers for dashboard cross-origin requests
 
-### Infrastructure
+### MCP Server
 
-- [x] **INFRA-01**: New mimicry-gate.ts module with time gate check, cap tracker, config resolution
-- [x] **INFRA-02**: Config hierarchy follows existing merge pattern (global → session → contact/group)
-- [x] **INFRA-03**: Zod schemas for sendGate and hourlyCap with .optional().default() on all new fields
-- [x] **INFRA-04**: bypassPolicy flag skips all mimicry gates (preserves /shutup, /join, /leave)
+- [ ] **MCP-01**: 8-10 consolidated MCP tools (send_message, send_media, read_messages, search, get_directory, manage_group, get_status, update_settings, send_poll, send_reaction)
+- [ ] **MCP-02**: Streamable HTTP transport on /mcp path (not deprecated SSE)
+- [ ] **MCP-03**: stdio transport mode for npx chatlytics-mcp local installs
+- [ ] **MCP-04**: MCP resources for contacts, groups, sessions, config, mimicry status
+- [ ] **MCP-05**: Actionable error messages with recovery hints in tool responses
 
-### Claude Code Integration
+### Webhook Forwarding
 
-- [x] **CC-01**: Claude Code whatsapp-messenger sends routed through mimicry gate+cap enforcement
-- [x] **CC-02**: Typing simulation applied to outbound Claude Code sends (proportional to message length)
+- [ ] **HOOK-01**: Inbound messages forwarded to registered callback URLs
+- [ ] **HOOK-02**: HMAC-SHA256 signatures on webhook payloads (X-Chatlytics-Signature header)
+- [ ] **HOOK-03**: Exponential backoff retry (3 attempts: 1s/2s/4s) with circuit breaker
+- [ ] **HOOK-04**: Webhook subscription stored in config (URL, event filters)
 
-### Behavioral Polish
+### Auth & Onboarding
 
-- [x] **BEH-01**: Jittered inter-message delays on all outbound sends (random variance +/-30-50% of base delay)
-- [x] **BEH-02**: Typing indicator duration proportional to message length (~40-60 WPM simulation)
-- [x] **BEH-03**: Drain rate throttling: 3-8s jittered delay between consecutive queue drain sends
+- [ ] **AUTH-01**: User registration with email and password (better-auth)
+- [ ] **AUTH-02**: Workspace creation (isolated tenant with own sessions, DBs, API keys)
+- [ ] **AUTH-03**: QR code scanning flow in dashboard (provision WAHA session, poll QR, detect connected)
+- [ ] **AUTH-04**: API key generation UI (show plaintext once, copy button, stored hashed)
+- [ ] **AUTH-05**: API key rotation (old key invalidated immediately)
+- [ ] **AUTH-06**: Integration setup wizard (choose MCP/REST/SKILL.md, copy config, send test message)
 
-### Admin UI
+### Multi-Tenant
 
-- [x] **UI-01**: Dashboard card showing maturity phase, days until upgrade, current cap usage vs limit, gate open/closed
-- [x] **UI-02**: Settings tab: send gate hours pickers, timezone selector, hourly cap limit inputs, progressive limits table
-- [x] **UI-03**: Mimicry status API endpoint (GET /api/admin/mimicry) for gate status and cap usage per session
+- [ ] **TENANT-01**: Per-workspace process isolation (crash containment)
+- [ ] **TENANT-02**: Per-workspace SQLite databases (directory, mimicry, analytics)
+- [ ] **TENANT-03**: Per-workspace WAHA session namespacing (ctl_{workspaceId}_{sessionName})
+- [ ] **TENANT-04**: API gateway routes by API key to workspace process
 
-### Adaptive Activity Patterns
+### Admin & Distribution
 
-- [x] **ADAPT-01**: System scans group/contact message history (last 7 days) to build per-chat activity profiles (busiest hours, busiest days)
-- [x] **ADAPT-02**: Activity profiles stored in SQLite table for reuse, rescanned weekly
-- [x] **ADAPT-03**: Scanning runs incrementally — small portion of contact list per day, during off-peak hours, only when system is not under high usage
-- [ ] **ADAPT-04**: Time gates adapt per-group/contact based on activity profile — sends aligned to match observed human activity patterns
-- [ ] **ADAPT-05**: Fallback to global/session default gate when no activity profile exists for a chat
+- [ ] **ADMIN-01**: Admin panel with standalone auth (not embedded in OpenClaw gateway)
+- [ ] **ADMIN-02**: Workspace management in admin panel (create, switch, delete workspaces)
+- [ ] **SKILL-01**: SKILL.md v4 referencing Chatlytics API key + MCP config (framework-agnostic)
+- [ ] **SITE-01**: Landing page at chatlytics.ai with product overview and getting started guide
+- [ ] **SITE-02**: API documentation site with interactive examples
+
+### Backward Compatibility
+
+- [ ] **COMPAT-01**: OpenClaw plugin refactored as thin Chatlytics API wrapper
+- [ ] **COMPAT-02**: All existing SKILL.md action names preserved in REST API
+- [ ] **COMPAT-03**: Existing admin panel routes and functionality preserved
 
 ## Future Requirements
 
-### Deferred from v1.20
+Deferred to v2.2+. Tracked but not in current roadmap.
 
-- **EXEMPT-01**: Per-contact rateLimitExempt flag in directory settings UI
-- **DIST-01**: Send-time distribution analytics chart (hourly histogram in admin panel)
-- **AUTO-01**: Automatic maturity phase promotion based on read receipt engagement signals
-- **AGG-01**: Cross-session aggregate cap (if multiple sessions share account context)
-- **PEAK-01**: Active-hours soft preference queue (hold for next engagement peak window)
+### SDK & Billing
+
+- **SDK-01**: Auto-generated TypeScript SDK client from OpenAPI spec
+- **SDK-02**: Auto-generated Python SDK client from OpenAPI spec
+- **BILL-01**: Per-workspace usage counters (messages sent, API calls)
+- **BILL-02**: Plan limits enforcement (message cap per plan tier)
+
+### Advanced Features
+
+- **TEAM-01**: Multiple users per workspace with role-based access
+- **MCP-06**: MCP prompt templates (whatsapp-assistant, group-manager system prompts)
+- **SKILL-02**: Framework-specific SKILL.md auto-generation per agent framework
+- **AUDIT-01**: Per-workspace audit log of all API calls and policy decisions
+- **WAHA-01**: Bring-your-own WAHA instance support
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| Message queuing with persistence | Reject-not-queue is safer default for v1.20; persistent queue adds SQLite complexity and message loss risk on restart |
-| Session rotation / multi-number spreading | Dilutes account maturity; fresh numbers have lower trust |
-| Read receipt suppression | Toggling privacy settings is itself an API call that may be monitored |
-| "Urgent" bypass flag on individual messages | Gets overused by LLM; undermines entire mimicry system |
-| Clockwork send scheduling | Creates perfectly regular machine signature; worse than jittered natural activity |
+| WhatsApp Business API (official Meta) | Different protocol (Cloud API), requires business verification, different pricing model |
+| GraphQL API | REST + OpenAPI covers all use cases, no evidence of demand |
+| MCP push notifications for inbound | Ecosystem not ready in 2026 — no major framework handles server-push |
+| Shared WAHA instance multi-tenancy | Cross-tenant event delivery risk; process-per-tenant required first |
+| Real-time chat (WebSocket) | Webhook callbacks + polling sufficient for agent use cases |
+| Broadcast/bulk send at scale | WhatsApp TOS violation, mimicry system prevents this |
+| Scheduled messages | WAHA doesn't support |
+| Disappearing messages | Low priority |
 
 ## Traceability
 
@@ -80,38 +108,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GATE-01 | Phase 53 | Complete |
-| GATE-02 | Phase 53 | Complete |
-| GATE-03 | Phase 53 | Complete |
-| GATE-04 | Phase 53 | Complete |
-| CAP-01 | Phase 53 | Complete |
-| CAP-02 | Phase 53 | Complete |
-| CAP-03 | Phase 53 | Complete |
-| CAP-04 | Phase 53 | Complete |
-| CAP-05 | Phase 53 | Complete |
-| INFRA-01 | Phase 53 | Complete |
-| INFRA-02 | Phase 53 | Complete |
-| INFRA-03 | Phase 53 | Complete |
-| INFRA-04 | Phase 53 | Complete |
-| CC-01 | Phase 55 Plan 01 | Complete |
-| CC-02 | Phase 55 Plan 01 | Complete |
-| BEH-01 | Phase 54 Plan 01 | Complete |
-| BEH-02 | Phase 54 Plan 01 | Complete |
-| BEH-03 | Phase 54 Plan 01 | Complete |
-| UI-01 | Phase 57 | Complete |
-| UI-02 | Phase 57 | Complete |
-| UI-03 | Phase 57 | Complete |
-| ADAPT-01 | Phase 56 | Complete |
-| ADAPT-02 | Phase 56 | Complete |
-| ADAPT-03 | Phase 56 | Complete |
-| ADAPT-04 | Phase 56 | Pending |
-| ADAPT-05 | Phase 56 | Pending |
+| (populated by roadmapper) | | |
 
 **Coverage:**
-- v1.20 requirements: 26 total
-- Mapped to phases: 26
-- Unmapped: 0
+- v2.0 requirements: 33 total
+- Mapped to phases: 0
+- Unmapped: 33 ⚠️
 
 ---
-*Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 — traceability populated after roadmap creation*
+*Requirements defined: 2026-03-28*
+*Last updated: 2026-03-28 after initial definition*
