@@ -106,7 +106,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 - [ ] **Phase 60: Public REST API + OpenAPI + CLI** — /api/v1/ route groups, API key auth, openapi.yaml, Spectral CI lint, Swagger UI, `npx chatlytics` CLI tool
 - [ ] **Phase 61: Webhook Forwarding** — HMAC-signed inbound delivery to callback URLs, exponential backoff, circuit breaker
 - [ ] **Phase 62: MCP Server** — 8-10 consolidated tools via StreamableHTTPServerTransport + stdio mode for npx chatlytics-mcp
-- [ ] **Phase 63: Dashboard Auth + Onboarding** — better-auth registration, workspace creation, QR pairing, API key UI (v2.1)
+- [x] **Phase 63: Dashboard Auth + Onboarding** — better-auth registration, workspace creation, QR pairing, API key UI (v2.1) (completed 2026-03-28)
 - [ ] **Phase 64: Multi-Tenant Process Isolation** — per-workspace process, SQLite DBs, WAHA session namespacing, API gateway routing (v2.1)
 - [ ] **Phase 65: Admin Standalone + Distribution** — standalone admin auth, workspace management, SKILL.md v4, landing page + docs site (v2.1)
 - [ ] **Phase 66: OpenClaw Thin Wrapper** — refactor channel.ts to HTTP client delegating to Chatlytics API (gated: 30-day production stability)
@@ -203,7 +203,7 @@ Plans:
 Plans:
 - [x] 63-01-PLAN.md — Server-side auth: better-auth instance, monitor.ts wiring (AUTH-01, AUTH-02)
 - [x] 63-02-PLAN.md — React auth gate, QR pairing tab, API keys tab (AUTH-03, AUTH-04, AUTH-05)
-- [ ] 63-03-PLAN.md — Integration wizard tab (AUTH-06)
+- [x] 63-03-PLAN.md — Integration wizard tab (AUTH-06)
 **UI hint**: yes
 
 ### Phase 64: Multi-Tenant Process Isolation
@@ -255,7 +255,7 @@ Plans:
 | 60. Public REST API + OpenAPI | v2.0 | 0/3 | Planned    |  |
 | 61. Webhook Forwarding | v2.0 | 1/2 | In Progress|  |
 | 62. MCP Server | v2.0 | 1/2 | In Progress|  |
-| 63. Dashboard Auth + Onboarding | v2.1 | 2/3 | In Progress|  |
+| 63. Dashboard Auth + Onboarding | v2.1 | 3/3 | Complete   | 2026-03-28 |
 | 64. Multi-Tenant Process Isolation | v2.1 | 0/? | Not started | - |
 | 65. Admin Standalone + Distribution | v2.1 | 0/? | Not started | - |
 | 66. OpenClaw Thin Wrapper | v2.1 | 0/? | Not started | - |
