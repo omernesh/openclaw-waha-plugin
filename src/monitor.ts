@@ -706,6 +706,7 @@ export function createWahaWebhookServer(opts: {
         consecutiveFailures: state?.consecutiveFailures ?? 0,
         lastSuccessAt: state?.lastSuccessAt ?? null,
         lastCheckAt: state?.lastCheckAt ?? null,
+        webhook_registered: state?.webhook_registered ?? false,
       });
       return;
     }
