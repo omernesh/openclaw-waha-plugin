@@ -156,7 +156,7 @@ Plans:
   8. `npx chatlytics --json status` returns machine-readable JSON for scripting
 **Plans**: 3 plans
 Plans:
-- [ ] 60-01-PLAN.md — REST API routes, auth guard, CORS (API-01, API-02, API-04)
+- [x] 60-01-PLAN.md — REST API routes, auth guard, CORS (API-01, API-02, API-04)
 - [ ] 60-02-PLAN.md — OpenAPI spec, Spectral lint, Swagger UI (API-03)
 - [ ] 60-03-PLAN.md — CLI tool with subcommands (CLI-01, CLI-02, CLI-03, CLI-04)
 
@@ -242,7 +242,7 @@ Plans:
 | 57. Admin UI & Observability | v1.20 | 1/1 | Complete | 2026-03-27 |
 | 58. SDK Decoupling | v2.0 | 3/3 | Complete   | 2026-03-28 |
 | 59. Standalone Entry + Docker | v2.0 | 1/2 | In Progress|  |
-| 60. Public REST API + OpenAPI | v2.0 | 0/3 | Not started | - |
+| 60. Public REST API + OpenAPI | v2.0 | 1/3 | In progress | - |
 | 61. Webhook Forwarding | v2.0 | 0/? | Not started | - |
 | 62. MCP Server | v2.0 | 0/? | Not started | - |
 | 63. Dashboard Auth + Onboarding | v2.1 | 0/? | Not started | - |
