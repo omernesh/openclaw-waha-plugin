@@ -1,0 +1,340 @@
+openapi: "3.1.0"
+info:
+  title: Chatlytics API
+  version: "1.0.0"
+  description: WhatsApp messaging API for AI agents
+servers:
+  - url: http://localhost:8050
+    description: Local instance
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ctl_xxx
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+    MessageSentResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        waha:
+          type: object
+          description: Raw WAHA API response object
+    MessageItem:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        fromMe:
+          type: boolean
+        timestamp:
+          type: integer
+        chatId:
+          type: string
+    SearchResult:
+      type: object
+      properties:
+        contacts:
+          type: array
+          items:
+            type: object
+            properties:
+              jid:
+                type: string
+              name:
+                type: string
+              phone:
+                type: string
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              jid:
+                type: string
+              name:
+                type: string
+    DirectoryListing:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              jid:
+                type: string
+              name:
+                type: string
+              type:
+                type: string
+                enum: [contact, group, newsletter]
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+    SessionStatus:
+      type: object
+      properties:
+        session:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        webhook_registered:
+          type: boolean
+    MimicryStatus:
+      type: object
+      properties:
+        session:
+          type: string
+        hourlyCapUsed:
+          type: integer
+        hourlyCapLimit:
+          type: integer
+        gateOpen:
+          type: boolean
+security:
+  - BearerAuth: []
+paths:
+  /api/v1/send:
+    post:
+      summary: Send a WhatsApp message
+      operationId: sendMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - chatId
+                - session
+                - text
+              properties:
+                chatId:
+                  type: string
+                  description: Target chat JID or contact name
+                session:
+                  type: string
+                  description: WAHA session name
+                text:
+                  type: string
+                  description: Message text to send
+                mediaUrl:
+                  type: string
+                  description: Optional media URL to attach
+                type:
+                  type: string
+                  description: Media type (image, video, file)
+                  enum: [image, video, file]
+      responses:
+        "200":
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageSentResponse"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized — missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Blocked by mimicry gate (quiet hours or hourly cap exceeded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/messages:
+    get:
+      summary: Read messages from a chat
+      operationId: getMessages
+      parameters:
+        - name: chatId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Chat JID to read messages from
+        - name: session
+          in: query
+          required: true
+          schema:
+            type: string
+          description: WAHA session name
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+          description: Maximum number of messages to return
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageItem"
+        "400":
+          description: Missing required parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/search:
+    get:
+      summary: Search contacts and groups
+      operationId: searchDirectory
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of results
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResult"
+        "400":
+          description: Missing required parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/directory:
+    get:
+      summary: List directory entries (contacts, groups, newsletters)
+      operationId: listDirectory
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [contact, group, newsletter]
+          description: Filter by entry type
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search term to filter results
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of results to return
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Pagination offset
+      responses:
+        "200":
+          description: Paginated directory listing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectoryListing"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/sessions:
+    get:
+      summary: List all WAHA sessions with health status
+      operationId: listSessions
+      responses:
+        "200":
+          description: Array of session status objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionStatus"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/mimicry:
+    get:
+      summary: Get mimicry gate and hourly cap status per session
+      operationId: getMimicryStatus
+      responses:
+        "200":
+          description: Array of mimicry status objects per session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MimicryStatus"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
