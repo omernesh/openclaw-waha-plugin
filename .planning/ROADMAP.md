@@ -101,7 +101,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 
 ### Phases
 
-- [ ] **Phase 58: SDK Decoupling** — Remove all openclaw/plugin-sdk imports outside channel.ts; new platform-types.ts, account-utils.ts, request-utils.ts
+- [x] **Phase 58: SDK Decoupling** — Remove all openclaw/plugin-sdk imports outside channel.ts; new platform-types.ts, account-utils.ts, request-utils.ts (completed 2026-03-28)
 - [ ] **Phase 59: Standalone Entry + Docker** — standalone.ts boots HTTP server, registers WAHA webhook; Dockerfile + Docker Compose with named volume
 - [ ] **Phase 60: Public REST API + OpenAPI + CLI** — /api/v1/ route groups, API key auth, openapi.yaml, Spectral CI lint, Swagger UI, `npx chatlytics` CLI tool
 - [ ] **Phase 61: Webhook Forwarding** — HMAC-signed inbound delivery to callback URLs, exponential backoff, circuit breaker
@@ -233,7 +233,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 | 55. Claude Code Integration | v1.20 | 1/1 | Complete | 2026-03-27 |
 | 56. Adaptive Activity Patterns | v1.20 | 2/2 | Complete | 2026-03-27 |
 | 57. Admin UI & Observability | v1.20 | 1/1 | Complete | 2026-03-27 |
-| 58. SDK Decoupling | v2.0 | 1/3 | In Progress|  |
+| 58. SDK Decoupling | v2.0 | 3/3 | Complete   | 2026-03-28 |
 | 59. Standalone Entry + Docker | v2.0 | 0/? | Not started | - |
 | 60. Public REST API + OpenAPI | v2.0 | 0/? | Not started | - |
 | 61. Webhook Forwarding | v2.0 | 0/? | Not started | - |
