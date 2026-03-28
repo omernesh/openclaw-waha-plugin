@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
 status: executing
-stopped_at: Completed 60-03-PLAN.md
-last_updated: "2026-03-28T13:00:32.037Z"
+stopped_at: Completed 61-01-PLAN.md
+last_updated: "2026-03-28T13:25:21.113Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 8
-  completed_plans: 6
+  total_plans: 10
+  completed_plans: 5
   percent: 70
 ---
 
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 60 — rest-api-cli
+**Current focus:** Phase 61 — webhook-forwarding
 
 ## Current Position
 
-Phase: 60 (rest-api-cli) — EXECUTING
-Plan: 3 of 3
+Phase: 61 (webhook-forwarding) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
 Last activity: 2026-03-28
 
@@ -60,6 +60,7 @@ Progress: [███████░░░] 70%
 | Phase 59 P01 | 8m | 2 tasks | 7 files |
 | Phase 60-rest-api-cli P02 | 20 | 2 tasks | 6 files |
 | Phase 60 P03 | 17m 49s | 2 tasks | 5 files |
+| Phase 61 P01 | 15 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,8 @@ Progress: [███████░░░] 70%
 - [Phase 60-02]: swagger-ui-dist bundled not CDN — Docker/air-gapped deployments need self-contained Swagger UI
 - [Phase 60]: Export makeApiCall and formatOutput from cli.ts for unit testing without spawning subprocesses
 - [Phase 60]: Guard program.parseAsync behind process.argv check to prevent auto-execution during vitest
+- [Phase 61]: Use publicApiKey as HMAC signing secret for webhook forwarding (operators already have this key)
+- [Phase 61]: In-memory circuit breaker per URL (Map<string, CircuitState>), not opossum library
 
 ### Architecture Notes
 
@@ -132,6 +135,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T13:00:32.031Z
-Stopped at: Completed 60-03-PLAN.md
+Last session: 2026-03-28T13:25:21.107Z
+Stopped at: Completed 61-01-PLAN.md
 Resume file: None

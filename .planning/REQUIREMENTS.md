@@ -40,10 +40,10 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 
 ### Webhook Forwarding
 
-- [ ] **HOOK-01**: Inbound messages forwarded to registered callback URLs
-- [ ] **HOOK-02**: HMAC-SHA256 signatures on webhook payloads (X-Chatlytics-Signature header)
-- [ ] **HOOK-03**: Exponential backoff retry (3 attempts: 1s/2s/4s) with circuit breaker
-- [ ] **HOOK-04**: Webhook subscription stored in config (URL, event filters)
+- [x] **HOOK-01**: Inbound messages forwarded to registered callback URLs
+- [x] **HOOK-02**: HMAC-SHA256 signatures on webhook payloads (X-Chatlytics-Signature header)
+- [x] **HOOK-03**: Exponential backoff retry (3 attempts: 1s/2s/4s) with circuit breaker
+- [x] **HOOK-04**: Webhook subscription stored in config (URL, event filters)
 
 ### Auth & Onboarding
 
@@ -129,10 +129,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-02 | Phase 60 | Complete |
 | CLI-03 | Phase 60 | Complete |
 | CLI-04 | Phase 60 | Complete |
-| HOOK-01 | Phase 61 | Pending |
-| HOOK-02 | Phase 61 | Pending |
-| HOOK-03 | Phase 61 | Pending |
-| HOOK-04 | Phase 61 | Pending |
+| HOOK-01 | Phase 61 | Complete |
+| HOOK-02 | Phase 61 | Complete |
+| HOOK-03 | Phase 61 | Complete |
+| HOOK-04 | Phase 61 | Complete |
 | MCP-01 | Phase 62 | Pending |
 | MCP-02 | Phase 62 | Pending |
 | MCP-03 | Phase 62 | Pending |
