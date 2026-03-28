@@ -4,11 +4,15 @@
   "description": "OpenClaw WAHA (WhatsApp HTTP API) channel plugin",
   "type": "module",
   "main": "./index.ts",
+  "bin": {
+    "chatlytics-mcp": "./dist/mcp-stdio.mjs"
+  },
   "files": [
     "index.ts",
     "src/",
     "!src/**/*.bak*",
     "dist/admin/",
+    "dist/mcp-stdio.mjs",
     "docs/",
     "!docs/extra phase/",
     "SKILL.md",
@@ -34,6 +38,7 @@
   "scripts": {
     "test": "vitest run --reporter=verbose",
     "build:admin": "vite build --config vite.admin.config.ts",
+    "build:mcp": "node -e \"const {execFileSync}=require('child_process');execFileSync(process.execPath,[require.resolve('esbuild/bin/esbuild'),'src/mcp-stdio.ts','--bundle','--platform=node','--format=esm','--outfile=dist/mcp-stdio.mjs','--external:better-sqlite3','--external:@modelcontextprotocol/sdk','--external:zod','--banner:js=#!/usr/bin/env node'],{stdio:'inherit'})\"",
     "dev:admin": "vite --config vite.admin.config.ts",
     "build": "npm run build:admin"
   },
