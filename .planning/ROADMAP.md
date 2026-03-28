@@ -202,7 +202,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 63-01-PLAN.md — Server-side auth: better-auth instance, monitor.ts wiring (AUTH-01, AUTH-02)
-- [ ] 63-02-PLAN.md — React auth gate, QR pairing tab, API keys tab (AUTH-03, AUTH-04, AUTH-05)
+- [x] 63-02-PLAN.md — React auth gate, QR pairing tab, API keys tab (AUTH-03, AUTH-04, AUTH-05)
 - [ ] 63-03-PLAN.md — Integration wizard tab (AUTH-06)
 **UI hint**: yes
 
@@ -255,7 +255,7 @@ Plans:
 | 60. Public REST API + OpenAPI | v2.0 | 0/3 | Planned    |  |
 | 61. Webhook Forwarding | v2.0 | 1/2 | In Progress|  |
 | 62. MCP Server | v2.0 | 1/2 | In Progress|  |
-| 63. Dashboard Auth + Onboarding | v2.1 | 1/3 | In Progress|  |
+| 63. Dashboard Auth + Onboarding | v2.1 | 2/3 | In Progress|  |
 | 64. Multi-Tenant Process Isolation | v2.1 | 0/? | Not started | - |
 | 65. Admin Standalone + Distribution | v2.1 | 0/? | Not started | - |
 | 66. OpenClaw Thin Wrapper | v2.1 | 0/? | Not started | - |
