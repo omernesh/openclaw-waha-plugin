@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.18
 milestone_name: Join/Leave/List & Skill Completeness — ✅ SHIPPED 2026-03-25
 status: completed
-stopped_at: Completed 57-01-PLAN.md
-last_updated: "2026-03-27T20:46:27.725Z"
+stopped_at: Completed 58-03-PLAN.md
+last_updated: "2026-03-28T03:00:32.238Z"
 last_activity: 2026-03-27
 progress:
   total_phases: 5
@@ -56,6 +56,7 @@ Progress: [███████░░░] 70%
 | Phase 55 P01 | 22 | 2 tasks | 4 files |
 | Phase 56 P01 | 602 | 2 tasks | 4 files |
 | Phase 57 P01 | 15 | 2 tasks | 5 files |
+| Phase 58 P03 | 28m 39s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Progress: [███████░░░] 70%
 - [Phase 56-02]: startActivityScanner receives session: account.accountId (same as accountId per ScannerOptions)
 - [Phase 57]: Route placed after /api/admin/sessions, getCapStatus used (read-only) never checkAndConsumeCap — status API must not consume quota
 - [Phase 57]: buildPayload() in SettingsTab extended with sendGate/hourlyCap to wire auto-save for new mimicry config fields
+- [Phase 58-03]: Use string[] for allowlist entries in resolveDmGroupAccessWithCommandGate — matches normalizeWahaAllowEntry return type
+- [Phase 58-03]: createReplyPrefixOptions shim returns prefixContext + onModelSelected without gateway-specific identity resolution
 
 ### Architecture Notes
 
@@ -116,6 +119,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T20:46:11.697Z
-Stopped at: Completed 57-01-PLAN.md
+Last session: 2026-03-28T03:00:32.233Z
+Stopped at: Completed 58-03-PLAN.md
 Resume file: None
