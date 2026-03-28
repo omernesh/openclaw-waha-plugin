@@ -138,7 +138,7 @@ Audit: `.planning/v1.11-MILESTONE-AUDIT.md`
 **Plans**: 2 plans
 Plans:
 - [x] 59-01-PLAN.md -- Standalone entry point, /health route, CHATLYTICS_DATA_DIR for SQLite
-- [ ] 59-02-PLAN.md -- Dockerfile, docker-compose.yml, container verification
+- [x] 59-02-PLAN.md -- Dockerfile, docker-compose.yml, container verification
 **UI hint**: yes
 
 ### Phase 60: Public REST API + OpenAPI + CLI

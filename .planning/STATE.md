@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
 status: executing
-stopped_at: Completed 59-01-PLAN.md
-last_updated: "2026-03-28T11:40:42.236Z"
+stopped_at: "Checkpoint: Task 2 awaiting user verification (59-02)"
+last_updated: "2026-03-28T11:46:07.439Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
@@ -96,6 +96,9 @@ Progress: [███████░░░] 70%
 - [Phase 59]: getDataDir() returns CHATLYTICS_DATA_DIR or falls back to ~/.openclaw/data for backward compat
 - [Phase 59]: standalone.ts calls monitorWahaProvider() directly — reuses existing HTTP server, no code duplication
 - [Phase 59]: C:/Program Files/Git/health route is public (before auth guard) — Docker HEALTHCHECK cannot pass API tokens
+- [Phase 59]: node:22-slim over alpine: better-sqlite3 native bindings require glibc
+- [Phase 59]: HEALTHCHECK probes /healthz (always public liveness) not /health (may gain auth later)
+- [Phase 59]: chatlytics-data named volume (not bind mount): Docker manages lifecycle, survives container recreation
 
 ### Architecture Notes
 
@@ -123,6 +126,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T11:40:42.231Z
-Stopped at: Completed 59-01-PLAN.md
+Last session: 2026-03-28T11:45:55.427Z
+Stopped at: Checkpoint: Task 2 awaiting user verification (59-02)
 Resume file: None
