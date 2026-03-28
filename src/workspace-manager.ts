@@ -19,6 +19,9 @@ import { createLogger } from "./logger.js";
 
 const log = createLogger({ component: "workspace-manager" });
 
+/** Timeout before force-killing a child process after shutdown IPC. DO NOT CHANGE. */
+const KILL_TIMEOUT_MS = 5_000;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ForkFn = typeof fork;
@@ -32,7 +35,7 @@ export interface WahaConfig {
 /** Live state for a single forked workspace process. */
 export interface WorkspaceEntry {
   workspaceId: string;
-  child: ChildProcess;
+  child: ChildProcess | null;
   port: number | null;
   status: "starting" | "ready" | "crashed";
   restartCount: number;
@@ -128,7 +131,7 @@ export class WorkspaceProcessManager {
 
     const entry: WorkspaceEntry = {
       workspaceId,
-      child: null as unknown as ChildProcess, // set in _fork
+      child: null, // set in _fork
       port: null,
       status: "starting",
       restartCount: 0,
@@ -241,44 +244,51 @@ export class WorkspaceProcessManager {
   }
 
   /**
-   * Send shutdown IPC to all workspace children and kill after 5s timeout.
+   * Send shutdown IPC to a workspace child and kill after KILL_TIMEOUT_MS.
+   * Shared by stopAll() and stopWorkspace() — DO NOT DUPLICATE this logic.
+   */
+  private async _shutdownChild(entry: WorkspaceEntry): Promise<void> {
+    if (!entry.child) return;
+
+    try {
+      entry.child.send({ type: "shutdown" });
+    } catch (err) {
+      log.warn("failed to send shutdown to child", {
+        workspaceId: entry.workspaceId,
+        error: String(err),
+      });
+    }
+
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        if (entry.child && entry.status !== "crashed") {
+          try { entry.child.kill(); } catch (err) { log.debug("failed to kill child", { error: String(err) }); }
+        }
+        resolve();
+      }, KILL_TIMEOUT_MS);
+      timeout.unref();
+      entry.child!.once("exit", () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Send shutdown IPC to all workspace children and kill after KILL_TIMEOUT_MS.
    *
    * DO NOT CHANGE: shutdown message format { type: "shutdown" } — workspace-entry.ts listens for this.
    */
   async stopAll(): Promise<void> {
     const entries = [...this.registry.values()];
-
-    for (const entry of entries) {
-      try {
-        entry.child.send({ type: "shutdown" });
-      } catch (err) {
-        log.warn("failed to send shutdown to child", {
-          workspaceId: entry.workspaceId,
-          error: String(err),
-        });
-      }
-    }
-
-    // Kill any children that haven't exited after 5s
-    await new Promise<void>((resolve) => {
-      setTimeout(() => {
-        for (const entry of entries) {
-          if (entry.status !== "crashed") {
-            try {
-              entry.child.kill();
-            } catch (err) { log.debug("failed to kill child", { error: String(err) }); }
-          }
-        }
-        resolve();
-      }, 5_000);
-    });
+    await Promise.all(entries.map((entry) => this._shutdownChild(entry)));
   }
 
   /**
    * Stop a single workspace child process and remove it from the registry.
    *
    * Phase 65 (ADMIN-02): Used by DELETE /api/admin/workspaces/:workspaceId.
-   * Sends IPC shutdown message, kills after 5s timeout, then removes from registry
+   * Sends IPC shutdown message, kills after KILL_TIMEOUT_MS, then removes from registry
    * so the crash-restart loop does not re-fork the deleted workspace.
    *
    * DO NOT CHANGE: registry.delete() must happen BEFORE the process exits naturally
@@ -295,24 +305,7 @@ export class WorkspaceProcessManager {
     // DO NOT CHANGE: must delete before kill so the 'exit' listener sees no entry and skips restart.
     this.registry.delete(workspaceId);
 
-    try {
-      entry.child.send({ type: "shutdown" });
-    } catch (err) {
-      log.warn("stopWorkspace: failed to send shutdown IPC", { workspaceId, error: String(err) });
-    }
-
-    // Kill after 5s if still running
-    await new Promise<void>((resolve) => {
-      const timeout = setTimeout(() => {
-        try { entry.child.kill(); } catch (err) { log.debug("failed to kill child", { error: String(err) }); }
-        resolve();
-      }, 5_000);
-      timeout.unref();
-      entry.child.once("exit", () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-    });
+    await this._shutdownChild(entry);
 
     log.info("workspace stopped", { workspaceId });
   }

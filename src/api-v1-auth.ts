@@ -55,10 +55,10 @@ export function handleCorsPreflightIfNeeded(req: IncomingMessage, res: ServerRes
 export function requirePublicApiAuth(
   req: IncomingMessage,
   res: ServerResponse,
-  coreCfg: unknown
+  coreCfg: Record<string, unknown>
 ): boolean {
   // Resolve configured token
-  const cfg = coreCfg as Record<string, unknown> | undefined;
+  const cfg = coreCfg;
   const waha = (cfg?.channels as Record<string, unknown> | undefined)?.waha as Record<string, unknown> | undefined;
   const token = (waha?.publicApiKey as string | undefined) ?? process.env.CHATLYTICS_API_KEY;
 

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 // We'll import the module after creation
-let requirePublicApiAuth: (req: IncomingMessage, res: ServerResponse, coreCfg: unknown) => boolean;
+let requirePublicApiAuth: (req: IncomingMessage, res: ServerResponse, coreCfg: Record<string, unknown>) => boolean;
 let setCorsHeaders: (res: ServerResponse) => void;
 let handleCorsPreflightIfNeeded: (req: IncomingMessage, res: ServerResponse) => boolean;
 

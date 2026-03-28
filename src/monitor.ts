@@ -60,6 +60,17 @@ import type { WorkspaceProcessManager } from "./workspace-manager.js";
 
 const log = createLogger({ component: "monitor" });
 
+// ── Static file cache — immutable hashed assets are read once and cached in memory. DO NOT CHANGE.
+const staticCache = new Map<string, Buffer>();
+function cachedReadFile(path: string): Buffer {
+  let buf = staticCache.get(path);
+  if (!buf) { buf = readFileSync(path); staticCache.set(path, buf); }
+  return buf;
+}
+function cachedReadFileUtf8(path: string): string {
+  return cachedReadFile(path).toString("utf-8");
+}
+
 // Phase 58: Local runtime factory — replaces SDK createLoggerBackedRuntime. DO NOT REMOVE.
 // Returns a minimal RuntimeEnv. The standalone server has no channel-level runtime.
 function createLoggerBackedRuntime(_name?: string): RuntimeEnv {
@@ -603,7 +614,7 @@ export function createWahaWebhookServer(opts: {
           map: "application/json",
         };
         res.writeHead(200, { "Content-Type": mimeTypes[ext] ?? "application/octet-stream" });
-        res.end(readFileSync(resolved));
+        res.end(cachedReadFile(resolved));
         return;
       }
       res.writeHead(404);
@@ -908,7 +919,7 @@ export function createWahaWebhookServer(opts: {
       }
       if (existsSync(filePath)) {
         const mime = ADMIN_MIME[extname(filePath)] ?? "application/octet-stream";
-        const buf = readFileSync(filePath);
+        const buf = cachedReadFile(filePath);
         res.writeHead(200, {
           "Content-Type": mime,
           "Cache-Control": "public, max-age=31536000, immutable",

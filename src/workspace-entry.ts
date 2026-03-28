@@ -134,6 +134,7 @@ async function main(): Promise<void> {
     log.info("dynamic port assigned", { port: actualPort, workspaceId });
   } else {
     actualPort = parseInt(portEnv, 10);
+    if (isNaN(actualPort)) actualPort = 8050;
   }
 
   // Override webhookPort in config with dynamic port so monitorWahaProvider listens there.

@@ -65,10 +65,12 @@ export function resetCircuitBreakers(): void {
 }
 
 function getCircuit(url: string): CircuitState {
-  if (!circuitMap.has(url)) {
-    circuitMap.set(url, { consecutiveTimeouts: 0, openedAt: null });
+  let state = circuitMap.get(url);
+  if (!state) {
+    state = { consecutiveTimeouts: 0, openedAt: null };
+    circuitMap.set(url, state);
   }
-  return circuitMap.get(url)!;
+  return state;
 }
 
 /**

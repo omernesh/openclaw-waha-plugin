@@ -156,9 +156,8 @@ async function bootMultiTenant(
   }
 
   // Step 5: Start WorkspaceGateway to route requests to children.
-  const wahaConfig2 = wahaSection;
-  const gatewayPort = (wahaConfig2.webhookPort as number | undefined) ?? 8050;
-  const gatewayHost = (wahaConfig2.webhookHost as string | undefined) ?? "0.0.0.0";
+  const gatewayPort = (wahaSection.webhookPort as number | undefined) ?? 8050;
+  const gatewayHost = (wahaSection.webhookHost as string | undefined) ?? "0.0.0.0";
 
   const gateway = new WorkspaceGateway({
     manager,

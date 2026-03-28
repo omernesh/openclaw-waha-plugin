@@ -97,8 +97,14 @@ export async function initAuthDb(): Promise<void> {
     await runMigrations();
     log.info("Auth DB schema ready", { path: authDbPath });
   } catch (err) {
-    log.warn("Auth DB migration warning (may already be up to date)", {
-      error: err instanceof Error ? err.message : String(err),
-    });
+    // Verify tables actually exist before downgrading to a warning.
+    // If tables are missing, migration failure is fatal — DO NOT swallow it.
+    try {
+      authDb.prepare("SELECT 1 FROM user LIMIT 0").run();
+      log.info("Auth DB tables already exist, migration skipped");
+    } catch {
+      log.error("Auth DB migration FAILED and tables do not exist");
+      throw err; // fatal
+    }
   }
 }

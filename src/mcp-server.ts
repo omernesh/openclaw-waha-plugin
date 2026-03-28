@@ -16,6 +16,14 @@ import { getWahaChatMessages } from "./send.js";
 import type { CoreConfig } from "./types.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Utility: extract error message from unknown thrown value
+// ─────────────────────────────────────────────────────────────────────────────
+
+function errMsg(err: unknown): string {
+  return errMsg(err);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Recovery hint builder (MCP-05)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -88,7 +96,9 @@ function sanitizeCfg(cfg: Record<string, unknown>): Record<string, unknown> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function setAtPath(obj: Record<string, unknown>, path: string, value: unknown): void {
+  if (!path) return;
   const parts = path.split(".");
+  if (parts.length === 0) return;
   let cur: Record<string, unknown> = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
@@ -98,6 +108,25 @@ function setAtPath(obj: Record<string, unknown>, path: string, value: unknown): 
     cur = cur[part] as Record<string, unknown>;
   }
   cur[parts[parts.length - 1]] = value;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: convert handleProxySend result to MCP tool response
+// Used by send_message, send_media, send_poll — DO NOT DUPLICATE this logic.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function proxySendResult(
+  result: { status: number; body: Record<string, unknown> },
+  successMsg: string
+) {
+  if (result.body.blocked) {
+    const hint = buildRecoveryHint(result.body);
+    return { content: [{ type: "text" as const, text: `${result.body.error}\n\nRecovery: ${hint}` }], isError: true };
+  }
+  if (result.status >= 400) {
+    return { content: [{ type: "text" as const, text: String(result.body.error ?? "Send failed") }], isError: true };
+  }
+  return { content: [{ type: "text" as const, text: successMsg }] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,16 +159,9 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
     async (args) => {
       try {
         const result = await handleProxySend({ body: { ...args, type: "text" }, cfg });
-        if (result.body.blocked) {
-          const hint = buildRecoveryHint(result.body);
-          return { content: [{ type: "text", text: `${result.body.error}\n\nRecovery: ${hint}` }], isError: true };
-        }
-        if (result.status >= 400) {
-          return { content: [{ type: "text", text: String(result.body.error ?? "Send failed") }], isError: true };
-        }
-        return { content: [{ type: "text", text: "Message sent." }] };
+        return proxySendResult(result, "Message sent.");
       } catch (err) {
-        return { content: [{ type: "text", text: `send_message error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `send_message error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -162,16 +184,9 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
     async (args) => {
       try {
         const result = await handleProxySend({ body: { ...args }, cfg });
-        if (result.body.blocked) {
-          const hint = buildRecoveryHint(result.body);
-          return { content: [{ type: "text", text: `${result.body.error}\n\nRecovery: ${hint}` }], isError: true };
-        }
-        if (result.status >= 400) {
-          return { content: [{ type: "text", text: String(result.body.error ?? "Media send failed") }], isError: true };
-        }
-        return { content: [{ type: "text", text: `${args.type} sent.` }] };
+        return proxySendResult(result, `${args.type} sent.`);
       } catch (err) {
-        return { content: [{ type: "text", text: `send_media error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `send_media error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -200,7 +215,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
         });
         return { content: [{ type: "text", text: JSON.stringify(messages) }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `read_messages error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `read_messages error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -223,7 +238,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
         const results = db.getContacts({ search: args.query, limit: args.limit ?? 20 });
         return { content: [{ type: "text", text: JSON.stringify(results) }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `search error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `search error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -254,7 +269,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
         const total = db.getContactCount(args.search, args.type as "contact" | "group" | "newsletter" | undefined);
         return { content: [{ type: "text", text: JSON.stringify({ total, results }) }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `get_directory error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `get_directory error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -278,6 +293,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
       try {
         const { baseUrl, apiKey } = getWahaCfg(cfg);
         const ctx = { action: `manage_group:${args.action}`, chatId: args.groupId };
+        const participantIds = (args.participants ?? []).map(jid => ({ id: jid }));
 
         let path: string;
         let method: "GET" | "POST" | "PUT" | "DELETE" = "POST";
@@ -295,19 +311,19 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
             break;
           case "add_participant":
             path = `/api/groups/${encodeURIComponent(args.groupId ?? "")}/participants/add`;
-            body = { participants: (args.participants ?? []).map(jid => ({ id: jid })) };
+            body = { participants: participantIds };
             break;
           case "remove_participant":
             path = `/api/groups/${encodeURIComponent(args.groupId ?? "")}/participants/remove`;
-            body = { participants: (args.participants ?? []).map(jid => ({ id: jid })) };
+            body = { participants: participantIds };
             break;
           case "promote_admin":
             path = `/api/groups/${encodeURIComponent(args.groupId ?? "")}/admin/promote`;
-            body = { participants: (args.participants ?? []).map(jid => ({ id: jid })) };
+            body = { participants: participantIds };
             break;
           case "demote_admin":
             path = `/api/groups/${encodeURIComponent(args.groupId ?? "")}/admin/demote`;
-            body = { participants: (args.participants ?? []).map(jid => ({ id: jid })) };
+            body = { participants: participantIds };
             break;
           case "leave":
             path = `/api/groups/${encodeURIComponent(args.groupId ?? "")}/leave`;
@@ -333,7 +349,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
         });
         return { content: [{ type: "text", text: JSON.stringify(result ?? { ok: true }) }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `manage_group error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `manage_group error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -381,7 +397,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
 
         return { content: [{ type: "text", text: JSON.stringify(statuses) }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `get_status error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `get_status error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -411,7 +427,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
         });
         return { content: [{ type: "text", text: `Updated ${args.path} = ${JSON.stringify(args.value)}` }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `update_settings error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `update_settings error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -442,16 +458,9 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
           },
           cfg,
         });
-        if (result.body.blocked) {
-          const hint = buildRecoveryHint(result.body);
-          return { content: [{ type: "text", text: `${result.body.error}\n\nRecovery: ${hint}` }], isError: true };
-        }
-        if (result.status >= 400) {
-          return { content: [{ type: "text", text: String(result.body.error ?? "Poll send failed") }], isError: true };
-        }
-        return { content: [{ type: "text", text: "Poll sent." }] };
+        return proxySendResult(result, "Poll sent.");
       } catch (err) {
-        return { content: [{ type: "text", text: `send_poll error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `send_poll error: ${errMsg(err)}` }], isError: true };
       }
     }
   );
@@ -484,7 +493,7 @@ export function createMcpServer(cfg: CoreConfig): McpServer {
         });
         return { content: [{ type: "text", text: JSON.stringify(result ?? { ok: true }) }] };
       } catch (err) {
-        return { content: [{ type: "text", text: `send_reaction error: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
+        return { content: [{ type: "text", text: `send_reaction error: ${errMsg(err)}` }], isError: true };
       }
     }
   );

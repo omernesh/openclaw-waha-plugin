@@ -11,36 +11,17 @@ import { listEnabledWahaAccounts } from "./accounts.js";
 import { getHealthState } from "./health.js";
 import { getMimicryDb, getMaturityPhase, resolveCapLimit, getCapStatus } from "./mimicry-gate.js";
 import { getWahaChatMessages } from "./send.js";
+import { readRequestBodyWithLimit } from "./request-utils.js";
+
+// ── Pagination constants — DO NOT CHANGE ────────────────────────────────────
+const DEFAULT_MESSAGE_LIMIT = 20;
+const DEFAULT_SEARCH_LIMIT = 20;
+const MAX_SEARCH_LIMIT = 100;
+const DEFAULT_DIRECTORY_LIMIT = 50;
+const MAX_DIRECTORY_LIMIT = 200;
 
 export interface ApiV1Opts {
   config: CoreConfig;
-}
-
-/** Read a request body with a 1MB limit and 30s timeout. Returns string. */
-async function readBodyString(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    const MAX_BYTES = 1024 * 1024; // 1MB
-    const timeout = setTimeout(() => reject(new Error("Request body timeout")), 30_000);
-    req.on("data", (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > MAX_BYTES) {
-        clearTimeout(timeout);
-        reject(new Error("Request body too large"));
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on("end", () => {
-      clearTimeout(timeout);
-      resolve(Buffer.concat(chunks).toString("utf-8"));
-    });
-    req.on("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-  });
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
@@ -75,7 +56,7 @@ export async function handleApiV1Request(
   if (pathname === "/api/v1/send" && req.method === "POST") {
     let body: Record<string, unknown>;
     try {
-      const raw = await readBodyString(req);
+      const raw = await readRequestBodyWithLimit(req, { maxBytes: 1024 * 1024, timeoutMs: 30_000 });
       body = JSON.parse(raw) as Record<string, unknown>;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -109,7 +90,7 @@ export async function handleApiV1Request(
       writeJson(res, 400, { error: "session query parameter is required" });
       return;
     }
-    const limit = parseInt(url.searchParams.get("limit") ?? "20", 10) || 20;
+    const limit = parseInt(url.searchParams.get("limit") ?? String(DEFAULT_MESSAGE_LIMIT), 10) || DEFAULT_MESSAGE_LIMIT;
     try {
       const messages = await getWahaChatMessages({
         cfg: opts.config,
@@ -132,7 +113,7 @@ export async function handleApiV1Request(
       writeJson(res, 400, { error: "q query parameter is required" });
       return;
     }
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 100);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? String(DEFAULT_SEARCH_LIMIT), 10) || DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT);
     const accounts = listEnabledWahaAccounts(opts.config);
     const firstAccount = accounts[0];
     if (!firstAccount) {
@@ -150,7 +131,7 @@ export async function handleApiV1Request(
   // ── GET /api/v1/directory ────────────────────────────────────────
   if (pathname === "/api/v1/directory" && req.method === "GET") {
     const search = url.searchParams.get("search") ?? undefined;
-    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10) || 50, 200);
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? String(DEFAULT_DIRECTORY_LIMIT), 10) || DEFAULT_DIRECTORY_LIMIT, MAX_DIRECTORY_LIMIT);
     const offset = parseInt(url.searchParams.get("offset") ?? "0", 10) || 0;
     const type = (url.searchParams.get("type") ?? undefined) as "contact" | "group" | "newsletter" | undefined;
     const accounts = listEnabledWahaAccounts(opts.config);
