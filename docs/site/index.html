@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatlytics — WhatsApp for AI Agents</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .gradient-text {
+      background: linear-gradient(135deg, #818cf8, #6366f1, #4f46e5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-bg {
+      background: radial-gradient(ellipse at 60% 0%, rgba(99,102,241,0.15) 0%, transparent 60%),
+                  radial-gradient(ellipse at 20% 80%, rgba(79,70,229,0.1) 0%, transparent 50%);
+    }
+    pre { scrollbar-width: thin; scrollbar-color: #4f46e5 #1e1b4b; }
+    pre::-webkit-scrollbar { height: 4px; }
+    pre::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 2px; }
+  </style>
+</head>
+<body class="dark bg-gray-950 text-gray-100 antialiased">
+
+  <!-- ─── Navigation ─── -->
+  <nav class="fixed top-0 inset-x-0 z-50 border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-14">
+        <span class="font-bold text-lg tracking-tight gradient-text">Chatlytics</span>
+        <div class="flex items-center gap-6 text-sm text-gray-400">
+          <a href="#features" class="hover:text-white transition-colors">Features</a>
+          <a href="#quickstart" class="hover:text-white transition-colors">Quick Start</a>
+          <a href="docs.html" class="hover:text-white transition-colors">Docs</a>
+          <a href="https://github.com/omernesh/openclaw-waha-plugin" target="_blank" rel="noopener"
+             class="bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-md font-medium transition-colors">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ─── Hero ─── -->
+  <section class="hero-bg pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1 text-sm text-brand-400 mb-6">
+        <span class="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse"></span>
+        v2.0 — Multi-tenant, MCP-native, Docker-ready
+      </div>
+      <h1 class="text-5xl sm:text-6xl font-extrabold tracking-tight mb-6">
+        <span class="gradient-text">Chatlytics</span>
+      </h1>
+      <p class="text-2xl sm:text-3xl font-semibold text-gray-200 mb-4">
+        WhatsApp for AI Agents
+      </p>
+      <p class="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
+        Connect any AI agent to WhatsApp in minutes. MCP server, REST API, CLI tool — all in one Docker container.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="#quickstart"
+           class="bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-lg font-semibold text-base transition-colors shadow-lg shadow-brand-600/20">
+          Get Started
+        </a>
+        <a href="docs.html"
+           class="border border-gray-700 hover:border-brand-500 text-gray-300 hover:text-white px-6 py-3 rounded-lg font-semibold text-base transition-colors">
+          Read the Docs
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Features Grid ─── -->
+  <section id="features" class="py-20 px-4 sm:px-6 lg:px-8 bg-gray-900/40">
+    <div class="max-w-6xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-3">Everything you need</h2>
+      <p class="text-gray-400 text-center mb-12">One platform. Any framework. Production-grade from day one.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- MCP Server -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-brand-500/40 transition-colors group">
+          <div class="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center mb-4 group-hover:bg-brand-500/20 transition-colors">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-white mb-2">MCP Server</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Connect Claude, Cursor, or any MCP client with a single config snippet. 10 tools covering send, search, directory, status and more.
+          </p>
+        </div>
+
+        <!-- REST API -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-brand-500/40 transition-colors group">
+          <div class="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center mb-4 group-hover:bg-brand-500/20 transition-colors">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-white mb-2">REST API</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Send messages, read chats, manage groups — all via authenticated HTTP endpoints with full OpenAPI documentation.
+          </p>
+        </div>
+
+        <!-- CLI Tool -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-brand-500/40 transition-colors group">
+          <div class="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center mb-4 group-hover:bg-brand-500/20 transition-colors">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-white mb-2">CLI Tool</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            <code class="text-brand-400 text-xs bg-gray-800 px-1.5 py-0.5 rounded">npx chatlytics send 'hello' --to 'John'</code> — WhatsApp from your terminal in one command.
+          </p>
+        </div>
+
+        <!-- Multi-Tenant -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-brand-500/40 transition-colors group">
+          <div class="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center mb-4 group-hover:bg-brand-500/20 transition-colors">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-white mb-2">Multi-Tenant</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Isolated workspaces per customer — crash one, others keep running. API key provisioning and QR code onboarding built in.
+          </p>
+        </div>
+
+        <!-- Mimicry Engine -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-brand-500/40 transition-colors group">
+          <div class="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center mb-4 group-hover:bg-brand-500/20 transition-colors">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-white mb-2">Mimicry Engine</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Human-like timing, typing indicators, quiet hours, and adaptive activity profiles. Avoid bans and stay undetected.
+          </p>
+        </div>
+
+        <!-- Docker Ready -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-brand-500/40 transition-colors group">
+          <div class="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center mb-4 group-hover:bg-brand-500/20 transition-colors">
+            <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10l-8-4V7"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-white mb-2">Docker Ready</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            <code class="text-brand-400 text-xs bg-gray-800 px-1.5 py-0.5 rounded">docker compose up</code> and you're live. SQLite data persists via named volumes. No external database needed.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Quick Start ─── -->
+  <section id="quickstart" class="py-20 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-3">Quick Start</h2>
+      <p class="text-gray-400 text-center mb-12">Up and running in under 5 minutes.</p>
+
+      <!-- Step 1: Docker -->
+      <div class="mb-10">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-7 h-7 rounded-full bg-brand-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">1</span>
+          <h3 class="font-semibold text-white text-lg">Start with Docker</h3>
+        </div>
+        <div class="relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/80">
+            <span class="text-xs text-gray-500 font-mono">docker-compose.yml</span>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>docker compose pull chatlytics
+docker compose up -d
+open http://localhost:8050/admin  # Scan QR, get API key</code></pre>
+        </div>
+      </div>
+
+      <!-- Step 2: MCP Config -->
+      <div class="mb-10">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-7 h-7 rounded-full bg-brand-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">2</span>
+          <h3 class="font-semibold text-white text-lg">Add MCP config (Claude Desktop)</h3>
+        </div>
+        <div class="relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/80">
+            <span class="text-xs text-gray-500 font-mono">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "mcpServers": {
+    "chatlytics": {
+      "command": "npx",
+      "args": ["-y", "chatlytics", "mcp"],
+      "env": {
+        "CHATLYTICS_URL": "http://localhost:8050",
+        "CHATLYTICS_API_KEY": "ctl_your_key_here"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+
+      <!-- Step 3: REST API -->
+      <div class="mb-10">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-7 h-7 rounded-full bg-brand-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">3</span>
+          <h3 class="font-semibold text-white text-lg">Or use the REST API directly</h3>
+        </div>
+        <div class="relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/80">
+            <span class="text-xs text-gray-500 font-mono">bash</span>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl -X POST http://localhost:8050/api/v1/send \
+  -H "Authorization: Bearer ctl_your_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"chatId": "Alice", "session": "my_session", "text": "Hello from the API!"}'</code></pre>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <a href="docs.html"
+           class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg shadow-brand-600/20">
+          Full Documentation
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Footer ─── -->
+  <footer class="border-t border-gray-800 py-10 px-4 sm:px-6 lg:px-8 bg-gray-950">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="text-sm text-gray-500">
+        Built by <span class="text-gray-300">Omer Nesher</span>
+      </div>
+      <div class="flex items-center gap-6 text-sm text-gray-500">
+        <a href="docs.html" class="hover:text-gray-300 transition-colors">Documentation</a>
+        <a href="https://github.com/omernesh/openclaw-waha-plugin" target="_blank" rel="noopener"
+           class="hover:text-gray-300 transition-colors flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

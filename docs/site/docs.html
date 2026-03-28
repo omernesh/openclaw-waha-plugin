@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatlytics — API Documentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    .gradient-text {
+      background: linear-gradient(135deg, #818cf8, #6366f1, #4f46e5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    /* Sidebar */
+    .sidebar { scrollbar-width: thin; scrollbar-color: #374151 #111827; }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+    /* Code blocks */
+    pre { scrollbar-width: thin; scrollbar-color: #4f46e5 #1e1b4b; }
+    pre::-webkit-scrollbar { height: 4px; }
+    pre::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 2px; }
+    /* Active nav item */
+    .nav-item.active { color: #818cf8; background: rgba(99,102,241,0.1); }
+    /* Method badges */
+    .badge-post { background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+    .badge-get  { background: rgba(59,130,246,0.1); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2); }
+  </style>
+</head>
+<body class="dark bg-gray-950 text-gray-100 antialiased">
+
+  <!-- ─── Top Bar ─── -->
+  <header class="fixed top-0 inset-x-0 z-50 h-14 border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm flex items-center px-4 sm:px-6 gap-4">
+    <button id="menu-btn" class="sm:hidden p-2 text-gray-400 hover:text-white" aria-label="Toggle menu">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+    <a href="index.html" class="font-bold text-lg tracking-tight gradient-text">Chatlytics</a>
+    <span class="text-gray-600 hidden sm:block">/</span>
+    <span class="text-gray-400 text-sm hidden sm:block">API Documentation</span>
+    <div class="ml-auto flex items-center gap-4 text-sm">
+      <a href="index.html" class="text-gray-400 hover:text-white transition-colors hidden sm:block">Home</a>
+      <a href="https://github.com/omernesh/openclaw-waha-plugin" target="_blank" rel="noopener"
+         class="text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/>
+        </svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+  <div class="flex pt-14 min-h-screen">
+
+    <!-- ─── Sidebar ─── -->
+    <aside id="sidebar"
+           class="sidebar fixed top-14 left-0 w-64 h-[calc(100vh-3.5rem)] overflow-y-auto bg-gray-950 border-r border-gray-800 p-4 z-40 -translate-x-full sm:translate-x-0 transition-transform duration-200">
+      <nav class="space-y-1 text-sm">
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">Getting Started</div>
+        <a href="#authentication" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Authentication
+        </a>
+
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 mt-4">REST API</div>
+        <a href="#send" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Send Messages
+        </a>
+        <a href="#messages" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Read Messages
+        </a>
+        <a href="#search" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Search
+        </a>
+        <a href="#directory" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Directory
+        </a>
+        <a href="#sessions" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Sessions
+        </a>
+        <a href="#status" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Mimicry Status
+        </a>
+
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 mt-4">Integrations</div>
+        <a href="#mcp" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          MCP Server
+        </a>
+        <a href="#cli" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          CLI Tool
+        </a>
+        <a href="#webhooks" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Webhooks
+        </a>
+        <a href="#configuration" class="nav-item flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+          Configuration
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ─── Main Content ─── -->
+    <main class="flex-1 sm:ml-64 px-4 sm:px-8 lg:px-12 py-8 max-w-4xl">
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Authentication                                               -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="authentication" class="mb-16 scroll-mt-20">
+        <h1 class="text-3xl font-bold mb-2">Authentication</h1>
+        <p class="text-gray-400 mb-6">All API endpoints require a Bearer token. API keys are provisioned per workspace through the admin panel.</p>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
+          <h3 class="font-semibold text-white mb-3">API Key Format</h3>
+          <p class="text-gray-400 text-sm mb-3">
+            All API keys start with <code class="text-brand-400 bg-gray-800 px-1.5 py-0.5 rounded text-xs">ctl_</code> followed by a random hex string.
+          </p>
+          <div class="bg-gray-800/50 rounded-lg px-4 py-2 font-mono text-sm text-brand-400">
+            ctl_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+          </div>
+        </div>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">HTTP Header</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>Authorization: Bearer ctl_your_api_key_here</code></pre>
+        </div>
+
+        <div class="bg-brand-500/5 border border-brand-500/20 rounded-xl p-5">
+          <h4 class="text-brand-400 font-semibold mb-2 text-sm">Getting your API key</h4>
+          <ol class="text-gray-400 text-sm space-y-1 list-decimal list-inside">
+            <li>Open the admin panel: <code class="text-gray-300 bg-gray-800 px-1 rounded text-xs">http://localhost:8050/admin</code></li>
+            <li>Navigate to the <strong class="text-gray-300">API Keys</strong> tab</li>
+            <li>Click <strong class="text-gray-300">Generate New Key</strong> — shown only once, copy it immediately</li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Send Messages                                                -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="send" class="mb-16 scroll-mt-20">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="badge-post text-xs font-bold px-2.5 py-1 rounded-full">POST</span>
+          <h2 class="text-2xl font-bold">/api/v1/send</h2>
+        </div>
+        <p class="text-gray-400 mb-6">
+          Send a WhatsApp text or media message. All sends route through the mimicry gate (time gate + hourly cap).
+          Returns <code class="text-brand-400 bg-gray-800 px-1 rounded text-xs">403</code> if blocked by quiet hours or cap.
+        </p>
+
+        <h3 class="font-semibold text-white mb-3">Request Body</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">application/json</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "chatId": "Alice",          // Contact name or JID (e.g. "972501234567@c.us")
+  "session": "my_session",   // WAHA session name
+  "text": "Hello from AI!",  // Message text (required for text type)
+  "mediaUrl": "https://...", // Optional: media URL for image/video/file
+  "type": "image"            // Optional: "image" | "video" | "file" | "voice"
+}</code></pre>
+        </div>
+
+        <h3 class="font-semibold text-white mb-3">Example</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">curl</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl -X POST http://localhost:8050/api/v1/send \
+  -H "Authorization: Bearer ctl_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chatId": "972501234567@c.us",
+    "session": "my_session",
+    "text": "Hello from Chatlytics!"
+  }'</code></pre>
+        </div>
+
+        <h3 class="font-semibold text-white mb-3">Response</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">200 OK</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{ "ok": true, "waha": { "id": "true_972501234567@c.us_ABCDEF123" } }</code></pre>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Read Messages                                                -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="messages" class="mb-16 scroll-mt-20">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="badge-get text-xs font-bold px-2.5 py-1 rounded-full">GET</span>
+          <h2 class="text-2xl font-bold">/api/v1/messages</h2>
+        </div>
+        <p class="text-gray-400 mb-6">Read recent messages from a WhatsApp chat.</p>
+
+        <h3 class="font-semibold text-white mb-3">Query Parameters</h3>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <table class="w-full text-sm">
+            <thead class="border-b border-gray-800">
+              <tr class="text-left">
+                <th class="px-4 py-3 text-gray-400 font-medium">Parameter</th>
+                <th class="px-4 py-3 text-gray-400 font-medium">Type</th>
+                <th class="px-4 py-3 text-gray-400 font-medium">Required</th>
+                <th class="px-4 py-3 text-gray-400 font-medium">Description</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">chatId</td>
+                <td class="px-4 py-3 text-gray-400">string</td>
+                <td class="px-4 py-3 text-green-400">yes</td>
+                <td class="px-4 py-3 text-gray-400">Chat JID to read from</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">session</td>
+                <td class="px-4 py-3 text-gray-400">string</td>
+                <td class="px-4 py-3 text-green-400">yes</td>
+                <td class="px-4 py-3 text-gray-400">WAHA session name</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">limit</td>
+                <td class="px-4 py-3 text-gray-400">integer</td>
+                <td class="px-4 py-3 text-gray-500">no</td>
+                <td class="px-4 py-3 text-gray-400">Max messages to return (default: 20, max: 100)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">curl</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl "http://localhost:8050/api/v1/messages?chatId=972501234567@c.us&session=my_session&limit=10" \
+  -H "Authorization: Bearer ctl_your_key"</code></pre>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Search                                                       -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="search" class="mb-16 scroll-mt-20">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="badge-get text-xs font-bold px-2.5 py-1 rounded-full">GET</span>
+          <h2 class="text-2xl font-bold">/api/v1/search</h2>
+        </div>
+        <p class="text-gray-400 mb-6">Search contacts and groups in the WhatsApp directory by name or JID.</p>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">curl</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl "http://localhost:8050/api/v1/search?q=Alice&limit=10" \
+  -H "Authorization: Bearer ctl_your_key"</code></pre>
+        </div>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">200 Response</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "contacts": [
+    { "jid": "972501234567@c.us", "name": "Alice Smith", "phone": "972501234567" }
+  ],
+  "groups": [
+    { "jid": "120363421825201386@g.us", "name": "Team Chat" }
+  ]
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Directory                                                    -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="directory" class="mb-16 scroll-mt-20">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="badge-get text-xs font-bold px-2.5 py-1 rounded-full">GET</span>
+          <h2 class="text-2xl font-bold">/api/v1/directory</h2>
+        </div>
+        <p class="text-gray-400 mb-6">Paginated listing of contacts, groups, and newsletters. Supports filtering and search.</p>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">curl — list all groups</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl "http://localhost:8050/api/v1/directory?type=group&limit=50&offset=0" \
+  -H "Authorization: Bearer ctl_your_key"</code></pre>
+        </div>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">200 Response</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "items": [
+    { "jid": "120363421825201386@g.us", "name": "Team Chat", "type": "group" },
+    { "jid": "972501234567@c.us", "name": "Alice Smith", "type": "contact" }
+  ],
+  "total": 42,
+  "limit": 50,
+  "offset": 0
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Sessions                                                     -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="sessions" class="mb-16 scroll-mt-20">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="badge-get text-xs font-bold px-2.5 py-1 rounded-full">GET</span>
+          <h2 class="text-2xl font-bold">/api/v1/sessions</h2>
+        </div>
+        <p class="text-gray-400 mb-6">List all WAHA sessions with their health status and connection state.</p>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">curl</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl "http://localhost:8050/api/v1/sessions" \
+  -H "Authorization: Bearer ctl_your_key"
+
+# Response:
+{
+  "sessions": [
+    {
+      "session": "my_session",
+      "name": "My Bot",
+      "status": "WORKING",
+      "webhook_registered": true
+    }
+  ]
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Mimicry Status                                               -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="status" class="mb-16 scroll-mt-20">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="badge-get text-xs font-bold px-2.5 py-1 rounded-full">GET</span>
+          <h2 class="text-2xl font-bold">/api/v1/status</h2>
+        </div>
+        <p class="text-gray-400 mb-6">Check current mimicry gate state — time gate open/closed and hourly cap usage. Read-only; never consumes quota.</p>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">curl</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>curl "http://localhost:8050/api/v1/status" \
+  -H "Authorization: Bearer ctl_your_key"
+
+# Response:
+{
+  "session": "my_session",
+  "hourlyCapUsed": 12,
+  "hourlyCapLimit": 30,
+  "gateOpen": true
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- MCP Server                                                   -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="mcp" class="mb-16 scroll-mt-20">
+        <h2 class="text-2xl font-bold mb-2">MCP Server</h2>
+        <p class="text-gray-400 mb-8">
+          Chatlytics exposes a Model Context Protocol server with 10 tools. Connect any MCP-compatible client (Claude Desktop, Cursor, Continue.dev) using the config snippets below.
+        </p>
+
+        <!-- Claude Desktop -->
+        <h3 class="font-semibold text-white mb-3">Claude Desktop</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">~/Library/Application Support/Claude/claude_desktop_config.json</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "mcpServers": {
+    "chatlytics": {
+      "command": "npx",
+      "args": ["-y", "chatlytics", "mcp"],
+      "env": {
+        "CHATLYTICS_URL": "http://localhost:8050",
+        "CHATLYTICS_API_KEY": "ctl_your_key_here"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+
+        <!-- Cursor -->
+        <h3 class="font-semibold text-white mb-3">Cursor</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">~/.cursor/mcp.json</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "mcpServers": {
+    "chatlytics": {
+      "command": "npx",
+      "args": ["-y", "chatlytics", "mcp"],
+      "env": {
+        "CHATLYTICS_URL": "http://localhost:8050",
+        "CHATLYTICS_API_KEY": "ctl_your_key_here"
+      }
+    }
+  }
+}</code></pre>
+        </div>
+
+        <!-- Continue.dev -->
+        <h3 class="font-semibold text-white mb-3">Continue.dev</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-8">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">~/.continue/config.json</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "experimental": {
+    "modelContextProtocolServers": [
+      {
+        "transport": {
+          "type": "stdio",
+          "command": "npx",
+          "args": ["-y", "chatlytics", "mcp"],
+          "env": {
+            "CHATLYTICS_URL": "http://localhost:8050",
+            "CHATLYTICS_API_KEY": "ctl_your_key_here"
+          }
+        }
+      }
+    ]
+  }
+}</code></pre>
+        </div>
+
+        <!-- MCP HTTP Transport -->
+        <h3 class="font-semibold text-white mb-3">HTTP Transport (Streamable)</h3>
+        <p class="text-gray-400 text-sm mb-3">For clients that support HTTP MCP transport directly:</p>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-8">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">HTTP MCP endpoint</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>POST http://localhost:8050/mcp
+Authorization: Bearer ctl_your_key_here
+Content-Type: application/json</code></pre>
+        </div>
+
+        <!-- Tool List -->
+        <h3 class="font-semibold text-white mb-4">Available MCP Tools</h3>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="border-b border-gray-800">
+              <tr class="text-left">
+                <th class="px-4 py-3 text-gray-400 font-medium">Tool</th>
+                <th class="px-4 py-3 text-gray-400 font-medium">Description</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">send_message</td>
+                <td class="px-4 py-3 text-gray-400">Send a WhatsApp text message through the mimicry gate</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">send_media</td>
+                <td class="px-4 py-3 text-gray-400">Send image, video, file, or voice via public URL</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">read_messages</td>
+                <td class="px-4 py-3 text-gray-400">Read recent messages from a chat</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">search</td>
+                <td class="px-4 py-3 text-gray-400">Search contacts and groups by name or JID</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">get_directory</td>
+                <td class="px-4 py-3 text-gray-400">List contacts, groups, or newsletters with pagination</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">get_sessions</td>
+                <td class="px-4 py-3 text-gray-400">List all WAHA sessions and their health status</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">get_status</td>
+                <td class="px-4 py-3 text-gray-400">Check mimicry gate state (time gate + hourly cap)</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">update_settings</td>
+                <td class="px-4 py-3 text-gray-400">Update plugin configuration (channels.waha.* paths)</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">get_group_info</td>
+                <td class="px-4 py-3 text-gray-400">Get group metadata including participant list</td>
+              </tr>
+              <tr>
+                <td class="px-4 py-3 font-mono text-brand-400 text-xs">manage_group</td>
+                <td class="px-4 py-3 text-gray-400">Group operations: add/remove participants, rename, set description</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- CLI Tool                                                     -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="cli" class="mb-16 scroll-mt-20">
+        <h2 class="text-2xl font-bold mb-2">CLI Tool</h2>
+        <p class="text-gray-400 mb-6">Use Chatlytics from the command line via <code class="text-brand-400 bg-gray-800 px-1.5 py-0.5 rounded text-xs">npx chatlytics</code> — no install required.</p>
+
+        <h3 class="font-semibold text-white mb-3">Environment Variables</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">.env or shell export</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>export CHATLYTICS_URL=http://localhost:8050
+export CHATLYTICS_API_KEY=ctl_your_key_here</code></pre>
+        </div>
+
+        <h3 class="font-semibold text-white mb-3">Commands</h3>
+        <div class="space-y-4">
+
+          <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+              <span class="text-xs text-gray-500 font-mono">send — send a message</span>
+              <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+            </div>
+            <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>npx chatlytics send "Hello!" --to "Alice" --session my_session</code></pre>
+          </div>
+
+          <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+              <span class="text-xs text-gray-500 font-mono">search — find contacts or groups</span>
+              <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+            </div>
+            <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>npx chatlytics search "Team" --limit 20</code></pre>
+          </div>
+
+          <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+              <span class="text-xs text-gray-500 font-mono">status — check gate and cap</span>
+              <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+            </div>
+            <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>npx chatlytics status</code></pre>
+          </div>
+
+          <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+              <span class="text-xs text-gray-500 font-mono">read — read messages from chat</span>
+              <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+            </div>
+            <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>npx chatlytics read --chat "972501234567@c.us" --session my_session --limit 10</code></pre>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Webhooks                                                     -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="webhooks" class="mb-16 scroll-mt-20">
+        <h2 class="text-2xl font-bold mb-2">Webhooks</h2>
+        <p class="text-gray-400 mb-6">Receive incoming WhatsApp messages and events via HTTP callbacks. Chatlytics signs each request with HMAC-SHA256 using your API key as the secret.</p>
+
+        <h3 class="font-semibold text-white mb-3">Configure a callback URL</h3>
+        <p class="text-gray-400 text-sm mb-4">Set <code class="text-brand-400 bg-gray-800 px-1 rounded text-xs">channels.waha.webhookSubscriptions</code> in config:</p>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">Configuration snippet</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "channels": {
+    "waha": {
+      "webhookSubscriptions": [
+        {
+          "url": "https://your-server.com/webhook",
+          "events": ["message", "message.reaction"]
+        }
+      ]
+    }
+  }
+}</code></pre>
+        </div>
+
+        <h3 class="font-semibold text-white mb-3">Verify HMAC Signature (Node.js)</h3>
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">Node.js — signature verification</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>import crypto from "crypto";
+
+function verifyWebhookSignature(req, apiKey) {
+  const sig = req.headers["x-chatlytics-signature"];
+  if (!sig) return false;
+
+  const body = JSON.stringify(req.body);
+  const expected = crypto
+    .createHmac("sha256", apiKey)
+    .update(body)
+    .digest("hex");
+
+  return crypto.timingSafeEqual(
+    Buffer.from(sig),
+    Buffer.from(`sha256=${expected}`)
+  );
+}
+
+// Express usage:
+app.post("/webhook", express.json(), (req, res) => {
+  if (!verifyWebhookSignature(req, process.env.CHATLYTICS_API_KEY)) {
+    return res.status(401).send("Unauthorized");
+  }
+  const event = req.body;
+  console.log("Received:", event.type, event.payload?.chatId);
+  res.sendStatus(200);
+});</code></pre>
+        </div>
+
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <h4 class="font-semibold text-white mb-3 text-sm">Retry behavior</h4>
+          <ul class="text-gray-400 text-sm space-y-1 list-disc list-inside">
+            <li>Failed deliveries (non-2xx) are retried up to 3 times with exponential backoff</li>
+            <li>Circuit breaker opens after 5 consecutive failures — pauses delivery for 60 seconds</li>
+            <li>Each event includes a unique <code class="text-brand-400 bg-gray-800 px-1 rounded text-xs">id</code> field for deduplication</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <!-- Configuration                                               -->
+      <!-- ════════════════════════════════════════════════════════════ -->
+      <section id="configuration" class="mb-16 scroll-mt-20">
+        <h2 class="text-2xl font-bold mb-2">Configuration</h2>
+        <p class="text-gray-400 mb-6">Key configuration fields for the mimicry engine and policy controls.</p>
+
+        <div class="code-block relative bg-gray-900 border border-gray-800 rounded-xl overflow-hidden mb-6">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-800">
+            <span class="text-xs text-gray-500 font-mono">channels.waha config (excerpt)</span>
+            <button class="copy-btn text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded transition-colors">Copy</button>
+          </div>
+          <pre class="p-4 text-sm font-mono text-gray-300 overflow-x-auto"><code>{
+  "channels": {
+    "waha": {
+      "apiUrl": "http://localhost:3004",
+      "apiKey": "your_waha_api_key",
+
+      // Mimicry gate — time-of-day restrictions
+      "sendGate": {
+        "enabled": true,
+        "startHour": 8,   // 8 AM
+        "endHour": 22,    // 10 PM
+        "timezone": "Asia/Jerusalem",
+        "onBlock": "reject"  // "reject" | "queue"
+      },
+
+      // Hourly send cap
+      "hourlyCap": {
+        "enabled": true,
+        "limits": {
+          "new": 5,      // New sessions — conservative
+          "growing": 15, // Growing sessions
+          "stable": 30,  // Established sessions
+          "trusted": 60  // Long-standing accounts
+        }
+      }
+    }
+  }
+}</code></pre>
+        </div>
+
+        <div class="bg-brand-500/5 border border-brand-500/20 rounded-xl p-5">
+          <h4 class="text-brand-400 font-semibold mb-2 text-sm">Updating config via API</h4>
+          <p class="text-gray-400 text-sm">
+            Use the <code class="text-gray-300 bg-gray-800 px-1 rounded text-xs">update_settings</code> MCP tool
+            or the admin panel Settings tab. Changes take effect immediately without restart.
+          </p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ─── Mobile sidebar backdrop ─── -->
+  <div id="backdrop" class="fixed inset-0 bg-black/50 z-30 hidden sm:hidden" onclick="toggleSidebar()"></div>
+
+  <!-- ─── Copy button + sidebar JS ─── -->
+  <script>
+    // Copy button functionality
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const code = btn.closest('.code-block').querySelector('code');
+        if (!code) return;
+        navigator.clipboard.writeText(code.textContent ?? '').then(() => {
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.classList.add('text-green-400');
+          setTimeout(() => {
+            btn.textContent = orig;
+            btn.classList.remove('text-green-400');
+          }, 2000);
+        }).catch(() => {
+          // Fallback for older browsers
+          const ta = document.createElement('textarea');
+          ta.value = code.textContent ?? '';
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        });
+      });
+    });
+
+    // Active nav highlight on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navItems = document.querySelectorAll('.nav-item[href^="#"]');
+
+    function updateActiveNav() {
+      let current = '';
+      sections.forEach(section => {
+        const top = section.getBoundingClientRect().top;
+        if (top <= 100) current = section.id;
+      });
+      navItems.forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('href') === '#' + current) {
+          item.classList.add('active');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', updateActiveNav, { passive: true });
+    updateActiveNav();
+
+    // Mobile sidebar toggle
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('backdrop');
+      const isOpen = !sidebar.classList.contains('-translate-x-full');
+      sidebar.classList.toggle('-translate-x-full', isOpen);
+      backdrop.classList.toggle('hidden', isOpen);
+    }
+
+    document.getElementById('menu-btn').addEventListener('click', toggleSidebar);
+
+    // Close sidebar when nav link clicked (mobile)
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        if (window.innerWidth < 640) toggleSidebar();
+      });
+    });
+  </script>
+
+</body>
+</html>
