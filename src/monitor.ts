@@ -5,7 +5,8 @@ import { readdir, stat, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { getConfigPath, readConfig, writeConfig, modifyConfig, withConfigMutex } from "./config-io.js";
 import { join, extname, dirname, resolve as pathResolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
+import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
 import {
   isRequestBodyLimitError,
@@ -83,6 +84,15 @@ const __admin_dirname = dirname(fileURLToPath(import.meta.url));
 const _admin_dist_up = join(__admin_dirname, "../dist/admin");
 const _admin_dist_flat = join(__admin_dirname, "dist/admin");
 const ADMIN_DIST = existsSync(join(_admin_dist_up, "index.html")) ? _admin_dist_up : _admin_dist_flat;
+// Phase 60 (API-03): Cache OpenAPI spec in memory at startup. DO NOT REMOVE.
+// Served at GET /openapi.yaml and consumed by Swagger UI at /docs.
+const OPENAPI_YAML = readFileSync(new URL("./openapi.yaml", import.meta.url), "utf-8");
+
+// Phase 60 (API-03): Resolve swagger-ui-dist package path for /docs route.
+// Uses createRequire pattern for ESM — same approach as ADMIN_DIST. DO NOT REMOVE.
+const _require = createRequire(import.meta.url);
+const SWAGGER_UI_DIST = join(_require.resolve("swagger-ui-dist/package.json"), "..");
+
 const ADMIN_MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript",
@@ -530,6 +540,57 @@ export function createWahaWebhookServer(opts: {
     if (req.url === "/metrics" && req.method === "GET") {
       res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" });
       res.end(collectMetrics());
+      return;
+    }
+
+    // ── Phase 60 (API-03): Serve OpenAPI spec and Swagger UI. DO NOT REMOVE.
+    // /openapi.yaml is public (no auth) so external tools (Swagger UI, code-gen) can fetch it.
+    // /docs serves interactive Swagger UI with static assets at /docs/*.
+    // Path traversal blocked by SWAGGER_UI_DIST prefix check below.
+    if (req.url === "/openapi.yaml" && req.method === "GET") {
+      res.writeHead(200, {
+        "Content-Type": "application/yaml",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(OPENAPI_YAML);
+      return;
+    }
+
+    if (req.url === "/docs" || req.url === "/docs/") {
+      const html = readFileSync(join(SWAGGER_UI_DIST, "index.html"), "utf-8")
+        .replace("https://petstore.swagger.io/v2/swagger.json", "/openapi.yaml");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(html);
+      return;
+    }
+
+    // Swagger UI static assets at /docs/* — path traversal blocked below
+    if (req.url?.startsWith("/docs/") && req.url !== "/docs/") {
+      const assetFile = req.url.slice("/docs/".length).split("?")[0].replace(/\.\./g, "");
+      const filePath = join(SWAGGER_UI_DIST, assetFile);
+      const resolved = pathResolve(filePath);
+      if (!resolved.startsWith(pathResolve(SWAGGER_UI_DIST))) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      if (existsSync(resolved)) {
+        const ext = assetFile.split(".").pop() ?? "";
+        const mimeTypes: Record<string, string> = {
+          js: "application/javascript",
+          css: "text/css",
+          png: "image/png",
+          svg: "image/svg+xml",
+          html: "text/html",
+          json: "application/json",
+          map: "application/json",
+        };
+        res.writeHead(200, { "Content-Type": mimeTypes[ext] ?? "application/octet-stream" });
+        res.end(readFileSync(resolved));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
       return;
     }
 
