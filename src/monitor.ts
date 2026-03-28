@@ -2965,7 +2965,15 @@ export function createWahaWebhookServer(opts: {
   const start = async () => {
     // Phase 63 (AUTH-01): Ensure auth.db tables exist before accepting requests.
     // DO NOT REMOVE — without this, /api/auth/* calls fail with "no such table: user".
-    await initAuthDb();
+    //
+    // Phase 64 (TENANT-01): Skip initAuthDb() in workspace child processes.
+    // Child processes must NOT open auth.db in their scoped data dir — auth routes
+    // are handled by the parent gateway only. The CHATLYTICS_WORKSPACE_ID env var
+    // signals that this is a workspace child.
+    // DO NOT REMOVE this guard — workspace children must not touch auth.db.
+    if (!process.env.CHATLYTICS_WORKSPACE_ID) {
+      await initAuthDb();
+    }
     await new Promise<void>((resolve, reject) => {
       server.on("error", reject);
       server.listen(port, host, () => resolve());
