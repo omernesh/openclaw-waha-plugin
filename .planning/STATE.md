@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
 status: verifying
-stopped_at: Completed 65-02-PLAN.md
-last_updated: "2026-03-28T17:59:28.171Z"
+stopped_at: "Completed 65-01-PLAN.md (checkpoint:human-verify reached)"
+last_updated: "2026-03-28T17:59:44.904Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
@@ -71,6 +71,7 @@ Progress: [███████░░░] 70%
 | Phase 64 P02 | 341s | 2 tasks | 3 files |
 | Phase 65 P03 | 4m | 1 tasks | 2 files |
 | Phase 65-admin-standalone P02 | 642 | 1 tasks | 11 files |
+| Phase 65 P01 | 20m | 1 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,8 @@ Progress: [███████░░░] 70%
 - [Phase 65-03]: docs/site/ not dist/admin/ — site artifacts separate from application dist, not served by process
 - [Phase 65-admin-standalone]: SKILL.md v4.0.0 references Chatlytics API key (ctl_) and MCP endpoint (/mcp) with zero OpenClaw-specific instructions
 - [Phase 65-admin-standalone]: All skills/*.md updated to use REST /api/v1/ examples — Action:Target:Parameters syntax removed
+- [Phase 65]: Export authDb from auth.ts for direct SQL workspace queries in monitor.ts routes
+- [Phase 65]: stopWorkspace() deletes registry entry before kill to prevent restart loop on deleted workspace
 
 ### Architecture Notes
 
@@ -170,6 +173,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T17:59:04.630Z
-Stopped at: Completed 65-02-PLAN.md
+Last session: 2026-03-28T17:59:44.897Z
+Stopped at: Completed 65-01-PLAN.md (checkpoint:human-verify reached)
 Resume file: None

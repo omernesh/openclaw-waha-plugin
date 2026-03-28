@@ -63,8 +63,8 @@ Requirements for the Chatlytics Universal Agent Platform. Each maps to roadmap p
 
 ### Admin & Distribution
 
-- [ ] **ADMIN-01**: Admin panel with standalone auth (not embedded in OpenClaw gateway)
-- [ ] **ADMIN-02**: Workspace management in admin panel (create, switch, delete workspaces)
+- [x] **ADMIN-01**: Admin panel with standalone auth (not embedded in OpenClaw gateway)
+- [x] **ADMIN-02**: Workspace management in admin panel (create, switch, delete workspaces)
 - [x] **SKILL-01**: SKILL.md v4 referencing Chatlytics API key + MCP config (framework-agnostic)
 - [x] **SITE-01**: Landing page at chatlytics.ai with product overview and getting started guide
 - [x] **SITE-02**: API documentation site with interactive examples
@@ -148,8 +148,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TENANT-02 | Phase 64 | Complete |
 | TENANT-03 | Phase 64 | Complete |
 | TENANT-04 | Phase 64 | Complete |
-| ADMIN-01 | Phase 65 | Pending |
-| ADMIN-02 | Phase 65 | Pending |
+| ADMIN-01 | Phase 65 | Complete |
+| ADMIN-02 | Phase 65 | Complete |
 | SKILL-01 | Phase 65 | Complete |
 | SITE-01 | Phase 65 | Complete |
 | SITE-02 | Phase 65 | Complete |
