@@ -108,13 +108,49 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| CORE-01 | Phase 58 | Pending |
+| CORE-02 | Phase 58 | Pending |
+| CORE-03 | Phase 58 | Pending |
+| CORE-05 | Phase 58 | Pending |
+| CORE-04 | Phase 59 | Pending |
+| CORE-06 | Phase 59 | Pending |
+| API-01 | Phase 60 | Pending |
+| API-02 | Phase 60 | Pending |
+| API-03 | Phase 60 | Pending |
+| API-04 | Phase 60 | Pending |
+| HOOK-01 | Phase 61 | Pending |
+| HOOK-02 | Phase 61 | Pending |
+| HOOK-03 | Phase 61 | Pending |
+| HOOK-04 | Phase 61 | Pending |
+| MCP-01 | Phase 62 | Pending |
+| MCP-02 | Phase 62 | Pending |
+| MCP-03 | Phase 62 | Pending |
+| MCP-04 | Phase 62 | Pending |
+| MCP-05 | Phase 62 | Pending |
+| AUTH-01 | Phase 63 | Pending |
+| AUTH-02 | Phase 63 | Pending |
+| AUTH-03 | Phase 63 | Pending |
+| AUTH-04 | Phase 63 | Pending |
+| AUTH-05 | Phase 63 | Pending |
+| AUTH-06 | Phase 63 | Pending |
+| TENANT-01 | Phase 64 | Pending |
+| TENANT-02 | Phase 64 | Pending |
+| TENANT-03 | Phase 64 | Pending |
+| TENANT-04 | Phase 64 | Pending |
+| ADMIN-01 | Phase 65 | Pending |
+| ADMIN-02 | Phase 65 | Pending |
+| SKILL-01 | Phase 65 | Pending |
+| SITE-01 | Phase 65 | Pending |
+| SITE-02 | Phase 65 | Pending |
+| COMPAT-01 | Phase 66 | Pending |
+| COMPAT-02 | Phase 66 | Pending |
+| COMPAT-03 | Phase 66 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 33 total
-- Mapped to phases: 0
-- Unmapped: 33 ⚠️
+- Mapped to phases: 33
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-28*
-*Last updated: 2026-03-28 after initial definition*
+*Last updated: 2026-03-28 — traceability populated by roadmapper*
