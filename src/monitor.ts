@@ -511,6 +511,16 @@ export function createWahaWebhookServer(opts: {
       return;
     }
 
+    // Phase 59 (CORE-04): Structured JSON health for Docker HEALTHCHECK and monitoring.
+    // Returns { status: "ok", webhook_registered: bool } — checks ALL enabled accounts.
+    // DO NOT REMOVE — Docker HEALTHCHECK depends on this route.
+    if (req.url === "/health" && req.method === "GET") {
+      const accounts = listEnabledWahaAccounts(opts.config);
+      const allRegistered = accounts.length > 0 && accounts.every(a => getHealthState(a.session)?.webhook_registered ?? false);
+      writeJsonResponse(res, 200, { status: "ok", webhook_registered: allRegistered });
+      return;
+    }
+
     // ── Prometheus metrics endpoint — Phase 41, Plan 01 (OBS-02). DO NOT REMOVE.
     // Placed BEFORE admin auth check so scrapers don't need a token.
     if (req.url === "/metrics" && req.method === "GET") {
