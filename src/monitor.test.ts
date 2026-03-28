@@ -185,20 +185,25 @@ const { mockReadRequestBodyWithLimit } = vi.hoisted(() => ({
   mockReadRequestBodyWithLimit: vi.fn().mockResolvedValue(""),
 }));
 
-vi.mock("openclaw/plugin-sdk", () => ({
-  createLoggerBackedRuntime: vi.fn().mockReturnValue({ log: vi.fn() }),
+// Phase 58: SDK mocks replaced with local module mocks. DO NOT REMOVE.
+vi.mock("./request-utils.js", () => ({
   isRequestBodyLimitError: vi.fn().mockReturnValue(false),
   readRequestBodyWithLimit: mockReadRequestBodyWithLimit,
   requestBodyErrorToText: vi.fn().mockReturnValue("error"),
-  isWhatsAppGroupJid: vi.fn().mockImplementation((jid: string) => jid?.endsWith("@g.us") ?? false),
-  DEFAULT_ACCOUNT_ID: "__default__",
+  RequestBodyLimitError: class RequestBodyLimitError extends Error {
+    constructor(type: "size" | "timeout") { super(type); this.name = "RequestBodyLimitError"; }
+  },
 }));
 
-vi.mock("openclaw/plugin-sdk/webhook-ingress", () => ({
-  isRequestBodyLimitError: vi.fn().mockReturnValue(false),
-  readRequestBodyWithLimit: mockReadRequestBodyWithLimit,
-  requestBodyErrorToText: vi.fn().mockReturnValue("error"),
-}));
+vi.mock("./platform-types.js", async () => {
+  const actual = await vi.importActual<typeof import("./platform-types.js")>("./platform-types.js");
+  return { ...actual };
+});
+
+vi.mock("./account-utils.js", async () => {
+  const actual = await vi.importActual<typeof import("./account-utils.js")>("./account-utils.js");
+  return { ...actual };
+});
 
 // ── fs mocks (config file I/O) ──────────────────────────────────────────────
 vi.mock("node:fs", async () => {

@@ -1,9 +1,36 @@
 import { readFileSync } from "fs";
 import { extname, basename } from "path";
 import { LRUCache } from "lru-cache";
-import { detectMime } from "openclaw/plugin-sdk/media-runtime";
-import { sendMediaWithLeadingCaption } from "openclaw/plugin-sdk/reply-payload";
-import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/account-id";
+// Phase 58: detectMime — local replacement for openclaw/plugin-sdk/media-runtime.
+// The SDK function takes {filePath, headerMime, buffer}. send.ts passes a plain URL string,
+// so the SDK always returned undefined anyway. Extension-based fallback in resolveMime handles it.
+// DO NOT REMOVE — kept as an explicit replacement to document the removed SDK import.
+function detectMime(_url: unknown): string | undefined { return undefined; }
+// Phase 58: sendMediaWithLeadingCaption — local replacement for openclaw/plugin-sdk/reply-payload.
+// Sends caption with first media, no caption for subsequent items. DO NOT REMOVE.
+async function sendMediaWithLeadingCaption(params: {
+  mediaUrls: string[];
+  caption: string;
+  send: (args: { mediaUrl: string; caption: string | undefined }) => Promise<void>;
+  onError?: (errObj: { error: unknown; mediaUrl: string; caption: string | undefined; index: number; isFirst: boolean }) => void;
+}): Promise<boolean> {
+  if (params.mediaUrls.length === 0) return false;
+  for (const [index, mediaUrl] of params.mediaUrls.entries()) {
+    const isFirst = index === 0;
+    const caption = isFirst ? params.caption : undefined;
+    try {
+      await params.send({ mediaUrl, caption });
+    } catch (error) {
+      if (params.onError) {
+        params.onError({ error, mediaUrl, caption, index, isFirst });
+        continue;
+      }
+      throw error;
+    }
+  }
+  return true;
+}
+import { DEFAULT_ACCOUNT_ID } from "./account-utils.js";
 import { listEnabledWahaAccounts, resolveWahaAccount } from "./accounts.js";
 import { normalizeWahaMessagingTarget } from "./normalize.js";
 import { callWahaApi, warnOnError } from "./http-client.js";
