@@ -217,7 +217,7 @@ Plans:
   4. An API request authenticated with workspace A's key cannot read or write to workspace B's data under any request path
 **Plans**: 2 plans
 Plans:
-- [ ] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
+- [x] 64-01-PLAN.md -- WorkspaceProcessManager, child entry point, session naming (TENANT-01, TENANT-02, TENANT-03)
 - [ ] 64-02-PLAN.md -- API gateway routing, webhook routing, standalone wiring (TENANT-01, TENANT-04)
 
 ### Phase 65: Admin Standalone + Distribution
@@ -265,6 +265,6 @@ Plans:
 | 61. Webhook Forwarding | v2.0 | 1/2 | In Progress|  |
 | 62. MCP Server | v2.0 | 1/2 | In Progress|  |
 | 63. Dashboard Auth + Onboarding | v2.1 | 3/3 | Complete   | 2026-03-28 |
-| 64. Multi-Tenant Process Isolation | v2.1 | 0/? | Not started | - |
+| 64. Multi-Tenant Process Isolation | v2.1 | 1/2 | In Progress|  |
 | 65. Admin Standalone + Distribution | v2.1 | 0/? | Not started | - |
 | 66. OpenClaw Thin Wrapper | v2.1 | 0/? | Not started | - |
