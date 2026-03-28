@@ -3,6 +3,8 @@
     "test": "vitest run --config vitest.config.ts --reporter=verbose"
   },
   "dependencies": {
+    "@better-auth/api-key": "^1.5.6",
+    "better-auth": "^1.5.6",
     "recharts": "^3.8.0"
   }
 }

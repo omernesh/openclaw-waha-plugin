@@ -1761,6 +1761,89 @@ export function createWahaWebhookServer(opts: {
     }
 
     // =========================================================================
+    // Phase 63 (AUTH-03): QR pairing proxy routes
+    // =========================================================================
+
+    // GET /api/admin/qr?session=xxx
+    // Proxies WAHA QR endpoint + session status for the OnboardingTab.
+    // Returns { qrBase64, mimetype, status } or { error: "session_not_found" }.
+    // DO NOT CHANGE: polls WAHA /api/{session}/auth/qr with Accept: application/json
+    if (req.url?.startsWith("/api/admin/qr") && req.method === "GET" && !req.url.startsWith("/api/admin/qr/start")) {
+      const qrUrl = new URL(req.url, "http://localhost");
+      const qrSession = qrUrl.searchParams.get("session") ?? account.session;
+      const qrBaseUrl = account.config.baseUrl ?? "";
+      const qrApiKey = account.apiKey;
+      try {
+        const [qrData, sessionInfo] = await Promise.allSettled([
+          callWahaApi({
+            baseUrl: qrBaseUrl,
+            apiKey: typeof qrApiKey === "string" ? qrApiKey : "",
+            session: qrSession,
+            method: "GET",
+            path: `/api/${qrSession}/auth/qr`,
+            query: { format: "image" },
+            skipRateLimit: true,
+            timeoutMs: 10_000,
+            context: { action: "qr-fetch" },
+          }),
+          callWahaApi({
+            baseUrl: qrBaseUrl,
+            apiKey: typeof qrApiKey === "string" ? qrApiKey : "",
+            session: qrSession,
+            method: "GET",
+            path: `/api/${qrSession}`,
+            skipRateLimit: true,
+            timeoutMs: 10_000,
+            context: { action: "qr-session-status" },
+          }),
+        ]);
+        const qr = qrData.status === "fulfilled" ? qrData.value : null;
+        const info = sessionInfo.status === "fulfilled" ? sessionInfo.value : null;
+        if (!info) {
+          writeJsonResponse(res, 404, { error: "session_not_found" });
+          return;
+        }
+        writeJsonResponse(res, 200, {
+          qrBase64: (qr as Record<string, unknown> | null)?.["data"] ?? null,
+          mimetype: (qr as Record<string, unknown> | null)?.["mimetype"] ?? "image/png",
+          status: (info as Record<string, unknown>)?.["status"] ?? "UNKNOWN",
+        });
+      } catch (err) {
+        log.error("GET /api/admin/qr failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "QR fetch failed" });
+      }
+      return;
+    }
+
+    // POST /api/admin/qr/start?session=xxx
+    // Creates a new WAHA session with NOWEB store enabled.
+    // Used by OnboardingTab "Start New Session" button.
+    if (req.url?.startsWith("/api/admin/qr/start") && req.method === "POST") {
+      const qrStartUrl = new URL(req.url, "http://localhost");
+      const qrStartSession = qrStartUrl.searchParams.get("session") ?? "default";
+      const qrStartBaseUrl = account.config.baseUrl ?? "";
+      const qrStartApiKey = account.apiKey;
+      try {
+        await callWahaApi({
+          baseUrl: qrStartBaseUrl,
+          apiKey: typeof qrStartApiKey === "string" ? qrStartApiKey : "",
+          session: qrStartSession,
+          method: "POST",
+          path: "/api/sessions/start",
+          body: { name: qrStartSession, config: { noweb: { store: { enabled: true } } } },
+          skipRateLimit: true,
+          timeoutMs: 15_000,
+          context: { action: "qr-start-session" },
+        });
+        writeJsonResponse(res, 200, { ok: true, session: qrStartSession });
+      } catch (err) {
+        log.error("POST /api/admin/qr/start failed", { error: String(err) });
+        writeJsonResponse(res, 500, { error: "Failed to start session" });
+      }
+      return;
+    }
+
+    // =========================================================================
     // Module management API (Phase 17, Plan 03 — MOD-03, MOD-04)
     // =========================================================================
 

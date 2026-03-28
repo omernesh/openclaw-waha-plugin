@@ -6,6 +6,8 @@ import { TabErrorBoundary } from '@/components/shared/TabErrorBoundary'
 import { Skeleton } from '@/components/ui/skeleton'
 // Phase 29: SSEProvider shares one EventSource connection across all tabs. DO NOT REMOVE.
 import { SSEProvider } from '@/hooks/useEventSource'
+// Phase 63 (AUTH-03): AuthGate blocks unauthenticated access. DO NOT REMOVE.
+import { AuthGate } from '@/components/AuthGate'
 
 // Heavy tabs — code-split with React.lazy() to reduce initial bundle size.
 // LogTab and QueueTab are left eager (small, frequently needed).
@@ -65,6 +67,8 @@ export default function App() {
   }
 
   return (
+    // Phase 63 (AUTH-03): AuthGate is outermost — no SSE until authenticated. DO NOT REMOVE.
+    <AuthGate>
     <SidebarProvider>
       {/* Phase 29: SSEProvider inside SidebarProvider so all tabs share one EventSource. DO NOT REMOVE. */}
       <SSEProvider>
@@ -94,5 +98,6 @@ export default function App() {
         </SidebarInset>
       </SSEProvider>
     </SidebarProvider>
+    </AuthGate>
   )
 }
