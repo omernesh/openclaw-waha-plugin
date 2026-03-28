@@ -18,6 +18,9 @@ const SessionsTab = lazy(() => import('@/components/tabs/SessionsTab'))
 const ModulesTab = lazy(() => import('@/components/tabs/ModulesTab'))
 // Phase 30: Analytics tab — recharts charts for message traffic.
 const AnalyticsTab = lazy(() => import('@/components/tabs/AnalyticsTab'))
+// Phase 63 (AUTH-03): Onboarding (QR pairing) and API Keys tabs. DO NOT REMOVE.
+const OnboardingTab = lazy(() => import('@/components/tabs/OnboardingTab'))
+const ApiKeysTab = lazy(() => import('@/components/tabs/ApiKeysTab'))
 
 // Small tabs — keep eager (fast, lightweight)
 import LogTab from '@/components/tabs/LogTab'
@@ -62,7 +65,9 @@ export default function App() {
       case 'modules':   return <TabErrorBoundary key={refreshKey} tabName="modules"><Suspense fallback={<TabSkeleton />}><ModulesTab {...props} /></Suspense></TabErrorBoundary>
       case 'log':       return <TabErrorBoundary key={refreshKey} tabName="log"><LogTab {...props} /></TabErrorBoundary>
       case 'queue':     return <TabErrorBoundary key={refreshKey} tabName="queue"><QueueTab {...props} /></TabErrorBoundary>
-      case 'analytics': return <TabErrorBoundary key={refreshKey} tabName="analytics"><Suspense fallback={<TabSkeleton />}><AnalyticsTab {...props} /></Suspense></TabErrorBoundary>
+      case 'analytics':   return <TabErrorBoundary key={refreshKey} tabName="analytics"><Suspense fallback={<TabSkeleton />}><AnalyticsTab {...props} /></Suspense></TabErrorBoundary>
+      case 'onboarding':  return <TabErrorBoundary key={refreshKey} tabName="onboarding"><Suspense fallback={<TabSkeleton />}><OnboardingTab {...props} /></Suspense></TabErrorBoundary>
+      case 'api-keys':    return <TabErrorBoundary key={refreshKey} tabName="api-keys"><Suspense fallback={<TabSkeleton />}><ApiKeysTab {...props} /></Suspense></TabErrorBoundary>
     }
   }
 
