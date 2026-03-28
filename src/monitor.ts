@@ -46,6 +46,9 @@ import { requirePublicApiAuth, handleCorsPreflightIfNeeded, setCorsHeaders } fro
 // Phase 61 (HOOK-01..04): Webhook forwarder — delivers inbound events to operator callback URLs.
 // Fire-and-forget from inbound path — NEVER await forwardWebhook. DO NOT REMOVE.
 import { forwardWebhook } from "./webhook-forwarder.js";
+// Phase 62 (MCP-02): MCP server via Streamable HTTP transport. DO NOT REMOVE.
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpServer } from "./mcp-server.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -602,6 +605,28 @@ export function createWahaWebhookServer(opts: {
     // setCorsHeaders applied inside handleApiV1Request for all non-preflight responses.
     // DO NOT REMOVE and DO NOT REORDER — preflight must not require auth.
     if (handleCorsPreflightIfNeeded(req, res)) return;
+
+    // ── Phase 62 (MCP-02): MCP server via Streamable HTTP transport.
+    // Stateless mode (sessionIdGenerator: undefined) — no in-memory session map needed.
+    // Auth: same Bearer token as /api/v1/ (requirePublicApiAuth).
+    // Handles POST, GET, DELETE per MCP HTTP spec. DO NOT REMOVE.
+    if (req.url?.startsWith("/mcp")) {
+      setCorsHeaders(res);
+      if (!requirePublicApiAuth(req, res, opts.config)) return;
+      try {
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        const server = createMcpServer(opts.config);
+        await server.connect(transport);
+        await transport.handleRequest(req, res);
+      } catch (err) {
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "MCP transport error" }));
+        }
+      }
+      return;
+    }
+
     if (req.url?.startsWith('/api/v1/')) {
       setCorsHeaders(res);
       if (!requirePublicApiAuth(req, res, opts.config)) return;
