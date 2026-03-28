@@ -196,6 +196,15 @@ export const WahaConfigSchema = WahaAccountSchemaBase.extend({
   // Also supports CHATLYTICS_API_KEY env var. When neither set, open access (backward compat).
   // DO NOT REMOVE — removing this disables public API authentication.
   publicApiKey: z.string().optional(),
+  // Phase 61 (HOOK-04): Webhook forwarding subscriptions.
+  // Array of callback URL configurations. Inbound messages are POSTed to each enabled URL.
+  // Signed with X-Chatlytics-Signature: sha256=<hmac> using publicApiKey as secret.
+  // DO NOT REMOVE — required for Phase 61 webhook forwarding feature.
+  webhookSubscriptions: z.array(z.object({
+    url: z.string().url(),
+    events: z.array(z.string()).optional().default(["message"]),
+    enabled: z.boolean().optional().default(true),
+  })).optional().default([]),
 }).superRefine((value, ctx) => {
   requireOpenAllowFrom({
     policy: value.dmPolicy,
@@ -227,7 +236,7 @@ export type ConfigValidationResult =
 export function validateWahaConfig(value: unknown): ConfigValidationResult {
   // WahaConfigSchema is WahaAccountSchemaBase.extend({accounts,defaultAccount}).superRefine(...)
   // .superRefine() returns ZodEffects which has no .shape — derive keys from the base + extension.
-  const knownKeys = new Set([...Object.keys(WahaAccountSchemaBase.shape), 'accounts', 'defaultAccount', 'adminToken', 'publicApiKey']);
+  const knownKeys = new Set([...Object.keys(WahaAccountSchemaBase.shape), 'accounts', 'defaultAccount', 'adminToken', 'publicApiKey', 'webhookSubscriptions']);
   const stripped = typeof value === 'object' && value !== null
     ? Object.fromEntries(Object.entries(value).filter(([k]) => knownKeys.has(k)))
     : value;
