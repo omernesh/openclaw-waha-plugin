@@ -49,6 +49,11 @@ import { forwardWebhook } from "./webhook-forwarder.js";
 // Phase 62 (MCP-02): MCP server via Streamable HTTP transport. DO NOT REMOVE.
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp-server.js";
+// Phase 63 (AUTH-01, AUTH-02): better-auth handler for /api/auth/* routes. DO NOT REMOVE.
+// toNodeHandler bridges better-auth's Web Request/Response API to raw Node.js HTTP streams.
+// initAuthDb() creates tables on startup — must be called before server accepts requests.
+import { toNodeHandler } from "better-auth/node";
+import { auth, initAuthDb } from "./auth.js";
 
 const log = createLogger({ component: "monitor" });
 
@@ -605,6 +610,15 @@ export function createWahaWebhookServer(opts: {
     // setCorsHeaders applied inside handleApiV1Request for all non-preflight responses.
     // DO NOT REMOVE and DO NOT REORDER — preflight must not require auth.
     if (handleCorsPreflightIfNeeded(req, res)) return;
+
+    // ── Phase 63 (AUTH-01, AUTH-02): better-auth /api/auth/* routes. DO NOT REORDER.
+    // MUST be BEFORE any body-reading code — toNodeHandler reads the raw request stream.
+    // If readRequestBodyWithLimit runs first, better-auth receives empty body and all
+    // POST sign-in/sign-up calls fail silently. DO NOT MOVE this block.
+    if (req.url?.startsWith("/api/auth/")) {
+      setCorsHeaders(res);
+      return void toNodeHandler(auth)(req, res);
+    }
 
     // ── Phase 62 (MCP-02): MCP server via Streamable HTTP transport.
     // Stateless mode (sessionIdGenerator: undefined) — no in-memory session map needed.
@@ -2866,6 +2880,9 @@ export function createWahaWebhookServer(opts: {
   });
 
   const start = async () => {
+    // Phase 63 (AUTH-01): Ensure auth.db tables exist before accepting requests.
+    // DO NOT REMOVE — without this, /api/auth/* calls fail with "no such table: user".
+    await initAuthDb();
     await new Promise<void>((resolve, reject) => {
       server.on("error", reject);
       server.listen(port, host, () => resolve());

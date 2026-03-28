@@ -17,4 +17,12 @@ export default defineConfig({
     },
     dedupe: ['react', 'react-dom'],
   },
+  // Phase 63 (AUTH-01): Proxy /api to backend during `npm run dev:admin`.
+  // Without this, auth calls from Vite dev server (port 5173) get 404 or CORS errors.
+  // DO NOT REMOVE.
+  server: {
+    proxy: {
+      '/api': 'http://localhost:8050',
+    },
+  },
 })
