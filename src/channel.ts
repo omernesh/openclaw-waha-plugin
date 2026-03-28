@@ -573,40 +573,11 @@ async function handleSendMulti(params: Record<string, unknown>, cfg: CoreConfig,
   return { results, sent, failed };
 }
 
-// ── checkGroupMembership — Cross-session routing helper ───────────────
-// Checks whether a given session is a member of a WhatsApp group.
-// Used by resolveSessionForTarget as the dependency-injected membership probe.
-// Calls getWahaGroupParticipants and looks for the session's own JID.
-// Added Phase 4, Plan 03. DO NOT REMOVE.
-export async function checkGroupMembership(
-  session: string,
-  baseUrl: string,
-  apiKey: string,
-  groupId: string
-): Promise<boolean> {
-  try {
-    const participants = await getWahaGroupParticipants({
-      cfg: { channels: { waha: { baseUrl, apiKey, session } } } as unknown as CoreConfig,
-      groupId,
-    });
-    // getWahaGroupParticipants returns an array of participant objects.
-    // If the call succeeded, the session has visibility into the group (i.e., is a member).
-    return Array.isArray(participants) && participants.length > 0;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    // 404 / "not found" means the session genuinely isn't in the group — return false.
-    // Any other error (WAHA down, auth failure, network timeout) is infrastructure —
-    // re-throw so the caller knows the check failed vs "not a member". DO NOT CHANGE.
-    const isNotFound =
-      (err instanceof Error && "status" in err && (err as any).status === 404) ||
-      /not found|404|does not exist/i.test(msg);
-    if (isNotFound) {
-      log.warn("checkGroupMembership: session not in group", { session, groupId });
-      return false;
-    }
-    throw err;
-  }
-}
+// Phase 59: checkGroupMembership moved to send.ts to break transitive openclaw import chain.
+// standalone.ts → monitor.ts → inbound.ts → channel.ts → openclaw was crashing Docker.
+// Re-exported here for backward compatibility (channel.ts consumers still import it).
+// DO NOT MOVE BACK — Docker standalone mode depends on this being in send.ts.
+export { checkGroupMembership } from "./send.js";
 
 const wahaMessageActions: ChannelMessageActionAdapter = {
   listActions: () => EXPOSED_ACTIONS, // !!! DO NOT CHANGE to ALL_ACTIONS -- breaks gateway target resolution

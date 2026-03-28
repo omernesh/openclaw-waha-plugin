@@ -44,6 +44,37 @@ import { enforceMimicry, recordMimicrySuccess } from "./mimicry-enforcer.js";
 
 
 const log = createLogger({ component: "send" });
+
+// Phase 59: Moved from channel.ts to break transitive openclaw import chain.
+// standalone.ts → monitor.ts → inbound.ts → channel.ts → openclaw was causing
+// ERR_MODULE_NOT_FOUND in Docker. This function only uses getWahaGroupParticipants
+// (defined in this file), so it belongs here. Used by both channel.ts and inbound.ts.
+// DO NOT MOVE BACK to channel.ts — Docker standalone mode will break.
+export async function checkGroupMembership(
+  session: string,
+  baseUrl: string,
+  apiKey: string,
+  groupId: string
+): Promise<boolean> {
+  try {
+    const participants = await getWahaGroupParticipants({
+      cfg: { channels: { waha: { baseUrl, apiKey, session } } } as unknown as CoreConfig,
+      groupId,
+    });
+    return Array.isArray(participants) && participants.length > 0;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isNotFound =
+      (err instanceof Error && "status" in err && (err as any).status === 404) ||
+      /not found|404|does not exist/i.test(msg);
+    if (isNotFound) {
+      log.warn("checkGroupMembership: session not in group", { session, groupId });
+      return false;
+    }
+    throw err;
+  }
+}
+
 const HEAD_DETECT_TIMEOUT_MS = 5000;
 const RESOLVE_FETCH_DELAY_MS = 200;
 

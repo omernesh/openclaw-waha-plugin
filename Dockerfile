@@ -19,7 +19,7 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 RUN npm run build:admin
@@ -37,8 +37,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 WORKDIR /app
 
 # Install production dependencies + tsx runtime (not in devDependencies).
+# Strip devDependencies from package.json to avoid peer-dep resolution conflicts
+# between vite@8 and @tailwindcss/vite (which expects vite@^5-7).
 COPY package*.json ./
-RUN npm ci --omit=dev && npm install tsx
+RUN node -e "const p=require('./package.json');delete p.devDependencies;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))" \
+    && npm install --legacy-peer-deps && npm install tsx
 
 # Copy source files loaded by tsx (jiti not used in standalone mode).
 COPY src/ ./src/

@@ -276,7 +276,9 @@ function createReplyPrefixOptions(_params: {
 type OpenClawConfig = Record<string, unknown>;
 import type { ResolvedWahaAccount } from "./accounts.js";
 import { resolveSessionForTarget } from "./accounts.js";
-import { checkGroupMembership } from "./channel.js";
+// Phase 59: Import from send.ts (not channel.ts) to avoid transitive openclaw import in Docker.
+// DO NOT CHANGE back to channel.js — breaks standalone mode.
+import { checkGroupMembership } from "./send.js";
 import { DmFilter, normalizePhoneIdentifier, type DmFilterConfig } from "./dm-filter.js";
 import { getDirectoryDb } from "./directory.js";
 import { claimMessage, isClaimedByBotSession } from "./dedup.js";
