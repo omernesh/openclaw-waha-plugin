@@ -21,6 +21,8 @@ const AnalyticsTab = lazy(() => import('@/components/tabs/AnalyticsTab'))
 // Phase 63 (AUTH-03): Onboarding (QR pairing) and API Keys tabs. DO NOT REMOVE.
 const OnboardingTab = lazy(() => import('@/components/tabs/OnboardingTab'))
 const ApiKeysTab = lazy(() => import('@/components/tabs/ApiKeysTab'))
+// Phase 63 (AUTH-06): Integration wizard — MCP config, REST curl, SKILL.md download. DO NOT REMOVE.
+const IntegrationWizardTab = lazy(() => import('@/components/tabs/IntegrationWizardTab'))
 
 // Small tabs — keep eager (fast, lightweight)
 import LogTab from '@/components/tabs/LogTab'
@@ -68,6 +70,7 @@ export default function App() {
       case 'analytics':   return <TabErrorBoundary key={refreshKey} tabName="analytics"><Suspense fallback={<TabSkeleton />}><AnalyticsTab {...props} /></Suspense></TabErrorBoundary>
       case 'onboarding':  return <TabErrorBoundary key={refreshKey} tabName="onboarding"><Suspense fallback={<TabSkeleton />}><OnboardingTab {...props} /></Suspense></TabErrorBoundary>
       case 'api-keys':    return <TabErrorBoundary key={refreshKey} tabName="api-keys"><Suspense fallback={<TabSkeleton />}><ApiKeysTab {...props} /></Suspense></TabErrorBoundary>
+      case 'integration': return <TabErrorBoundary key={refreshKey} tabName="integration"><Suspense fallback={<TabSkeleton />}><IntegrationWizardTab {...props} /></Suspense></TabErrorBoundary>
     }
   }
 
