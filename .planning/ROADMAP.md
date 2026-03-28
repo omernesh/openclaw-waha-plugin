@@ -234,7 +234,7 @@ Plans:
 Plans:
 - [ ] 65-01-PLAN.md — Workspace CRUD backend + WorkspacesTab UI + sidebar wiring (ADMIN-01, ADMIN-02)
 - [ ] 65-02-PLAN.md — SKILL.md v4 rewrite, framework-agnostic (SKILL-01)
-- [ ] 65-03-PLAN.md — Landing page + API docs site (SITE-01, SITE-02)
+- [x] 65-03-PLAN.md — Landing page + API docs site (SITE-01, SITE-02)
 **UI hint**: yes
 
 ### Phase 66: OpenClaw Thin Wrapper
@@ -267,5 +267,5 @@ Plans:
 | 62. MCP Server | v2.0 | 1/2 | In Progress|  |
 | 63. Dashboard Auth + Onboarding | v2.1 | 3/3 | Complete   | 2026-03-28 |
 | 64. Multi-Tenant Process Isolation | v2.1 | 2/2 | Complete   | 2026-03-28 |
-| 65. Admin Standalone + Distribution | v2.1 | 0/3 | Planned | - |
+| 65. Admin Standalone + Distribution | v2.1 | 1/3 | In Progress|  |
 | 66. OpenClaw Thin Wrapper | v2.1 | 0/2 | Not started | - |

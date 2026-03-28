@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Chatlytics Universal Agent Platform
-status: verifying
-stopped_at: Completed 64-02-PLAN.md
-last_updated: "2026-03-28T17:31:33.916Z"
+status: executing
+stopped_at: Completed 65-03-PLAN.md
+last_updated: "2026-03-28T17:52:43.920Z"
 last_activity: 2026-03-28
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 17
-  completed_plans: 11
+  total_plans: 20
+  completed_plans: 12
   percent: 70
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Reliable, always-on WhatsApp communication for AI agents — messages must send, receive, and resolve targets without silent failures, across multiple sessions, with policy-level control over what the agent can and cannot do.
-**Current focus:** Phase 64 — multi-tenant
+**Current focus:** Phase 65 — admin-standalone
 
 ## Current Position
 
-Phase: 64 (multi-tenant) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 65 (admin-standalone) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-03-28
 
 Progress: [███████░░░] 70%
@@ -69,6 +69,7 @@ Progress: [███████░░░] 70%
 | Phase 63 P03 | 4m | 1 tasks | 3 files |
 | Phase 64 P01 | 609s | 2 tasks | 4 files |
 | Phase 64 P02 | 341s | 2 tasks | 3 files |
+| Phase 65 P03 | 4m | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,8 @@ Progress: [███████░░░] 70%
 - [Phase 64]: LRU cache (max 500, TTL 60s) wraps verifyApiKey in WorkspaceGateway — avoids per-request auth.db queries
 - [Phase 64]: WorkspaceGateway routing order: healthz → auth → webhook → api/v1 — prevents unauthenticated proxy access
 - [Phase 64]: bootMultiTenant queries auth.db read-only for workspace discovery, entryPath resolved via fileURLToPath(import.meta.url)
+- [Phase 65-03]: Static HTML + Tailwind CDN for site artifacts — no build step, deploy to any static host
+- [Phase 65-03]: docs/site/ not dist/admin/ — site artifacts separate from application dist, not served by process
 
 ### Architecture Notes
 
@@ -164,6 +167,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T17:31:33.910Z
-Stopped at: Completed 64-02-PLAN.md
+Last session: 2026-03-28T17:52:43.907Z
+Stopped at: Completed 65-03-PLAN.md
 Resume file: None
